@@ -1,3 +1,5 @@
+[![License](https://img.shields.io/badge/License-BSD%202--Clause-blue.svg)](https://opensource.org/licenses/BSD-2-Clause)
+
 # Xelp - A C command line interpreter and script parser
 
 copyright (C) <2012>  <M. A. Chatterjee>  <deftio [at] deftio [dot] com>
