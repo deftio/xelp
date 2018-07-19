@@ -3,27 +3,30 @@
 # Xelp - A C command line interpreter and script parser
 
 copyright (C) <2012>  <M. A. Chatterjee>  <deftio [at] deftio [dot] com>
-version 0.23 M. A. Chatterjee
+
  
 ## About XELP
 
-xelp is a simple command interpreter for embedded projects which run "on the metal" or in otherwords have no formal OS.  This allows the programmer to have a script interpeter available for debugging with the syntax of a command line.  Includes a small set of built-in commands for memory operations, viewing, and pointer operations.
+xelp is a simple combined command line interpreter / script interpreter for embedded projects which run "on the metal" or in may not have a formal OS.  This allows the programmer to have a script interpeter available for debugging with the syntax of a command line.  Xelp is meant to work seamlessly with pure C (also C++) so that the programmer can add their own commands which are then available at run time from the xelp script environment.  Passing data from xelp to C functions and from C to xelp scripts is supported.    The xelp parser can run without dynamic memory support which allows its use in interrupts or memory constrained environments such as machine monitors.
+
+Xelp includes a small set of built-in commands for memory operations, viewing, and pointer operations which can be optionally compiled in.
 
 Written in pure C with function pointers for adding user called fuctions.  
-Compiled sizes range from 900 - 1600 bytes depending on platform and architecture. 
+Compiled sizes range from 900 - 4k bytes depending on options chosen, platform and architecture. 
+
 
 ## Features
 
 * Command Line Interface (CLI) with C language function calls 
 * Scriptable commands  
 	* Anything run at commandline or menus can also be called as a script.  
-	* Scripts are ROM-able  strings
+	* Scripts can be ROM-able strings
 	* No script strings are modified during execution by core parser / interpreter (eg no "strtok() style" procecssing.)
 * Programmer supplied C-language functions can be called from command line or from script
 * Each function can also have an optional help string.
 * Single-key mode for immediate menus or actions (w/o having to pressing ENTER) 
 * Thru-mode allows redirection of key strokes to another peripheral w/o any parsing (useful for debugging modems or other peripherals) 
-	* thru-mode is switchable on the fly at runtime
+	* thru-mode is switchable on the fly at runtime and can be redirected
 * Tokenizer output available for user supplied functions that need to parse params
 * Str2Int tokenizer allows converting numbers, and hex digits to integers.  (123 --> int, or 123h --> int)
 * Single line comments via # symbol  (useful for scripts). Tabs also supported for indentation readability in scripts.  
@@ -34,16 +37,16 @@ Compiled sizes range from 900 - 1600 bytes depending on platform and architectur
 	* help function optional (remove to save space, see table)
 	* Override/select key mappings (enter, backspace, etc), also escape char mappings 
 	* Settable prompt for CLI (e.g. "myPrompt>")
-* Supports quoted strings in command line, escapes for command line via '`', escapes for quoted strings via '\'.  All escape chars are overridable.
+* Supports "quoted strings" in command line (treats as single token), escapes for command line via '`', escapes for quoted strings via '\'.  All escape chars are overridable.
 * No dynamic memory needed for CLI / script interpreter / tokenizer / command dispatch (eg no malloc/free new/delete)  
 * No globals or global state -- all state is stored in an instance so several instances can be run at the same time
-* Reentrant provided same instance is not used as a CLI for 2 competing threads.  Scripts are reentrant by default unless programmer supplied functions are not reentrant.
+* Reentrant provided same instance is not used as a CLI for 2 competing threads.  Scripts are reentrant by default unless user supplied functions are not reentrant.
 * Platform independant
 	* No library support required (stdio.h, string.h etc not needed).  
 	* Entirely in C (no assembly) for portability. C89, C90, C99, ANSI compliant (for dealing w older compilers)
 	* Simple platform asbtraction layer ("HAL") for porting uses 5 function pointers. 
-* OSI approved open-source.  
-
+* OSI approved open-source.    
+	
 ## usage:
 ```
 #include "xelp.h"			/* in the file where xelp calls are to be made */
@@ -67,7 +70,9 @@ There is no binary distribution - include the source in your project along with 
 
 ## Platform Support
 
-xelp has been compiled and run (with no warnings for the following processors / platforms)
+xelp has been compiled and run (with no warnings for the following processors / platforms).
+
+### Architecture Support Table
 
 | Processor Arch  | Compiler  | Platform        | Arch           |
 |-----------------|-----------|-----------------|----------------|
@@ -75,7 +80,7 @@ xelp has been compiled and run (with no warnings for the following processors / 
 | 80x86-64        | Vis C++   | Windows-10      | 64 bit         |
 | 80x86-32        | GCC 4.8   | Linux/Ubuntu    | 32 bit  	     |
 | 80x86-32        | Vis C++   | Win XP          | 32 bit         |
-| 80286           | Turbo C++ | MS DOS          | 16 bit         |
+| 8086 / 186/286  | Turbo C++ | MS DOS          | 16 bit         |
 | ARM32           | GCC       | MBED /Rasp Pi   | 32 bit         | 
 | ARM32-Thumb	  | GCC       | "               | 32 bit         |
 | MSP430          | GCC       |                 | 16 bit         |
@@ -88,6 +93,8 @@ xelp has been compiled and run (with no warnings for the following processors / 
 FAQ:
 Q: I just want to able to use keypresses without being in "ESC" mode or "CLI" mode.
 A: just compile with the "DIO_ENABLE_KEY" #define in xelpcfg.h and comment out "DIO_ENABLE_FULL" in xelpcfg.h
+
+Q: 
 
 
 ## License

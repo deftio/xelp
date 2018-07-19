@@ -8,8 +8,8 @@ size xelp.o | awk 'FNR==2{print "exec code:     " $1 " bytes"}'
 #du -b  xelp.o
 #size xelp.o | awk 'FNR==2{print "exec code: " $1 " bytes"}' 
 
-echo clang-3.5 64bit intel -Os "**************************"
-clang-3.5 -c xelp.c -Os -Wall
+echo clang 64bit intel -Os "**************************"
+clang -c xelp.c -Os -Wall
 du -b xelp.o | awk '{print "obj file size: " $1 " bytes"}'
 size xelp.o | awk 'FNR==2{print "exec code:     " $1 " bytes"}' 
 

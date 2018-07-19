@@ -1,7 +1,8 @@
 # lang extension design notes
 Feature selectio between small embeded extensble CLI library and true interoperable language support
 
-## kwyp --> cmd line parser ( extensible key word interpeter parser only)
+## xelp --> cmd line parser ( extensible key word interpeter parser only)
+
 * Command Line Interface (CLI) with C language function calls 
 * Scriptable commands  
 	* Anything run at commandline or menus can also be called as a script.  
@@ -27,9 +28,13 @@ Feature selectio between small embeded extensble CLI library and true interopera
 	* No library support required (stdio.h, string.h etc not needed).  
 	* Entirely in C (no assembly) for portability. C89, C90, C99, ANSI compliant (for dealing w older compilers)
 	* Simple platform asbtraction layer ("HAL") for porting uses 5 function pointers. 
-* OSI approved open-source.  feedback welcome!
-Goal.. less than 1.5KB of MSP430 code (allows running on MSP430F2012 as low end micro)
-## mtcl --> (micro-TCL) language extension of kwyp (separate C-file? or separate repo?)
+* OSI approved open-source.  feedback welcome!  
+
+
+# Goals.. 
+* less than 1.5KB of MSP430 code (allows running on MSP430F2012 as low end micro) including parser, and 
+
+## mtcl --> (micro-TCL) language extension of xelp (separate C-file? or separate repo?)
 Provides more language support, requires more code, handling of dynamic variables and functions
  * TCL like language
  * var support  (so needs mini mem allocator)
@@ -37,11 +42,11 @@ Provides more language support, requires more code, handling of dynamic variable
  * provide var access from C  e.g. getVar(ths, char *, len) --> returns struct {int type; <value>} #use same str match as commands
  * scripted or C functions can call each other
  * CLI is treated like an annoymous function with no arguments (? or set a CLI arg string?  this is like calling a shell script with args sort of ..)
- * register C funcs via kwipAddFunc(funcStruct *), kwipDelFunc(char* name)
+ * register C funcs via xelpAddFunc(funcStruct *), xelpDelFunc(char* name)
  												  --> 
- * if in same repo could be kwip is base exensible cmd lin parser.
- * move built-in commands (help,peek, poke) --> to separate C-file -- kwipcmds.c  (KWIP_INCL_BASE_CMDS)  // need to deal with name spaces.  could hard-code a ptr search in Parse
- * if in kwipcfg we include #define KWIP_INCL_MTCL  1   // <<-- now language support included. replaces Parse with more capable parse. etc
+ * if in same repo could be xelp is base exensible cmd lin parser.
+ * move built-in commands (help,peek, poke) --> to separate C-file -- xelpcmds.c  (XELP_INCL_BASE_CMDS)  // need to deal with name spaces.  could hard-code a ptr search in Parse
+ * if in xelpcfg we include #define KWIP_INCL_MTCL  1   // <<-- now language support included. replaces Parse with more capable parse. etc
  * mTCL commands need var storage, recursive call support, ability to execute strings(?)
 Goal... less than 3KB of MSP430 code (allows running on all micros with atleast 4KB of code space with 1KB for scripts.  Note this is may not be palatable use of space on some embedded systems but
 should generally allow comfortable running on most 32bit uCs and all 16bit systems w atleast 8KB of code.  But then it is a script interpreter so ...)
@@ -59,29 +64,29 @@ Calling functions/code/scripts involves the following choices:
 all of these have compiled C-code function bodies
 	* 1st token is searched for in available commands.  if found then code executed.  Possible C command prototypes:
 		* C code:  funcName(int)			    // simplest no context, no args, used in KEY mode.  can also be used in CLI via built-in "skc a" execute key command.
-		* C code:  funcName(kwyp * ths, int)    // allows C func to have script var context
+		* C code:  funcName(xelp * ths, int)    // allows C func to have script var context
  		* C code:  funcName(char * args, alen)  // NO access to script env.
-		* C code:  funcName(kwyp* ths, char * args, int alen) // same but now can call script vars, functions from C
-		* C code:  funcName(kwyp* ths, char * args, int alen, char *buf, int blen, int bpos);  //passes calling context for fns such as _go:
+		* C code:  funcName(xelp* ths, char * args, int alen) // same but now can call script vars, functions from C
+		* C code:  funcName(xelp* ths, char * args, int alen, char *buf, int blen, int bpos);  //passes calling context for fns such as _go:
 Note that in constrained memory systems a global instance can be created of the parser which could be shared, without instance based prototypes.
 
 ### call Script func from inslide CLI / script: cmdname arg1 arg2 ...  argn #  variadic args are passed as string. 
 	* 1st token in searched for in avail commands. 
 		* script code: (   		   char *code )  						  # script code is "just" a string.  this is the C equiv of a func ptr.  the 
 		* script code: (		   char *code, char * args, int alen)    # the args passed same as C code
-		* script code: (kwyp *ths, char *code, char * args, int alen) 	 			  # full context of ths, code, args passed
-		* script code: (kwyp *ths, char *code, char * args, int alen, char *sbuf, int slen, int *spos) # passes calling context for statements such as _go: .. still need way to chance spos
+		* script code: (xelp *ths, char *code, char * args, int alen) 	 			  # full context of ths, code, args passed
+		* script code: (xelp *ths, char *code, char * args, int alen, char *sbuf, int slen, int *spos) # passes calling context for statements such as _go: .. still need way to chance spos
 
-//C Version
-kwypCallFunc(kwyp* ths, 						//instance pointer
+## C Version
+xelpCallFunc(xelp* ths, 						//instance pointer
 			char* code, int codelen,			//script instructions buffer ??require null term?
 			char* args, int alen,				//argument buf and len
 			char* sbuf, int slen, int *spos      //script buffer, len and current execuation position.
 			 )
-//C++ ish version
-kwyp.callFunc(string code, string args, string sbuf, int *spos);
+## C++ ish version
+xelp.callFunc(string code, string args, string sbuf, int *spos);
 
-typedef kwypContext {
+typedef xelpContext {
 	
 }
 typedef struct
@@ -89,13 +94,13 @@ typedef struct
 	char* mpCode;		//null terminated. if creaed at run-time sense=r
 	char* mpCmdName;	//null terminated
 	char* mpHelpString; //null terminated
-}DIOScriptFuncMapEntry; 
+}XELPScriptFuncMapEntry; 
 
-DIORESULT DioExecScript (kwip* ths, const char *code, int clen, char *args, int alen) ; // C func runs interpreter with arguments
+XELPRESULT XelpExecScript (xelp* ths, const char *code, int clen, char *args, int alen) ; // C func runs interpreter with arguments
 
 to run a function (not just a codeStringScript from C)	
 
-DIORESULT DioExecFunc (kwip* ths, const char *funcName, int flen, char *args, int alen) ; 
+XELPRESULT DioExecFunc (xelp* ths, const char *funcName, int flen, char *args, int alen) ; 
 	* C interp looks up func and executes if found
 		* script run-time table (scripts declared at run-time from code)
 		* scripts stored statically in C
@@ -113,8 +118,8 @@ if script func:
 	args passed as (ths, char*, len)  --> to string of script statement
 
 from in C:
-	DIOParseFull(ths,tok0,tok0len, args, arglen)
---> DIOParseFull(ths,tok0,tok0len,tok1,line_end-tok1_start);
+	XELPParseFull(ths,tok0,tok0len, args, arglen)
+--> XELPParseFull(ths,tok0,tok0len,tok1,line_end-tok1_start);
 	exec [command arg arg] arg  <-- TCL style.  Here command evaluates first.  Need to figure out how to return value.  incl no-value returned.  
 	exec $varname arg           <-- TCL style.  $varname substituted w var value.  Note if memory laid out correctly can just point to that.
 	note for user script C fn need way to eval [ ] or get value of $variable. eg. in C call a fn or get the value of a stored var.
@@ -135,7 +140,7 @@ in script:
 	$name 				 # retriev value
 
 in C
-	DIOSetVar(ths,"name","value");
+	XELPSetVar(ths,"name","value");
 
 get value:
 
@@ -175,7 +180,7 @@ var life cycle:
 	del name 		#attempts to delete a var from memory regardless of type.  C functions, lang commands can't be deleted ... don't name vars same as these
 
 ## from C:
-DIOParseFull(ths, char *func, int flen, char * args, int alen);  // allows arguments to be passed to script from C.  also allows script fn to call with args?
+XELPParseFull(ths, char *func, int flen, char * args, int alen);  // allows arguments to be passed to script from C.  also allows script fn to call with args?
 
 
 ? value returns..
@@ -194,7 +199,7 @@ passing values (for lang extensions):
 in C:
 typedef struct {
 	char *fbody;	// this is instead of the function pointer
-	char *fname;	// name is visible inside any script ... or from C --> DIOParseFull(ths,"name",strlen(name),char args, int alen);
+	char *fname;	// name is visible inside any script ... or from C --> XELPParseFull(ths,"name",strlen(name),char args, int alen);
 	char *help;		// help string is same for C declared function
 }
 
@@ -209,7 +214,7 @@ calling a string function from inside cli or script
 funcname args args args  #TBD prob want script name space first.  
 	first tries C namespace.  If found calls C function.
 	next calls Script namespace.  If found calls function like this:
-		DIOParseFull(ths,fname,flen,args,alen);
+		XELPParseFull(ths,fname,flen,args,alen);
 
 #name space hierachy:
 1 scripted functions stored at runtime
@@ -260,18 +265,18 @@ givens:
 "peek addr"		--> return hex byte
 "peek addr num" --> return num bytes starting at addr in 
 
-DIORESULT DIOs2i (char *buf, int buflen, *num);  --> returns true if num else DIO_E_PARSE_ERR
-DIORESULT DIOOutnum2hex ()	--> print a hex nmber to DIOOut()
-DIORESULT peek(const char* buf, blen) {  --> writes to DIOOut()  internally
+XELPRESULT XELPs2i (char *buf, int buflen, *num);  --> returns true if num else XELP_E_PARSE_ERR
+XELPRESULT XELPOutnum2hex ()	--> print a hex nmber to XELPOut()
+XELPRESULT peek(const char* buf, blen) {  --> writes to XELPOut()  internally
 	int i,a;
-	if DIONextTok(buf,blen,..) == DIO_S_OK { //skip over "peek"
-		if DIONextTok(buf, blen, ....) == DIO_S_OK {
-			if (DIO_S_OK == DIOs2i(buf,a)
-				DIOOutnum2hex(*a);
+	if XELPNextTok(buf,blen,..) == XELP_S_OK { //skip over "peek"
+		if XELPNextTok(buf, blen, ....) == XELP_S_OK {
+			if (XELP_S_OK == XELPs2i(buf,a)
+				XELPOutnum2hex(*a);
 				_PUTC('h');
 		}
 	}
-	return DIO_E_ARGS;
+	return XELP_E_ARGS;
 }
 
 ## bracket / parens parsing
@@ -302,7 +307,7 @@ Actions:
 		
 		if (bkt_cnt == 0) {
 			//bracket context now available [bkt_start_pos_ptr : p]
-			kwipParse(ths, bkt_start_pos_ptr, p-bkt_start_pos_ptr, <no args>, sbuf, spos, slen); // need to get return value from this..
+			XelpParse(ths, bkt_start_pos_ptr, p-bkt_start_pos_ptr, <no args>, sbuf, spos, slen); // need to get return value from this..
 			//TODO also allow brkt_end_next state 
 		}
 		if (bkt_cnt < 0) {

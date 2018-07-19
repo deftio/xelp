@@ -133,11 +133,11 @@ void main (void) {
 		printf("%2d: %d\t%d\t%d\t%d\n",x,(int)(gStates[x].cs),(int)(gStates[x].ef),(int)(gStates[x].ns),(int)(strlen(gStates[x].d)));
 	}
 	printf("\n");
-	fp = fopen("scip_table.c","wt"); 
+	fp = fopen("xelp_table.c","wt"); 
 
 
 	if (fp) {
-		fprintf(fp,"/* SCIP Parser table generator\n\n */");
+		fprintf(fp,"/* XELP Parser table generator\n\n */");
 
 		fprintf(fp,"%s\n",gSCIPdefines);
 

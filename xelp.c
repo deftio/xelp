@@ -3,12 +3,11 @@
  		
  @copy Copyright (C) <2012>  <M. A. Chatterjee>
  @author M A Chatterjee <deftio [at] deftio [dot] com>
- @version 0.3 M. A. Chatterjee
  
  This file contains implementation for the xelp simple embedded command  interpreter.
  
  @license: 
-	Copyright (c) 2011-2016, M. A. Chatterjee <deftio at deftio dot com>
+	Copyright (c) M. A. Chatterjee <deftio at deftio dot com>
 	All rights reserved.
 
 	Redistribution and use in source and binary forms, with or without
@@ -39,9 +38,8 @@
 /**
 local defines (this file only)
  */
-#define _PUTC(c)	((ths->mpfOut)((char)c))   /* write char to output */
 #ifndef _PUTC
-#define _PUTC(c)	
+#define _PUTC(c)	((ths->mpfOut)((char)(c)))   /* write char to output */
 #endif
 
 /** 
@@ -404,7 +402,7 @@ XELPRESULT XELPParse (XELP* ths, const char *buf, int blen) {
 /**
 	XELPParseKey() 
 	live command line handling. 
-	first looks for mode-switches.
+	first looks for mode switch commans (single-key --> cli ---> thru)
 	then if in single-key mode looks up single key.
 	then if in command mode looks for <ENTER> and the attempts to parse current buffer.
 
@@ -492,6 +490,7 @@ XELPRESULT XELPParseKey (XELP *ths, char key)
   345h --> read as hex
  */
 #define FR_SMUL10(x)	(((x)<<3)+(((x)<<1)))  /* many micros don't have multiply in core inst set */
+
 int XELPStr2Int (const char* s,int  maxlen) {
 	const char *p = s+maxlen-1;
 	int r=0,x=0,d;

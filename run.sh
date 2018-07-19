@@ -5,11 +5,12 @@
 printf "***************************************************************\n"
 printf "RUN + COMPILE SCRIPT HEADER ***********************************\n"
 
+#clean up *.o
+make clean
+
 #build it
 make
 
-#clean up *.o
-make clean
 
 #run it
 #./xelp-example > testout.txt

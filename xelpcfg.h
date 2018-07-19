@@ -1,8 +1,8 @@
-/*
+/**
 
   @xelpcfg.h - header file for xelp command interpreter
  		
-  @copy Copyright (C) <2012>  <M. A. Chatterjee>
+  @copy Copyright (C) <2011>  <M. A. Chatterjee>
   @author M A Chatterjee <deftio [at] deftio [dot] com>
   
   This file contains build-flags used to control what features are used in the xelp command library compilation.
@@ -36,13 +36,14 @@
 #define XELP_QUO_ESC		('\\')		  /* character used  for escaping inside quoted strings        */
 
 
+
 /**
  Enable CLI Mode.
  definining this flag includes support for interactive command line.  Script support also requires this.
 
- leaving undefined saves btw 500-750 bytes (target dependant)
  */
-#define XELP_ENABLE_CLI    1
+#define XELP_ENABLE_CLI       1
+
 
 /**
  Enable KEY Mode.
@@ -51,6 +52,7 @@
  leaving undefined saves btw 200-500 bytes (target dependant)
  */
 #define XELP_ENABLE_KEY 	  1
+
 
 /**
  Enable THRU Mode.
@@ -69,16 +71,17 @@
 #define XELP_ENABLE_HELP	  1	
 
 /* Help related controls */
-#define XELP_HELP_KEY_STR    "\nKey functions\n"
-#define XELP_HELP_CLI_STR    "\nCLI functions\n"
-#define XELP_HELP_ABT_STR    ths->mpAboutMsg			/* or may set to any null terminated string e.g. "My Embedded System About Message" */
+#define XELP_HELP_KEY_STR    "\nKey functions\n"        /* Help section for single-key press commands such as menus */
+#define XELP_HELP_CLI_STR    "\nCLI functions\n"        /* Help string displayed before script or CLI commands      */
+#define XELP_HELP_ABT_STR    (ths->mpAboutMsg)			/* You may set to any null terminated string e.g. "My Embedded System About Message" */
 
 /* prompt string, leave undefined (commented out) for no prompt and to save space 
    if a fixed string is provided such as "xelp>" then all instances will use this prompt.  
-   if set to ths->mpPrompt then per-instance console prompt is set via pointer.  (see examples)  This can be usesful when different 
-   instances are listening on different ports.
+   if set to (ths->mpPrompt) then per-instance console prompt is set via pointer.  (see examples)  This can be usesful when different 
+   instances are listening on different ports and each should have a different prompt.
 */
 #define XELP_CLI_PROMPT		"xelp>"					/* or may set to ths->mpPrompt	for per-instance prompt      */
+
 
 /* enable built-in language features such poke, peek, go */
 #define XELP_ENABLE_LCORE  1
@@ -89,5 +92,6 @@
 //#define XELP_ENABLE_FULL	  1
 
 
-#endif	/* XELP_CONFIG_OVERRIDE */
+#endif	/* XELP_CONFIG_OVERRIDE (not used)*/
+
 #endif  /* __XELP_CONFIG_H__ */

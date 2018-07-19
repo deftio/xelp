@@ -46,7 +46,7 @@ extern "C"
 #endif
 
 
-#if defined (SDCC_mcs51) 
+#if defined (SDCC_mcs51)   /* the SDCC 8051 compiler needs this for setting interrupts */
 #define REENTRANT_SDCC __reentrant 
 #else 
 #define REENTRANT_SDCC 
@@ -60,11 +60,12 @@ extern "C"
 #define XELP_ENABLE_LCORE       1   /* enable script language features such poke, peek, go     */
 #endif
 
-/********************************8
+/********************************
  error code handling.  {errors < 0, OK==0, warnings > 0}
+ Note that success is 0 (like  posix command line return
 */
 
-typedef int XELPRESULT; 		/* error codes / function results */
+typedef int XELPRESULT; 		
 
 #define XELP_S_NOTFOUND	    (2)
 #define XELP_W_Warn   		(1)
@@ -72,7 +73,7 @@ typedef int XELPRESULT; 		/* error codes / function results */
 #define XELP_E_Err			(-1)
 #define XELP_E_CmdBufFull 	(-2)
 
-#define XELP_T_OK(r) (r>=0) 	/* simple macro for testing OK or warning only */
+#define XELP_T_OK(r) ((r)>=0) 	/* simple macro for testing OK or warning only */
 
 #define XELP_CMDBUFSZ 		(64) 
 
@@ -91,8 +92,8 @@ typedef int XELPRESULT; 		/* error codes / function results */
 typedef struct
 {
 	XELPRESULT (*mFunPtr)(int) REENTRANT_SDCC;	/* function pointer to user-supplied fnc(int) */
-	char  mKey;
-	char* mpHelpString;						    /* NULL if no help provided */
+	char  mKey;								    /* key press code                             */
+	char* mpHelpString;						    /* use NULL or 0 if no help string is to be provided */
 }XELPKeyFuncMapEntry;
 /* #define XELP_KEYFUNCENTRY_LAST {0,0,""}          function list terminator */
 
@@ -116,7 +117,7 @@ typedef struct
 
 
 /** 
- key code mappings.  useful as defaults but you can supply any in the diocfg.h
+ key code mappings.  useful as defaults but you can supply any in the xelpcfg.h
 */
 #define XELPKEY_CTA      (0x01)  /* CTRL-A  */
 #define XELPKEY_CTC      (0x03)  /* CTRL-C  */
@@ -128,18 +129,19 @@ typedef struct
 
 #define XELPKEY_ENTER    ('\n')  /* Enter Key for Cmd Mode */
 #define XELPKEY_SPC      (0x20)  /* space char             */
-#define XELPKEY_BKSP		(0x7)	/* back space             */
-#define XELPKEY_DEL		(0x7f)	/* DEL                    */
-#define XELPKEY_ESC 		(0x1b)  /* Escape                 */
+#define XELPKEY_BKSP	 (0x7)	 /* back space             */
+#define XELPKEY_DEL		 (0x7f)	 /* DEL                    */
+#define XELPKEY_ESC 	 (0x1b)  /* Escape                 */
 
 
 /***********************************************************
  Live command modes:
  XELP_MODE_CLI   // each key is stored in buffer until <ENTER> pressed. (default)
- XELP_MODE_KEY  	// each single key press is evaluated as a command
+ XELP_MODE_KEY   // each single key press is evaluated as a command
  XELP_MODE_THR   // each key is passed to the mpfThru() function.  (see docs)
 
  See also xelpcfg.h  which has compilation control directives if some modes are not needed.
+
  */
  
 #define XELP_MODE_CLI 	(0x00)  
@@ -198,31 +200,31 @@ typedef struct
 
 
 /***************************************************************
- * XELPCI API Begins Here
+ * XELP API Begins Here
  */
-XELPRESULT XELPInit (XELP *ths, const char *pAboutMsg);			   /* initialize instance             */
+XELPRESULT XELPInit (XELP *ths, const char *pAboutMsg);			    /* initialize instance             */
 
 /*  Macros to set function pointer arrays	  */
-#define XELP_SET_FN_CLI(ths,pfaCLI)	  (ths.mpCLIModeFuncs=pfaCLI)  /* load CLI fns table              */
-#define XELP_SET_FN_KEY(ths,pfaKey)	  (ths.mpKeyModeFuncs=pfaKey)  /* load KEY fns table              */
+#define XELP_SET_FN_CLI(ths,pfaCLI)	  (ths.mpCLIModeFuncs=pfaCLI)   /* load CLI fns table              */
+#define XELP_SET_FN_KEY(ths,pfaKey)	  (ths.mpKeyModeFuncs=pfaKey)   /* load KEY fns table              */
 
-/*  Macros to set Abstraction Layer Functions */
-#define XELP_SET_FN_OUT(ths,pfOut)     (ths.mpfOut=pfOut)           /* print chars                     */
+/*  Macros to set Platform Abstraction Layer Functions */
+#define XELP_SET_FN_OUT(ths,pfOut)     (ths.mpfOut=pfOut)           /* print out chars                 */
 #define XELP_SET_FN_THR(ths,pfThru)    (ths.mpfPassThru=pfThru)     /* Thru callback                   */
 #define XELP_SET_FN_ERR(ths,pfErr)     (ths.mpfErr=pfErr)           /* Error callback                  */
 #define XELP_SET_FN_EMCHG(ths,pfEMCHG) (ths.mpfEditModeChg=pfEMCHG) /* Entry Mode Change               */
-#define XELP_SET_FN_BKSP(ths,pfBKSP)	  (ths.mpfBksp=pfBKSP)	       /* Handle Backspace                */
+#define XELP_SET_FN_BKSP(ths,pfBKSP)	  (ths.mpfBksp=pfBKSP)	    /* Handle Backspace                */
 
-#define XELP_SET_VAL_CLI_PROMPT(ths,prompt)	(ths.mpPrompt=prompt)  /* set per instnce prompt if enbld in cfg  */
+#define XELP_SET_VAL_CLI_PROMPT(ths,prompt)	(ths.mpPrompt=prompt)  /* set per instnce prompt if enabled in xelpcfg.h  */
 
 #ifdef XELP_ENABLE_HELP
 XELPRESULT XELPHelp		(XELP *ths);                                /* print online help (if avail)    */
 #endif
 
-XELPRESULT XELPOut 		(XELP *ths, const char* msg, int maxlen);   /* print function                  */
-XELPRESULT XELPExecKC		(XELP *ths, char key);					   /* execute key command             */
-XELPRESULT XELPParse 		(XELP *ths, const char *buf, int blen);     /* execute CLI or script commands  */
-XELPRESULT XELPParseKey 	(XELP *ths, char key);				       /* handle keypress at CLI          */
+XELPRESULT XELPOut 		    (XELP *ths, const char* msg, int maxlen);  /* print function                  */
+XELPRESULT XELPExecKC		(XELP *ths, char key);				     /* execute key command             */
+XELPRESULT XELPParse 		(XELP *ths, const char *buf, int blen);  /* execute CLI or script commands  */
+XELPRESULT XELPParseKey 	(XELP *ths, char key);				     /* handle keypress at CLI          */
 
 /* XELPTokLine is the main tokenizer which can get next token or line at time                          */
 XELPRESULT XELPTokLine (const char *buf, int blen, const char **t0s, const char **t0e, const char **eol, int srchType); 

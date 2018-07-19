@@ -13,14 +13,14 @@ Next up:
 	[x] default state machine with Key, CLI modes
 	[x] default state machine with Key only mode
 	[x] default state machine with CLI only mode
-	[ ] make command buffer size user settable.  e.g user make (static) allocaion char myBuf[80] and passed it to xelp (TBD)
+	[ ] make command buffer size user settable.  e.g user make (static) allocation char myBuf[80] and passed it to xelp (TBD)
 	[ ] combine mEchoState, mCurMode in to single mFlags variable (save stack space)
 	[x] overidable key-map via #defines
 		[x] default destructive backspace (e.g. xelp treats as destructive bsp)
 		[x] default key-combo to enter CMD mode
 		[x] default key-combo to enter parse mode
 		[x] default terminal statement char (e.g. ";") //may need to be compiled in due to state machine
-		[ ] default intra statement char (e.g. ":")  or use [] like TCL
+		[ ] default intra statement char (e.g. ":")  or use [] like TCL 
 		[x] default cmd line esc char (`)  //backtick
 		[x] default quoted esc char (\)
 	[x] funcPtr to map output chars
@@ -83,7 +83,7 @@ Next up:
 	[ ] recent key history.  e.g. if (up_arrow) show last CLI command (only if no other key has been pressed.)
 	[ ] if (down_arrow) show empty line.
 	[ ] define function (which is just a script) ... functions take 2 forms scripted or C.  both should be able to call each other.
-		- C functions are defined at compile time.  can be called via string/fptr (already works) from script.  C funcs can each other as per normal convention.
+		- C functions are defined at compile time.  can be called via string/fptr (already works) from script.  C funcs can call each other as per normal convention.
 		- Script funcs can be defined at run time or compile time (as a string).  At run time as
 			runtime: func <name> "string"    --> just stores a named string
 			compile time: "func \"name contents \";  //? store an array of strings of funcs.
