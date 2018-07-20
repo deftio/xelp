@@ -58,15 +58,22 @@ set default declarations (key maps etc)
 
 no other dependancies are required for embedded operations.
 
-## Debugging on Linux
+## Debugging on Linux / POSIX
 Currently on linux the "curses" library (actually ncurses) is used to trap key presses for debugging purposes.  This can be installed as follows on debian.
 ```
 sudo apt-get install libncurses5-dev
 
+make
+
+```
+Note that the example executable is called xelp-example.out this can be run to see some basic xelp commands.  However the real value comes out when user supplied and callable functions are added e.g. 
+```
+int runMotor (...);
+// and this is registered via 
 ```
 
+There is no binary distribution - include the source in your project along with the appropriate types file and xelpcfg.h file to control options.
 
-There is no binary distribution - include the source in your project along with the appropriate types file.
 
 ## Platform Support
 
@@ -90,7 +97,24 @@ xelp has been compiled and run (with no warnings for the following processors / 
 | 68HC11/12       | GCC       |                 |  8 bit         |
 
 
-FAQ:
+## Testing
+Testing has been done on linux as the main test driver though xelp has been run as part of private projects on other platforms / processors.
+
+To run the unit tests:
+```
+make xelp-unit-tests.out 
+
+./xelp-unit-tests.out  
+
+```
+Note to make sure the text executable is runnable by this command if necessary:
+
+```
+chmod +x xelp-unit-tests.out
+```
+
+## FAQ / Questions
+
 Q: I just want to able to use keypresses without being in "ESC" mode or "CLI" mode.
 A: just compile with the "DIO_ENABLE_KEY" #define in xelpcfg.h and comment out "DIO_ENABLE_FULL" in xelpcfg.h
 

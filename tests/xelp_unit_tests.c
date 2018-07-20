@@ -1,12 +1,11 @@
 /*
 
-  @main.c - simple test file example file for fr_math library
+  @xelp_unit_tests.c - simple test file example file for xelp embedded cli/scripting library
 
   @copy Copyright (C)   <M. A. Chatterjee>
   @author M A Chatterjee <deftio [at] deftio [dot] com>
  
-  This file contains header defintions for travis-ci code testing example.
-
+  
   @license: 
 	Copyright (c) 2011-2018, M. A. Chatterjee <deftio at deftio dot com>
 	All rights reserved.
@@ -37,9 +36,6 @@
 #include <stdio.h>
 #include "xelp.h"
 
-#define S_OK (0)
-#define E_FAIL (-1)
-
 
 /* ************************************************
 	simple test cases for  library functions 
@@ -52,10 +48,10 @@
 int test_XELPStr2Int() {
 	
 	if (XELPStr2Int("90",2) != 90)
-		return E_FAIL;
+		return XELP_E_Err;
 
 
-	return S_OK;
+	return XELP_S_OK;
 }
 
 
@@ -65,13 +61,13 @@ int test_XELPStr2Int() {
 	more general purpose test framework.
 */
 int run_tests() {
-	if (E_FAIL == test_XELPStr2Int()) {
+	if (XELP_S_OK != test_XELPStr2Int()) {
 		printf("failed test_XELPStr2Int()\n");
-		return E_FAIL;
+		return XELP_E_Err;
 	}
 
 
-	return S_OK;
+	return XELP_S_OK;
 }
 
 
@@ -85,10 +81,10 @@ int main()
 {
 	int result;
 	
-	printf("Running Example tests .. \n");
+	printf("Running Xelp Unit tests .. \n");
 	result = run_tests();
 
-	if (result == S_OK) 
+	if (result == XELP_S_OK) 
 		printf ("tests passed.\n");
 	else
 		printf ("tests failed.\n");

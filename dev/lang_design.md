@@ -26,7 +26,8 @@ Feature selectio between small embeded extensble CLI library and true interopera
 * Reentrant provided same instance is not used as a CLI for 2 competing threads.  Scripts are reentrant by default unless programmer supplied functions are not reentrant.
 * Platform independant
 	* No library support required (stdio.h, string.h etc not needed).  
-	* Entirely in C (no assembly) for portability. C89, C90, C99, ANSI compliant (for dealing w older compilers)
+	* Entirely in C (no assembly) for portability. C89, C90, C99, ANSI compliant (for dealing w older compilers) 
+		* this means things like // comments are not used in the .h or .c implementation files  :(
 	* Simple platform asbtraction layer ("HAL") for porting uses 5 function pointers. 
 * OSI approved open-source.  feedback welcome!  
 
