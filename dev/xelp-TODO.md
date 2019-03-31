@@ -34,10 +34,10 @@ Next up:
 	[0] function set CR/LF emission characteristic -- decide (won't do)
 	[ ] parser grammar formalize
 		<command><space><args><terminal>  --> terminal is ';' from the POV of parser
-			-->` (backtick)  allows escaping of terminal chars so that if we include math ops ^ isn't "taken" ot for paths \ or / aren't taken
+			-->` (backtick)  allows escaping of terminal chars so that if we include math ops ^ isn't "taken" out for paths \ or / aren't taken
 			-->`:  colon is clause separator for if statements  
 			--> parse not attempted (in parse mode) until <CR>  
-	[ ]	developer examples
+	[ ]	developer examples C / CLI
 		[ ] how to make Key mode only (menu system, min build).  Add help.   Add scripting several key commands via loop in C.
 		[ ] make a CLI mode only (w help) application. show abstraction set up with backspace.
 		[ ] make a CLI+Key mode only app (w help).  Show scripting.
@@ -53,6 +53,7 @@ Next up:
 		[ ] extended lib functions (str2int, int2hex, int2dec)
 		[ ] var stack functions (user supplied mem, ints, strings in managed dict, int fns: +-*/^&|)  #TBD...
 	[ ] C++ wrapper, xelp.hpp is included which provides a simpler C++ class style interface.  Both the C++ and C versions are identical in functionality.
+		[ ] C++ includes XelpBuf class
 	[ ] xelp base library funcs (separate file?).  library funcs requre *ths for scratchpad ram / var ram?			
 		[0] _peek <addr> <numbytes>  # num bytes optional, if not spec'd returns 2 bytes.  bytes always returned as hex.  grouped in 16 by line.
 		[0] _poke <addr> <values>    # must be hex bytes. poke 34h 03h a3h 34h  //h for hex, else dec.  each item must have h to be hex. first item is addr (required)
@@ -216,28 +217,11 @@ XELPParseKey(ctx, key)
 
 
 
-### CLI Parser examples
-
-command;
-command1;command2	# ; breaks commands apart 
-command1^;command2  # attempts "command^" "command2"
-command arg;
-command ;
-command arg arg\n
-command^n
- commmand 			#Note leading spaces (which will be ignored)
-  ;command;			#Note leading spaces and ; (which will be ignored)
-
-command arg1; # comment 
-
-```
-
-
 =============================
 ## cross compiling notes
 
 ARM32 (here shown with thumb, optimze for size)
-```
+```bash
 arm-none-eabi-gcc -c xelp.c -Os -mthumb  
 ```
 

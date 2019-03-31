@@ -1,7 +1,8 @@
-# lang extension design notes
-Feature selectio between small embeded extensble CLI library and true interoperable language support
+# XELP  A cmd line parser with ROMable scripting support
 
-## xelp --> cmd line parser ( extensible key word interpeter parser only)
+## XELP design notes
+Feature selection between small embeded extensble CLI library and true interoperable language support
+
 
 * Command Line Interface (CLI) with C language function calls 
 * Scriptable commands  
@@ -30,6 +31,7 @@ Feature selectio between small embeded extensble CLI library and true interopera
 		* this means things like // comments are not used in the .h or .c implementation files  :(
 	* Simple platform asbtraction layer ("HAL") for porting uses 5 function pointers. 
 * OSI approved open-source.  feedback welcome!  
+
 
 
 # Goals.. 

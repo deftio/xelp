@@ -2,7 +2,7 @@
 # @author M A Chatterjee <deftio [at] deftio [dot] com>
 
 CC=gcc
-CFLAGS=-I. -Wall
+CFLAGS=-I. -Wall 
 DEPS= xelp.h
 OBJ= xelp.o xelp-example.o  
 INC=$(.) $(./tests)
@@ -12,7 +12,7 @@ INC=$(.) $(./tests)
 
 #posix demo test program
 xelp-example.out: $(OBJ)
-	$(CC) -o $@ $^ $(CFLAGS) -lm -lncurses -Os
+	$(CC) -o $@ $^ $(CFLAGS) -lm -lncurses -Os 
 
 #clean up object files, useful before check-ins etc
 clean :

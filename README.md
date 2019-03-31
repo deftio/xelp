@@ -25,8 +25,10 @@ Compiled sizes range from 900 - 4k bytes depending on options chosen, platform a
 * Programmer supplied C-language functions can be called from command line or from script
 * Each function can also have an optional help string.
 * Single-key mode for immediate menus or actions (w/o having to pressing ENTER) 
+	* programmer supplied actions (key presses or cmds) switch btw single key or cmd-line modes.
 * Thru-mode allows redirection of key strokes to another peripheral w/o any parsing (useful for debugging modems or other peripherals) 
-	* thru-mode is switchable on the fly at runtime and can be redirected
+	* thru-mode is switchable on the fly at runtime and can be redirected or compiled out.
+	* example: use thru-mode to on-the-fly connect to a modem and type in AT commands then switch back to CLI mode when done allowing graceful switching between CLI and peripheral command sets
 * Tokenizer output available for user supplied functions that need to parse params
 * Str2Int tokenizer allows converting numbers, and hex digits to integers.  (123 --> int, or 123h --> int)
 * Single line comments via # symbol  (useful for scripts). Tabs also supported for indentation readability in scripts.  
@@ -37,18 +39,20 @@ Compiled sizes range from 900 - 4k bytes depending on options chosen, platform a
 	* help function optional (remove to save space, see table)
 	* Override/select key mappings (enter, backspace, etc), also escape char mappings 
 	* Settable prompt for CLI (e.g. "myPrompt>")
-* Supports "quoted strings" in command line (treats as single token), escapes for command line via '`', escapes for quoted strings via '\'.  All escape chars are overridable.
+* Supports "quoted strings" in command line (treats as single token), escapes for command line via '`', escapes for quoted strings via '\'.  All escape chars are overridable at compile time.
 * No dynamic memory needed for CLI / script interpreter / tokenizer / command dispatch (eg no malloc/free new/delete)  
 * No globals or global state -- all state is stored in an instance so several instances can be run at the same time
+	* allows a XELP instance to be attached to different serial ports for example.
 * Reentrant provided same instance is not used as a CLI for 2 competing threads.  Scripts are reentrant by default unless user supplied functions are not reentrant.
 * Platform independant
 	* No library support required (stdio.h, string.h etc not needed).  
 	* Entirely in C (no assembly) for portability. C89, C90, C99, ANSI compliant (for dealing w older compilers)
 	* Simple platform asbtraction layer ("HAL") for porting uses 5 function pointers. 
-* OSI approved open-source.    
+* OSI approved open-source - BSD-2 License  
+
 	
 ## usage:
-```
+```C
 #include "xelp.h"			/* in the file where xelp calls are to be made */
 ```
 
@@ -60,14 +64,14 @@ no other dependancies are required for embedded operations.
 
 ## Debugging on Linux / POSIX
 Currently on linux the "curses" library (actually ncurses) is used to trap key presses for debugging purposes.  This can be installed as follows on debian.
-```
+```bash
 sudo apt-get install libncurses5-dev
 
 make
 
 ```
 Note that the example executable is called xelp-example.out this can be run to see some basic xelp commands.  However the real value comes out when user supplied and callable functions are added e.g. 
-```
+```C
 int runMotor (...);
 // and this is registered via 
 ```
@@ -101,7 +105,7 @@ xelp has been compiled and run (with no warnings for the following processors / 
 Testing has been done on linux as the main test driver though xelp has been run as part of private projects on other platforms / processors.
 
 To run the unit tests:
-```
+```bash
 make xelp-unit-tests.out 
 
 ./xelp-unit-tests.out  
@@ -109,7 +113,7 @@ make xelp-unit-tests.out
 ```
 Note to make sure the text executable is runnable by this command if necessary:
 
-```
+```bash
 chmod +x xelp-unit-tests.out
 ```
 

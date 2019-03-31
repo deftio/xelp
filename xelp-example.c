@@ -131,6 +131,18 @@ XELPKeyFuncMapEntry gMyKeyCommands[] =
 	//{0         , 0 , ""              }
 };
 
+XELPRESULT cmdCLS (const char* args, int maxlen)
+{
+	printw("\x1B");
+	printw("C");
+	return XELP_S_OK;
+}
+XELPRESULT cmdHome (const char* args, int maxlen)
+{
+	printw("\x1B");
+	printw("H");
+	return XELP_S_OK;
+}
 XELPRESULT cmdEcho (const char* args, int maxlen)
 {
 	int i;
@@ -264,6 +276,8 @@ XELPCLIFuncMapEntry gMyCLICommands[] =
 	{&cmdHelp	 		, "help"    ,  "help"						},
 	{&cmdPrintPokeBuf	, "ppb"		,  "print poke test buf"		},
 	{&cmdPrintNum       , "num"     ,  "print num to console"       },
+	{&cmdCLS			, "cls"		,  "clear screen (uses ASCII ESC seq"},
+	{&cmdHome			, "home"	,  "Set cursor to home"			},
 	{&cmdMath           , "+"       ,  "add two numbers"            },
 	{&cmdMath           , "-"       ,  "sub two numbers"            },
 	{&cmdMath           , "*"       ,  "mul two numbers"            },
