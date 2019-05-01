@@ -37,4 +37,12 @@
 *.asm
 *.rel
 *.s
-dioci-example.out
+*.out
+
+# Coverage files
+*.gcov
+*.gcda
+*.gcno
+
+# dirs
+.vscode

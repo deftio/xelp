@@ -34,39 +34,90 @@
  */
 
 #include <stdio.h>
-#include "xelp.h"
+#include "../src/xelp.h"
 
+int FailMsg (const char *c, int n) {
+    printf("TestCase: %3d FAIL: %s\n",n,c);
+    return XELP_S_OK;
+}
 
-/* ************************************************
-	simple test cases for  library functions 
-   ************************************************
+typedef struct {
+    int totalCases;
+    int totalPassed;
+    int curCases;
+    int curCasesPassed;
+} GTESTDATA;
+
+/*************************************************
+Unit Test Cases for XELP() functions below
 */
 
 
+int test_XELPStrLen() {
+    int testno = 0;
 
-/*   test cases for op_and() function  */
+    if (3 != XELPStrLen("abc")) {
+        FailMsg("XelpStrLen",testno);
+        return XELP_E_Err;
+    }
+
+    return XELP_S_OK;
+}
+/*   test cases for string parser function  */
 int test_XELPStr2Int() {
 	
 	if (XELPStr2Int("90",2) != 90)
 		return XELP_E_Err;
 
-
 	return XELP_S_OK;
+}
+
+int test_XelpBufCmp() {
+    int   testno = 0;
+    char *a = "token1";
+    char *b = " token1\0";
+    char *ae, *be;
+
+    ae = a + XELPStrLen(a);
+    be = b + XELPStrLen(b);
+
+    if (XELP_S_NOTFOUND != XelpBufCmp(a,ae,b,be,XELP_CMP_TYPE_A0B0)) {
+        FailMsg("XelpBufCmp",testno);
+        return XELP_E_Err;
+    }
+    testno++;
+    if (XELP_S_OK == XelpBufCmp(a,ae,b+1,be,XELP_CMP_TYPE_A0B0)) {
+        FailMsg("XelpBufCmp",testno);
+        return XELP_E_Err;
+    }
+    testno++;
+
+    return XELP_S_OK;
 }
 
 
 /* 	************************************************
-	this is a simple test suite.  
-	normally you would run cppUnit or some other 
-	more general purpose test framework.
+	Xelp  simple test suite.  
 */
 int run_tests() {
+    GTESTDATA gTestData;
+    gTestData.totalCases  = 0;
+    gTestData.totalPassed = 0;
+
+    if (XELP_S_OK != test_XELPStrLen()) {
+        printf("failed test_XELPStrLen\n");
+        return XELP_E_Err;
+    }
+
 	if (XELP_S_OK != test_XELPStr2Int()) {
 		printf("failed test_XELPStr2Int()\n");
 		return XELP_E_Err;
 	}
 
-
+    if (XELP_S_OK != test_XelpBufCmp()) {
+		printf("failed test_XelpBufCmp()\n");
+		return XELP_E_Err;
+	}
 	return XELP_S_OK;
 }
 

@@ -40,7 +40,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <time.h>
 #include <ncurses.h>
 #define XELPGLOBAL_DEFAULTS
-#include "xelp.h"
+#include "../../src/xelp.h"
 
 int getkey() /* unix non-blocking key get */
 {
@@ -173,6 +173,16 @@ XELPRESULT cmdNumToks (const char* args, int maxlen)
 	printw("numtoks: %d\n",i);
 	return XELP_S_OK;
 };
+XELPRESULT cmdPrintR (const char* args, int maxlen){
+	int i = example.mR[0];
+	printw("%x\n",i);
+	return i;  // leaves mR[0] unchanged
+}
+
+XELPRESULT cmdPrintS (const char* args, int maxlen){
+	printw("not implemented\n");
+	return XELP_W_Warn;  
+}
 XELPRESULT cmdPrintPokeBuf (const char* args, int maxlen){
 	int i=0;
 	for (i=0;i<31; i++){
@@ -282,6 +292,8 @@ XELPCLIFuncMapEntry gMyCLICommands[] =
 	{&cmdMath           , "-"       ,  "sub two numbers"            },
 	{&cmdMath           , "*"       ,  "mul two numbers"            },
 	{&cmdMath           , "/"       ,  "div two numbers"            },
+	{&cmdPrintR			, "pr"      ,  "print Xelp regs"            },
+	{&cmdPrintS			, "pstk"    ,  "print Xelp stack"           },
 	{&cmdExit           , "exit"    ,  "quit demo program"          },
 	XELP_FUNC_ENTRY_LAST
 };

@@ -1,4 +1,46 @@
 
+/*****************************/
+/*
+ This is the original tokenzier / line parser.
+ It works fine but its been replaced by the new one which doesn't use [ *buf, blen] ==> buffer ptr, buffer len 
+ with XelpBuf style parser which uses startPtr, posPtr,endPtr 
+ this later style is easier to use in successive calls by functions which are "consuming" a line
+
+ */
+XELPRESULT XELPTokLineOld (const char *buf, int blen, const char **t0s, const char **t0e, const char **eol, int srchType) {
+ 	const char *s;		 /* state ptr */
+	char cs=_PS_SEEK,prev=_PS_SEEK,tmp;   
+	int tm=1; /*  (token mode) allows capture of t0e, t0s only for first token seen */
+
+	while (blen--) {
+		s = gPSMStates+(int)(gPSMJumpTable[(unsigned int)cs]);//index in to state array quickly
+		/* while (*s != _PS_EOS) { //technically can be while(1) since each state _MUST_ have a default */
+		while (1) { 
+			if ( ( 0 == *s) || (*buf == (*s)) )// default in this state or char is match
+				break;	
+			s+=3; //goto next iteration in this state.  
+		}	/* now we've found the correct state.  do any actions */
+
+		s++; /* advance ptr to exec flags byte */
+		/* if (*s)		// if there are any exec flags.. technically not needed but it can speed things up */
+		{ 
+			if (tm) {
+				if ((*s) & _EF_TS) { *t0s =  buf; };
+				if ((*s) & _EF_TE) { *t0e =  buf;  if (XELP_TOK_ONLY == srchType) return XELP_S_OK; tm=0;};
+			}
+			if ((*s) & _EF_LE) { *eol  = buf; return XELP_S_OK;};
+		}
+		s++; /* advance ptr to next_state byte */
+		tmp = cs;
+		cs = (*s == _PS_PREV) ? prev : (*s);
+		prev = tmp;
+		/* end of parser state update */
+
+		buf++; /* advance char ptr */
+	}
+	return XELP_S_NOTFOUND;
+}
+
 /**********************************************************
  DIOSCIPFuncMapEntry declares functions that provide "langauge" features
   such as _if, _wh, _go, _pshi, _popi, _inc _dec
