@@ -42,38 +42,59 @@ int FailMsg (const char *c, int n) {
 }
 
 typedef struct {
-    int totalCases;
+    int totalCases; // total test cases run
     int totalPassed;
+    int totalUnitsTested;
+    int totalUnitsPassed;
     int curCases;
     int curCasesPassed;
 } GTESTDATA;
 
+GTESTDATA gTestData;
+
+void gUnitInit() {
+    gTestData.curCases=0;
+    gTestData.curCasesPassed=0;
+    gTestData.totalUnitsTested++;
+}
+
+XELPRESULT logTest(int result, char *msg) {
+    gTestData.totalCases++; // global count
+    gTestData.curCases++; // unit count...
+    
+    if (result == 0) { // pass
+        gTestData.totalPassed++;
+        gTestData.curCasesPassed++;
+    }
+    else {
+        FailMsg(msg,gTestData.curCases);
+    }
+    return result;
+}
 /*************************************************
 Unit Test Cases for XELP() functions below
 */
 
 
 int test_XELPStrLen() {
-    int testno = 0;
+    gUnitInit();
 
-    if (3 != XELPStrLen("abc")) {
-        FailMsg("XelpStrLen",testno);
+    if (logTest (3 != XELPStrLen("abc"),"XelpStrLen")) 
         return XELP_E_Err;
-    }
 
     return XELP_S_OK;
 }
 /*   test cases for string parser function  */
 int test_XELPStr2Int() {
-	
-	if (XELPStr2Int("90",2) != 90)
+	gUnitInit();
+	if (logTest(XELPStr2Int("90",2) != 90,"Str2Int"))
 		return XELP_E_Err;
 
 	return XELP_S_OK;
 }
 
 int test_XelpBufCmp() {
-    int   testno = 0;
+    gUnitInit();
     char *a = "token1";
     char *b = " token1\0";
     char *ae, *be;
@@ -81,16 +102,13 @@ int test_XelpBufCmp() {
     ae = a + XELPStrLen(a);
     be = b + XELPStrLen(b);
 
-    if (XELP_S_NOTFOUND != XelpBufCmp(a,ae,b,be,XELP_CMP_TYPE_A0B0)) {
-        FailMsg("XelpBufCmp",testno);
+    if (logTest(XELP_S_NOTFOUND != XelpBufCmp(a,ae,b,be,XELP_CMP_TYPE_A0B0),"XelpBufCmp" ))
         return XELP_E_Err;
-    }
-    testno++;
-    if (XELP_S_OK == XelpBufCmp(a,ae,b+1,be,XELP_CMP_TYPE_A0B0)) {
-        FailMsg("XelpBufCmp",testno);
+    
+
+    if (logTest(XELP_S_OK == XelpBufCmp(a,ae,b+1,be,XELP_CMP_TYPE_A0B0),"XelpBufCmp")) 
         return XELP_E_Err;
-    }
-    testno++;
+    
 
     return XELP_S_OK;
 }
@@ -99,8 +117,9 @@ int test_XelpBufCmp() {
 /* 	************************************************
 	Xelp  simple test suite.  
 */
+
 int run_tests() {
-    GTESTDATA gTestData;
+    
     gTestData.totalCases  = 0;
     gTestData.totalPassed = 0;
 
@@ -118,6 +137,11 @@ int run_tests() {
 		printf("failed test_XelpBufCmp()\n");
 		return XELP_E_Err;
 	}
+
+    printf("Test Cases Run\n");
+    printf("Total Cases Passed %4d of %4d\n\n",gTestData.totalPassed, gTestData.totalCases);
+    
+
 	return XELP_S_OK;
 }
 
