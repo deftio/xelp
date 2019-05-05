@@ -105,24 +105,70 @@ int test_XELPStr2Int() {
 int test_XelpBufCmp() {
     gUnitInit();
     char *a = "token1";
-    char *b = " token1\0x";
-    char *ae, *be;
+    char *b = " token1\0abc";
+    char *c = "token1abc";
+    char *ae, *be, *ce;
 
     ae = a + XELPStrLen(a);
     be = b + XELPStrLen(b);
-
+    ce = c + XELPStrLen(a);
+  
     if (logTest(XELP_S_NOTFOUND != XelpBufCmp(a,ae,b,be,XELP_CMP_TYPE_A0B0),"XelpBufCmp" ))
         return XELP_E_Err;
     
-
-    if (logTest(XELP_S_OK == XelpBufCmp(a,ae,b+1,be,XELP_CMP_TYPE_A0B0),"XelpBufCmp")) 
+    be = b+1+XELPStrLen(a);
+    if (logTest(XELP_S_OK != XelpBufCmp(a,ae,b+1,be,XELP_CMP_TYPE_A0B0),"XelpBufCmp")) 
         return XELP_E_Err;
     
+
+    be = b+2+XELPStrLen(b+1);
+    if (logTest(XELP_S_NOTFOUND != XelpBufCmp(a,ae,b+1,be,XELP_CMP_TYPE_BUF),"XelpBufCmp")) 
+        return XELP_E_Err;
+    
+    ce = c+XELPStrLen(a);
+    if (logTest(XELP_S_OK != XelpBufCmp(a,ae,c,ce,XELP_CMP_TYPE_BUF),"XelpBufCmp")) 
+        return XELP_E_Err;
+    
+
+    ce = c+XELPStrLen(a)+1;
+    if (logTest(XELP_S_NOTFOUND != XelpBufCmp(a,ae,c,ce,XELP_CMP_TYPE_BUF),"XelpBufCmp")) 
+        return XELP_E_Err;
 
     return XELP_S_OK;
 }
 
 
+int test_XelpFindTok() {
+    gUnitInit();
+    char *label = "label1:",*le;
+    char *b0 = "token1 token2; token3 token4 ; \n token5 token6 token7\n";
+    char *b1 = "token1 token2 label1:\n";
+    char *b2 = "token1 token2; \ntoken3 token4 token5\n   label1: token7 token8\n token9 label1: token10\n token11;";
+    char *b3 = "token1 token2; \ntoken3 token4 token5\n   xlabel1: token7 token8\n token9 label1: token10\n token11;";
+    XelpBuf x;
+    
+    le = label+XELPStrLen(label);
+
+    x.s = b0;  x.p = x.s; x.e = x.s+XELPStrLen(x.s);
+    if (logTest(XELP_S_NOTFOUND != XELPFindTok(&x,label,le,XELP_TOK_ONLY),"XelpFindTok" ) )
+        return XELP_E_Err;
+
+    x.s = b1;  x.p = x.s; x.e = x.s+XELPStrLen(x.s);
+    if (logTest(XELP_S_OK != XELPFindTok(&x,label,le,XELP_TOK_ONLY),"XelpFindTok" ) )
+        return XELP_E_Err;
+
+    x.s = b2;  x.p = x.s; x.e = x.s+XELPStrLen(x.s);
+    if (logTest(XELP_S_OK != XELPFindTok(&x,label,le,XELP_TOK_LINE),"XelpFindTok" ) )
+        return XELP_E_Err;
+
+    x.s = b3;  x.p = x.s; x.e = x.s+XELPStrLen(x.s);
+    if (logTest(XELP_S_NOTFOUND != XELPFindTok(&x,label,le,XELP_TOK_LINE),"XelpFindTok" ) )
+        return XELP_E_Err;
+
+
+
+    return XELP_S_OK;
+}
 /* 	************************************************
 	Xelp  simple test suite.  
 */
@@ -146,6 +192,10 @@ int run_tests() {
 		printf("failed test_XelpBufCmp()\n");
 		return XELP_E_Err;
 	}
+
+    if (XELP_S_OK != test_XelpFindTok()) {
+        printf("failed test_XelpFindTOk()\n");
+    }
 
     printf("Test Cases Run\n");
     printf("Total Cases Passed %4d of %4d\n\n",gTestData.totalPassed, gTestData.totalCases);

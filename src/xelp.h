@@ -162,7 +162,7 @@ typedef struct
 
 
 /*****************************************************************************
- key code mappings.  useful as defaults but you can supply any in the xelpcfg.h
+ key code mappings.  useful as defaults but you can any other keys in xelpcfg.h
 */
 #define XELPKEY_CTA      (0x01)  /* CTRL-A  */
 #define XELPKEY_CTC      (0x03)  /* CTRL-C  */
@@ -266,10 +266,10 @@ XELPRESULT XELPInit (XELP *ths, const char *pAboutMsg);			    /* initialize inst
 #define XELP_SET_FN_EMCHG(ths,pfEMCHG) (ths.mpfEditModeChg=pfEMCHG) /* Entry Mode Change               */
 #define XELP_SET_FN_BKSP(ths,pfBKSP)   (ths.mpfBksp=pfBKSP)	        /* Handle Backspace                */
 
-#define XELP_SET_VAL_CLI_PROMPT(ths,prompt)	(ths.mpPrompt=prompt)  /* set per instnce prompt if enabled in xelpcfg.h  */
+#define XELP_SET_VAL_CLI_PROMPT(ths,prompt)	(ths.mpPrompt=prompt)   /* set per instnce prompt if enabled in xelpcfg.h  */
 
 #ifdef XELP_ENABLE_HELP
-XELPRESULT XELPHelp		(XELP *ths);                                /* print online help (if avail)    */
+XELPRESULT XELPHelp	        (XELP *ths);                             /* print online help (if avail)    */
 #endif
 
 /* Xelp API functions */
@@ -278,14 +278,16 @@ XELPRESULT XELPExecKC		(XELP *ths, char key);				     /* execute key command    
 XELPRESULT XELPParse 		(XELP *ths, const char *buf, int blen);  /* execute CLI or script commands  */
 XELPRESULT XELPParseKey 	(XELP *ths, char key);				     /* handle keypress at CLI          */
 
-/* XELPTokLine is the main tokenizer which can get next token or line at time                          */
+/* XELPTokLine is the main tokenizer which can get next token or line at time                           */
 /* XELPRESULT XELPTokLine (const char *buf, int blen, const char **t0s, const char **t0e, const char **eol, int srchType); */
 XELPRESULT XELPTokLine (const char *buf, const char *bufend, const char **t0s, const char **t0e, const char **eol, int srchType); 
+XELPRESULT XELPTokLineXB (XelpBuf *buf, XelpBuf *tok, int srchType);
 
-/* XELPNEXTTOK get next token in a string buffer.  This is just a macro call to DioTokLine             */
-#define   XELPNEXTTOK(buf,blen,tok_s,tok_e)    (XELPTokLine(buf, buf+blen, tok_s, tok_e, 0, XELP_TOK_ONLY))
-int       XELPStrLen(const char* c);                               /* compute length of null terminated string. */ 
-int       XELPStr2Int(const char* s,int  maxlen);                  /* parse a str->int accepts hex as 123h or signed decimal num.  no safety for non-num chars */   
+/* XELPNEXTTOK get next token in a string buffer.  This is just a macro call to XELPTokLine             */
+#define    XELPNEXTTOK(buf,blen,tok_s,tok_e)    (XELPTokLine(buf, buf+blen, tok_s, tok_e, 0, XELP_TOK_ONLY))
+int        XELPStrLen(const char* c);                               /* compute length of null terminated string. */ 
+int        XELPStr2Int(const char* s,int  maxlen);                  /* parse a str->int accepts hex as 123h or signed decimal num.  no safety for non-num chars */   
+XELPRESULT XELPFindTok(XelpBuf *x, const char *t0s, const char *t0e, int srchType);
 
 /* XelpBufCmp() compare buffers / string */
 XELPRESULT XelpBufCmp (const char *as, const char *ae, const char *bs, const char * be, int cmpType); 

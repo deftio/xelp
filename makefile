@@ -4,7 +4,7 @@
 CC=gcc
 CPP=g++
 
-C_FLAGS=-I. -Wall 
+C_FLAGS=-I. -Wall -g
 CPP_FLAGS=-std=c++11 -Wall
 
 LIB_DIR=src
@@ -20,7 +20,7 @@ INCLUDES=\
 #=======================================================================
 #build unit tests in /tests folder 
 TEST_DIR=tests
-TEST_FLAGS=-fprofile-arcs -ftest-coverage # coverage and profiling data
+TEST_FLAGS=-fprofile-arcs -ftest-coverage -g # coverage and profiling data
 SRC_TESTS=\
     $(LIB_DIR)/xelp.c\
 	$(TEST_DIR)/xelp_unit_tests.c

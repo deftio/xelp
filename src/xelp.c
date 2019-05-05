@@ -87,6 +87,7 @@ XELPRESULT XELPHelp(XELP* ths)
 		XELPOut(ths,XELP_HELP_KEY_STR,x);
 		while (e->mFunPtr)	{
 			_PUTC(e->mKey);
+            //XELPOut(ths,&(e->mKey),1);
 			_PUTC(':');
 			XELPOut(ths,e->mpHelpString,x);
 			_PUTC('\n');
@@ -162,12 +163,12 @@ XELPRESULT XELPStrEq (const char* pbuf, int blen, const char *cmd)
  XELPBufCmp() : test if 2 buffers have byte for byte equality.  Used for finding if tokens match commands or labels
  
  cmpType: (comparison type)
- XELP_CMP_TYPE_BUF : both buffers are only tested for byte for byte comparison by length (\0 is ignored)
+ XELP_CMP_TYPE_BUF : both buffers are only tested for byte for byte comparison by length (\0 is not treated as end-of-buf)
  XELP_CMP_TYPE_A0  : buffer a also treats \0 as a end of buffer 
- XELP_CMP_TYPE_A0B0  : if either buffer has \0 that is treated as the end of the buffer
+ XELP_CMP_TYPE_A0B0  : if either buffer has \0 that is treated as the end of the buffer in addition to reaching the end ptr
  
 */
-XELPRESULT XelpBufCmp (const char *as, const char *ae, const char *bs, const char * be, int cmpType) 
+XELPRESULT XelpBufCmp (const char *as, const char *ae, const char *bs, const char *be, int cmpType) 
 {
     while ((as < ae) && (bs < be) ) {
         if (*as != *bs)
@@ -183,10 +184,31 @@ XELPRESULT XelpBufCmp (const char *as, const char *ae, const char *bs, const cha
         as++;
         bs++;
     }
-    if ((as == ae) && (bs == be))
-        return XELP_S_NOTFOUND;
+    if ((as == ae) && (bs == be)) /* both ptrs shoud be at end of buf now (includes null term case if applicable) */
+        return XELP_S_OK;
 
-    return XELP_S_OK;
+    return XELP_S_NOTFOUND; 
+}
+/********************************************************
+ XELPFindTok() : find a matching token in x
+ 
+ srchType: 
+ XELP_TOK_ONLY  : find the next token (if any) that matches the supplied token
+ XELP_TOK_LINE  : find the next token that matches the supplied token, but only if its the first token of the line.
+ if successful returns XELP_S_OK and x->p points to the position _just_after_ the found token.
+ else returns XELP_S_NOTFOUND and x->p points to x->e
+
+*/
+
+XELPRESULT XELPFindTok(XelpBuf *x, const char *t0s, const char *t0e, int srchType) 
+{
+    XelpBuf tok;
+    
+    while (XELP_S_OK == XELPTokLineXB(x,&tok,XELP_TOK_ONLY)) {
+        if (XELP_S_OK == XelpBufCmp(t0s,t0e,tok.s,tok.p,XELP_CMP_TYPE_BUF))
+            return XELP_S_OK;
+    }
+    return XELP_S_NOTFOUND;
 }
 #endif
 /********************************************************
@@ -415,13 +437,13 @@ XELPRESULT XELPParseCompact (XELP* ths, const char *buf, int blen) {
 */
 /* XELP_ENABLE_LCORE */
 #ifdef XELP_ENABLE_LCORE
-const char *XELP_L_Cmds[] = {
-	"peek",		/* 00 */
-	"poke",		/* 01 */
+//const char *XELP_L_Cmds[] = {
+//	"peek",		/* 00 */
+//	"poke",		/* 01 */
 /*	"go",	*/	/* 02 */
 /*	"if",	*/	/* 03 */
-	0			/* terminator */
-};
+//	0			/* terminator */
+//};
 #endif
 
 XELPRESULT XELPParse (XELP* ths, const char *buf, int blen) {
