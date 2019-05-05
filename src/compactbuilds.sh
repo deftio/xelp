@@ -96,4 +96,4 @@ gcc -c xelp.c -Os
 
 echo "*******************************"
 #show function allocation table
-nm xelp.o -n -S
+nm xelp.o -n -S  --size-sort -f sysv -t d

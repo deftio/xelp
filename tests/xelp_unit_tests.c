@@ -75,6 +75,7 @@ XELPRESULT logTest(int result, char *msg) {
 Unit Test Cases for XELP() functions below
 */
 
+//=================================================
 
 int test_XELPStrLen() {
     gUnitInit();
@@ -82,21 +83,29 @@ int test_XELPStrLen() {
     if (logTest (3 != XELPStrLen("abc"),"XelpStrLen")) 
         return XELP_E_Err;
 
+    if (logTest (0 != XELPStrLen(""),"XelpStrLen")) 
+        return XELP_E_Err;
+
     return XELP_S_OK;
 }
-/*   test cases for string parser function  */
+//=================================================
+/*   test cases for string num parser function  */
 int test_XELPStr2Int() {
 	gUnitInit();
 	if (logTest(XELPStr2Int("90",2) != 90,"Str2Int"))
 		return XELP_E_Err;
 
+    if (logTest(XELPStr2Int("31h",3) != 49,"Str2Int")) // hrc parser
+		return XELP_E_Err;
+
 	return XELP_S_OK;
 }
+//=================================================
 
 int test_XelpBufCmp() {
     gUnitInit();
     char *a = "token1";
-    char *b = " token1\0";
+    char *b = " token1\0x";
     char *ae, *be;
 
     ae = a + XELPStrLen(a);

@@ -40,7 +40,9 @@ local defines (this file only)
 #ifndef _PUTC
 #define _PUTC(c)	((ths->mpfOut)((char)(c)))   /* write char to output */
 #endif
-
+/***************************************** 
+ XELPStrLen() - find length of a string in bytes assuming its null terminated
+ */
 int XELPStrLen (const char* c) {
     int l=0;
     while (*c++ != 0) {
@@ -49,9 +51,8 @@ int XELPStrLen (const char* c) {
     return l;
 }
 
-/** 
+/***************************************** 
  XELPOut() - print a string.
- 
  takes a length specified string and prints to output stream
  */
 XELPRESULT XELPOut (XELP *ths, const char* msg, int maxlen)
@@ -64,7 +65,7 @@ XELPRESULT XELPOut (XELP *ths, const char* msg, int maxlen)
 	}
 	return XELP_S_OK;	
 }
-/**
+/******************************************
  XELPHelp() - print out help strings for functions
  see xelpcfg.h for setting or overriding
  XELP_HELP_ABT_STR, XELP_HELP_KEY_STR, XELP_HELP_CLI_STR
@@ -429,9 +430,9 @@ XELPRESULT XELPParse (XELP* ths, const char *buf, int blen) {
 	int i;  
     bufe = buf+blen;
 #ifdef XELP_ENABLE_LCORE
-	const char **c;
-	char *t=0;
-    int j=0; 
+//	const char **c;
+//	char *t=0;
+//  int j=0; 
 #endif
 	pos = buf;  /* buf holds the initial start position for the current script/command */
 	while (blen>0) {
@@ -442,69 +443,15 @@ XELPRESULT XELPParse (XELP* ths, const char *buf, int blen) {
 			f=ths->mpCLIModeFuncs;
 			while(f->mpCmd) {
                 // if (XELP_S_OK == XELPStrCmp(f->mpCmd,f->mpCmd+(int)(t1-t0),t0,t1,XELP_CMP_TYPE_A0))
-				if (XELP_S_OK == XELPStrEq(t0,(int)(t1-t0),f->mpCmd)){
+                if (XELP_S_OK == XelpBufCmp(t0,t1,f->mpCmd,(char *)-1,XELP_CMP_TYPE_A0B0))
+				//if (XELP_S_OK == XELPStrEq(t0,(int)(t1-t0),f->mpCmd))
+                {
 					ths->mR[0] = (f->mFunPtr)(t0,(int)(t2-t0));	break;
 				}
 				f++;
 			}
-#ifdef XELP_ENABLE_LCORE			
-			if (0==(f->mpCmd)) {  /* at this moment t0,t1,t2 are t0k0-start, tok0-end, line-end */
-				c = XELP_L_Cmds; i=0;  
-				while(*c) {
-					if (XELP_S_OK == XELPStrEq(t0,(int)(t1-t0),*c)){
-						XELPTokLine(t1,t2,&t0,&t1,0,XELP_TOK_ONLY);// get next token to pass to cmd
-						/*
-						do built-in command stuff here.  remember we have buf, cur position, and ths context available
-						here in this fn already. We've consumed the 1st tokn in the line so we don't have
-						to do that again by calling another fn ptr etc so this save space in very small targets
-						*/
-						switch(i) {
-							case 0:   /* peek   <addr>  */
-								i = XELPStr2Int(t0,(int)(t1-t0));
-								{
-									t = t+i;
-									j=1;
-									if (XELP_S_OK == XELPTokLine(t1,t2,&t0,&t1,0,XELP_TOK_ONLY) ) 
-										j = XELPStr2Int(t0,(int)(t1-t0));
-									while (j--) {
-										_PUTC(*t++);
-										if (!(j%0xf))
-											_PUTC('\n');
-											
-									}
-								}	
-											
-								break;
-							case 1:   /* poke  <addr> <byte_value> */
-								i = XELPStr2Int(t0,(int)(t1-t0));
-								{
-									if (XELP_S_OK == XELPTokLine(t1,t2,&t0,&t1,0,XELP_TOK_ONLY) ) {
-										j = XELPStr2Int(t0,(int)(t1-t0));
-										t = t+i;
-										*t=j&0xff;
-									}
-								}
-								break;
-							/*
-							case 2:	  / * go     * /
-								j++;
-								//i++;
-								break;
-							case 3:   / *  if     * /
-								j--;
-								//i--;
-								break;
-							*/
-						}
-						
-						_PUTC('\n');
-						break;
-					}
-					c++; 
-					i++;
-				}				
-			}
-#endif 	/* XELP_ENABLE_LCORE */			
+/* ifdef XELP_ENABLE_LCORE went here */
+		
 		}
 		else {	break;	}
 		

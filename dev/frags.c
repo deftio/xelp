@@ -1,4 +1,64 @@
 
+//Piece from XELPParse
+#ifdef XELP_ENABLE_LCORE			
+			if (0==(f->mpCmd)) {  /* at this moment t0,t1,t2 are t0k0-start, tok0-end, line-end */
+				c = XELP_L_Cmds; i=0;  
+				while(*c) {
+					if (XELP_S_OK == XELPStrEq(t0,(int)(t1-t0),*c)){
+						XELPTokLine(t1,t2,&t0,&t1,0,XELP_TOK_ONLY);// get next token to pass to cmd
+						/*
+						do built-in command stuff here.  remember we have buf, cur position, and ths context available
+						here in this fn already. We've consumed the 1st tokn in the line so we don't have
+						to do that again by calling another fn ptr etc so this save space in very small targets
+						*/
+						switch(i) {
+							case 0:   /* peek   <addr>  */
+								i = XELPStr2Int(t0,(int)(t1-t0));
+								{
+									t = t+i;
+									j=1;
+									if (XELP_S_OK == XELPTokLine(t1,t2,&t0,&t1,0,XELP_TOK_ONLY) ) 
+										j = XELPStr2Int(t0,(int)(t1-t0));
+									while (j--) {
+										_PUTC(*t++);
+										if (!(j%0xf))
+											_PUTC('\n');
+											
+									}
+								}	
+											
+								break;
+							case 1:   /* poke  <addr> <byte_value> */
+								i = XELPStr2Int(t0,(int)(t1-t0));
+								{
+									if (XELP_S_OK == XELPTokLine(t1,t2,&t0,&t1,0,XELP_TOK_ONLY) ) {
+										j = XELPStr2Int(t0,(int)(t1-t0));
+										t = t+i;
+										*t=j&0xff;
+									}
+								}
+								break;
+							/*
+							case 2:	  / * go     * /
+								j++;
+								//i++;
+								break;
+							case 3:   / *  if     * /
+								j--;
+								//i--;
+								break;
+							*/
+						}
+						
+						_PUTC('\n');
+						break;
+					}
+					c++; 
+					i++;
+				}				
+			}
+#endif 	/* XELP_ENABLE_LCORE */	
+
 /*****************************/
 /*
  This is the original tokenzier / line parser.

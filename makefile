@@ -1,16 +1,13 @@
-# make file for xelp posix tests (simple interpreter for embedded systems)
+# make file for xelp posix tests (xelp interpreter for embedded systems)
 # @author M A Chatterjee <deftio [at] deftio [dot] com>
 
 CC=gcc
 CPP=g++
 
 C_FLAGS=-I. -Wall 
-TEST_FLAGS=-fprofile-arcs -ftest-coverage # coverage and profiling data
 CPP_FLAGS=-std=c++11 -Wall
 
 LIB_DIR=src
-TEST_DIR=tests
-EXAMPLE_POSIX_DIR=examples/posix-simple
 
 INCLUDES=\
     -I$(LIB_DIR)\
@@ -22,6 +19,8 @@ INCLUDES=\
 
 #=======================================================================
 #build unit tests in /tests folder 
+TEST_DIR=tests
+TEST_FLAGS=-fprofile-arcs -ftest-coverage # coverage and profiling data
 SRC_TESTS=\
     $(LIB_DIR)/xelp.c\
 	$(TEST_DIR)/xelp_unit_tests.c
@@ -34,6 +33,7 @@ tests: $(OBJC_TESTS)
 
 #=======================================================================
 #build simple example in /example/posix-simple folder
+EXAMPLE_POSIX_DIR=examples/posix-simple
 SRC_EXAMPLE1=\
 	$(LIB_DIR)/xelp.c\
 	$(EXAMPLE_POSIX_DIR)/xelp-example.c	
@@ -45,6 +45,11 @@ example: $(OBJC_EXAMPLE1)
 	@$(EXAMPLE_POSIX_DIR)/xelp-example.out
 
 #=======================================================================
+# clean deletes all compiled object files and debugging / profiling / listing files
 clean:
-	rm $(OBJ_TESTS) $(OBJC_EXAMPLE1) *.o *.out *.asm  *.lst *.sym *.rel *.s *.gcov *.gcno *.gcda -f
+	rm $(OBJC_TESTS) $(OBJC_EXAMPLE1) -f
+	rm $(TEST_DIR)/*.gcda  $(TEST_DIR)/*.gcno $(TEST_DIR)/*.gcov $(TEST_DIR)/*.out -f 
+	rm $(EXAMPLE_POSIX_DIR)/*.gcda  $(EXAMPLE_POSIX_DIR)/*.gcno $(EXAMPLE_POSIX_DIR)/*.gcov $(EXAMPLE_POSIX_DIR)/*.out -f 
+	rm $(LIB_DIR)/*.gcda  $(LIB_DIR)/*.gcno $(LIB_DIR)/*.gcov  $(LIB_DIR)/*.out $(LIB_DIR)/*.asm $(LIB_DIR)/*.rel $(LIB_DIR)/*.s $(LIB_DIR)/*.asm -f 
+
 
