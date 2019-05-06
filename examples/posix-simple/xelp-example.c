@@ -74,6 +74,7 @@ int getkey() /* unix non-blocking key get */
 char gPokeBuf[200];  //for testing poke, peek commands
 
 XELP example; //global declarator for an interperter.  Note this can be instance based.
+
 // default err functiom
 void XELPErr(XELP* ths, int e) {
 	addch('E');
@@ -324,11 +325,6 @@ void modeChangeMsg(int mode) {
 	return;
 }
 
-int XELP_strlen( const char* s) {
-	const char *p=s;
-	while (*p){p++;};
-	return (int)(p-s);
-}
 
 
 
@@ -342,7 +338,7 @@ int main (int argc, char *argv[])
 	cbreak();
 	noecho();
     nodelay( stdscr, TRUE ); //setup non blocking io in ncurses.  ncurses is just used for terminal debugging in linux
-    keypad( stdscr, TRUE); //allow capture of special keys eg delete etc
+    keypad( stdscr, TRUE);   //allow capture of special keys eg delete etc
     scrollok(stdscr, TRUE);
 
     //raw()					//captures CTRL-C, CTRL-Z etc
@@ -383,7 +379,9 @@ int main (int argc, char *argv[])
 	printw("\n%s\n",c4);
 #ifdef XELP_ENABLE_CLI
 
-	XELPParse(&example,c4,XELP_strlen(c4));
+    XelpBuf xb;
+    XELP_XBInit(xb,c4,XELPStrLen(c4))
+    XELPParseXB(&example,&xb);
 #endif
 
 	printw("\n==================\n");

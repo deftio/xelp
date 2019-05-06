@@ -125,7 +125,7 @@ XELPRESULT XELPInit 	 (
 		*p=0;
 	
 	ths->mpAboutMsg = pAboutMsg;
-	
+	XELP_XBInit(ths->mpCmdBuf,ths->mCmdMsgBuf,XELP_CMDBUFSZ-1);
 	/* comand mode mssage index 
 	ths->mCmdMsgIndex = 0;  //set to 0 by ptr loop at top
 	*/
@@ -159,6 +159,18 @@ XELPRESULT XELPStrEq (const char* pbuf, int blen, const char *cmd)
 	return XELP_S_OK;
 }
 
+XELPRESULT XELPStrEq2 (const char* pbuf, const char* pend, const char *cmd)
+{
+	while(pbuf<pend){
+		if (*cmd == 0) 
+			return XELP_S_NOTFOUND;
+		if (*pbuf++ != *cmd++)
+			return XELP_S_NOTFOUND;
+	}
+	if (*cmd != 0)
+		return XELP_S_NOTFOUND;
+	return XELP_S_OK;
+}
 /********************************************************
  XELPBufCmp() : test if 2 buffers have byte for byte equality.  Used for finding if tokens match commands or labels
  
@@ -173,9 +185,11 @@ XELPRESULT XelpBufCmp (const char *as, const char *ae, const char *bs, const cha
     while ((as < ae) && (bs < be) ) {
         if (*as != *bs)
             return XELP_S_NOTFOUND;
+
         if (cmpType == XELP_CMP_TYPE_A0) {
             if (*as == 0) {ae = as+1;}
         }
+
         if (cmpType == XELP_CMP_TYPE_A0B0) {
             if (*as == 0) {ae = as+1;}
             if (*bs == 0) {be = bs+1;}
@@ -190,13 +204,14 @@ XELPRESULT XelpBufCmp (const char *as, const char *ae, const char *bs, const cha
     return XELP_S_NOTFOUND; 
 }
 /********************************************************
- XELPFindTok() : find a matching token in x
+ XELPFindTok() : find a matching token in a buffer.  The buffer is a XelpBuf, the token is passed as 
+    ptr to its beginning and a ptr to one position beyond its end 
  
  srchType: 
  XELP_TOK_ONLY  : find the next token (if any) that matches the supplied token
  XELP_TOK_LINE  : find the next token that matches the supplied token, but only if its the first token of the line.
  if successful returns XELP_S_OK and x->p points to the position _just_after_ the found token.
- else returns XELP_S_NOTFOUND and x->p points to x->e
+ else returns XELP_S_NOTFOUND and (x->p) == (x->e)
 
 */
 
@@ -204,7 +219,7 @@ XELPRESULT XELPFindTok(XelpBuf *x, const char *t0s, const char *t0e, int srchTyp
 {
     XelpBuf tok;
     
-    while (XELP_S_OK == XELPTokLineXB(x,&tok,XELP_TOK_ONLY)) {
+    while (XELP_S_OK == XELPTokLineXB(x,&tok,srchType)) {
         if (XELP_S_OK == XelpBufCmp(t0s,t0e,tok.s,tok.p,XELP_CMP_TYPE_BUF))
             return XELP_S_OK;
     }
@@ -219,7 +234,7 @@ the key value is passed to the command as an int
 
 This is used in KEY (menu driven) mode or can be called from any C function.  
 
-e.g.g
+e.g.
 XelpExecKC(myInstance,'a');  // execute the single key command 'a' if it exists
 
 */
@@ -305,7 +320,6 @@ static unsigned char const gPSMJumpTable[8]= {
  81 /* _PS_QEND */
 };
 
-
 XELPRESULT XELPTokLine (const char *bs, const char *be, const char **t0s, const char **t0e, const char **eol, int srchType) {
  	const char *s;		 /* state ptr */
 	char cs=_PS_SEEK,prev=_PS_SEEK,tmp;   
@@ -339,6 +353,19 @@ XELPRESULT XELPTokLine (const char *bs, const char *be, const char **t0s, const 
 	}
 	return XELP_S_NOTFOUND;
 }
+/*
+XELPRESULT XELPTokLineX ( char *bs,  char *be, const char **t0s, const char **t0e, const char **eol, int srchType) {
+    XelpBuf b,tok;
+    XELPRESULT r;
+    XELP_XBInitPtrs(b,bs,bs,be);
+
+    r=XELPTokLineXB(&b,&tok,srchType);
+    *t0s = tok.s;
+    *t0e = tok.p;
+    *eol = tok.e;
+    return r;
+}
+*/
 /********************************************************
   XELPTokLineXB(buf, output, srch) - main tokenizer - handles whitespaces, linefeeds, comments, quoted strings
 
@@ -366,7 +393,7 @@ XELPRESULT XELPTokLineXB (XelpBuf *buf, XelpBuf *tok, int srchType) {
 			if (tm) {
 				if ((*s) & _EF_TS) { tok->s =  (buf->p); };
 				if ((*s) & _EF_TE) { tok->p =  (buf->p);  
-                    if (XELP_TOK_ONLY == srchType)  { /*tok->e= tok->p;*/ return XELP_S_OK;} 
+                    if (XELP_TOK_ONLY == srchType)  { tok->e= buf->e; return XELP_S_OK;} 
                     tm=0;
                 };
 			}
@@ -382,101 +409,19 @@ XELPRESULT XELPTokLineXB (XelpBuf *buf, XelpBuf *tok, int srchType) {
 	}
 	return XELP_S_NOTFOUND;
 }
-/********************************************************
- XelpFindTok(buffer, token) - find if a label exists and return ptr to character just after the label,
 
- if label found, returns XELP_S_OK
- if label not found. returns XELP_S_NOTFOUND
-
-search type: 
-    XELP_TOK_NEXT       find next token which matches 
-    XELP_TOK_LABEL      only those tokens on the beginning of a line are matched. (used for IF and GO statements)
-
- */
-/*
-XELPRESULT XelpFindTok (XelpBuf *b, const char *ts, const char *te) {
-    const char *s,*p,*e;
-    while (1) {
-        if (XELP_S_OK == XELPTokLine( (b->s), (b->e), &s, &p, &e, XELP_TOK_LINE)) {
-            //if (XelpBufCmp)
-        }
-        break;
-    }
-    return XELP_S_NOTFOUND;
-}
-*/
-/**
-  XELPParse()
-  parse text buffer and execute commands.
-  used by command line and also can be passed scripts.
- */
-/*
-XELPRESULT XELPParseCompact (XELP* ths, const char *buf, int blen) {
-	const char *bufe, *t0s, *t0e, *eol;
-	XELPCLIFuncMapEntry *f;
-	bufe = buf+blen; 
-	while (buf<bufe) {
-		if (XELP_S_OK == XELPTokLine(buf,bufe,&t0s,&t0e,&eol,XELP_TOK_LINE)) {
-			f=ths->mpCLIModeFuncs;
-			while(f->mpCmd) {
-				if (XELP_S_OK == XELPStrEq(t0s,(int)(t0e-t0s),f->mpCmd)){
-					(f->mFunPtr)(t0s,(int)(eol-t0s));// TODO note error handling should use mp->Err * /
-					break;
-				}
-				f++;
-			}
-		}
-		else {	break;	}
-		blen -= (int)(eol-buf);
-		t0s = eol;
-		buf = t0s;
-	}
-	return XELP_S_OK;
-}
-
-*/
-/* XELP_ENABLE_LCORE */
-#ifdef XELP_ENABLE_LCORE
-//const char *XELP_L_Cmds[] = {
-//	"peek",		/* 00 */
-//	"poke",		/* 01 */
-/*	"go",	*/	/* 02 */
-/*	"if",	*/	/* 03 */
-//	0			/* terminator */
-//};
-#endif
-
-XELPRESULT XELPParse (XELP* ths, const char *buf, int blen) {
-	const char *pos, *bufe, *t0, *t1, *t2;
+XELPRESULT XELPParseXB (XELP* ths, XelpBuf *args) {
+	XelpBuf line;
 	XELPCLIFuncMapEntry   *f;
-	int i;  
-    bufe = buf+blen;
-#ifdef XELP_ENABLE_LCORE
-//	const char **c;
-//	char *t=0;
-//  int j=0; 
-#endif
-	pos = buf;  /* buf holds the initial start position for the current script/command */
-	while (blen>0) {
-		i = XELPTokLine(pos,bufe,&t0,&t1,&t2,XELP_TOK_LINE);
-		//blen -= (int)(t2-t0);
-		pos = t2;
-		if (XELP_S_OK == i ) {
-			f=ths->mpCLIModeFuncs;
-			while(f->mpCmd) {
-                // if (XELP_S_OK == XELPStrCmp(f->mpCmd,f->mpCmd+(int)(t1-t0),t0,t1,XELP_CMP_TYPE_A0))
-                if (XELP_S_OK == XelpBufCmp(t0,t1,f->mpCmd,(char *)-1,XELP_CMP_TYPE_A0B0))
-				//if (XELP_S_OK == XELPStrEq(t0,(int)(t1-t0),f->mpCmd))
-                {
-					ths->mR[0] = (f->mFunPtr)(t0,(int)(t2-t0));	break;
-				}
-				f++;
-			}
-/* ifdef XELP_ENABLE_LCORE went here */
-		
-		}
-		else {	break;	}
-		
+
+	while (XELP_S_OK ==  XELPTokLineXB(args,&line,XELP_TOK_LINE) ) {
+        f=ths->mpCLIModeFuncs;
+        while(f->mpCmd) {    
+            if (XELP_S_OK == XELPStrEq(line.s,(int)(line.p-line.s),f->mpCmd)){
+                ths->mR[0] = (f->mFunPtr)(line.s,(int)(line.e-line.s));	break;
+            }
+            f++;
+        }
 	}
 	return XELP_S_OK;
 }
@@ -493,7 +438,7 @@ XELPRESULT XELPParse (XELP* ths, const char *buf, int blen) {
 XELPRESULT XELPParseKey (XELP *ths, char key)
 {
 	int i=ths->mCurMode;
-
+    XelpBuf ax; 
 	/* 	first we test to see if we should switch modes.  this is a "key" difference  btw 
 	just submitting a buffer to be parsed and running at command line
 	*/
@@ -546,8 +491,11 @@ XELPRESULT XELPParseKey (XELP *ths, char key)
 					if (key == XELPKEY_ENTER )	{
 						ths->mCmdMsgBuf[ths->mCmdMsgIndex]=';'; /*';' is used by the parser as statement terminator*/
 						ths->mCmdMsgIndex++;
-						XELPParse(ths,ths->mCmdMsgBuf,ths->mCmdMsgIndex);
-						ths->mCmdMsgIndex=0; /* reset after command attempt */
+						//XELPParse(ths,ths->mCmdMsgBuf,ths->mCmdMsgIndex);
+                        
+                        XELP_XBInit(ax,ths->mCmdMsgBuf,ths->mCmdMsgIndex);
+                        XELPParseXB(ths,&ax);
+                        ths->mCmdMsgIndex=0; /* reset after command attempt */
 #ifdef XELP_CLI_PROMPT
 						XELPOut(ths,XELP_CLI_PROMPT,-1);
 #endif

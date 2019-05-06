@@ -106,27 +106,32 @@ typedef int XELPRESULT;
 typedef struct {
     const char* s;  /* start of buf                    */
     const char* p;  /* current position                */
-    const char* e;  /* s + buflen + 1  (end of buffer) */
+    const char* e;  /* s + buflen (end of buffer)      */
 }XelpBufC;  /* const buffer */
 
 
 typedef struct {
     char* s;  /* start of buf                    */
     char* p;  /* current position                */
-    char* e;  /* s + buflen + 1  (end of buffer) */
+    char* e;  /* s + buflen  (end of buffer)     */
 } XelpBufW;  /* Writable eg non-const buffer     */
 
 #define XelpBuf XelpBufW
 
+/* XelpBuf MACROS */
+#define XELP_XBInit(xb,buf,buflen)       {xb.s=buf; xb.p=buf; xb.e = xb.s+buflen;}      /* init from raw ptr  with length              */
+#define XELP_XBInitPtrs(xb,s,p,e)        {xb.s=s; xb.p=p; xb.e=e;}                      /* init from 3 raw pointrs                     */
+#define XELP_XBInitBP(xb,buf,pos,buflen) {xb.s=buf; xb.p=buf+pos; xb.e = xb.s+buflen;}  /* init from raw pts and set 'cursor' position */
 
-#define XELP_XBInit(xb,buf,buflen)       {xb->s=buf; xb->p=buf; xb->e = s+buflen+1;}      /* init from raw ptrs                          */
-#define XELP_XBInitBP(xb,buf,pos,buflen) {xb->s=buf; xb->p=buf+pos; xb->e = s+buflen+1;}  /* init from raw pts and set 'cursor' position */
+/* XelpBuf const macros (no data changed) */
+#define XELP_XBPCopy(a,b)				 {b.s=a.s; b.p=a.p; b.e=a.e;}                   /* copy params from XelpBuf a to XelpBuf b     */
+#define XELP_XBGetBufPtr(x)              (x.s)                                          /* get start pos                               */
+#define XELP_XBBufLen(x)                 ((int)((x.e)- (x.s))                           /* get length in bytes of XelpBuf              */
+#define XELP_XBGetBuf(x,ptr,len)         {ptr=x.s; len= (x.e) - (x.s)}                  /* get the start ptr, and total length of the Xelp buf*/
 
-#define XELP_XBPCopy(a,b)				 {b->s=a->s; b->p=a->p; b->e=a->e;}               /* copy params from XelpBuf a to XelpBuf b     */
-#define XELP_XBGetBufPtr(x)              (x->s)                                           /* get start pos                               */
-#define XELP_XBBufLen(x)                 ((int)((x->e) - 1 - (x->s))                      /* get length in bytes of XelpBuf              */
-#define XELP_XBGetBuf(x,ptr,len)         {ptr=x->s; len= (x->e) -1- (x->s)}               /* get the start ptr, and total length of the Xelp buf*/
-
+/* Xelp writing and setting */
+#define XELP_XBPUTC(x,ch)                {if (x.p<x.e){*(x.p)++ =ch;}}                   /* write char to buf */
+#define XELP_XBTOP(x)                    {x.p=x.s}                                      /* set pos ptr to beginning */
 
 
 
@@ -221,6 +226,7 @@ typedef struct
 	char					mCmdMsgBuf[XELP_CMDBUFSZ]; 	/* cli string buffer.               */
 	int 					mCmdBufSize;     /* cli Buf size                                */
 	int						mCmdMsgIndex;    /* current cursor position                     */
+    XelpBuf                 mpCmdBuf;        /* buffer                                      */
 #endif
 
 
@@ -276,6 +282,7 @@ XELPRESULT XELPHelp	        (XELP *ths);                             /* print on
 XELPRESULT XELPOut 		    (XELP *ths, const char* msg, int maxlen);/* print function                  */
 XELPRESULT XELPExecKC		(XELP *ths, char key);				     /* execute key command             */
 XELPRESULT XELPParse 		(XELP *ths, const char *buf, int blen);  /* execute CLI or script commands  */
+XELPRESULT XELPParseXB      (XELP *ths, XelpBuf *args);                 /* execute CLI or script commands  */
 XELPRESULT XELPParseKey 	(XELP *ths, char key);				     /* handle keypress at CLI          */
 
 /* XELPTokLine is the main tokenizer which can get next token or line at time                           */
