@@ -125,7 +125,7 @@ XELPRESULT XELPInit 	 (
 		*p=0;
 	
 	ths->mpAboutMsg = pAboutMsg;
-	XELP_XBInit(ths->mpCmdBuf,ths->mCmdMsgBuf,XELP_CMDBUFSZ-1);
+	XELP_XBInit(ths->mCmdXB,ths->mCmdMsgBuf,XELP_CMDBUFSZ-1);
 	/* comand mode mssage index 
 	ths->mCmdMsgIndex = 0;  //set to 0 by ptr loop at top
 	*/
@@ -353,19 +353,22 @@ XELPRESULT XELPTokLine (const char *bs, const char *be, const char **t0s, const 
 	}
 	return XELP_S_NOTFOUND;
 }
-/*
-XELPRESULT XELPTokLineX ( char *bs,  char *be, const char **t0s, const char **t0e, const char **eol, int srchType) {
-    XelpBuf b,tok;
-    XELPRESULT r;
-    XELP_XBInitPtrs(b,bs,bs,be);
 
-    r=XELPTokLineXB(&b,&tok,srchType);
+XELPRESULT XELPTokLineX(char* bs, char* be, const char **t0s, const char **t0e, const char **eol, int srchType) {
+    XelpBuf xc,tok;
+    XELPRESULT r;
+
+    XELP_XBInitPtrs(xc,bs,bs,be);
+    //XELP_XBInit(xc,bs,(int)(be-bs));
+
+    r=XELPTokLineXB(&xc,&tok,srchType);
     *t0s = tok.s;
     *t0e = tok.p;
     *eol = tok.e;
     return r;
 }
-*/
+
+
 /********************************************************
   XELPTokLineXB(buf, output, srch) - main tokenizer - handles whitespaces, linefeeds, comments, quoted strings
 
@@ -438,8 +441,10 @@ XELPRESULT XELPParseXB (XELP* ths, XelpBuf *args) {
 XELPRESULT XELPParseKey (XELP *ths, char key)
 {
 	int i=ths->mCurMode;
-    XelpBuf ax; 
-	/* 	first we test to see if we should switch modes.  this is a "key" difference  btw 
+    XelpBuf line; // this represents a tokenized "line" see XelpTokLine
+
+	/* 	
+    First we test to see if we should switch modes.  this is a "key" difference  btw 
 	just submitting a buffer to be parsed and running at command line
 	*/
 	switch (key) {
@@ -481,30 +486,26 @@ XELPRESULT XELPParseKey (XELP *ths, char key)
 				break;
 			default: /* XELP_MODE_CLI */
 #ifdef XELP_ENABLE_CLI
-				if ((key == XELPKEY_BKSP) && (ths->mCmdMsgIndex )) {
-					ths->mCmdMsgIndex --;
-					if(ths->mpfBksp)
-						ths->mpfBksp();
+                if (key == XELPKEY_BKSP){ 
+                    if (ths->mCmdXB.p > ths->mCmdXB.s ) {
+                        (ths->mCmdXB.p)--;
+                        if(ths->mpfBksp)
+                            ths->mpfBksp();
+                    }
 				}
 				else {
-					_PUTC(key);
+					_PUTC(key); /* echo to output */
 					if (key == XELPKEY_ENTER )	{
-						ths->mCmdMsgBuf[ths->mCmdMsgIndex]=';'; /*';' is used by the parser as statement terminator*/
-						ths->mCmdMsgIndex++;
-						//XELPParse(ths,ths->mCmdMsgBuf,ths->mCmdMsgIndex);
-                        
-                        XELP_XBInit(ax,ths->mCmdMsgBuf,ths->mCmdMsgIndex);
-                        XELPParseXB(ths,&ax);
-                        ths->mCmdMsgIndex=0; /* reset after command attempt */
+						XELP_XBPUTC_RAW(ths->mCmdXB,';');
+                        XELP_XBInitPtrs(line,ths->mCmdXB.s,ths->mCmdXB.s,ths->mCmdXB.e);
+                        XELPParseXB(ths,&line);
+                        XELP_XBTOP(ths->mCmdXB);
 #ifdef XELP_CLI_PROMPT
 						XELPOut(ths,XELP_CLI_PROMPT,-1);
 #endif
 					}
 					else {
-						if (ths->mCmdMsgIndex<(XELP_CMDBUFSZ-2) ) 	{ /* make sure still be able to press ENTER even if buf full */
-							ths->mCmdMsgBuf[ths->mCmdMsgIndex]=key;
-							ths->mCmdMsgIndex++;
-						}
+                        XELP_XBPUTC(ths->mCmdXB,key);
 					}
 				}
 #endif
@@ -552,7 +553,7 @@ int XELPStr2Int (const char* s,int  maxlen) {
 	return r;
 }
 /*
-XELPRESULT XelpStackOp (int opcode) {
+XELPRESULT XelpStackOp (int opcode, int *a, int *b) {
 
 	switch (opcode) {
         case XELP_STACK_NOP:

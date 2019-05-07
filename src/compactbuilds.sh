@@ -89,7 +89,7 @@ powerpc-linux-gnu-gcc -c xelp.c -Os
 du -b xelp.o | awk '{print "obj file size: " $1 " bytes"}'
 size xelp.o | awk 'FNR==2{print "exec code:     " $1 " bytes"}' 
 
-make clean #clean up all the cruft .sym, .asm, etc
+rm *.o -f
 
 #rebuild one last time for current env
 gcc -c xelp.c -Os 

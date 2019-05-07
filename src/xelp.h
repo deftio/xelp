@@ -120,7 +120,7 @@ typedef struct {
 
 /* XelpBuf MACROS */
 #define XELP_XBInit(xb,buf,buflen)       {xb.s=buf; xb.p=buf; xb.e = xb.s+buflen;}      /* init from raw ptr  with length              */
-#define XELP_XBInitPtrs(xb,s,p,e)        {xb.s=s; xb.p=p; xb.e=e;}                      /* init from 3 raw pointrs                     */
+#define XELP_XBInitPtrs(xb,bs,bp,be)     {xb.s=bs; xb.p=bp; xb.e=be;}                   /* init from 3 raw pointrs                     */
 #define XELP_XBInitBP(xb,buf,pos,buflen) {xb.s=buf; xb.p=buf+pos; xb.e = xb.s+buflen;}  /* init from raw pts and set 'cursor' position */
 
 /* XelpBuf const macros (no data changed) */
@@ -131,8 +131,8 @@ typedef struct {
 
 /* Xelp writing and setting */
 #define XELP_XBPUTC(x,ch)                {if (x.p<x.e){*(x.p)++ =ch;}}                   /* write char to buf */
-#define XELP_XBTOP(x)                    {x.p=x.s}                                      /* set pos ptr to beginning */
-
+#define XELP_XBPUTC_RAW(x,ch)            {*(x.p)++=ch;}                                  /* write char to buf */
+#define XELP_XBTOP(x)                    {x.p=x.s;}                                      /* set pos ptr to beginning */
 
 
 /*****************************************************************************
@@ -223,10 +223,8 @@ typedef struct
 	
 #ifdef XELP_ENABLE_CLI						 /* if CLI and script support enabled           */
 	XELPCLIFuncMapEntry		*mpCLIModeFuncs; /* command mode function dispatch              */
-	char					mCmdMsgBuf[XELP_CMDBUFSZ]; 	/* cli string buffer.               */
-	int 					mCmdBufSize;     /* cli Buf size                                */
-	int						mCmdMsgIndex;    /* current cursor position                     */
-    XelpBuf                 mpCmdBuf;        /* buffer                                      */
+	char					mCmdMsgBuf[XELP_CMDBUFSZ]; 	/* cli string buffer storage        */
+    XelpBuf                 mCmdXB;          /* buffer ptrs for parsing                     */
 #endif
 
 
