@@ -127,11 +127,13 @@ typedef struct {
 #define XELP_XBPCopy(a,b)				 {b.s=a.s; b.p=a.p; b.e=a.e;}                   /* copy params from XelpBuf a to XelpBuf b     */
 #define XELP_XBGetBufPtr(x)              (x.s)                                          /* get start pos                               */
 #define XELP_XBBufLen(x)                 ((int)((x.e)- (x.s))                           /* get length in bytes of XelpBuf              */
+#define XELP_XBGetPos(x)                 ((int)(x.p-x.s))                               /* return current position as int              */
 #define XELP_XBGetBuf(x,ptr,len)         {ptr=x.s; len= (x.e) - (x.s)}                  /* get the start ptr, and total length of the Xelp buf*/
 
 /* Xelp writing and setting */
 #define XELP_XBPUTC(x,ch)                {if (x.p<x.e){*(x.p)++ =ch;}}                   /* write char to buf */
-#define XELP_XBPUTC_RAW(x,ch)            {*(x.p)++=ch;}                                  /* write char to buf */
+#define XELP_XBPUTC_RAW(x,ch)            {*(x.p)++=ch;}                                  /* write char to buf no bounds check*/
+#define XELP_XBGETC(x,ch)                {if (x.p<x.e)(ch=(*x.e);x.e++})                 /* get next char */
 #define XELP_XBTOP(x)                    {x.p=x.s;}                                      /* set pos ptr to beginning */
 
 
@@ -215,7 +217,7 @@ typedef struct
 
 	const char* 			mpAboutMsg;      /* Used as beginning of help message           */
 
-	int 					mR[XELP_REGS_SZ];/* mR is the register(s) used for func retn, ifOK etc (see docs) */
+	int 					mR[XELP_REGS_SZ];/* mR is the reg(s) used for func retn, ifOK etc (see docs) */
 
 #ifdef XELP_ENABLE_KEY						 /* if single-key commands enabled              */
 	XELPKeyFuncMapEntry		*mpKeyModeFuncs; /* key mode function dispatch                  */
@@ -229,7 +231,7 @@ typedef struct
 
 
 #ifdef XELP_CLI_PROMPT 						 /* prompt for CLI enabled                      */
-	const char*				mpPrompt;		 /* prompt at beginning of CLI e.g. dio>		*/
+	const char*				mpPrompt;		 /* prompt at beginning of CLI e.g. xelp>		*/
 #endif	
 
 	/****
@@ -241,7 +243,7 @@ typedef struct
 	void (*mpfEditModeChg)(int);  /* function called when key mode is changed.               */
 
 #ifdef XELP_ENABLE_THR	
-	void (*mpfPassThru)(int);    /* function to pass keys in thru mode                      */
+	void (*mpfPassThru)(char);    /* function to pass keys in thru mode                      */
 #endif 	
 #ifdef XELP_ENABLE_CLI	
 	void (*mpfBksp)();			  /* function to handle destructive backspace at CLI prompt  */
@@ -278,21 +280,24 @@ XELPRESULT XELPHelp	        (XELP *ths);                             /* print on
 
 /* Xelp API functions */
 XELPRESULT XELPOut 		    (XELP *ths, const char* msg, int maxlen);/* print function                  */
+#define XELPOutXB(x,xb)     (XELPOut(x,xb.p,(int((xb.e-xb.p)))       /* print a XelpBuf from cur pos    */
 XELPRESULT XELPExecKC		(XELP *ths, char key);				     /* execute key command             */
 XELPRESULT XELPParse 		(XELP *ths, const char *buf, int blen);  /* execute CLI or script commands  */
-XELPRESULT XELPParseXB      (XELP *ths, XelpBuf *args);                 /* execute CLI or script commands  */
+XELPRESULT XELPParseXB      (XELP *ths, XelpBuf *script);            /* execute CLI or script commands  */
 XELPRESULT XELPParseKey 	(XELP *ths, char key);				     /* handle keypress at CLI          */
 
 /* XELPTokLine is the main tokenizer which can get next token or line at time                           */
 /* XELPRESULT XELPTokLine (const char *buf, int blen, const char **t0s, const char **t0e, const char **eol, int srchType); */
-XELPRESULT XELPTokLine (const char *buf, const char *bufend, const char **t0s, const char **t0e, const char **eol, int srchType); 
+XELPRESULT XELPTokLine ( char *buf, char *bufend, const char **t0s, const char **t0e, const char **eol, int srchType); 
 XELPRESULT XELPTokLineXB (XelpBuf *buf, XelpBuf *tok, int srchType);
+XELPRESULT XELPTokN (XelpBuf *buf, int n, XelpBuf *tok);
+XELPRESULT XelpNumToks (XelpBuf *buf, int *n);
 
 /* XELPNEXTTOK get next token in a string buffer.  This is just a macro call to XELPTokLine             */
 #define    XELPNEXTTOK(buf,blen,tok_s,tok_e)    (XELPTokLine(buf, buf+blen, tok_s, tok_e, 0, XELP_TOK_ONLY))
 int        XELPStrLen(const char* c);                               /* compute length of null terminated string. */ 
 int        XELPStr2Int(const char* s,int  maxlen);                  /* parse a str->int accepts hex as 123h or signed decimal num.  no safety for non-num chars */   
-XELPRESULT XELPFindTok(XelpBuf *x, const char *t0s, const char *t0e, int srchType);
+XELPRESULT XELPFindTok(XelpBuf *x, const char *t0s, const char *t0e, int srchType); /* find matching tok (next tok || next label) */
 
 /* XelpBufCmp() compare buffers / string */
 XELPRESULT XelpBufCmp (const char *as, const char *ae, const char *bs, const char * be, int cmpType); 

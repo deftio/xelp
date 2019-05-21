@@ -1,10 +1,11 @@
 # make file for xelp posix tests (xelp interpreter for embedded systems)
 # @author M A Chatterjee <deftio [at] deftio [dot] com>
 
-CC=gcc
-CPP=g++
+CC=gcc   	# C compiler to use
+CPP=g++		# C++ compiler to use
 
-C_FLAGS=-I. -Wall -g
+#C_FLAGS=-I. -Wall -g
+C_FLAGS=-I. -Wall -g -fprofile-arcs -ftest-coverage 
 CPP_FLAGS=-std=c++11 -Wall
 
 LIB_DIR=src
@@ -30,6 +31,10 @@ OBJC_TESTS=$(SRC_TESTS:.c=.o)  # object files for C language (not CPP) for tests
 tests: $(OBJC_TESTS)
 	$(CC) $(C_FLAGS) $(INCLUDES) $(TEST_FLAGS) $(OBJC_TESTS) -o $(TEST_DIR)/xelp_unit_tests.out
 	@$(TEST_DIR)/xelp_unit_tests.out
+	@$(.)gcov src/xelp.c $(LIB_DIR)/xelp.c
+	@$(.)mv xelp.c.gcov $(TEST_DIR)
+	# @$(TEST_DIR)lcov xelp.c.gcov   ///lcov --coverage --directory . --output-file main_coverage.info
+	# genhtml xelp.info --output-directory $(TEST_DIR)
 
 #=======================================================================
 #build simple example in /example/posix-simple folder

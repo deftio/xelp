@@ -122,7 +122,7 @@ XELPRESULT XELPInit 	 (
 	int i=sizeof(XELP);
  	char *p = (char *) ths;  
 	while (i--)
-		*p=0;
+		*p++=0;
 	
 	ths->mpAboutMsg = pAboutMsg;
 	XELP_XBInit(ths->mCmdXB,ths->mCmdMsgBuf,XELP_CMDBUFSZ-1);
@@ -241,13 +241,16 @@ XelpExecKC(myInstance,'a');  // execute the single key command 'a' if it exists
 #ifdef XELP_ENABLE_KEY
 XELPRESULT XELPExecKC(XELP* ths, char key) {
 	XELPKeyFuncMapEntry *p = ths->mpKeyModeFuncs;
-	while (p->mFunPtr) {
-		if (p->mKey == key)			{
-			ths->mR[0] = p->mFunPtr((int)key);
-			return ths->mR[0];
-		}
-		p++;
-	}
+    if (p) 
+    {          
+        while (p->mFunPtr) {
+            if (p->mKey == key)			{
+                ths->mR[0] = p->mFunPtr((int)key);
+                return ths->mR[0];
+            }
+            p++;
+        }
+    }
     ths->mR[0] = XELP_S_NOTFOUND;
 	return ths->mR[0];
 }
@@ -265,7 +268,7 @@ XELPRESULT XELPExecKC(XELP* ths, char key) {
 
 #define _PS_SEEK   (0x00)  /* seek next token0 */
 #define _PS_ESCA   (0x01)  /* esc sequence */
-#define _PS_TOK0   (0x02)  /* token0 (the command / opterator */
+#define _PS_TOK0   (0x02)  /* token0 (the command / opterator)*/
 #define _PS_CMNT   (0x03)  /* single-line comment */
 #define _PS_SEOL   (0x04)  /* seek end-of-line */
 #define _PS_QUOT   (0x05)  /* quoted string */
@@ -319,7 +322,7 @@ static unsigned char const gPSMJumpTable[8]= {
  78,/* _PS_QESC */
  81 /* _PS_QEND */
 };
-
+#ifdef XTOKLINE_OLD
 XELPRESULT XELPTokLine (const char *bs, const char *be, const char **t0s, const char **t0e, const char **eol, int srchType) {
  	const char *s;		 /* state ptr */
 	char cs=_PS_SEEK,prev=_PS_SEEK,tmp;   
@@ -351,10 +354,12 @@ XELPRESULT XELPTokLine (const char *bs, const char *be, const char **t0s, const 
 
 		bs++; /* advance char ptr */
 	}
+    
 	return XELP_S_NOTFOUND;
 }
+#endif
 
-XELPRESULT XELPTokLineX(char* bs, char* be, const char **t0s, const char **t0e, const char **eol, int srchType) {
+XELPRESULT XELPTokLine(char* bs, char* be, const char **t0s, const char **t0e, const char **eol, int srchType) {
     XelpBuf xc,tok;
     XELPRESULT r;
 
@@ -380,6 +385,12 @@ XELPRESULT XELPTokLineXB (XelpBuf *buf, XelpBuf *tok, int srchType) {
  	const char *s;		 /*parser state ptr */
 	char cs=_PS_SEEK,prev=_PS_SEEK,tmp;   
 	int tm=1; /*  (token mode) allows capture of t0e, t0s only for first token seen */
+
+tok->s=buf->s;
+tok->p=buf->s;
+
+    if ((buf->p) >= (buf->e)) {  return XELP_S_NOTFOUND; }
+
 
 	while ((buf->p) < (buf->e)) {
 		s = gPSMStates+(int)(gPSMJumpTable[(unsigned int)cs]);//index in to state array quickly
@@ -410,24 +421,97 @@ XELPRESULT XELPTokLineXB (XelpBuf *buf, XelpBuf *tok, int srchType) {
 
 		(buf->p)++; /* advance char ptr */
 	}
-	return XELP_S_NOTFOUND;
+    tok->e  = buf->p; 
+    
+    return XELP_S_OK;
+    
 }
+
+/********************************************************
+ XelpParseXB() parse buffer and execute commands 
+ */
 
 XELPRESULT XELPParseXB (XELP* ths, XelpBuf *args) {
 	XelpBuf line;
 	XELPCLIFuncMapEntry   *f;
 
-	while (XELP_S_OK ==  XELPTokLineXB(args,&line,XELP_TOK_LINE) ) {
+	while (XELP_S_OK ==  XELPTokLineXB(args,&line,XELP_TOK_LINE) ) { /* for each logical line */
+        XELPOut(ths,"(",-1);
+        XELPOut(ths,line.s,(int)(line.p-line.s));
+        XELPOut(ths,")",-1);
+
+        XELPOut(ths,">>>",-1);
+        XELPOut(ths,line.s,(int)(line.e-line.s));
+        XELPOut(ths,"<<<\n",-1);
+
         f=ths->mpCLIModeFuncs;
         while(f->mpCmd) {    
             if (XELP_S_OK == XELPStrEq(line.s,(int)(line.p-line.s),f->mpCmd)){
-                ths->mR[0] = (f->mFunPtr)(line.s,(int)(line.e-line.s));	break;
+                
+                ths->mR[0] = (f->mFunPtr)(line.s,(int)(line.e-line.s));	
+                break;
             }
             f++;
         }
 	}
 	return XELP_S_OK;
 }
+XELPRESULT XELPParse 		(XELP *ths, const char *buf, int blen)
+{
+    XelpBufC args;
+    XELP_XBInit(args,buf,blen); 
+    return XELPParseXB(ths,&args);
+}
+/********************************************************
+ XELPTokN() find the nth token (if it exists) - useful for parsing arguments
+
+ note: tok has last successfully found token regardless of result (check return value == XELP_S_OK)
+ buf.p is pointing to position just after nth token.
+
+ */
+
+
+XELPRESULT XELPTokN (XelpBuf *buf, int n, XelpBuf *tok)
+{
+    XELPRESULT r;
+    buf->p = buf->s;
+    while (n--) {
+        r = XELPTokLineXB(buf,tok,XELP_TOK_ONLY);
+        if (XELP_S_OK != r)
+            break;
+    }
+    
+    return r;
+}
+
+XELPRESULT XelpNumToks (XelpBuf *b, int *n)
+{
+    XelpBuf t;
+    *n=0;
+    while (XELP_S_OK == XELPTokLineXB(b,&t,XELP_TOK_ONLY))
+        (*n)++;
+        
+    return XELP_S_OK;
+    /*
+	const char *s;
+	const char *e;
+	const char *tmp;
+	int i=0;
+	s = args;
+	e = args;
+	tmp = args;
+#ifdef XELP_ENABLE_CLI
+	while (XELP_S_OK == XELPNEXTTOK(s,maxlen+1,&s,&e)) {
+		i++;
+		maxlen -= (e-tmp);
+		s=e;
+		tmp=s;
+	}
+#endif
+	printw("numtoks: %d\n",i);
+	return XELP_S_OK;
+    */
+};
 #endif /* XELP_ENABLE_CLI */
 
 /**
@@ -445,7 +529,7 @@ XELPRESULT XELPParseKey (XELP *ths, char key)
 
 	/* 	
     First we test to see if we should switch modes.  this is a "key" difference  btw 
-	just submitting a buffer to be parsed and running at command line
+	just submitting a buffer to be parsed and running a live command line interpreter.
 	*/
 	switch (key) {
 #ifdef XELP_ENABLE_CLI
@@ -468,10 +552,10 @@ XELPRESULT XELPParseKey (XELP *ths, char key)
 	}
 	
 	if (ths->mCurMode != i) {
-		if (ths->mpfEditModeChg)
+		if (ths->mpfEditModeChg) /* if we have changed modes call the mode-change callback (if supplied) */
 			ths->mpfEditModeChg(ths->mCurMode);
 	}
-	else {
+	else { /* we haven't changed modes so we act on the key */
 		switch(ths->mCurMode) {
 			case XELP_MODE_KEY:
 #ifdef XELP_ENABLE_KEY
@@ -489,17 +573,20 @@ XELPRESULT XELPParseKey (XELP *ths, char key)
                 if (key == XELPKEY_BKSP){ 
                     if (ths->mCmdXB.p > ths->mCmdXB.s ) {
                         (ths->mCmdXB.p)--;
-                        if(ths->mpfBksp)
-                            ths->mpfBksp();
+                    if(ths->mpfBksp)
+                        ths->mpfBksp();
                     }
 				}
 				else {
 					_PUTC(key); /* echo to output */
+                    
 					if (key == XELPKEY_ENTER )	{
-						XELP_XBPUTC_RAW(ths->mCmdXB,';');
-                        XELP_XBInitPtrs(line,ths->mCmdXB.s,ths->mCmdXB.s,ths->mCmdXB.e);
+                        
+						//XELP_XBPUTC_RAW(ths->mCmdXB,';'); /* write this explictly b/c XELPKEY_ENTER may not be a parser term */
+                        XELP_XBInitPtrs(line,ths->mCmdXB.s,ths->mCmdXB.s,ths->mCmdXB.p);
                         XELPParseXB(ths,&line);
-                        XELP_XBTOP(ths->mCmdXB);
+                        line.p=line.s;
+                        XELP_XBTOP(ths->mCmdXB);/* reset command buf to beginning */
 #ifdef XELP_CLI_PROMPT
 						XELPOut(ths,XELP_CLI_PROMPT,-1);
 #endif

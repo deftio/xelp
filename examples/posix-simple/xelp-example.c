@@ -84,6 +84,7 @@ void XELPErr(XELP* ths, int e) {
 	addch((char)('a'+((e>>4)&0xf)));
 	addch((char)('a'+((e&0xf))));
 	addch(' ');
+    addch('\n');
 }
 
 XELPRESULT fooBar(int c)
@@ -159,7 +160,8 @@ XELPRESULT cmdNumToks (const char* args, int maxlen)
 	const char *s;
 	const char *e;
 	const char *tmp;
-	int i=0;
+	int i=0,n=0;
+    XelpBuf b;
 	s = args;
 	e = args;
 	tmp = args;
@@ -171,8 +173,13 @@ XELPRESULT cmdNumToks (const char* args, int maxlen)
 		tmp=s;
 	}
 #endif
-	printw("numtoks: %d\n",i);
-	return XELP_S_OK;
+    //XELP_XBInit(b,args,len);
+    //XelpNumToks(b,&n);
+	printw("numtoks: %d : XelpNumToks %d",i,n);
+	
+    return XELP_S_OK;
+
+
 };
 XELPRESULT cmdPrintR (const char* args, int maxlen){
 	int i = example.mR[0];
@@ -362,7 +369,7 @@ int main (int argc, char *argv[])
 	XELP_SET_FN_BKSP(example,&handleBackspace);
 	//example.mpfBksp = &handleBackspace; // setup backpace platform dependant visual handling.  (applies to CLI parse mode only)
 #endif
-	//example.mpfEditModeChg = &modeChangeMsg;  //emite message when key entry mode changes
+	//example.mpfEditModeChg = &modeChangeMsg;  //emit message when key entry mode changes
 	XELP_SET_FN_EMCHG(example,&modeChangeMsg);
 
 	//XELPSetIO(&example,&gPutChar,&gPutChar);
