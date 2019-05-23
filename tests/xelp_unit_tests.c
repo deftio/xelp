@@ -256,8 +256,6 @@ XELPRESULT test_XELPStrEq2() {
     
     return XELP_S_OK;
 }
-
-
 /* ====================================================================
  test_XELPStr2Int()
  */
@@ -267,6 +265,12 @@ XELPRESULT test_XELPStr2Int() {
 		return XELP_E_Err;
 
     if (gLogTest(XELPStr2Int("31h",3) != 49,"Str2Int")) // hex parser
+		return XELP_E_Err;
+
+    if (gLogTest(XELPStr2Int("-87",3) != -87,"Str2Int")) // hex parser
+		return XELP_E_Err;
+
+    if (gLogTest(XELPStr2Int("+6546",5) != 6546,"Str2Int")) // hex parser
 		return XELP_E_Err;
 
 	return XELP_S_OK;
@@ -372,7 +376,6 @@ XELPRESULT test_XelpTokLineXB() {
 
     return XELP_S_OK;
 }
-
 /* ====================================================================
  test_XelpInit()
  */
@@ -557,6 +560,60 @@ XELPRESULT test_XELPParseKey() {
 }
 
 
+
+
+/* ====================================================================
+ test_XELPTokN()
+ XELPRESULT XELPTokN (XelpBuf *b, int *n)
+ */
+
+XELPRESULT test_XELPTokN() {
+    XelpBuf x, tok;
+    XELPRESULT r;
+    char *c1 = "tok1 tok2    \t tok3   tok4\n otk5";
+    char *c2 = " tok1 tok2    \t# tok3   tok4\n t0k5"; // test with comment
+
+    
+    XELP_XBInit(x,c1,XELPStrLen(c1));   
+    r = XELPTokN(&x,0,&tok);
+    //if (gLogTest( ((r!=XELP_S_OK)&& (XELPStrEq2(tok.s, tok.p,"tok1") )),"XELPTokN get 0th token"))
+    //    return XELP_E_Err;
+
+    return XELP_S_OK;
+}
+/* ====================================================================
+ test_XelpNumToks()
+ */
+
+XELPRESULT test_XelpNumToks() {
+    XelpBuf x;
+    XELPRESULT r;
+    int n=0;
+    char *c1 = "tok1 tok2    \t tok3   tok4\n t0k5";
+    char *c2 = " tok1 tok2    \t# tok3   tok4\n t0k5"; // test with comment
+
+    XELP_XBInit(x,c1,XELPStrLen(c1));
+    r = XelpNumToks(&x,&n);
+    if (gLogTest(((r!=XELP_S_OK) && (n !=5)),"XelpNumToks tabs and newlines"))
+        return XELP_E_Err;
+
+    XELP_XBInit(x,c2,XELPStrLen(c2));
+    r = XelpNumToks(&x,&n);
+    if (gLogTest(((r!=XELP_S_OK) && (n !=3)),"XelpNumToks comment on second line"))
+        return XELP_E_Err;
+
+    return XELP_S_OK;
+}
+/* ====================================================================
+ test_XELPParseXB()
+ */
+
+XELPRESULT test_XELPParseXB() {
+    XELP x;
+
+    XELPInit(&x,"TestParseXB");
+    return XELP_S_OK;
+}
 /* ====================================================================
  test_XELPParse()
  */
@@ -576,16 +633,8 @@ XELPRESULT test_XELPParse() {
         return XELP_E_Err;
     return XELP_S_OK;
 }
-/* ====================================================================
- test_XELPParseXB()
- */
 
-XELPRESULT test_XELPParseXB() {
-    XELP x;
 
-    XELPInit(&x,"TestParseXB");
-    return XELP_S_OK;
-}
 /* 	************************************************
 	Xelp simple unit test suite.  
 */
@@ -601,6 +650,8 @@ int run_tests() {
     gRunUnit(test_XelpBufCmp,"test_XelpBufCmp");
     gRunUnit(test_XelpFindTok,"test_XelpFindTOk");
     gRunUnit(test_XelpTokLineXB,"test_XelpTokLineXB");
+    gRunUnit(test_XELPTokN,"test_XelpTokN");
+    gRunUnit(test_XelpNumToks,"test_XelpNumToks");
     gRunUnit(test_XelpInit,"test_XelpInit");
     gRunUnit(test_XelpOut_XelpThru_XelpErr,"failed test_XelpOut_XelpThru_XelpErr");
     gRunUnit(test_XELPExecKC,"test_XELPExecKC");

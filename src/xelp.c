@@ -483,6 +483,11 @@ XELPRESULT XELPTokN (XelpBuf *buf, int n, XelpBuf *tok)
     return r;
 }
 
+/********************************************************
+ XelpNumToks() find the number of tokens in a buffer.
+
+ */
+
 XELPRESULT XelpNumToks (XelpBuf *b, int *n)
 {
     XelpBuf t;
@@ -491,25 +496,6 @@ XELPRESULT XelpNumToks (XelpBuf *b, int *n)
         (*n)++;
         
     return XELP_S_OK;
-    /*
-	const char *s;
-	const char *e;
-	const char *tmp;
-	int i=0;
-	s = args;
-	e = args;
-	tmp = args;
-#ifdef XELP_ENABLE_CLI
-	while (XELP_S_OK == XELPNEXTTOK(s,maxlen+1,&s,&e)) {
-		i++;
-		maxlen -= (e-tmp);
-		s=e;
-		tmp=s;
-	}
-#endif
-	printw("numtoks: %d\n",i);
-	return XELP_S_OK;
-    */
 };
 #endif /* XELP_ENABLE_CLI */
 
@@ -638,33 +624,3 @@ int XELPStr2Int (const char* s,int  maxlen) {
 	}
 	return r;
 }
-/*
-XELPRESULT XelpStackOp (int opcode, int *a, int *b) {
-
-	switch (opcode) {
-        case XELP_STACK_NOP:
-            return XELP_E_Err;
-            break;
-        case XELP_STACK_PUSH:
-            return XELP_E_Err;
-            break;
-        case XELP_STACK_POP:
-            return XELP_E_Err;
-            break;
-        case XELP_STACK_XOR:
-            break;
-        case XELP_STACK_NOT:
-        case XELP_STACK_ADD:
-        case XELP_STACK_INC:
-        case XELP_STACK_DEC:
-        case XELP_STACK_SUB:
-        case XELP_STACK_MUL:
-        case XELP_STACK_AND:
-        case XELP_STACK_OR :
-        default:
-            return XELP_W_Warn;
-	}
-    
-	return XELP_S_OK;
-}
-*/
