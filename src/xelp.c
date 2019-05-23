@@ -420,6 +420,8 @@ tok->p=buf->s;
 
 		(buf->p)++; /* advance char ptr */
 	}
+    if (tm)
+        tok->p  = buf->p;
     tok->e  = buf->p; 
     
     return XELP_S_OK;
@@ -474,11 +476,11 @@ XELPRESULT XELPTokN (XelpBuf *buf, int n, XelpBuf *tok)
 {
     XELPRESULT r;
     buf->p = buf->s;
-    while (n--) {
+    do {
         r = XELPTokLineXB(buf,tok,XELP_TOK_ONLY);
         if (XELP_S_OK != r)
             break;
-    }
+    }while (n--);
     
     return r;
 }
@@ -499,7 +501,7 @@ XELPRESULT XelpNumToks (XelpBuf *b, int *n)
 };
 #endif /* XELP_ENABLE_CLI */
 
-/**
+/********************************************************
 	XELPParseKey() 
 	live command line handling. 
 	first looks for mode switch commans (single-key --> cli ---> thru)
@@ -587,19 +589,20 @@ XELPRESULT XELPParseKey (XELP *ths, char key)
 	
 	return XELP_S_OK;
 }
-/**
+/********************************************************
   XELPSStr2Int()
   parse a string return an integer
   345  --> read as decimal
   345h --> read as hex
  */
-#define FR_SMUL10(x)	(((x)<<3)+(((x)<<1)))  /* many micros don't have multiply in core inst set */
+#define FR_SMUL10(x)	(((x)<<3)+(((x)<<1)))  /* many old micros don't have multiply in core inst set */
 
 int XELPStr2Int (const char* s,int  maxlen) {
 	const char *p = s+maxlen-1;
 	int r=0,x=0,d;
 
-	if ('h' == *p) { /* hexadecimal */
+	if ('h' == *p) 
+    { /* hexadecimal */
 		while (s<p) {
 			d = (*s > '9') ? (*s-'a'+0xa) : (*s-'0');
 			r = (r<<4)|d;

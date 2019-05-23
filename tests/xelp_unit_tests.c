@@ -570,14 +570,30 @@ XELPRESULT test_XELPParseKey() {
 XELPRESULT test_XELPTokN() {
     XelpBuf x, tok;
     XELPRESULT r;
-    char *c1 = "tok1 tok2    \t tok3   tok4\n otk5";
-    char *c2 = " tok1 tok2    \t# tok3   tok4\n t0k5"; // test with comment
-
+    char *c1 = "tok0 tok1 tok2    \t tok3   tok4\n tok5";
+    char *c2 = " tokk0 tok1 tok2    \t # tok3   tok4\n tok5 "; // test with comment
+    char *c3 = " tokk0 tok1 tok2    \t # tok3   tok4\n tok5"; // test with comment
     
     XELP_XBInit(x,c1,XELPStrLen(c1));   
     r = XELPTokN(&x,0,&tok);
-    //if (gLogTest( ((r!=XELP_S_OK)&& (XELPStrEq2(tok.s, tok.p,"tok1") )),"XELPTokN get 0th token"))
-    //    return XELP_E_Err;
+    if (gLogTest( ((r!=XELP_S_OK) || (XELP_S_OK != XELPStrEq2(tok.s, tok.p,"tok0") )),"XELPTokN get 0th token"))
+        return XELP_E_Err;
+
+    r = XELPTokN(&x,3,&tok);
+    if (gLogTest( ((r!=XELP_S_OK) || (XELP_S_OK != XELPStrEq2(tok.s, tok.p,"tok3") )),"XELPTokN get 3rd token"))
+        return XELP_E_Err;
+
+
+    XELP_XBInit(x,c2,XELPStrLen(c2));   
+    r = XELPTokN(&x,3,&tok);
+    if (gLogTest( ((r!=XELP_S_OK) || (XELP_S_OK != XELPStrEq2(tok.s, tok.p,"tok5") )),"XELPTokN get 3rd token w commented line"))
+        return XELP_E_Err;
+
+    XELP_XBInit(x,c2,XELPStrLen(c3));   
+    r = XELPTokN(&x,3,&tok);
+    if (gLogTest( ((r!=XELP_S_OK) || (XELP_S_OK != XELPStrEq2(tok.s, tok.p,"tok5") )),"XELPTokN get 3rd token w commented line"))
+        return XELP_E_Err;
+
 
     return XELP_S_OK;
 }
