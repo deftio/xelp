@@ -57,7 +57,6 @@ int XELPStrLen (const char* c) {
  */
 XELPRESULT XELPOut (XELP *ths, const char* msg, int maxlen)
 {
-	//maxlen = (maxlen == 0) ? -1 : maxlen;  //truly a C hack.  let maxlen wrap around
 	if ((0 == msg) || (0==ths->mpfOut))
 		return XELP_S_OK;
 	while ((*msg !=0) && (maxlen--)){

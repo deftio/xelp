@@ -296,6 +296,8 @@ XELPRESULT XelpNumToks (XelpBuf *buf, int *n);
 /* XELPNEXTTOK get next token in a string buffer.  This is just a macro call to XELPTokLine             */
 #define    XELPNEXTTOK(buf,blen,tok_s,tok_e)    (XELPTokLine(buf, buf+blen, tok_s, tok_e, 0, XELP_TOK_ONLY))
 int        XELPStrLen(const char* c);                               /* compute length of null terminated string. */ 
+XELPRESULT XELPStrEq (const char* pbuf, int blen, const char *cmd);
+XELPRESULT XELPStrEq2 (const char* pbuf, const char* pend, const char *cmd);
 int        XELPStr2Int(const char* s,int  maxlen);                  /* parse a str->int accepts hex as 123h or signed decimal num.  no safety for non-num chars */   
 XELPRESULT XELPFindTok(XelpBuf *x, const char *t0s, const char *t0e, int srchType); /* find matching tok (next tok || next label) */
 
