@@ -75,7 +75,7 @@
  */
 #define XELP_HELP_KEY_STR    "\nKey functions\n"        /* Help section for single-key press commands such as menus */
 #define XELP_HELP_CLI_STR    "\nCLI functions\n"        /* Help string displayed before script or CLI commands      */
-#define XELP_HELP_ABT_STR    (ths->mpAboutMsg)		    	/* You may set to any null terminated string e.g. "My Embedded System About Message" */
+#define XELP_HELP_ABT_STR    (ths->mpAboutMsg)		    /* You may set to any null terminated string e.g. "My Embedded System About Message" */
 
 /**************************************************************************************************** 
   prompt string, leave undefined (commented out) for no prompt and to save space 
@@ -88,10 +88,23 @@
   
   #define XELP_CLI_PROMPT   (ths->mpPrompt)
 
+  Then use the macros in Xelp.h 
+  XELP_SET_VAL_CLI_PROMPT(myXelp,"your message")   //myXelp is the instance variable, message will be only for that instance.
+
 */
 #define XELP_CLI_PROMPT		"xelp>"					
 
+
+/**************************************************************************************************** 
+  XELP_REGS_SZ is the number of integer registers to use for scripting and return vars.
+  It must be atleast 1 for Xelp to work as it is where all return values from function calls are deposited.
+  Some Xelp library functions (see stack ops) require atleast 2 registers.
+  size of register is set by XELPREG (default is machine int)
+ */
 #define XELP_REGS_SZ    2
+
+#define XELPREG int    /* can change this to a valid C type for your plaform. eg. short, long, _int64 */
+
 
 /**************************************************************************************************** 
  XELP Stack Operations is a lightweight stack machine interpreter allowing one to run true commands from the CLI/script including 

@@ -76,6 +76,9 @@ extern "C"
 
 typedef int XELPRESULT; 		
 
+#ifndef XELPREG
+typedef int XELPREG;
+#endif
 
 #define XELP_S_NOTFOUND	    (2)
 #define XELP_W_Warn   		(1)
@@ -217,7 +220,7 @@ typedef struct
 
 	const char* 			mpAboutMsg;      /* Used as beginning of help message           */
 
-	int 					mR[XELP_REGS_SZ];/* mR is the reg(s) used for func retn, ifOK etc (see docs) */
+	XELPREG					mR[XELP_REGS_SZ];/* mR is the reg(s) used for func retn, ifOK etc (see docs) */
 
 #ifdef XELP_ENABLE_KEY						 /* if single-key commands enabled              */
 	XELPKeyFuncMapEntry		*mpKeyModeFuncs; /* key mode function dispatch                  */
