@@ -159,9 +159,9 @@ typedef struct
  */
 typedef struct
 {
-	XELPRESULT (*mFunPtr)(const char *pArgString, int maxbuflen) REENTRANT_SDCC ;	
-	char* mpCmd;
-	char* mpHelpString;
+	XELPRESULT (*mFunPtr)(const char *pArgString, int maxbuflen) REENTRANT_SDCC ;	/* fn ptr to command */
+	char* mpCmd;                               /* name of cmd at run-time / in script                    */
+	char* mpHelpString;                        /* optional help string                                   */
 }XELPCLIFuncMapEntry; 
 /*#define XELP_CLIFUNCENTRY_LAST {0,"",""}			 function list terminator */
 
@@ -299,6 +299,7 @@ int        XELPStrLen(const char* c);                               /* compute l
 XELPRESULT XELPStrEq (const char* pbuf, int blen, const char *cmd);
 XELPRESULT XELPStrEq2 (const char* pbuf, const char* pend, const char *cmd);
 int        XELPStr2Int(const char* s,int  maxlen);                  /* parse a str->int accepts hex as 123h or signed decimal num.  no safety for non-num chars */   
+XELPRESULT XelpParseNum (const char* s, int maxlen, int* n);        /* parse a str returns a number if successful */
 XELPRESULT XELPFindTok(XelpBuf *x, const char *t0s, const char *t0e, int srchType); /* find matching tok (next tok || next label) */
 
 /* XelpBufCmp() compare buffers / string */

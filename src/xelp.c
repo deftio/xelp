@@ -87,28 +87,28 @@ XELPRESULT XELPHelp(XELP* ths)
 
 	XELPOut(ths,XELP_HELP_ABT_STR,x);
 #ifdef XELP_ENABLE_KEY
-	if (e->mFunPtr) { //check and see if first entry is not terminator
+	if (e) { //check and see if first entry is not terminator
 		XELPOut(ths,XELP_HELP_KEY_STR,x);
-		while (e->mFunPtr)	{
+		do 	{
 			_PUTC(e->mKey);
             //XELPOut(ths,&(e->mKey),1);
 			_PUTC(':');
 			XELPOut(ths,e->mpHelpString,x);
 			_PUTC('\n');
 			e++;
-		}
+		} while (e->mFunPtr);
 	}
 #endif
 #ifdef XELP_ENABLE_CLI
-	if (s->mFunPtr) {
+	if (s) {
 		XELPOut(ths,XELP_HELP_CLI_STR,x);
-		while (s->mFunPtr)	{
+		do	{
 			XELPOut(ths,s->mpCmd,x);
 			_PUTC(':');
 			XELPOut(ths,s->mpHelpString,x);			
 			_PUTC('\n');	
 			s++;	
-		}
+		} while (s->mFunPtr);
 	}
 #endif
 	return XELP_S_OK;
@@ -454,13 +454,15 @@ XELPRESULT XELPParseXB (XELP* ths, XelpBuf *args) {
         XELPOut(ths,"<<<\n",-1);
 
         f=ths->mpCLIModeFuncs;
-        while(f->mpCmd) {    
-            if (XELP_S_OK == XELPStrEq(line.s,(int)(line.p-line.s),f->mpCmd)){
-                
-                ths->mR[0] = (f->mFunPtr)(line.s,(int)(line.e-line.s));	
-                break;
+        if (f) { /* make sure fn dispatch table exists */
+            while(f->mpCmd) {    
+                if (XELP_S_OK == XELPStrEq(line.s,(int)(line.p-line.s),f->mpCmd)){
+                    
+                    ths->mR[0] = (f->mFunPtr)(line.s,(int)(line.e-line.s));	
+                    break;
+                }
+                f++;
             }
-            f++;
         }
 	}
 	return XELP_S_OK;
@@ -636,3 +638,13 @@ int XELPStr2Int (const char* s,int  maxlen) {
 	}
 	return r;
 }
+/*
+XELPRESULT XelpParseNum (const char* s, int maxlen, int* n) {
+    XelpBuf x;
+    XELP_XBInit(x,s,maxlen);
+
+    //do next token to eat leading white space
+
+    return XELP_S_OK;
+}
+*/

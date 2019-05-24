@@ -216,6 +216,17 @@ XELPRESULT test_XELPStr2Int() {
 	return XELP_S_OK;
 }
 /* ====================================================================
+ test_XelpParseNum()
+ */
+
+XELPRESULT test_XelpParseNum() {
+    XELPRESULT r;
+
+
+
+	return XELP_S_OK;
+}
+/* ====================================================================
  test_XelpBufCmp()
  */
 XELPRESULT test_XelpBufCmp() {
@@ -691,10 +702,10 @@ XELPRESULT test_XELPParse() {
     XELP_SET_FN_OUT(x,dummyOut);
 
 
-   // r = XELPParse(&x,s,XELPStrLen(s));
+   r = XELPParse(&x,s,XELPStrLen(s));
     
-   // if (LOGTEST(r!=XELP_S_OK,"XELPParse Fail"))
-   //     return XELP_E_Err;
+   if (LOGTEST(r!=XELP_S_OK,"XELPParse Fail"))
+     return XELP_E_Err;
 
     return XELP_S_OK;
 }
@@ -725,6 +736,7 @@ int run_tests() {
     XelpUnit_RunUnit(test_XELPParse,"Test Parse");
     XelpUnit_RunUnit(test_XELPParseXB,"Test ParseXB");
     XelpUnit_RunUnit(test_XelpHelp,"test_XelpHelp");
+    XelpUnit_RunUnit(test_XelpParseNum,"test_XelpParseNum");
    
     XelpUnit_PrintResults();
 	return XelpUnit_BuildPass(); // return whether we passed for CI purposes.  MOdify gBuildPass() if there is a diff way to report build pass 
@@ -739,7 +751,7 @@ int main()
 {
 	int result;
 	
-	printf("Running Xelp Unit tests .. \n");
+	printf("\n*************************************\nRunning Xelp Unit tests .. \n");
 	result = run_tests();
 
 	if  (XELPUNIT_NOTFAIL(result)) 
