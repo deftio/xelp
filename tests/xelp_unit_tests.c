@@ -754,7 +754,7 @@ int main()
 	printf("\n*************************************\nRunning Xelp Unit tests .. \n");
 	result = run_tests();
 
-	if  (XELPUNIT_NOTFAIL(result)) 
+	if  (XELPUNIT_NOTFAIL(result) == 0) 
 		printf ("Tests passed.\n");
 	else
 		printf ("Tests failed.\n");

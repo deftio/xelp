@@ -363,7 +363,7 @@ XELPRESULT XELPTokLine (const char *bs, const char *be, const char **t0s, const 
 	return XELP_S_NOTFOUND;
 }
 #endif
-/*
+
 XELPRESULT XELPTokLine(char* bs, char* be, const char **t0s, const char **t0e, const char **eol, int srchType) {
     XelpBuf xc,tok;
     XELPRESULT r;
@@ -377,7 +377,7 @@ XELPRESULT XELPTokLine(char* bs, char* be, const char **t0s, const char **t0e, c
     *eol = tok.e;
     return r;
 }
-*/
+
 
 /********************************************************
   XELPTokLineXB(buf, output, srch) - main tokenizer - handles whitespaces, linefeeds, comments, quoted strings
@@ -445,6 +445,8 @@ XELPRESULT XELPParseXB (XELP* ths, XelpBuf *args) {
 	XELPCLIFuncMapEntry   *f;
 
 	while (XELP_S_OK ==  XELPTokLineXB(args,&line,XELP_TOK_LINE) ) { /* for each logical line */
+        
+        /* DEBUG REMOVE
         XELPOut(ths,"(",-1);
         XELPOut(ths,line.s,(int)(line.p-line.s));
         XELPOut(ths,")",-1);
@@ -452,7 +454,7 @@ XELPRESULT XELPParseXB (XELP* ths, XelpBuf *args) {
         XELPOut(ths,">>>",-1);
         XELPOut(ths,line.s,(int)(line.e-line.s));
         XELPOut(ths,"<<<\n",-1);
-
+        */
         f=ths->mpCLIModeFuncs;
         if (f) { /* make sure fn dispatch table exists */
             while(f->mpCmd) {    

@@ -294,7 +294,7 @@ XELPRESULT XELPTokN (XelpBuf *buf, int n, XelpBuf *tok);
 XELPRESULT XelpNumToks (XelpBuf *buf, int *n);
 
 /* XELPNEXTTOK get next token in a string buffer.  This is just a macro call to XELPTokLine             */
-#define    XELPNEXTTOK(buf,blen,tok_s,tok_e)    (XELPTokLine(buf, buf+blen, tok_s, tok_e, 0, XELP_TOK_ONLY))
+//#define    XELPNEXTTOK(buf,blen,tok_s,tok_e)    (XELPTokLine(buf, buf+blen, tok_s, tok_e, 0, XELP_TOK_ONLY))
 int        XELPStrLen(const char* c);                               /* compute length of null terminated string. */ 
 XELPRESULT XELPStrEq (const char* pbuf, int blen, const char *cmd);
 XELPRESULT XELPStrEq2 (const char* pbuf, const char* pend, const char *cmd);

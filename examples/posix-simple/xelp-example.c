@@ -157,29 +157,14 @@ XELPRESULT cmdEcho (const char* args, int maxlen)
 
 XELPRESULT cmdNumToks (const char* args, int maxlen)
 {
-	const char *s;
-	const char *e;
-	const char *tmp;
-	int i=0,n=0;
     XelpBuf b;
-	s = args;
-	e = args;
-	tmp = args;
-#ifdef XELP_ENABLE_CLI
-	while (XELP_S_OK == XELPNEXTTOK(s,maxlen+1,&s,&e)) {
-		i++;
-		maxlen -= (e-tmp);
-		s=e;
-		tmp=s;
-	}
-#endif
-    //XELP_XBInit(b,args,len);
-    //XelpNumToks(b,&n);
-	printw("numtoks: %d : XelpNumToks %d",i,n);
+ 
+    int n;
+    XELP_XBInit(b,args,maxlen);
+    XelpNumToks(&b,&n);
+	printw(" XelpNumToks %d\n",n);
 	
     return XELP_S_OK;
-
-
 };
 XELPRESULT cmdPrintR (const char* args, int maxlen){
 	int i = example.mR[0];
@@ -202,31 +187,23 @@ XELPRESULT cmdPrintPokeBuf (const char* args, int maxlen){
 
 XELPRESULT cmdListToks (const char* args, int maxlen)
 {
-	const char *s;
-	const char *e;
-	//const char *end;
-	const char *tmp;
-	//end = args+maxlen+1;
-	s = args;
-	e = args;
-	tmp = args;
-	//printw("\n|");
-	//XELPOut(&example,args,maxlen);
-	//printw("|\n");
+    
 #ifdef XELP_ENABLE_CLI
-	while (XELP_S_OK == XELPNEXTTOK(s,maxlen+1,&s,&e)) {
+    XelpBuf b,tok;
+    int n,i;
 
-		maxlen -= e-tmp;
-		//printw("<(%d:%d,%d)",s-args,e-args,maxlen);
+    XELP_XBInit(b,args,maxlen);
+    XelpNumToks(&b,&n);
+    XELP_XBTOP(b);
+	for (i=0; i< n; i++) {
+        XELPTokN( &b,i,&tok);
 		printw("<");
-		XELPOut(&example,s,e-s);
+        printw("%d:",i);
+		XELPOut(&example,tok.s,tok.p-tok.s);
 		printw(">");
-		s=e;
-		tmp =s;
 	}
 #endif
 	printw("\n");
-	//printw("<<(%d:%d,%d)>>\n",s-args,e-args,maxlen);
 		
 	return XELP_S_OK;
 };
@@ -240,28 +217,35 @@ XELPRESULT cmdExit (const char* args, int maxlen) {
 	gExit = 1;
 	return XELP_S_OK;
 }
-XELPRESULT cmdPrintNum (const char *arg, int maxlen) {
-	const char *s,*e;
-	XELPNEXTTOK(arg,maxlen,&s,&e);  /*arg 0 is this command.. */
-	s=e;
-	XELPNEXTTOK(s,maxlen-(s-e),&s,&e); /* arg 1 is the number */
-	//XELPOut(&example,s,e-s);
-	printw("[%d]\n",XELPStr2Int(s,e-s));
+XELPRESULT cmdPrintNum (const char *args, int maxlen) {
+	XelpBuf b,tok;
+    int n;
+
+    XELP_XBInit(b,args,maxlen);
+    XELPTokN(&b,1,&tok),
+    
+	printw("[%d]\n",XELPStr2Int(tok.s,tok.p-tok.s));
 	return XELP_S_OK;
 }
 
-XELPRESULT cmdMath (const char* arg, int maxlen) {
-	const char *s,*e;
-	int i,j,k,op;
-	XELPNEXTTOK(arg,maxlen,&s,&e);         /* arg 0 is this command.. */
-	op = *s;
-	s=e;
-	XELPNEXTTOK(s,maxlen-(e-arg)+1,&s,&e); /* arg 1 is the number     */
-	i = XELPStr2Int(s,e-s);
+XELPRESULT cmdMath (const char* args, int maxlen) {
+	XelpBuf b,tok;
+    int i,j,k;
+    int op;
 
-	s=e;
-	XELPNEXTTOK(s,maxlen-(e-arg)+1,&s,&e); /* arg 2 is the number     */
-	j = XELPStr2Int(s,e-s);
+    XELP_XBInit(b,args,maxlen);
+    XELPTokN(&b,0,&tok),
+
+
+	op = *b.s;
+	
+    XELP_XBTOP(b);
+    XELPTokN(&b,1,&tok);
+    i = XELPStr2Int(tok.s,tok.p-tok.s);
+    
+    XELP_XBTOP(b);
+    XELPTokN(&b,2,&tok);
+	j =XELPStr2Int(tok.s,tok.p-tok.s);
 
 	switch(op) {
 		case '+':
