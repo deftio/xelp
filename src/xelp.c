@@ -40,6 +40,11 @@ local defines (this file only)
 #ifndef _PUTC
 #define _PUTC(c)	((ths->mpfOut)((char)(c)))   /* write char to output */
 #endif
+
+
+#ifndef _XOUTC
+#define _XOUTC(x,c)    ({if(x->mpfOut){x->mpfOut(c);}}) /* write a char to output (null ptr safe) */
+#endif
 /***************************************** 
  XELPStrLen() - find length of a string in bytes assuming its null terminated
  */
@@ -145,8 +150,9 @@ XELPRESULT XELPInit 	 (
 #ifdef XELP_ENABLE_CLI
 XELPRESULT XELPStrEq (const char* pbuf, int blen, const char *cmd)
 {
-	if (0 == blen)
-		return XELP_S_NOTFOUND;
+	if (0 == blen) {
+        return (*cmd == 0) ? XELP_S_OK : XELP_S_NOTFOUND;
+    }
 	while(blen--){
 		if (*cmd == 0) 
 			return XELP_S_NOTFOUND;
@@ -357,7 +363,7 @@ XELPRESULT XELPTokLine (const char *bs, const char *be, const char **t0s, const 
 	return XELP_S_NOTFOUND;
 }
 #endif
-
+/*
 XELPRESULT XELPTokLine(char* bs, char* be, const char **t0s, const char **t0e, const char **eol, int srchType) {
     XelpBuf xc,tok;
     XELPRESULT r;
@@ -371,7 +377,7 @@ XELPRESULT XELPTokLine(char* bs, char* be, const char **t0s, const char **t0e, c
     *eol = tok.e;
     return r;
 }
-
+*/
 
 /********************************************************
   XELPTokLineXB(buf, output, srch) - main tokenizer - handles whitespaces, linefeeds, comments, quoted strings
@@ -385,8 +391,10 @@ XELPRESULT XELPTokLineXB (XelpBuf *buf, XelpBuf *tok, int srchType) {
 	char cs=_PS_SEEK,prev=_PS_SEEK,tmp;   
 	int tm=1; /*  (token mode) allows capture of t0e, t0s only for first token seen */
 
-tok->s=buf->s;
-tok->p=buf->s;
+    /* NOT needed remove... these two lines after full testing
+    tok->s=buf->s;
+    tok->p=buf->s;
+    */
 
     if ((buf->p) >= (buf->e)) {  return XELP_S_NOTFOUND; }
 
@@ -512,8 +520,8 @@ XELPRESULT XelpNumToks (XelpBuf *b, int *n)
 XELPRESULT XELPParseKey (XELP *ths, char key)
 {
 	int i=ths->mCurMode;
-    XelpBuf line; // this represents a tokenized "line" see XelpTokLine
-
+    int modeChangeAttempt = 1;
+    XelpBuf line; // this represents a tokenized "line" see XelpTokLineXB()
 	/* 	
     First we test to see if we should switch modes.  this is a "key" difference  btw 
 	just submitting a buffer to be parsed and running a live command line interpreter.
@@ -535,10 +543,11 @@ XELPRESULT XELPParseKey (XELP *ths, char key)
 			break;
 #endif /* XELP_ENABLE_THR */
 		default:
+            modeChangeAttempt = 0;
 			break;
 	}
 	
-	if (ths->mCurMode != i) {
+	if ((ths->mCurMode != i) && (modeChangeAttempt)) {
 		if (ths->mpfEditModeChg) /* if we have changed modes call the mode-change callback (if supplied) */
 			ths->mpfEditModeChg(ths->mCurMode);
 	}

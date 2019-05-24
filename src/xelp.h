@@ -240,7 +240,7 @@ typedef struct
 	*/
 	void (*mpfOut)(char); 		  /* function to emit chars to console                       */
 	void (*mpfErr)(char);		  /* function to handle errors (optional callback)           */
-	void (*mpfEditModeChg)(int);  /* function called when key mode is changed.               */
+	void (*mpfEditModeChg)(int);  /* function called when key entry mode changed (optional)  */
 
 #ifdef XELP_ENABLE_THR	
 	void (*mpfPassThru)(char);    /* function to pass keys in thru mode                      */
@@ -288,7 +288,7 @@ XELPRESULT XELPParseKey 	(XELP *ths, char key);				     /* handle keypress at CL
 
 /* XELPTokLine is the main tokenizer which can get next token or line at time                           */
 /* XELPRESULT XELPTokLine (const char *buf, int blen, const char **t0s, const char **t0e, const char **eol, int srchType); */
-XELPRESULT XELPTokLine ( char *buf, char *bufend, const char **t0s, const char **t0e, const char **eol, int srchType); 
+//XELPRESULT XELPTokLine ( char *buf, char *bufend, const char **t0s, const char **t0e, const char **eol, int srchType); 
 XELPRESULT XELPTokLineXB (XelpBuf *buf, XelpBuf *tok, int srchType);
 XELPRESULT XELPTokN (XelpBuf *buf, int n, XelpBuf *tok);
 XELPRESULT XelpNumToks (XelpBuf *buf, int *n);

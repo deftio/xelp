@@ -24,6 +24,7 @@ TEST_DIR=tests
 TEST_FLAGS=-fprofile-arcs -ftest-coverage -g # coverage and profiling data
 SRC_TESTS=\
     $(LIB_DIR)/xelp.c\
+	$(TEST_DIR)/xelp_simple_unit_test_fw.c\
 	$(TEST_DIR)/xelp_unit_tests.c
 
 OBJC_TESTS=$(SRC_TESTS:.c=.o)  # object files for C language (not CPP) for tests
