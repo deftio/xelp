@@ -133,7 +133,7 @@ typedef struct {
 #define XELP_XBGetPos(x)                 ((int)(x.p-x.s))                               /* return current position as int              */
 #define XELP_XBGetBuf(x,ptr,len)         {ptr=x.s; len= (x.e) - (x.s)}                  /* get the start ptr, and total length of the Xelp buf*/
 
-/* Xelp writing and setting */
+/* XelpBuf writing and setting */
 #define XELP_XBPUTC(x,ch)                {if (x.p<x.e){*(x.p)++ =ch;}}                   /* write char to buf */
 #define XELP_XBPUTC_RAW(x,ch)            {*(x.p)++=ch;}                                  /* write char to buf no bounds check*/
 #define XELP_XBGETC(x,ch)                {if (x.p<x.e)(ch=(*x.e);x.e++})                 /* get next char */

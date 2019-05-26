@@ -363,13 +363,12 @@ XELPRESULT XELPTokLine (const char *bs, const char *be, const char **t0s, const 
 	return XELP_S_NOTFOUND;
 }
 #endif
-
+/*
 XELPRESULT XELPTokLine(char* bs, char* be, const char **t0s, const char **t0e, const char **eol, int srchType) {
     XelpBuf xc,tok;
     XELPRESULT r;
 
     XELP_XBInitPtrs(xc,bs,bs,be);
-    //XELP_XBInit(xc,bs,(int)(be-bs));
 
     r=XELPTokLineXB(&xc,&tok,srchType);
     *t0s = tok.s;
@@ -377,7 +376,7 @@ XELPRESULT XELPTokLine(char* bs, char* be, const char **t0s, const char **t0e, c
     *eol = tok.e;
     return r;
 }
-
+*/
 
 /********************************************************
   XELPTokLineXB(buf, output, srch) - main tokenizer - handles whitespaces, linefeeds, comments, quoted strings
@@ -478,20 +477,22 @@ XELPRESULT XELPParse 		(XELP *ths, const char *buf, int blen)
 /********************************************************
  XELPTokN() find the nth token (if it exists) - useful for parsing arguments
 
+ XelpTokN finds the nth token (starting from the current buffer position buf->p);
  note: tok has last successfully found token regardless of result (check return value == XELP_S_OK)
  buf.p is pointing to position just after nth token.
 
  */
-
-
 XELPRESULT XELPTokN (XelpBuf *buf, int n, XelpBuf *tok)
 {
     XELPRESULT r;
     buf->p = buf->s;
     do {
         r = XELPTokLineXB(buf,tok,XELP_TOK_ONLY);
-        if (XELP_S_OK != r)
+        if (XELP_S_OK != r) {
+            tok->p = tok->s;
+            tok->e = tok->s;
             break;
+        }
     }while (n--);
     
     return r;

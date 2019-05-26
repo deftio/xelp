@@ -109,7 +109,12 @@ XELPRESULT fooHelp(int c)
 {
 	return XELPHelp(&example);
 }
+XELPRESULT printBanner( int c) {
+	char *xelp_greeting = "\n          _      \n__  _____| |_ __  	\n\\ \\/ / _ \\ | '_ \\\n >  <  __/ | |_) |\n/_/\\_\\___|_| .__/ \n           |_|    \n";
 
+	printw(xelp_greeting);
+	return XELP_S_OK;
+}
 void fooNormal(char c)
 {
 	printw("fooNormal called (single-key mode)");
@@ -128,6 +133,7 @@ XELPKeyFuncMapEntry gMyKeyCommands[] =
 	{&fooBar   ,'f', "fooBar()"      },
 	{&fooPrint ,'p', "Prints stuff"  },
 	{&fooPrint ,'w', "Prints stuff"  },
+    {&printBanner,'b',"Print XELP   "},
 	{&fooExit  ,'x', "Exit()"        },
 	XELP_FUNC_ENTRY_LAST
 	//{0         , 0 , ""              }
@@ -137,6 +143,12 @@ XELPRESULT cmdCLS (const char* args, int maxlen)
 {
 	printw("\x1B");
 	printw("C");
+	return XELP_S_OK;
+}
+
+XELPRESULT banner (const char* args, int maxlen)
+{
+	printBanner('b');
 	return XELP_S_OK;
 }
 XELPRESULT cmdHome (const char* args, int maxlen)
@@ -191,13 +203,15 @@ XELPRESULT cmdListToks (const char* args, int maxlen)
 #ifdef XELP_ENABLE_CLI
     XelpBuf b,tok;
     int n,i;
-
+    XELPRESULT r;
     XELP_XBInit(b,args,maxlen);
     XelpNumToks(&b,&n);
     XELP_XBTOP(b);
+    printw("[%d]",n);
 	for (i=0; i< n; i++) {
-        XELPTokN( &b,i,&tok);
-		printw("<");
+        XELP_XBTOP(b);
+        r = XELPTokN( &b,i,&tok);
+        printw("<");
         printw("%d:",i);
 		XELPOut(&example,tok.s,tok.p-tok.s);
 		printw(">");
@@ -272,6 +286,7 @@ XELPRESULT cmdMath (const char* args, int maxlen) {
 //declare a command map for functions in parse mode
 XELPCLIFuncMapEntry gMyCLICommands[] =
 {
+    {&banner    		, "banner"	,  "print XELP banner in ASCII" },
 	{&cmdEcho    		, "echo"	,  "print args to screen"       },
 	{&cmdNumToks 		, "numtoks" ,  "print number of arguments"  },
 	{&cmdListToks		, "lt"      ,  "list parsed tokens"         },

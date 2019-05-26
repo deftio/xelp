@@ -625,9 +625,10 @@ XELPRESULT test_XELPParseKey() {
 XELPRESULT test_XELPTokN() {
     XelpBuf x, tok;
     XELPRESULT r;
-    char *c1 = "tok0 tok1 tok2    \t tok3   tok4\n tok5";
-    char *c2 = " tokk0 tok1 tok2    \t # tok3   tok4\n tok5 "; // test with comment
-    char *c3 = " tokk0 tok1 tok2    \t # tok3   tok4\n tok5"; // test with comment
+    char *c1 =   "tok0 tok1 tok2    \t tok3   tok4\n tok5";
+    char *c2 = "\ttok0 tok1 tok2    \t # tok3   tok4\n tok5 "; // test with comment
+    char *c3 = " tok0 tok1 tok2    \t # tok3   tok4;\n tok5; tok6 "; // test with comment
+    char *c4 = " tok0 tok1 tok2    \t #tok3   tok4;\n tok5; tok6 "; // test with comment hugging token
     
     XELP_XBInit(x,c1,XELPStrLen(c1));   
     r = XELPTokN(&x,0,&tok);
@@ -644,14 +645,20 @@ XELPRESULT test_XELPTokN() {
     if (LOGTEST( ((r!=XELP_S_OK) || (XELP_S_OK != XELPStrEq2(tok.s, tok.p,"tok5") )),"XELPTokN get 3rd token w commented line"))
         return XELP_E_Err;
 
-    XELP_XBInit(x,c2,XELPStrLen(c3));   
     r = XELPTokN(&x,3,&tok);
+    XELP_XBInit(x,c2,XELPStrLen(c3));   
     if (LOGTEST( ((r!=XELP_S_OK) || (XELP_S_OK != XELPStrEq2(tok.s, tok.p,"tok5") )),"XELPTokN get 3rd token w commented line"))
         return XELP_E_Err;
 
-    XELP_XBInit(x,c2,XELPStrLen(c2));   
+
+    XELP_XBInit(x,c4,XELPStrLen(c4));   
+    r = XELPTokN(&x,3,&tok);
+    if (LOGTEST( ((r != XELP_S_OK) || (XELP_S_OK != XELPStrEq2(tok.s, tok.p,"tok5") )),"XELPTokN get 3rd token w commented line w space"))
+        return XELP_E_Err;
+
+    XELP_XBInit(x,c4,XELPStrLen(c4));   
     r = XELPTokN(&x,23,&tok);
-    if (LOGTEST( ((r == XELP_S_OK) || (XELP_S_NOTFOUND != XELPStrEq2(tok.s, tok.p,"tok5") )),"XELPTokN get 3rd token w commented line"))
+    if (LOGTEST( ((r == XELP_S_OK) || (XELP_S_NOTFOUND != XELPStrEq2(tok.s, tok.p,"tok5") )),"XELPTokN get token past buffer"))
         return XELP_E_Err;
 
     return XELP_S_OK;
@@ -664,19 +671,30 @@ XELPRESULT test_XelpNumToks() {
     XelpBuf x;
     XELPRESULT r;
     int n=0;
+    char *c0 = "";
     char *c1 = "tok1 tok2    \t tok3   tok4\n t0k5";
-    char *c2 = " tok1 tok2    \t# tok3   tok4\n t0k5"; // test with comment
+    char *c2 = "\t tok1 tok2    \t# tok3   tok4\n t0k5; tok6"; // test with comment
+    char *c3 = "\t tok1 tok2    \t#tok3   tok4\n t0k5; tok6";  // test with comment
+
+    XELP_XBInit(x,c0,XELPStrLen(c0));
+    r = XelpNumToks(&x,&n);
+    if (LOGTEST(((r!=XELP_S_OK) || (n !=0)),"XelpNumToks tabs and newlines"))
+        return XELP_E_Err;
 
     XELP_XBInit(x,c1,XELPStrLen(c1));
     r = XelpNumToks(&x,&n);
-    if (LOGTEST(((r!=XELP_S_OK) && (n !=5)),"XelpNumToks tabs and newlines"))
+    if (LOGTEST(((r!=XELP_S_OK) || (n !=5)),"XelpNumToks tabs and newlines"))
         return XELP_E_Err;
 
     XELP_XBInit(x,c2,XELPStrLen(c2));
     r = XelpNumToks(&x,&n);
-    if (LOGTEST(((r!=XELP_S_OK) && (n !=3)),"XelpNumToks comment on second line"))
+    if (LOGTEST(((r!=XELP_S_OK) || (n !=4)),"XelpNumToks comment on second line"))
         return XELP_E_Err;
 
+    XELP_XBInit(x,c3,XELPStrLen(c3));
+    r = XelpNumToks(&x,&n);
+    if (LOGTEST(((r!=XELP_S_OK) || (n !=4)),"XelpNumToks comment on second line"))
+        return XELP_E_Err;
     return XELP_S_OK;
 }
 /* ====================================================================
@@ -726,7 +744,10 @@ int run_tests() {
     XelpUnit_RunUnit(test_XelpBufCmp,"test_XelpBufCmp");
     XelpUnit_RunUnit(test_XelpFindTok,"test_XelpFindTOk");
     XelpUnit_RunUnit(test_XelpTokLineXB,"test_XelpTokLineXB");
+    
     XelpUnit_RunUnit(test_XELPTokN,"test_XelpTokN");
+    //Problem in comment handling
+
     XelpUnit_RunUnit(test_XelpNumToks,"test_XelpNumToks");
     XelpUnit_RunUnit(test_XelpInit,"test_XelpInit");
     XelpUnit_RunUnit(test_XelpOut_XelpThru_XelpErr,"failed test_XelpOut_XelpThru_XelpErr");
