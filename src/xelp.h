@@ -70,6 +70,21 @@ extern "C"
 #endif 
 
 /*****************************************************************************
+ XELP_BANNER_STR stores the following logo as a string:
+          _      
+ __  _____| |_ __  	
+ \ \/ / _ \ | '_ \
+  >  <  __/ | |_) |
+ /_/\_\___|_| .__/ 
+            |_|    
+
+ no compile or library space is used for this string if XELP_BANNER_STR is not used in the code (e.g. its a MACRO so its not put in
+ your code unless its used.)
+
+ If used it takes 114 bytes.
+ */
+#define XELP_BANNER_STR   "          _      \n__  _____| |_ __  	\n\\ \\/ / _ \\ | '_ \\\n >  <  __/ | |_) |\n/_/\\_\\___|_| .__/ \n           |_|    \n"
+/*****************************************************************************
  error code handling.  {errors < 0, OK==0, warnings > 0}
  Note that success is 0 (like  posix command line return
 */

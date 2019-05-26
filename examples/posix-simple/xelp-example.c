@@ -110,9 +110,8 @@ XELPRESULT fooHelp(int c)
 	return XELPHelp(&example);
 }
 XELPRESULT printBanner( int c) {
-	char *xelp_greeting = "\n          _      \n__  _____| |_ __  	\n\\ \\/ / _ \\ | '_ \\\n >  <  __/ | |_) |\n/_/\\_\\___|_| .__/ \n           |_|    \n";
-
-	printw(xelp_greeting);
+	printw("\n");
+	printw(XELP_BANNER_STR);
 	return XELP_S_OK;
 }
 void fooNormal(char c)
