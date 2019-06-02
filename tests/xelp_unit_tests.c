@@ -34,7 +34,7 @@
  */
 
 #include <stdio.h>
-#include "xelp_simple_unit_test_fw.h"
+#include "jumpbug_unit_test_fw.h"  /* micro portable unit test framework */
 #include "../src/xelp.h"
 
 //=======================================================
@@ -735,32 +735,32 @@ XELPRESULT test_XELPParse() {
 
 int run_tests() {
     
-    XelpUnit_InitGlobal(); // initialize the test case counters
+    JumpBug_InitGlobal(); // initialize the test case counters
 
-    XelpUnit_RunUnit(test_XELPStrLen,"test_XELPStrLen");
-	XelpUnit_RunUnit(test_XELPStr2Int,"test_XELPStr2Int");
-    XelpUnit_RunUnit(test_XELPStrEq, "test_StrEq");
-    XelpUnit_RunUnit(test_XELPStrEq2, "test_StrEq2");
-    XelpUnit_RunUnit(test_XelpBufCmp,"test_XelpBufCmp");
-    XelpUnit_RunUnit(test_XelpFindTok,"test_XelpFindTOk");
-    XelpUnit_RunUnit(test_XelpTokLineXB,"test_XelpTokLineXB");
+    JumpBug_RunUnit(test_XELPStrLen,"test_XELPStrLen");
+	JumpBug_RunUnit(test_XELPStr2Int,"test_XELPStr2Int");
+    JumpBug_RunUnit(test_XELPStrEq, "test_StrEq");
+    JumpBug_RunUnit(test_XELPStrEq2, "test_StrEq2");
+    JumpBug_RunUnit(test_XelpBufCmp,"test_XelpBufCmp");
+    JumpBug_RunUnit(test_XelpFindTok,"test_XelpFindTOk");
+    JumpBug_RunUnit(test_XelpTokLineXB,"test_XelpTokLineXB");
     
-    XelpUnit_RunUnit(test_XELPTokN,"test_XelpTokN");
+    JumpBug_RunUnit(test_XELPTokN,"test_XelpTokN");
     //Problem in comment handling
 
-    XelpUnit_RunUnit(test_XelpNumToks,"test_XelpNumToks");
-    XelpUnit_RunUnit(test_XelpInit,"test_XelpInit");
-    XelpUnit_RunUnit(test_XelpOut_XelpThru_XelpErr,"failed test_XelpOut_XelpThru_XelpErr");
-    XelpUnit_RunUnit(test_XELPExecKC,"test_XELPExecKC");
+    JumpBug_RunUnit(test_XelpNumToks,"test_XelpNumToks");
+    JumpBug_RunUnit(test_XelpInit,"test_XelpInit");
+    JumpBug_RunUnit(test_XelpOut_XelpThru_XelpErr,"failed test_XelpOut_XelpThru_XelpErr");
+    JumpBug_RunUnit(test_XELPExecKC,"test_XELPExecKC");
     
-    XelpUnit_RunUnit(test_XELPParseKey,"Test ParseKey");
-    XelpUnit_RunUnit(test_XELPParse,"Test Parse");
-    XelpUnit_RunUnit(test_XELPParseXB,"Test ParseXB");
-    XelpUnit_RunUnit(test_XelpHelp,"test_XelpHelp");
-    XelpUnit_RunUnit(test_XelpParseNum,"test_XelpParseNum");
+    JumpBug_RunUnit(test_XELPParseKey,"Test ParseKey");
+    JumpBug_RunUnit(test_XELPParse,"Test Parse");
+    JumpBug_RunUnit(test_XELPParseXB,"Test ParseXB");
+    JumpBug_RunUnit(test_XelpHelp,"test_XelpHelp");
+    JumpBug_RunUnit(test_XelpParseNum,"test_XelpParseNum");
    
-    XelpUnit_PrintResults();
-	return XelpUnit_BuildPass(); // return whether we passed for CI purposes.  MOdify gBuildPass() if there is a diff way to report build pass 
+    JumpBug_PrintResults();
+	return JumpBug_BuildPass(); // return whether we passed for CI purposes.  MOdify gBuildPass() if there is a diff way to report build pass 
 }
 
 /* 
@@ -772,13 +772,14 @@ int main()
 {
 	int result;
 	
+    printf("%s",XELP_BANNER_STR);
 	printf("\n*************************************\nRunning Xelp Unit tests .. \n");
 	result = run_tests();
 
-	if  (XELPUNIT_NOTFAIL(result) == 0) 
-		printf ("Tests passed.\n");
+	if  (JB_NOTFAIL(result)) 
+		printf ("Tests passed ++++\n\n");
 	else
-		printf ("Tests failed.\n");
+		printf ("Tests failed \n\n");
 
     return result;  /* remember the value 0 is considered passing in a *nix build continuous integration sense */
 

@@ -39,7 +39,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <termios.h>
 #include <time.h>
 #include <ncurses.h>
+
 #define XELPGLOBAL_DEFAULTS
+
 #include "../../src/xelp.h"
 
 int getkey() /* unix non-blocking key get */
