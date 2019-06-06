@@ -43,6 +43,68 @@
 */
 JB_UnitTestData gTestData;
 
+
+/**************************************
+ * Helper fns
+ */
+int JumpBug_StrLen (const char* c) {
+    int l=0;
+    while (*c++ != 0) {
+        l++;
+    }
+    return l;
+}
+
+/***************************************
+ write out a string.
+ @param f  function pointer to char out function
+ @param s  char buffer
+ @max      max len of char buffer
+
+ if (max == -1) treat as null terminated string only.
+
+ */
+JB_RESULT JumpBug_OutS( int (*f)(char), char *s, int max) {
+    
+    if (f && s && (*s) ) {
+        max = max < 0 ? JumpBug_StrLen(s) : max;
+        while ((max--) && (*s != 0)){
+            f(*s++);
+        } 
+        return JB_PASS;
+    }
+    return JB_FAIL;
+}
+
+void intParseRecursive (int t, int o,  int (*f)(char))
+{
+        if(t != 0) intParseRecursive(t / 10, t % 10, f);
+        f((char)o  + '0');
+}
+JB_RESULT JumpBug_OutN( int (*f)(char), int n ){
+    if (f) {
+        if(n < 0) { n = -n, f( '-');}
+        intParseRecursive(n/10,n%10,f);
+        return JB_PASS;
+    }
+    return JB_FAIL;
+}
+
+JB_RESULT JumpBug_OutH( int (*f)(char), int n ){
+    int d,x = ((sizeof(int))<<1)-1;
+    
+    if (f) {
+        f('0');
+        f('x');
+        do  {
+            d = (n >> (x<<2))&0xf;
+            d = (d > 9) ? (d-0xa + 'a') : (d + '0');
+            f(d);
+        }while (x--);
+        return JB_PASS;
+    }
+    return JB_FAIL;
+}
 /***************************************
 
 */
@@ -51,19 +113,23 @@ JB_RESULT JumpBug_FailMsg (const char *c, int n) {
     return JB_PASS;
 }
 
-JB_RESULT JumpBug_InitGlobal(){
-    return JumpBug_InitStats(&gTestData);
+JB_RESULT JumpBug_InitGlobal(int (*f)(char), int (*flog)(char)) {
+    JumpBug_InitStats(&gTestData, f, flog);
 }
 /***************************************
 
 */
-JB_RESULT JumpBug_InitStats(JB_UnitTestData *x){
+JB_RESULT JumpBug_InitStats(JB_UnitTestData *x,int (*f)(char), int (*flog)(char)) 
+{
     int i   = sizeof(JB_UnitTestData);
  	char *p = (char *) x;  
 	
     if (x) {
         while (i--)
 		*p++=0;
+
+        x->mpfPutChar = f;
+        x->mpfPutCharLog = flog;
         return JB_PASS;
     }
     
@@ -90,11 +156,11 @@ JB_RESULT JumpBug_RunUnit( int (*f)(), char *unitName) {
     result = f();
     if (JB_NOTFAIL(result)) {
         gTestData.totalUnitsPassed++;
-        if ((result != JB_PASS) || (gTestData.curCases < 1))
+        if ((result != JB_PASS) || (gTestData.curCases < 1)) {
             gTestData.totalUnitsPassedWarn++;
+        }
 
-        if (gTestData.curCases < 1)  // unit was run but no tests were encountered..
-        {
+        if (gTestData.curCases < 1) {/* unit was run but no tests were encountered..*/
             printf("Warning ==> Unit: \"%s\" no test cases run\n",unitName);
         }
     }
@@ -127,7 +193,7 @@ JB_RESULT JumpBug_LogTest (int result, char *msg) {
     return result;
 }
 /***************************************
- * Test whether the build passed (warnings are OK)
+ * Test whether the build passed 
 */
 
 JB_RESULT JumpBug_BuildPass() {
@@ -145,8 +211,11 @@ JB_RESULT JumpBug_BuildPass() {
 JB_RESULT JumpBug_PrintResults() {
     printf("\n");
     printf("Test Cases Run\n");
-    printf("Total Units Passed %4d of %4d with (%d warnings)\n", gTestData.totalUnitsPassed,gTestData.totalUnitsTested,gTestData.totalPassedWarn);
-    printf("Total Cases Passed %4d of %4d with (%d warnings)\n\n",gTestData.totalPassed, gTestData.totalCases,gTestData.totalUnitsPassedWarn);
+    printf("Total Units Passed %4d of %4d with (%d warnings)\n", gTestData.totalUnitsPassed,gTestData.totalUnitsTested,gTestData.totalUnitsPassedWarn);
+    printf("Total Cases Passed %4d of %4d with (%d warnings)\n\n",gTestData.totalPassed, gTestData.totalCases,gTestData.totalPassedWarn);
+    
+    printf("\n");
+    
     return JB_PASS;
 }
 

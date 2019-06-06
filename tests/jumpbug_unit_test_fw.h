@@ -118,14 +118,21 @@ typedef struct {
  JumpBug API
 
  */
-JB_RESULT JumpBug_InitGlobal();                          // init test case statistics
-
-JB_RESULT JumpBug_InitStats(JB_UnitTestData *x);         // init stats structure for unit tests
+JB_RESULT JumpBug_InitGlobal(int (*f)(char), int (*flog)(char));                     // init test case statistics
+JB_RESULT JumpBug_InitStats(JB_UnitTestData *x,int (*f)(char), int (*flog)(char)) ; // init stats structure for unit tests
 JB_RESULT JumpBug_InitUnit();                            // init the test stats before running each unit
 JB_RESULT JumpBug_RunUnit(int (*f)(), char *unitName);   // run a unit test (cases for a function or module)
 JB_RESULT JumpBug_LogTest(int result, char *msg);        // log result of an individual testcase
 JB_RESULT JumpBug_BuildPass();                           // test whether the build passed.  modifiy this to change passing criteria
 JB_RESULT JumpBug_PrintResults();                        // print final results 
+
+/**************************************************************
+ * Support Fns (used internally but can be used anywhere)
+ */
+int JumpBug_StrLen (const char* c);                        /* find length of null term stri  */
+JB_RESULT JumpBug_OutS( int (*f)(char), char *s, int max); /* output a string using the PAL  */
+JB_RESULT JumpBug_OutN( int (*f)(char), int n );           /* output a decimal num using PAL */
+JB_RESULT JumpBug_OutH( int (*f)(char), int n );           /* output a hex num using PAL     */
 
 //JB_RESULT JumpBug_TestRunner(JB_Tests *t);
 

@@ -32,8 +32,8 @@ size xelp.o | awk 'FNR==2{print "exec code:     " $1 " bytes"}'
 #size xelp.o | awk 'FNR==2{print "exec code: " $1 " bytes"}' 
 
 
-#sudo apt-get tcc
-echo TinyCC aka cc 32 bit intel -Os  "**************************"
+#sudo apt-get tcc  
+echo TinyCC aka tcc 32 bit intel -Os  "**************************"
 tcc -c xelp.c -Os -m32 -Wall
 du -b xelp.o | awk '{print "obj file size: " $1 " bytes"}'
 size xelp.o | awk 'FNR==2{print "exec code:     " $1 " bytes"}' 

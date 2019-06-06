@@ -735,31 +735,33 @@ XELPRESULT test_XELPParse() {
 
 int run_tests() {
     
-    JumpBug_InitGlobal(); // initialize the test case counters
+    JumpBug_InitGlobal(putchar,0); // initialize the test case counters
 
-    JumpBug_RunUnit(test_XELPStrLen,"test_XELPStrLen");
-	JumpBug_RunUnit(test_XELPStr2Int,"test_XELPStr2Int");
-    JumpBug_RunUnit(test_XELPStrEq, "test_StrEq");
-    JumpBug_RunUnit(test_XELPStrEq2, "test_StrEq2");
-    JumpBug_RunUnit(test_XelpBufCmp,"test_XelpBufCmp");
-    JumpBug_RunUnit(test_XelpFindTok,"test_XelpFindTOk");
-    JumpBug_RunUnit(test_XelpTokLineXB,"test_XelpTokLineXB");
+    JumpBug_RunUnit(test_XELPStrLen,"XELPStrLen");
+	JumpBug_RunUnit(test_XELPStr2Int,"XELPStr2Int");
+    JumpBug_RunUnit(test_XELPStrEq, "StrEq");
+    JumpBug_RunUnit(test_XELPStrEq2, "StrEq2");
+    JumpBug_RunUnit(test_XelpBufCmp,"XelpBufCmp");
+    JumpBug_RunUnit(test_XelpFindTok,"XelpFindTOk");
+    JumpBug_RunUnit(test_XelpTokLineXB,"XelpTokLineXB");
     
-    JumpBug_RunUnit(test_XELPTokN,"test_XelpTokN");
+    JumpBug_RunUnit(test_XELPTokN,"XelpTokN");
     //Problem in comment handling
 
-    JumpBug_RunUnit(test_XelpNumToks,"test_XelpNumToks");
-    JumpBug_RunUnit(test_XelpInit,"test_XelpInit");
-    JumpBug_RunUnit(test_XelpOut_XelpThru_XelpErr,"failed test_XelpOut_XelpThru_XelpErr");
-    JumpBug_RunUnit(test_XELPExecKC,"test_XELPExecKC");
+    JumpBug_RunUnit(test_XelpNumToks,"XelpNumToks");
+    JumpBug_RunUnit(test_XelpInit,"XelpInit");
+    JumpBug_RunUnit(test_XelpOut_XelpThru_XelpErr,"XelpOut_XelpThru_XelpErr");
+    JumpBug_RunUnit(test_XELPExecKC,"XELPExecKC");
     
-    JumpBug_RunUnit(test_XELPParseKey,"Test ParseKey");
-    JumpBug_RunUnit(test_XELPParse,"Test Parse");
-    JumpBug_RunUnit(test_XELPParseXB,"Test ParseXB");
-    JumpBug_RunUnit(test_XelpHelp,"test_XelpHelp");
-    JumpBug_RunUnit(test_XelpParseNum,"test_XelpParseNum");
+    JumpBug_RunUnit(test_XELPParseKey,"XelpParseKey");
+    JumpBug_RunUnit(test_XELPParse,"XelpParse");
+    JumpBug_RunUnit(test_XELPParseXB,"XELPParseXB");
+    JumpBug_RunUnit(test_XelpHelp,"XelpHelp");
+    JumpBug_RunUnit(test_XelpParseNum,"XelpParseNum");
    
     JumpBug_PrintResults();
+
+    
 	return JumpBug_BuildPass(); // return whether we passed for CI purposes.  MOdify gBuildPass() if there is a diff way to report build pass 
 }
 
