@@ -66,43 +66,70 @@ typedef int JB_RESULT;
 #define JB_NOTFAIL(x) ((x>=0)?1:0)
 
 
+/* when to stop testing   */
+#define JB_STOPLEVEL_FIRST_ERR 0
+#define JB_STOPLEVEL_FIRST_WRN 1
+#define JB_STOPLEVEL_RUN_ALL   2
+
 /* The UnitTestData structure holds all the stats counters about what is happening in the unit test */
 typedef struct {
-    /* stats section */
+    /* stats section **********************************/
+
+    /* total individual cases run across all units */
     int totalCases;         
     int totalPassed;
     int totalPassedWarn;
 
+    /* total number of units run                   */
     int totalUnitsTested;   
     int totalUnitsPassed;
     int totalUnitsPassedWarn;
 
+    /* stats with in currently tested unit         */
     int curCases;           
     int curCasesPassed;
     int curCasesPassedWarn;
 
     /* other settings */
-    int verboseLevel;  
-    int loggingLevel;
+    int stopLevel;                /* don't stop, stop on 1st warn, stop on 1st error                               */
+    int consoleVerboseLevel;      /* how detailed to print stats at end of run                                     */
+    int loggingFormat;            /* print loggin as text or JSON or YAML                                          */
 
     /* platform abstraction layer */
-    int (*mpfPutChar)(char);     /* default fun for writing out results */
-    int (*mpfPutCharLog)(char);  /* if full logging, then this needs to be set.  Can be set equal to mpfPutChar */
+    int (*mpfPutChar)(char);      /* default stream for writing out results (e.g. console)                         */
+    int (*mpfPutCharLog)(char);   /* if full logging, then this needs to be set.  Can be set equal to mpfPutChar   */
+
 }JB_UnitTestData;
 
 
-#define JUMPBUG_SET_FN_OUT(ths,pfOut)     (ths.mpfPutChar=pfOut)       /* print chars to console                 */
-#define JUMPBUG_SET_FN_LOGOUT(ths,pfOut)     (ths.mpfPutCharLog=pfOut) /* print chars to logging                 */
+/*************************************************************
+ test set
+ */
+typedef struct {
+    char *name;
+    int (*mpfTest)();
+} JB_Tests;
 
+#define JUMPBUG_SET_FN_OUT(ths,pfOut)       (ths.mpfPutChar=pfOut)       /* print chars to console                 */
+#define JUMPBUG_SET_FN_LOGOUT(ths,pfOut)    (ths.mpfPutCharLog=pfOut)    /* print chars to logging stream          */
+
+
+/*************************************************************
+ JumpBug API
+
+ */
 JB_RESULT JumpBug_InitGlobal();                          // init test case statistics
 
-JB_RESULT JumpBug_InitStats(JB_UnitTestData *x);       // init stats structure for unit tests
+JB_RESULT JumpBug_InitStats(JB_UnitTestData *x);         // init stats structure for unit tests
 JB_RESULT JumpBug_InitUnit();                            // init the test stats before running each unit
-JB_RESULT JumpBug_RunUnit(int (*f)(), char *unistName);  // run a unit test (cases for a function or module)
+JB_RESULT JumpBug_RunUnit(int (*f)(), char *unitName);   // run a unit test (cases for a function or module)
 JB_RESULT JumpBug_LogTest(int result, char *msg);        // log result of an individual testcase
 JB_RESULT JumpBug_BuildPass();                           // test whether the build passed.  modifiy this to change passing criteria
-JB_RESULT JumpBug_PrintResults();                        // print final results to console
+JB_RESULT JumpBug_PrintResults();                        // print final results 
 
+//JB_RESULT JumpBug_TestRunner(JB_Tests *t);
+
+	
 #define LOGTEST JumpBug_LogTest                                // short hand for JumpBug_LogTest()
 
 #ifdef __cplusplus

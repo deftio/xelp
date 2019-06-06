@@ -15,7 +15,8 @@ This is a simple unit test framework which should run on most embedded systems.
 * add support for verbose levels
     none
     stats only (at end of run)
-    print stats as JSON only
+    (flag) print stats as JSON only
+    (flag) print log as JSON only 
 * add support for
     stop on first error
     stop on first warning

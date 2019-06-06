@@ -58,20 +58,16 @@ JB_RESULT JumpBug_InitGlobal(){
 
 */
 JB_RESULT JumpBug_InitStats(JB_UnitTestData *x){
+    int i   = sizeof(JB_UnitTestData);
+ 	char *p = (char *) x;  
+	
+    if (x) {
+        while (i--)
+		*p++=0;
+        return JB_PASS;
+    }
     
-    x->totalCases           = 0;
-    x->totalPassed          = 0;
-    x->totalPassedWarn      = 0;
-
-    x->totalUnitsTested     = 0;
-    x->totalUnitsPassed     = 0;
-    x->totalUnitsPassedWarn = 0;
-    
-    x->curCases             = 0;
-    x->curCasesPassed       = 0;
-    x->curCasesPassedWarn   = 0;
-    
-    return JB_PASS;
+    return JB_FAIL;
 }
 
 /***************************************

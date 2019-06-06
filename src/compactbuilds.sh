@@ -31,6 +31,14 @@ size xelp.o | awk 'FNR==2{print "exec code:     " $1 " bytes"}'
 #du -b  xelp.o
 #size xelp.o | awk 'FNR==2{print "exec code: " $1 " bytes"}' 
 
+
+#sudo apt-get tcc
+echo TinyCC aka cc 32 bit intel -Os  "**************************"
+tcc -c xelp.c -Os -m32 -Wall
+du -b xelp.o | awk '{print "obj file size: " $1 " bytes"}'
+size xelp.o | awk 'FNR==2{print "exec code:     " $1 " bytes"}' 
+
+
 #sudo add-apt-repository ppa:team-gcc-arm-embedded/ppa
 #sudo apt-get install gcc-arm-embedded
 echo ARM64 GCC 4.8 "***************************"
