@@ -425,8 +425,7 @@ XELPRESULT test_XelpHelp() {
 
     r = XELPHelp(&x);
     gDummyBufOut(0);
-    //printf("%s\n",gDummyBuf); 
-    //printf("%d",XELPStrLen(gDummyBuf));
+    
     if (LOGTEST( (r!= XELP_S_OK) || ( XELPStrLen(gDummyBuf) != 149), "Test Help fail" )) {
         return XELP_E_Err;
     }
@@ -452,7 +451,7 @@ XELPRESULT test_XELPExecKC() {
 
     r = XELPExecKC(&x,'1');
     if (LOGTEST((r!=XELP_S_OK)&&(gGlobalCallbackData.c1!='1'),"failed ExecKC '1' ")){
-        printf("r=%d\n",r);
+        // printf("r=%d\n",r);
         return r;
     }
 
@@ -735,7 +734,7 @@ XELPRESULT test_XELPParse() {
 
 int run_tests() {
     
-    JumpBug_InitGlobal(putchar,0); // initialize the test case counters
+    JumpBug_InitGlobal("Xelp", putchar,0); // initialize the test case counters
 
     JumpBug_RunUnit(test_XELPStrLen,"XELPStrLen");
 	JumpBug_RunUnit(test_XELPStr2Int,"XELPStr2Int");
@@ -772,7 +771,7 @@ int run_tests() {
  */
 int main()
 {
-	int result;
+	int result,z=10;
 	
     printf("%s",XELP_BANNER_STR);
 	printf("\n*************************************\nRunning Xelp Unit tests .. \n");

@@ -73,8 +73,9 @@ typedef int JB_RESULT;
 
 /* The UnitTestData structure holds all the stats counters about what is happening in the unit test */
 typedef struct {
+    char *mModuleName;          /* name of this test suite, printed out in results, log  */
+    
     /* stats section **********************************/
-
     /* total individual cases run across all units */
     int totalCases;         
     int totalPassed;
@@ -96,8 +97,8 @@ typedef struct {
     int loggingFormat;            /* print loggin as text or JSON or YAML                                          */
 
     /* platform abstraction layer */
-    int (*mpfPutChar)(char);      /* default stream for writing out results (e.g. console)                         */
-    int (*mpfPutCharLog)(char);   /* if full logging, then this needs to be set.  Can be set equal to mpfPutChar   */
+    int (*mpfPutChar)(const char);      /* default stream for writing out results (e.g. console)                         */
+    int (*mpfPutCharLog)(const char);   /* if full logging, then this needs to be set.  Can be set equal to mpfPutChar   */
 
 }JB_UnitTestData;
 
@@ -118,8 +119,8 @@ typedef struct {
  JumpBug API
 
  */
-JB_RESULT JumpBug_InitGlobal(int (*f)(char), int (*flog)(char));                     // init test case statistics
-JB_RESULT JumpBug_InitStats(JB_UnitTestData *x,int (*f)(char), int (*flog)(char)) ; // init stats structure for unit tests
+JB_RESULT JumpBug_InitGlobal(char *moduleName, int (*f)(char), int (*flog)(char));                     // init test case statistics
+JB_RESULT JumpBug_InitStats(JB_UnitTestData *x, char *moduleName, int (*f)(char), int (*flog)(char)) ; // init stats structure for unit tests
 JB_RESULT JumpBug_InitUnit();                            // init the test stats before running each unit
 JB_RESULT JumpBug_RunUnit(int (*f)(), char *unitName);   // run a unit test (cases for a function or module)
 JB_RESULT JumpBug_LogTest(int result, char *msg);        // log result of an individual testcase
@@ -132,6 +133,7 @@ JB_RESULT JumpBug_PrintResults();                        // print final results
 int JumpBug_StrLen (const char* c);                        /* find length of null term stri  */
 JB_RESULT JumpBug_OutS( int (*f)(char), char *s, int max); /* output a string using the PAL  */
 JB_RESULT JumpBug_OutN( int (*f)(char), int n );           /* output a decimal num using PAL */
+JB_RESULT JumpBug_OutNd(int (*f)(char), int n, int pad );  /* prints an decimal num with up to pad # of spaces (e.g. %8d) */
 JB_RESULT JumpBug_OutH( int (*f)(char), int n );           /* output a hex num using PAL     */
 
 //JB_RESULT JumpBug_TestRunner(JB_Tests *t);

@@ -43,20 +43,22 @@
 */
 JB_UnitTestData gTestData;
 
+/* gloabl emits */
+#define OUTS(s) {JumpBug_OutS(gTestData.mpfPutChar,s,-1);}
+#define OUTN(n) {JumpBug_OutN(gTestData.mpfPutChar,n);}
+
 
 /**************************************
  * Helper fns
  */
 int JumpBug_StrLen (const char* c) {
     int l=0;
-    while (*c++ != 0) {
-        l++;
-    }
+    while (*c++ != 0) { l++; }
     return l;
 }
 
 /***************************************
- write out a string.
+ JumpBug_OutS write out a string.
  @param f  function pointer to char out function
  @param s  char buffer
  @max      max len of char buffer
@@ -65,7 +67,6 @@ int JumpBug_StrLen (const char* c) {
 
  */
 JB_RESULT JumpBug_OutS( int (*f)(char), char *s, int max) {
-    
     if (f && s && (*s) ) {
         max = max < 0 ? JumpBug_StrLen(s) : max;
         while ((max--) && (*s != 0)){
@@ -75,20 +76,59 @@ JB_RESULT JumpBug_OutS( int (*f)(char), char *s, int max) {
     }
     return JB_FAIL;
 }
+/***************************************
+ JumpBug_OutN write out a decimal integer
+ */
 
+
+JB_RESULT JumpBug_OutN( int (*f)(char), int n ){
+    int t=10;
+    if (f) {
+        if(n < 0) { n = -n, f('-');}
+        while ( (n/t) > 0) { t*=10; }
+        while ( t>=10) {  
+            t/=10;
+            f((char)((n/t)%10)+'0');          
+        }        
+        return JB_PASS;
+    }
+    return JB_FAIL;
+}
+/***************************************
+ JumpBug_OutNR write out a decimal integer
+ this way uses recursion..
+ 
 void intParseRecursive (int t, int o,  int (*f)(char))
 {
-        if(t != 0) intParseRecursive(t / 10, t % 10, f);
-        f((char)o  + '0');
+    if(t != 0) intParseRecursive(t / 10, t % 10, f);
+    f((char)o  + '0');
 }
-JB_RESULT JumpBug_OutN( int (*f)(char), int n ){
+JB_RESULT JumpBug_OutNR ( int (*f)(char), int n ){
     if (f) {
-        if(n < 0) { n = -n, f( '-');}
+        if(n < 0) { n = -n, f('-');}
         intParseRecursive(n/10,n%10,f);
         return JB_PASS;
     }
     return JB_FAIL;
 }
+*/
+
+JB_RESULT JumpBug_OutNd( int (*f)(char), int n, int pad ){
+    int t=10,s=0;
+    if (f) {
+        if(n < 0) { n = -n, s=1;pad--;}
+        while ( (n/t) > 0) { t*=10; pad--;}
+        while (pad-- > 0) {f(' ');}
+        if (s) f('-');
+        while ( t>=10) {  
+            t/=10;
+            f((char)((n/t)%10)+'0');          
+        }        
+        return JB_PASS;
+    }
+    return JB_FAIL;
+}
+
 
 JB_RESULT JumpBug_OutH( int (*f)(char), int n ){
     int d,x = ((sizeof(int))<<1)-1;
@@ -109,30 +149,34 @@ JB_RESULT JumpBug_OutH( int (*f)(char), int n ){
 
 */
 JB_RESULT JumpBug_FailMsg (const char *c, int n) {
-    printf("TestCase: %3d FAIL: %s\n",n,c);
+    OUTS("Unit TestCase: ");
+    OUTN(n);
+    OUTS(" FAIL: ");
+    OUTS(c);
     return JB_PASS;
 }
 
-JB_RESULT JumpBug_InitGlobal(int (*f)(char), int (*flog)(char)) {
-    JumpBug_InitStats(&gTestData, f, flog);
+JB_RESULT JumpBug_InitGlobal(char *moduleName, int (*f)(char), int (*flog)(char)) {
+    JumpBug_InitStats(&gTestData, moduleName, f, flog);
 }
 /***************************************
 
 */
-JB_RESULT JumpBug_InitStats(JB_UnitTestData *x,int (*f)(char), int (*flog)(char)) 
+JB_RESULT JumpBug_InitStats(JB_UnitTestData *x, char *moduleName, int (*f)(char), int (*flog)(char)) 
 {
     int i   = sizeof(JB_UnitTestData);
  	char *p = (char *) x;  
 	
     if (x) {
         while (i--)
-		*p++=0;
+	    	*p++=0;
 
-        x->mpfPutChar = f;
-        x->mpfPutCharLog = flog;
+        x->mModuleName = moduleName;   /* global test suite name */
+        x->mpfPutChar = f;                      /* console output fn      */
+        x->mpfPutCharLog = flog;                /* log output fn          */
+
         return JB_PASS;
     }
-    
     return JB_FAIL;
 }
 
@@ -150,9 +194,13 @@ JB_RESULT JumpBug_InitUnit() {
 
 */
 JB_RESULT JumpBug_RunUnit( int (*f)(), char *unitName) {
-    JumpBug_InitUnit();
     int result;
-    
+
+    /* if logging ... */
+
+    /* if verbose ... */
+
+    JumpBug_InitUnit();
     result = f();
     if (JB_NOTFAIL(result)) {
         gTestData.totalUnitsPassed++;
@@ -161,11 +209,14 @@ JB_RESULT JumpBug_RunUnit( int (*f)(), char *unitName) {
         }
 
         if (gTestData.curCases < 1) {/* unit was run but no tests were encountered..*/
-            printf("Warning ==> Unit: \"%s\" no test cases run\n",unitName);
+            OUTS("Warning ==> Unit: ");
+            OUTS(unitName);
+            OUTS(" no test cases run\n");
         }
     }
     else {
-        printf("Failed Unit Test: %s",unitName);    
+        OUTS("Failed Unit Test: ");
+        OUTS(unitName);    
     }
     return result;
 
@@ -209,12 +260,23 @@ JB_RESULT JumpBug_BuildPass() {
 
 */
 JB_RESULT JumpBug_PrintResults() {
-    printf("\n");
-    printf("Test Cases Run\n");
-    printf("Total Units Passed %4d of %4d with (%d warnings)\n", gTestData.totalUnitsPassed,gTestData.totalUnitsTested,gTestData.totalUnitsPassedWarn);
-    printf("Total Cases Passed %4d of %4d with (%d warnings)\n\n",gTestData.totalPassed, gTestData.totalCases,gTestData.totalPassedWarn);
+    OUTS("\n");
+    OUTS("Test Cases Run\n");
+    OUTS("Total Units Passed ")
+    OUTN(gTestData.totalUnitsPassed); 
+    OUTS(" of ");
+    OUTN(gTestData.totalUnitsTested);
+    OUTS(" with (");
+    OUTN(gTestData.totalUnitsPassedWarn); 
+    OUTS(") warnings.\n"); 
+    OUTS("Total Cases Passed ");
+    OUTN(gTestData.totalPassed);
+    OUTS(" of ");
+    OUTN(gTestData.totalCases);
+    OUTS(" with (");
+    OUTN(gTestData.totalPassedWarn);
+    OUTS(") warnings\n\n"); 
     
-    printf("\n");
     
     return JB_PASS;
 }

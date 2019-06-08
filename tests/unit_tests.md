@@ -12,19 +12,25 @@ This is a simple unit test framework which should run on most embedded systems.
 * instance based (can run mult at same time)
 
 ## TODO
-* add support for verbose levels
-    none
-    stats only (at end of run)
-    (flag) print stats as JSON only
-    (flag) print log as JSON only 
-* add support for
-    stop on first error
-    stop on first warning
-    don't stop (try to go as long as possible)
-* add support for logging all test cases ==> logs all test cases to this stream (on posix show file w flush example)
-    * SET_FN_PUTC_LOG((int*)(f(char c))) 
-* get rid of printf() dependancy --> make SET_FN_PUTC((int *)(f(char c))
-    * note to do this we need to hande the %s and %d in the current printf() functions
+* verbose - add support for summary section at console / stdout
+    * (flag:slient)   - nothing printed only return code is available (e.g. returns 0)
+    * (flag:one-line) - Name & result only ==> "Running tests for 'MyProject' ... passed"
+    * (flag:stats )   - Name & result along with summary stats
+* stop levels - add support for
+    * stop on first error
+    * stop on first warning
+    * don't stop (try to go as long as possible)
+* logging - support for logging all test cases ==> logs all test cases to this stream (on posix show file w flush example)
+    * setup
+        * programmer (user) must provide setup, teardown. 
+            * SET_FN_PUTC_LOG((int*)(f(char c))) 
+            * set flush()?
+    * logging format 
+        * md (?)
+        * JSON
+        * YAML (?) - advantage of YAML is that doesn't need close brace.  so if the execution stops the file is still valid.
+* (done) get rid of printf() dependancy --> make SET_FN_PUTC((int *)(f(char c))
+    * (done) note to do this we need to hande the %s and %d in the current printf() functions
     * note for posix also add
         consider adding puts  # faster writing to log
         consider showing example where each write is flushed and each write opens, closes, appends file.
