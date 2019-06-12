@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+    <!-- JumpBug test framework
+        simple HTML report
+        (c) M A Chatterjee
+        deftio <at> deftio <dot> com
+        deftio.com/jumpbug
+     -->
+<html lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+<script type="text/javascript" src="./bitwrench.min.js"></script>  <!-- page setup, formatting (see deftio.com/bitwrench for more info) -->
+<script type="text/javascript" src="./js-yaml.min.js"></script>    <!-- YAML parser            (see https://github.com/nodeca/js-yaml)  -->
+</head>
+
+<body class="bw-def-page-setup bw-font-sans-serif">
+<script>
+    
+    var testDataRaw = "";  // raw unparsed YAML file.  If something goes wrong w YAML parsing we can always show this...
+    var testData = {};     // global storage for the test case data (after parsing from YAML to js)
+    
+    function renderReport(jsData) {
+        testData = jsyaml.load(jsData);     // convert from YAML to javascript
+        bw.DOM("#test",bw.prettyPrintJSON(testData)); // render it
+    }
+
+    bw.getFile("../xelp-test-log.yaml",function(td){testDataRaw =td; renderReport(td);});  // get the YAML file with the test data
+    
+    // Page formatting & set up
+    var content = 
+    [
+        ["h1",{},"Unit Test Output"],
+        //["p", {},"<strong>bitwrench.js version:</strong> " + bw.version()["version"]], 
+        //["h2",{},"Test Output"],
+        ["div",{id:"test"},"waiting for test data<br>"],
+        "<br><br>"
+    ];
+
+    bw.DOM("body", content.map( function(x) {return bw.buildHTMLObjString(x)}).join("")); // render page.  Note:  ()=>() not supported in ealrly browsers
+
+</script>
+</body>
+</html>

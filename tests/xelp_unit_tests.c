@@ -34,6 +34,8 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
+
 #include "jumpbug_unit_test_fw.h"  /* micro portable unit test framework */
 #include "../src/xelp.h"
 
@@ -334,7 +336,7 @@ XELPRESULT test_XelpInit() {
     XELP myXelp, *x;
     x = &myXelp;
 
-    if (LOGTEST(XELP_S_OK != XELPInit(x,"Xelp Unit Tests"),"XelpInit fail")) {
+    if (LOGTEST(XELP_S_OK != XELPInit(x,"Xelp Unit Tests"),"XelpInit")) {
         return XELP_E_Err;
     }
     
@@ -364,19 +366,19 @@ XELPRESULT test_XelpOut_XelpThru_XelpErr() {
     XELP_SET_FN_THR(myXelp,dummyOut);
     XELP_SET_FN_ERR(myXelp,dummyOut);
 
-    if (LOGTEST(XELP_S_OK != XELPOut(&myXelp,"a",1),"XelpOut fail")) {
+    if (LOGTEST(XELP_S_OK != XELPOut(&myXelp,"a",1),"XelpOut")) {
         return XELP_E_Err;
         if (gChar != 'a')
             return XELP_E_Err;
     }
 
-    if (LOGTEST(XELP_S_OK != XELPOut(&myXelp,"ab",2),"XelpOut fail")) {
+    if (LOGTEST(XELP_S_OK != XELPOut(&myXelp,"ab",2),"XelpOut")) {
         return XELP_E_Err;
         if (gChar != 'b')
             return XELP_E_Err;
     }
 
-    if (LOGTEST(XELP_S_OK != XELPOut(&myXelp,0,0),"XelpOut test Null msg")) {
+    if (LOGTEST(XELP_S_OK != XELPOut(&myXelp,0,0),"XelpOut test NULL msg")) {
         return XELP_E_Err;
     }
     return XELP_S_OK;
@@ -426,7 +428,7 @@ XELPRESULT test_XelpHelp() {
     r = XELPHelp(&x);
     gDummyBufOut(0);
     
-    if (LOGTEST( (r!= XELP_S_OK) || ( XELPStrLen(gDummyBuf) != 149), "Test Help fail" )) {
+    if (LOGTEST( (r!= XELP_S_OK) || ( XELPStrLen(gDummyBuf) != 149), "Test Help" )) {
         return XELP_E_Err;
     }
     return XELP_S_OK;
@@ -441,7 +443,7 @@ XELPRESULT test_XELPExecKC() {
     XELPInit(&x,"TestExecKC");
 
     r = XELPExecKC(&x,'1');
-    if (LOGTEST(r!=XELP_S_NOTFOUND,"failed ExecKC null ptr")){
+    if (LOGTEST(r!=XELP_S_NOTFOUND,"ExecKC null ptr")){
         return r;
     }
     
@@ -450,13 +452,13 @@ XELPRESULT test_XELPExecKC() {
 	XELP_SET_FN_OUT(x,dummyOut);
 
     r = XELPExecKC(&x,'1');
-    if (LOGTEST((r!=XELP_S_OK)&&(gGlobalCallbackData.c1!='1'),"failed ExecKC '1' ")){
+    if (LOGTEST((r!=XELP_S_OK)&&(gGlobalCallbackData.c1!='1'),"ExecKC '1' ")){
         // printf("r=%d\n",r);
         return r;
     }
 
     r = XELPExecKC(&x,'z'); // not a mapped key...
-    if (LOGTEST(r!=XELP_S_NOTFOUND,"failed ExecKC 'z'")){
+    if (LOGTEST(r!=XELP_S_NOTFOUND,"ExecKC 'z'")){
         return r;
     }
     
@@ -482,15 +484,15 @@ XELPRESULT test_XELPParseKey() {
         char *c1 = " foo ";
         for (i=0; i  <XELPStrLen(c1); i++) {
             r = XELPParseKey(&x,c1[i]);
-            if (LOGTEST(r!= XELP_S_OK, "Failed Parse Key -- sending keys")){
+            if (LOGTEST(r!= XELP_S_OK, "XELPParseKey -- sending keys")){
                 return XELP_E_Err;
             }
         }
         r = XELPParseKey(&x,XELPKEY_ENTER);
-            if (LOGTEST(r!= XELP_S_OK, "Failed Parse Key -- sending keys")){
+            if (LOGTEST(r!= XELP_S_OK, "XELPParseKey -- sending keys")){
                 return XELP_E_Err;
             }
-        if (LOGTEST(gGlobalCallbackData.c1 != 1,"Failed Parse Key test cli1 value")) {
+        if (LOGTEST(gGlobalCallbackData.c1 != 1,"Test cli 1 value")) {
             return XELP_E_Err;
         }
     }
@@ -500,16 +502,16 @@ XELPRESULT test_XELPParseKey() {
         char *c2 = " bar; ";
         for (i=0; i  <XELPStrLen(c2); i++) {
             r = XELPParseKey(&x,c2[i]);
-            if (LOGTEST(r!= XELP_S_OK, "Failed Parse Key -- sending keys")){
+            if (LOGTEST(r!= XELP_S_OK, "XELPParseKey -- sending keys")){
                 return XELP_E_Err;
             }
         }
         r = XELPParseKey(&x,XELPKEY_BKSP);
         r = XELPParseKey(&x,XELPKEY_ENTER);
-        if (LOGTEST(r!= XELP_S_OK, "Failed Parse Key -- sending keys w bskp test")){
+        if (LOGTEST(r!= XELP_S_OK, "XELPParseKey -- sending keys w bskp test")){
             return XELP_E_Err;
         }
-        if (LOGTEST(gGlobalCallbackData.c1 != 1,"Failed Parse Key test cli1 value")) {
+        if (LOGTEST(gGlobalCallbackData.c1 != 1,"XELPParseKey test cli1 value")) {
             return XELP_E_Err;
         }
 
@@ -520,7 +522,7 @@ XELPRESULT test_XELPParseKey() {
         r = XELPParseKey(&x,'a');
         r = XELPParseKey(&x,XELPKEY_BKSP);
         r = XELPParseKey(&x,XELPKEY_ENTER);
-        if (LOGTEST( (r!= XELP_S_OK) || (gBool != 1), "Failed Parse Key --  bskp callback test")){
+        if (LOGTEST( (r!= XELP_S_OK) || (gBool != 1), "XELPParseKey --  bskp callback test")){
             return XELP_E_Err;
         }
 
@@ -531,11 +533,11 @@ XELPRESULT test_XELPParseKey() {
         XELP_SET_FN_EMCHG(x,0);
         
         r = XELPParseKey(&x,XELPKEY_CLI);
-        if (LOGTEST( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_CLI), "Failed Parse Key -- mode change to CLI 1")){
+        if (LOGTEST( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_CLI), "XELPParseKey -- mode change to CLI 1")){
             return XELP_E_Err;
         }
         r = XELPParseKey(&x,XELPKEY_KEY);
-        if (LOGTEST( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_KEY), "Failed Parse Key -- mode change to KEY")){
+        if (LOGTEST( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_KEY), "XELPParseKey -- mode change to KEY")){
             return XELP_E_Err;
         }
 
@@ -543,12 +545,12 @@ XELPRESULT test_XELPParseKey() {
         XELP_SET_FN_THR(x,dummyOut); // can only change to THR mode if there is a valid call back fn.
 
         r = XELPParseKey(&x,XELPKEY_THR);
-        if (LOGTEST( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_THR) || (gInt != x.mCurMode), "Failed Parse Key -- mode change to THR")){
+        if (LOGTEST( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_THR) || (gInt != x.mCurMode), "XELPParseKey -- mode change to THR")){
             return XELP_E_Err;
         }
 
         r = XELPParseKey(&x,XELPKEY_CLI);
-        if (LOGTEST( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_CLI) || (gInt != x.mCurMode), "Failed Parse Key -- mode change to CLI 2")){
+        if (LOGTEST( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_CLI) || (gInt != x.mCurMode), "XELPParseKey -- mode change to CLI 2")){
             return XELP_E_Err;
         }
         
@@ -560,21 +562,21 @@ XELPRESULT test_XELPParseKey() {
         XELP_SET_FN_EMCHG(x,0); // don't want to deal with mode-chnage call backs
         
         r = XELPParseKey(&x,XELPKEY_THR);
-        if (LOGTEST( (r!= XELP_S_OK) && (x.mCurMode != XELP_MODE_THR), "Failed ParseKey -- mode change to THR")){
+        if (LOGTEST( (r!= XELP_S_OK) && (x.mCurMode != XELP_MODE_THR), "XELPParseKey -- mode change to THR")){
             return XELP_E_Err;
         }
 
         XELP_SET_FN_THR(x,dummyOut);
         r = XELPParseKey(&x,'a');
-        if (LOGTEST( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_THR) || (gChar != 'a'), "Failed ParseKey --  THR 1")){
+        if (LOGTEST( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_THR) || (gChar != 'a'), "XELPParseKey --  THR 1")){
             return XELP_E_Err;
         }
         r = XELPParseKey(&x,'b');
-        if (LOGTEST( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_THR) || (gChar != 'b'), "Failed ParseKey --  THR 2")){
+        if (LOGTEST( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_THR) || (gChar != 'b'), "XELPParseKey --  THR 2")){
             return XELP_E_Err;
         }
         r = XELPParseKey(&x,XELPKEY_CLI); // change to CLI now THRU function shouldn't be called and dummy value should be unchnaged
-        if (LOGTEST( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_CLI) || (gChar != 'b'), "Failed ParseKey --  THR x")){
+        if (LOGTEST( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_CLI) || (gChar != 'b'), "XELPParseKey --  THR x")){
             return XELP_E_Err;
         }
 
@@ -583,26 +585,26 @@ XELPRESULT test_XELPParseKey() {
     //test KEY function redirects
     {
         r = XELPParseKey(&x,XELPKEY_KEY);
-        if (LOGTEST( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_KEY) , "Failed ParseKey --  KEY 1")){
+        if (LOGTEST( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_KEY) , "XELPParseKey --  KEY 1")){
             return XELP_E_Err;
         }
 
         gGlobalCallbackData.k0 = 'x';
         r = XELPParseKey(&x,'0');
-        if (LOGTEST( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_KEY) || (gGlobalCallbackData.k0 != '0'), "Failed ParseKey --  THR 2")){
+        if (LOGTEST( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_KEY) || (gGlobalCallbackData.k0 != '0'), "XELPParseKey --  THR 0")){
             return XELP_E_Err;
         }
         
         gGlobalCallbackData.k1 = 'y';
         r = XELPParseKey(&x,'1');
-        if (LOGTEST( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_KEY) || (gGlobalCallbackData.k1 != '1'), "Failed ParseKey --  THR 2")){
+        if (LOGTEST( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_KEY) || (gGlobalCallbackData.k1 != '1'), "XELPParseKey --  THR 1")){
             return XELP_E_Err;
         }
 
         // end of tests ... change mode to CLI and we shouldn't be getting key callbacks anymore
         gGlobalCallbackData.k1 = 'z';
         r = XELPParseKey(&x,XELPKEY_CLI); // change to CLI now THRU function shouldn't be called and dummy value should be unchnaged
-        if (LOGTEST( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_CLI) || (gGlobalCallbackData.k1  != 'z'), "Failed ParseKey --  THR x")){
+        if (LOGTEST( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_CLI) || (gGlobalCallbackData.k1  != 'z'), "XELPParseKey--  THR x")){
             return XELP_E_Err;
         }
 
@@ -718,11 +720,10 @@ XELPRESULT test_XELPParse() {
     XELPInit(&x,"TestParse");
     XELP_SET_FN_OUT(x,dummyOut);
 
-
-   r = XELPParse(&x,s,XELPStrLen(s));
+    r = XELPParse(&x,s,XELPStrLen(s));
     
-   if (LOGTEST(r!=XELP_S_OK,"XELPParse Fail"))
-     return XELP_E_Err;
+    if (LOGTEST(r!=XELP_S_OK,"XELPParse"))
+        return XELP_E_Err;
 
     return XELP_S_OK;
 }
@@ -731,10 +732,19 @@ XELPRESULT test_XELPParse() {
 /* 	************************************************
 	Xelp Simple Unit Test suite.  
 */
-
+FILE *logfile;
+int flogout (char x) {
+    if (logfile) {
+        fputc(x,logfile);
+        fflush(logfile);
+    }
+    return 0;
+}
 int run_tests() {
     
-    JumpBug_InitGlobal("Xelp", putchar,0); // initialize the test case counters
+    
+    
+    JumpBug_InitGlobal("Xelp", putchar,flogout); // initialize the test case counters
 
     JumpBug_RunUnit(test_XELPStrLen,"XELPStrLen");
 	JumpBug_RunUnit(test_XELPStr2Int,"XELPStr2Int");
@@ -771,17 +781,23 @@ int run_tests() {
  */
 int main()
 {
-	int result,z=10;
+	int result;
 	
     printf("%s",XELP_BANNER_STR);
 	printf("\n*************************************\nRunning Xelp Unit tests .. \n");
-	result = run_tests();
+
+    logfile = fopen("xelp-test-log.yaml","w");
+	
+    result = run_tests();
+
+    if (logfile) {     fclose(logfile); }
 
 	if  (JB_NOTFAIL(result)) 
 		printf ("Tests passed ++++\n\n");
 	else
 		printf ("Tests failed \n\n");
 
+    printf("JumpBug..\n size of JumpBug Instance %d (bytes)\n===> %s, %d <===\n",(int)sizeof(JB_UnitTestData),JUMPBUG_DBG_FILE, JUMPBUG_DBG_LINE);
     return result;  /* remember the value 0 is considered passing in a *nix build continuous integration sense */
 
 }

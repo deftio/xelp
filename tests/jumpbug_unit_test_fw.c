@@ -35,7 +35,6 @@
  */
 
 #include "jumpbug_unit_test_fw.h"
-#include <stdio.h>
 
 
 /***************************************
@@ -66,7 +65,7 @@ int JumpBug_StrLen (const char* c) {
  if (max == -1) treat as null terminated string only.
 
  */
-JB_RESULT JumpBug_OutS( int (*f)(char), char *s, int max) {
+int JumpBug_OutS( int (*f)(char), const char *s, int max) {
     if (f && s && (*s) ) {
         max = max < 0 ? JumpBug_StrLen(s) : max;
         while ((max--) && (*s != 0)){
@@ -81,7 +80,7 @@ JB_RESULT JumpBug_OutS( int (*f)(char), char *s, int max) {
  */
 
 
-JB_RESULT JumpBug_OutN( int (*f)(char), int n ){
+int JumpBug_OutN( int (*f)(char), int n ){
     int t=10;
     if (f) {
         if(n < 0) { n = -n, f('-');}
@@ -96,14 +95,13 @@ JB_RESULT JumpBug_OutN( int (*f)(char), int n ){
 }
 /***************************************
  JumpBug_OutNR write out a decimal integer
- this way uses recursion..
+ old way uses recursion..
  
-void intParseRecursive (int t, int o,  int (*f)(char))
-{
+void intParseRecursive (int t, int o,  int (*f)(char)) {
     if(t != 0) intParseRecursive(t / 10, t % 10, f);
     f((char)o  + '0');
 }
-JB_RESULT JumpBug_OutNR ( int (*f)(char), int n ){
+int JumpBug_OutNR ( int (*f)(char), int n ){
     if (f) {
         if(n < 0) { n = -n, f('-');}
         intParseRecursive(n/10,n%10,f);
@@ -112,8 +110,13 @@ JB_RESULT JumpBug_OutNR ( int (*f)(char), int n ){
     return JB_FAIL;
 }
 */
-
-JB_RESULT JumpBug_OutNd( int (*f)(char), int n, int pad ){
+/***************************************
+ JumpBug_OutN write out a decimal integer with space padding
+  equiavlent ot %d in printf family
+  e.g. printf("%4d",12) ==> "  12"  
+   
+ */
+int JumpBug_OutNd( int (*f)(char), int n, int pad ){
     int t=10,s=0;
     if (f) {
         if(n < 0) { n = -n, s=1;pad--;}
@@ -128,11 +131,12 @@ JB_RESULT JumpBug_OutNd( int (*f)(char), int n, int pad ){
     }
     return JB_FAIL;
 }
+/***************************************
+ JumpBug_OutH write out a integer as hex
+ */
 
-
-JB_RESULT JumpBug_OutH( int (*f)(char), int n ){
+int JumpBug_OutH( int (*f)(char), int n ){
     int d,x = ((sizeof(int))<<1)-1;
-    
     if (f) {
         f('0');
         f('x');
@@ -146,23 +150,82 @@ JB_RESULT JumpBug_OutH( int (*f)(char), int n ){
     return JB_FAIL;
 }
 /***************************************
+ Logging support functions (YAML)
+ */
+#ifdef JUMPBUG_LOGGING_SUPPORT 
+int JumpBug_YAML_Cmt(int (*f)(char), char *comment){                   /* YAML comment and \n e.g.'#my comment \n     */
+    if (!f)
+        return JB_FAIL;
+    f('#');
+    JumpBug_OutS(f,comment,-1);
+    f('\n');
+    return JB_PASS;
+}
+int JumpBug_YAML_Block(int (*f)(char), char *string, int indent){      /* YAML block begin e.g.   '  myblock:\n'      */
+    if (!f)
+        return JB_FAIL;
+    while (indent--)
+        f(JUMPBUG_YAML_INDENT);
+    JumpBug_OutS(f,string,-1);
+    f(':');
+    f('\n');
+    return JB_PASS;
+}
+int JumpBug_YAML_BlockN(int (*f)(char), char *string, int n, int indent){      /* YAML block begin e.g.   '  myblock:\n'      */
+    if (!f)
+        return JB_FAIL;
+    while (indent--)
+        f(JUMPBUG_YAML_INDENT);
+    JumpBug_OutS(f,string,-1);
+    JumpBug_OutN(f,n);
+    f(':');
+    f('\n');
+    return JB_PASS;
+}
+int JumpBug_YAML_SS(int (*f)(char), char *key, char *val, int indent){ /* YAML string : string eg '   "key":"value"\n'*/
+    if (!f)
+        return JB_FAIL;
+    while (indent--)
+        f(JUMPBUG_YAML_INDENT);
+    JumpBug_OutS(f,key,-1);
+    f(':');f(' ');
+    JumpBug_OutS(f,val,-1);
+    f(' ');f('\n');
+    return JB_PASS;
+}
+int JumpBug_YAML_SN(int (*f)(char), char *key, int val, int indent){   /* YAML string : num    eg '   "key":123    \n'*/
+    if (!f)
+        return JB_FAIL;
+    while (indent--)
+        f(JUMPBUG_YAML_INDENT);
+    JumpBug_OutS(f,key,-1);
+    f(':');f(' ');
+    JumpBug_OutN(f,val);
+    f(' ');f('\n');
+    return JB_PASS;
+}
+#endif
 
+/***************************************
+ * print out fail message to console
 */
-JB_RESULT JumpBug_FailMsg (const char *c, int n) {
+int JumpBug_FailMsg (const char *c, int n) {
     OUTS("Unit TestCase: ");
     OUTN(n);
     OUTS(" FAIL: ");
     OUTS(c);
     return JB_PASS;
 }
-
-JB_RESULT JumpBug_InitGlobal(char *moduleName, int (*f)(char), int (*flog)(char)) {
-    JumpBug_InitStats(&gTestData, moduleName, f, flog);
+/***************************************
+ *  initialize stats for global ctr
+ */ 
+int JumpBug_InitGlobal(char *moduleName, int (*f)(char), int (*flog)(char)) {
+    return JumpBug_InitStats(&gTestData, moduleName, f, flog);
 }
 /***************************************
-
+ * init stats data structure, set up serialized output function ptrs
 */
-JB_RESULT JumpBug_InitStats(JB_UnitTestData *x, char *moduleName, int (*f)(char), int (*flog)(char)) 
+int JumpBug_InitStats(JB_UnitTestData *x, char *moduleName, int (*f)(char), int (*flog)(char)) 
 {
     int i   = sizeof(JB_UnitTestData);
  	char *p = (char *) x;  
@@ -171,10 +234,18 @@ JB_RESULT JumpBug_InitStats(JB_UnitTestData *x, char *moduleName, int (*f)(char)
         while (i--)
 	    	*p++=0;
 
-        x->mModuleName = moduleName;   /* global test suite name */
-        x->mpfPutChar = f;                      /* console output fn      */
-        x->mpfPutCharLog = flog;                /* log output fn          */
+        x->mModuleName   = moduleName;   /* global test suite name     */
+        x->mpfPutChar    = f;            /* console output fn          */
+#ifdef JUMPBUG_LOGGING_SUPPORT    
+        x->mpfPutCharLog = flog;         /* log output fn, OK if NULL  */
 
+        if (x->mpfPutCharLog) {
+            JumpBug_YAML_Cmt(x->mpfPutCharLog,"JumpBug YAML File output begin");
+            JumpBug_YAML_Block(x->mpfPutCharLog ,"Global Test Parameters",1);
+            JumpBug_YAML_SN(x->mpfPutCharLog,"JumpBug Framework Version",JUMPBUG_VERSION,2);
+            JumpBug_YAML_SS(x->mpfPutCharLog,"Test Module Name",moduleName,2);
+        }
+#endif
         return JB_PASS;
     }
     return JB_FAIL;
@@ -183,22 +254,24 @@ JB_RESULT JumpBug_InitStats(JB_UnitTestData *x, char *moduleName, int (*f)(char)
 /***************************************
 
 */
-JB_RESULT JumpBug_InitUnit() {
+int JumpBug_InitUnit() {
     gTestData.curCases=0;
     gTestData.curCasesPassed=0;
     gTestData.totalUnitsTested++;
+
     return JB_PASS;
 }
 
 /***************************************
 
 */
-JB_RESULT JumpBug_RunUnit( int (*f)(), char *unitName) {
+int JumpBug_RunUnit( int (*f)(), char *unitName) {
     int result;
 
     /* if logging ... */
-
-    /* if verbose ... */
+#ifdef JUMPBUG_LOGGING_SUPPORT
+    JumpBug_YAML_Block(gTestData.mpfPutCharLog,unitName,1);
+#endif
 
     JumpBug_InitUnit();
     result = f();
@@ -216,16 +289,63 @@ JB_RESULT JumpBug_RunUnit( int (*f)(), char *unitName) {
     }
     else {
         OUTS("Failed Unit Test: ");
-        OUTS(unitName);    
+        OUTS(unitName); 
+#ifdef JUMPBUG_LOGGING_SUPPORT
+            JumpBug_YAML_SS (gTestData.mpfPutCharLog,"UNIT_FAIL","true",2);
+#endif           
     }
+#ifdef JUMPBUG_LOGGING_SUPPORT
+    JumpBug_YAML_SN(gTestData.mpfPutCharLog,"Total Tests Run",gTestData.curCases,2);
+    JumpBug_YAML_SN(gTestData.mpfPutCharLog,"Total Tests Passed",gTestData.curCasesPassed,2);
+    JumpBug_YAML_SN(gTestData.mpfPutCharLog,"Total Tests Passed with Warning(s)",gTestData.curCasesPassedWarn,2);
+    JumpBug_YAML_SN(gTestData.mpfPutCharLog,"Total Tests Failed",gTestData.curCases-gTestData.curCasesPassed,2);        
+#endif
+
     return result;
 
 }
 
 /***************************************
-
+ * log test result
 */
-JB_RESULT JumpBug_LogTest (int result, char *msg) {
+int JumpBug_LogTest (int result, char *msg) {
+
+#ifdef JUMPBUG_LOGGING_SUPPORT
+            JumpBug_YAML_BlockN (gTestData.mpfPutCharLog,"test_case",gTestData.curCases,2);
+#endif            
+
+    gTestData.totalCases++; // global individual test cases count
+    gTestData.curCases++;   // global unit count...
+    
+    if (JB_NOTFAIL(result)) { // pass
+
+        gTestData.totalPassed++;
+        gTestData.curCasesPassed++;
+        if (result != JB_PASS) {
+            gTestData.totalPassedWarn++;
+            gTestData.curCasesPassedWarn++;
+#ifdef JUMPBUG_LOGGING_SUPPORT
+            JumpBug_YAML_SS (gTestData.mpfPutCharLog,msg,"PASSWARN",3);
+#endif            
+        }
+#ifdef JUMPBUG_LOGGING_SUPPORT
+            JumpBug_YAML_SS (gTestData.mpfPutCharLog,msg,"PASS",3);
+#endif                    
+
+    }
+    else {
+#ifdef JUMPBUG_LOGGING_SUPPORT
+            JumpBug_YAML_SS (gTestData.mpfPutCharLog,msg,"FAIL",4);
+#endif         
+        JumpBug_FailMsg(msg,gTestData.curCases);
+    }
+    return result;
+}
+/***************************************
+    JumpBug_LogTestF 
+    log a test result and print out file and line number if available
+*/
+int JumpBug_LogTestF(int result, char *msg, char *fname, int lineno ) {
 
     gTestData.totalCases++; // global individual test cases count
     gTestData.curCases++;   // global unit count...
@@ -247,9 +367,24 @@ JB_RESULT JumpBug_LogTest (int result, char *msg) {
  * Test whether the build passed 
 */
 
-JB_RESULT JumpBug_BuildPass() {
-    JB_RESULT r = JB_FAIL;
+int JumpBug_BuildPass() {
+    int r = JB_FAIL;
+    int x = 2;
+#ifdef JUMPBUG_LOGGING_SUPPORT   
+        if (gTestData.mpfPutCharLog) {
+            JumpBug_YAML_Block(gTestData.mpfPutCharLog ,"Global Test Results",x-1);
 
+            JumpBug_YAML_SN(gTestData.mpfPutCharLog,"Total Units Run",gTestData.totalUnitsTested,x);
+            JumpBug_YAML_SN(gTestData.mpfPutCharLog,"Total Units Passed",gTestData.totalUnitsPassed,x);
+            JumpBug_YAML_SN(gTestData.mpfPutCharLog,"Total Units Passed with Warning(s)",gTestData.totalUnitsPassedWarn,x);
+            JumpBug_YAML_SN(gTestData.mpfPutCharLog,"Total Units Failed",gTestData.totalUnitsTested-gTestData.totalUnitsPassed,x);
+
+            JumpBug_YAML_SN(gTestData.mpfPutCharLog,"Total Test Cases Run",gTestData.totalCases,x);
+            JumpBug_YAML_SN(gTestData.mpfPutCharLog,"Total Test Cases Passed",gTestData.totalPassed ,x);
+            JumpBug_YAML_SN(gTestData.mpfPutCharLog,"Total test Cases Passed with Warning(s)",gTestData.totalPassedWarn,x);
+            JumpBug_YAML_SN(gTestData.mpfPutCharLog,"Total Test Cases Failed",gTestData.totalCases-gTestData.totalPassed,x);            
+        }
+#endif
     if ((gTestData.totalCases == gTestData.totalPassed) && (gTestData.totalUnitsPassed == gTestData.totalUnitsTested)) {
         r = JB_PASS;
     }
@@ -259,7 +394,7 @@ JB_RESULT JumpBug_BuildPass() {
 /***************************************
 
 */
-JB_RESULT JumpBug_PrintResults() {
+int JumpBug_PrintResults() {
     OUTS("\n");
     OUTS("Test Cases Run\n");
     OUTS("Total Units Passed ")

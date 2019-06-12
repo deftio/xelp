@@ -8,7 +8,9 @@ This is a simple unit test framework which should run on most embedded systems.
 * prints stats at end (opt see verbose)
 * can be used with coverage tool such as gcov etc
 * low overhead
-* can be used cross platform for embedded projects (e.g. same on arduino vs ubuntu linux) using HAL
+* can be used cross platform for embedded projects (e.g. same on arduino vs ubuntu linux) using Platform Abstraction Layer
+    * no dependancies on C std library
+    * string / number / YAML output are all serialized internally
 * instance based (can run mult at same time)
 
 ## TODO
