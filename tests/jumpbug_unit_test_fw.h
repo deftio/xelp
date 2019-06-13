@@ -180,7 +180,7 @@ int JumpBug_OutH( int (*f)(char), int n );           /* output a hex num using P
  * 
  */ 
 #ifdef JUMPBUG_LOGGING_SUPPORT 
-#define JUMPBUG_YAML_INDENT ' '
+#define JUMPBUG_YAML_INDENT ' '                                        /* YAML indent character                       */
 int JumpBug_YAML_Cmt(int (*f)(char), char *comment);                   /* YAML comment and \n e.g.'#my comment \n     */
 int JumpBug_YAML_Block(int (*f)(char), char *string, int indent);      /* YAML block begin e.g.   '  myblock:\n'      */
 int JumpBug_YAML_SS(int (*f)(char), char *key, char *val, int indent); /* YAML string : string eg '   "key":"value"\n'*/
@@ -191,13 +191,14 @@ int JumpBug_YAML_SN(int (*f)(char), char *key, int val, int indent);   /* YAML s
 //int JumpBug_TestRunner(JB_Tests *t);
 
 	
-#define LOGTEST JumpBug_LogTest                            // short hand for JumpBug_LogTest()
+//#define LOGTEST JumpBug_LogTest   
 
 /* this wrapper allows dissolving macro use (e.g. in your makefile just #define JB_ASSRT(r,m) ()) */
 #ifndef JB_ASSRT
-#define JB_ASSERT(result,msg)   {JumpBug_LogTestF(result,msg,JUMPBUG_DBG_FILE,JUMPBUG_DBG_LINE)}
+#define JB_ASSERT(result,msg)   JumpBug_LogTestF(result,msg,JUMPBUG_DBG_FILE,JUMPBUG_DBG_LINE)
 #endif
 
+#define LOGTEST JB_ASSERT
 #ifdef __cplusplus
 }
 #endif

@@ -1,11 +1,9 @@
-/*
+/**************************************************************************************************
 
   @xelp_unit_tests.c - simple test file example file for xelp embedded cli/scripting library
-
   @copy Copyright (C)   <M. A. Chatterjee>
   @author M A Chatterjee <deftio [at] deftio [dot] com>
- 
-  
+   
   @license: 
 	Copyright (c) 2011-2019, M. A. Chatterjee <deftio at deftio dot com>
 	All rights reserved.
@@ -91,15 +89,13 @@ XELPRESULT cli3 (const char *c, int max) {
     return XELP_S_OK;
 }
 //declare a command map for functions in parse mode
-XELPCLIFuncMapEntry gMyCLICommands[] =
-{
+XELPCLIFuncMapEntry gMyCLICommands[] = {
 	{&cli0    		    , "cli0",  "cli function 0   "       },
 	{&cli1    		    , "foo"	,  "foo cli function "       },
     {&cli2    		    , "bar"	,  "bar cli function "       },
     {&cli3              , "rst" ,  "reset all cli global test vars to zero"},
 	XELP_FUNC_ENTRY_LAST
 };
-
 
 /*************************************************
 Unit Test Cases for XELP() functions below
@@ -108,13 +104,12 @@ Unit Test Cases for XELP() functions below
 /* ====================================================================
  test_XELPStrLen()
  */
-
 XELPRESULT test_XELPStrLen() {
     
-    if (LOGTEST(3 != XELPStrLen("abc"),"XelpStrLen")) 
+    if (JB_ASSERT(3 != XELPStrLen("abc"),"XelpStrLen")) 
         return XELP_E_Err;
 
-    if (LOGTEST(0 != XELPStrLen(""),"XelpStrLen")) 
+    if (JB_ASSERT(0 != XELPStrLen(""),"XelpStrLen")) 
         return XELP_E_Err;
 
     return XELP_S_OK;
@@ -135,29 +130,29 @@ XELPRESULT test_XELPStrEq() {
     
     int alen = XELPStrLen(a);
     
-    if (LOGTEST(XELP_S_NOTFOUND != XELPStrEq(a,alen,b),"XELPStrEq" ))
+    if (JB_ASSERT(XELP_S_NOTFOUND != XELPStrEq(a,alen,b),"XELPStrEq" ))
         return XELP_E_Err;
     
-    if (LOGTEST(XELP_S_OK != XELPStrEq(a,alen,b+1),"XELPStrEq offset")) 
+    if (JB_ASSERT(XELP_S_OK != XELPStrEq(a,alen,b+1),"XELPStrEq offset")) 
         return XELP_E_Err;
     
 
-    if (LOGTEST(XELP_S_NOTFOUND != XELPStrEq(a,alen,c),"XELPStrEq 3")) 
+    if (JB_ASSERT(XELP_S_NOTFOUND != XELPStrEq(a,alen,c),"XELPStrEq 3")) 
         return XELP_E_Err;
     
     
-    if (LOGTEST(XELP_S_OK != XELPStrEq(c,alen,a),"XELPStrEq 4")) 
+    if (JB_ASSERT(XELP_S_OK != XELPStrEq(c,alen,a),"XELPStrEq 4")) 
         return XELP_E_Err;
     
 
     alen = XELPStrLen(a);
-    if (LOGTEST(XELP_S_OK != XELPStrEq(c,alen,a),"XELPStrEq len test")) 
+    if (JB_ASSERT(XELP_S_OK != XELPStrEq(c,alen,a),"XELPStrEq len test")) 
         return XELP_E_Err;
 
-    if (LOGTEST(XELP_S_OK != XELPStrEq(c,0,d),"XELPStrEq zero len test")) 
+    if (JB_ASSERT(XELP_S_OK != XELPStrEq(c,0,d),"XELPStrEq zero len test")) 
         return XELP_E_Err;
 
-    if (LOGTEST(XELP_S_NOTFOUND != XELPStrEq(c,0,b),"XELPStrEq zero len test")) 
+    if (JB_ASSERT(XELP_S_NOTFOUND != XELPStrEq(c,0,b),"XELPStrEq zero len test")) 
         return XELP_E_Err;
 
     return XELP_S_OK;
@@ -179,21 +174,21 @@ XELPRESULT test_XELPStrEq2() {
     
     ae = a+ XELPStrLen(a);
     
-    if (LOGTEST(XELP_S_NOTFOUND != XELPStrEq2(a,ae,b),"XELPStrEq2 t1" ))
+    if (JB_ASSERT(XELP_S_NOTFOUND != XELPStrEq2(a,ae,b),"XELPStrEq2 t1" ))
         return XELP_E_Err;
     
-    if (LOGTEST(XELP_S_OK != XELPStrEq2(a,ae,b+1),"XELPStrEq2 offset")) 
+    if (JB_ASSERT(XELP_S_OK != XELPStrEq2(a,ae,b+1),"XELPStrEq2 offset")) 
         return XELP_E_Err;
     
 
-    if (LOGTEST(XELP_S_NOTFOUND != XELPStrEq2(a,ae,c),"XELPStrEq2")) 
+    if (JB_ASSERT(XELP_S_NOTFOUND != XELPStrEq2(a,ae,c),"XELPStrEq2")) 
         return XELP_E_Err;
     
     
-    if (LOGTEST(XELP_S_OK != XELPStrEq2(c,c+XELPStrLen(a),a),"XELPStrEq2")) 
+    if (JB_ASSERT(XELP_S_OK != XELPStrEq2(c,c+XELPStrLen(a),a),"XELPStrEq2")) 
         return XELP_E_Err;
     
-    if (LOGTEST(XELP_S_NOTFOUND != XELPStrEq2(c,c+XELPStrLen(a),d),"XELPStrEq2 null start")) 
+    if (JB_ASSERT(XELP_S_NOTFOUND != XELPStrEq2(c,c+XELPStrLen(a),d),"XELPStrEq2 null start")) 
         return XELP_E_Err;
     
     return XELP_S_OK;
@@ -203,16 +198,16 @@ XELPRESULT test_XELPStrEq2() {
  */
 
 XELPRESULT test_XELPStr2Int() {
-	if (LOGTEST(XELPStr2Int("90",2) != 90,"Str2Int"))
+	if (JB_ASSERT(XELPStr2Int("90",2) != 90,"Str2Int"))
 		return XELP_E_Err;
 
-    if (LOGTEST(XELPStr2Int("31h",3) != 49,"Str2Int")) // hex parser
+    if (JB_ASSERT(XELPStr2Int("31h",3) != 49,"Str2Int")) // hex parser
 		return XELP_E_Err;
 
-    if (LOGTEST(XELPStr2Int("-87",3) != -87,"Str2Int")) // hex parser
+    if (JB_ASSERT(XELPStr2Int("-87",3) != -87,"Str2Int")) // hex parser
 		return XELP_E_Err;
 
-    if (LOGTEST(XELPStr2Int("+6546",5) != 6546,"Str2Int")) // hex parser
+    if (JB_ASSERT(XELPStr2Int("+6546",5) != 6546,"Str2Int")) // hex parser
 		return XELP_E_Err;
 
 	return XELP_S_OK;
@@ -242,33 +237,33 @@ XELPRESULT test_XelpBufCmp() {
     be = b + XELPStrLen(b);
     ce = c + XELPStrLen(a);
     de = c + XELPStrLen(d);
-    if (LOGTEST(XELP_S_NOTFOUND != XelpBufCmp(a,ae,b,be,XELP_CMP_TYPE_A0B0),"XelpBufCmp" ))
+    if (JB_ASSERT(XELP_S_NOTFOUND != XelpBufCmp(a,ae,b,be,XELP_CMP_TYPE_A0B0),"XelpBufCmp" ))
         return XELP_E_Err;
     
     be = b+1+XELPStrLen(a);
-    if (LOGTEST(XELP_S_OK != XelpBufCmp(a,ae,b+1,be,XELP_CMP_TYPE_A0B0),"XelpBufCmp")) 
+    if (JB_ASSERT(XELP_S_OK != XelpBufCmp(a,ae,b+1,be,XELP_CMP_TYPE_A0B0),"XelpBufCmp")) 
         return XELP_E_Err;
     
 
     be = b+2+XELPStrLen(b+1);
-    if (LOGTEST(XELP_S_NOTFOUND != XelpBufCmp(a,ae,b+1,be,XELP_CMP_TYPE_BUF),"XelpBufCmp")) 
+    if (JB_ASSERT(XELP_S_NOTFOUND != XelpBufCmp(a,ae,b+1,be,XELP_CMP_TYPE_BUF),"XelpBufCmp")) 
         return XELP_E_Err;
     
     ce = c+XELPStrLen(a);
-    if (LOGTEST(XELP_S_OK != XelpBufCmp(a,ae,c,ce,XELP_CMP_TYPE_BUF),"XelpBufCmp")) 
+    if (JB_ASSERT(XELP_S_OK != XelpBufCmp(a,ae,c,ce,XELP_CMP_TYPE_BUF),"XelpBufCmp")) 
         return XELP_E_Err;
     
     ce = c+XELPStrLen(a)+1;
-    if (LOGTEST(XELP_S_NOTFOUND != XelpBufCmp(a,ae,c,ce,XELP_CMP_TYPE_BUF),"XelpBufCmp")) 
+    if (JB_ASSERT(XELP_S_NOTFOUND != XelpBufCmp(a,ae,c,ce,XELP_CMP_TYPE_BUF),"XelpBufCmp")) 
         return XELP_E_Err;
 
 
-    if (LOGTEST(XELP_S_NOTFOUND != XelpBufCmp(d,de+2,a,ae,XELP_CMP_TYPE_A0),"XelpBufCmp A01")) 
+    if (JB_ASSERT(XELP_S_NOTFOUND != XelpBufCmp(d,de+2,a,ae,XELP_CMP_TYPE_A0),"XelpBufCmp A01")) 
         return XELP_E_Err;
 
     ae = a + XELPStrLen(a);
     ce = c + XELPStrLen(a);
-    if (LOGTEST(XELP_S_OK != XelpBufCmp(a,ae,c,ce,XELP_CMP_TYPE_A0),"XelpBufCmp A02")) 
+    if (JB_ASSERT(XELP_S_OK != XelpBufCmp(a,ae,c,ce,XELP_CMP_TYPE_A0),"XelpBufCmp A02")) 
         return XELP_E_Err;
 
     return XELP_S_OK;
@@ -289,19 +284,19 @@ XELPRESULT test_XelpFindTok() {
     le = label+XELPStrLen(label);
 
     x.s = b0;  x.p = x.s; x.e = x.s+XELPStrLen(x.s);
-    if (LOGTEST(XELP_S_NOTFOUND != XELPFindTok(&x,label,le,XELP_TOK_ONLY),"XelpFindTok" ) )
+    if (JB_ASSERT(XELP_S_NOTFOUND != XELPFindTok(&x,label,le,XELP_TOK_ONLY),"XelpFindTok" ) )
         return XELP_E_Err;
 
     x.s = b1;  x.p = x.s; x.e = x.s+XELPStrLen(x.s);
-    if (LOGTEST(XELP_S_OK != XELPFindTok(&x,label,le,XELP_TOK_ONLY),"XelpFindTok" ) )
+    if (JB_ASSERT(XELP_S_OK != XELPFindTok(&x,label,le,XELP_TOK_ONLY),"XelpFindTok" ) )
         return XELP_E_Err;
 
     x.s = b2;  x.p = x.s; x.e = x.s+XELPStrLen(x.s);
-    if (LOGTEST(XELP_S_OK != XELPFindTok(&x,label,le,XELP_TOK_LINE),"XelpFindTok" ) )
+    if (JB_ASSERT(XELP_S_OK != XELPFindTok(&x,label,le,XELP_TOK_LINE),"XelpFindTok" ) )
         return XELP_E_Err;
 
     x.s = b3;  x.p = x.s; x.e = x.s+XELPStrLen(x.s);
-    if (LOGTEST(XELP_S_NOTFOUND != XELPFindTok(&x,label,le,XELP_TOK_LINE),"XelpFindTok" ) )
+    if (JB_ASSERT(XELP_S_NOTFOUND != XELPFindTok(&x,label,le,XELP_TOK_LINE),"XelpFindTok" ) )
         return XELP_E_Err;
 
 
@@ -321,7 +316,7 @@ XELPRESULT test_XelpTokLineXB() {
     r  = XELPTokLineXB(&b,&out,XELP_TOK_ONLY);
     r2 = XelpBufCmp(line1, line1+3,out.s,out.p,XELP_CMP_TYPE_BUF);
 
-    if (LOGTEST((XELP_S_OK !=r) || (XELP_S_OK != r2),"XelpToklineXB first token"))
+    if (JB_ASSERT((XELP_S_OK !=r) || (XELP_S_OK != r2),"XelpToklineXB first token"))
         return XELP_E_Err;
     XELP_XBTOP(b);
     
@@ -336,7 +331,7 @@ XELPRESULT test_XelpInit() {
     XELP myXelp, *x;
     x = &myXelp;
 
-    if (LOGTEST(XELP_S_OK != XELPInit(x,"Xelp Unit Tests"),"XelpInit")) {
+    if (JB_ASSERT(XELP_S_OK != XELPInit(x,"Xelp Unit Tests"),"XelpInit")) {
         return XELP_E_Err;
     }
     
@@ -358,7 +353,7 @@ XELPRESULT test_XelpOut_XelpThru_XelpErr() {
     XELP myXelp;
     XELPInit(&myXelp,"XelpOut Tests");
     
-    if (LOGTEST(XELP_S_OK != XELPOut(&myXelp,0,0),"XelpOut test XOut FN not set")) {
+    if (JB_ASSERT(XELP_S_OK != XELPOut(&myXelp,0,0),"XelpOut test XOut FN not set")) {
         return XELP_E_Err;
     }
 
@@ -366,19 +361,19 @@ XELPRESULT test_XelpOut_XelpThru_XelpErr() {
     XELP_SET_FN_THR(myXelp,dummyOut);
     XELP_SET_FN_ERR(myXelp,dummyOut);
 
-    if (LOGTEST(XELP_S_OK != XELPOut(&myXelp,"a",1),"XelpOut")) {
+    if (JB_ASSERT(XELP_S_OK != XELPOut(&myXelp,"a",1),"XelpOut")) {
         return XELP_E_Err;
         if (gChar != 'a')
             return XELP_E_Err;
     }
 
-    if (LOGTEST(XELP_S_OK != XELPOut(&myXelp,"ab",2),"XelpOut")) {
+    if (JB_ASSERT(XELP_S_OK != XELPOut(&myXelp,"ab",2),"XelpOut")) {
         return XELP_E_Err;
         if (gChar != 'b')
             return XELP_E_Err;
     }
 
-    if (LOGTEST(XELP_S_OK != XELPOut(&myXelp,0,0),"XelpOut test NULL msg")) {
+    if (JB_ASSERT(XELP_S_OK != XELPOut(&myXelp,0,0),"XelpOut test NULL msg")) {
         return XELP_E_Err;
     }
     return XELP_S_OK;
@@ -428,7 +423,7 @@ XELPRESULT test_XelpHelp() {
     r = XELPHelp(&x);
     gDummyBufOut(0);
     
-    if (LOGTEST( (r!= XELP_S_OK) || ( XELPStrLen(gDummyBuf) != 149), "Test Help" )) {
+    if (JB_ASSERT( (r!= XELP_S_OK) || ( XELPStrLen(gDummyBuf) != 149), "Test Help" )) {
         return XELP_E_Err;
     }
     return XELP_S_OK;
@@ -443,7 +438,7 @@ XELPRESULT test_XELPExecKC() {
     XELPInit(&x,"TestExecKC");
 
     r = XELPExecKC(&x,'1');
-    if (LOGTEST(r!=XELP_S_NOTFOUND,"ExecKC null ptr")){
+    if (JB_ASSERT(r!=XELP_S_NOTFOUND,"ExecKC null ptr")){
         return r;
     }
     
@@ -452,13 +447,13 @@ XELPRESULT test_XELPExecKC() {
 	XELP_SET_FN_OUT(x,dummyOut);
 
     r = XELPExecKC(&x,'1');
-    if (LOGTEST((r!=XELP_S_OK)&&(gGlobalCallbackData.c1!='1'),"ExecKC '1' ")){
+    if (JB_ASSERT((r!=XELP_S_OK)&&(gGlobalCallbackData.c1!='1'),"ExecKC '1' ")){
         // printf("r=%d\n",r);
         return r;
     }
 
     r = XELPExecKC(&x,'z'); // not a mapped key...
-    if (LOGTEST(r!=XELP_S_NOTFOUND,"ExecKC 'z'")){
+    if (JB_ASSERT(r!=XELP_S_NOTFOUND,"ExecKC 'z'")){
         return r;
     }
     
@@ -471,7 +466,6 @@ XELPRESULT test_XELPExecKC() {
 XELPRESULT test_XELPParseKey() {
     XELP x;
     XELPRESULT r;
-    //char c;
     int i;
   
     r = XELPInit(&x,"TestParseKey");
@@ -484,15 +478,15 @@ XELPRESULT test_XELPParseKey() {
         char *c1 = " foo ";
         for (i=0; i  <XELPStrLen(c1); i++) {
             r = XELPParseKey(&x,c1[i]);
-            if (LOGTEST(r!= XELP_S_OK, "XELPParseKey -- sending keys")){
+            if (JB_ASSERT(r!= XELP_S_OK, "XELPParseKey -- sending keys")){
                 return XELP_E_Err;
             }
         }
         r = XELPParseKey(&x,XELPKEY_ENTER);
-            if (LOGTEST(r!= XELP_S_OK, "XELPParseKey -- sending keys")){
+            if (JB_ASSERT(r!= XELP_S_OK, "XELPParseKey -- sending keys")){
                 return XELP_E_Err;
             }
-        if (LOGTEST(gGlobalCallbackData.c1 != 1,"Test cli 1 value")) {
+        if (JB_ASSERT(gGlobalCallbackData.c1 != 1,"Test cli 1 value")) {
             return XELP_E_Err;
         }
     }
@@ -502,16 +496,16 @@ XELPRESULT test_XELPParseKey() {
         char *c2 = " bar; ";
         for (i=0; i  <XELPStrLen(c2); i++) {
             r = XELPParseKey(&x,c2[i]);
-            if (LOGTEST(r!= XELP_S_OK, "XELPParseKey -- sending keys")){
+            if (JB_ASSERT(r!= XELP_S_OK, "XELPParseKey -- sending keys")){
                 return XELP_E_Err;
             }
         }
         r = XELPParseKey(&x,XELPKEY_BKSP);
         r = XELPParseKey(&x,XELPKEY_ENTER);
-        if (LOGTEST(r!= XELP_S_OK, "XELPParseKey -- sending keys w bskp test")){
+        if (JB_ASSERT(r!= XELP_S_OK, "XELPParseKey -- sending keys w bskp test")){
             return XELP_E_Err;
         }
-        if (LOGTEST(gGlobalCallbackData.c1 != 1,"XELPParseKey test cli1 value")) {
+        if (JB_ASSERT(gGlobalCallbackData.c1 != 1,"XELPParseKey test cli1 value")) {
             return XELP_E_Err;
         }
 
@@ -522,7 +516,7 @@ XELPRESULT test_XELPParseKey() {
         r = XELPParseKey(&x,'a');
         r = XELPParseKey(&x,XELPKEY_BKSP);
         r = XELPParseKey(&x,XELPKEY_ENTER);
-        if (LOGTEST( (r!= XELP_S_OK) || (gBool != 1), "XELPParseKey --  bskp callback test")){
+        if (JB_ASSERT( (r!= XELP_S_OK) || (gBool != 1), "XELPParseKey --  bskp callback test")){
             return XELP_E_Err;
         }
 
@@ -533,11 +527,11 @@ XELPRESULT test_XELPParseKey() {
         XELP_SET_FN_EMCHG(x,0);
         
         r = XELPParseKey(&x,XELPKEY_CLI);
-        if (LOGTEST( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_CLI), "XELPParseKey -- mode change to CLI 1")){
+        if (JB_ASSERT( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_CLI), "XELPParseKey -- mode change to CLI 1")){
             return XELP_E_Err;
         }
         r = XELPParseKey(&x,XELPKEY_KEY);
-        if (LOGTEST( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_KEY), "XELPParseKey -- mode change to KEY")){
+        if (JB_ASSERT( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_KEY), "XELPParseKey -- mode change to KEY")){
             return XELP_E_Err;
         }
 
@@ -545,12 +539,12 @@ XELPRESULT test_XELPParseKey() {
         XELP_SET_FN_THR(x,dummyOut); // can only change to THR mode if there is a valid call back fn.
 
         r = XELPParseKey(&x,XELPKEY_THR);
-        if (LOGTEST( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_THR) || (gInt != x.mCurMode), "XELPParseKey -- mode change to THR")){
+        if (JB_ASSERT( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_THR) || (gInt != x.mCurMode), "XELPParseKey -- mode change to THR")){
             return XELP_E_Err;
         }
 
         r = XELPParseKey(&x,XELPKEY_CLI);
-        if (LOGTEST( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_CLI) || (gInt != x.mCurMode), "XELPParseKey -- mode change to CLI 2")){
+        if (JB_ASSERT( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_CLI) || (gInt != x.mCurMode), "XELPParseKey -- mode change to CLI 2")){
             return XELP_E_Err;
         }
         
@@ -562,21 +556,21 @@ XELPRESULT test_XELPParseKey() {
         XELP_SET_FN_EMCHG(x,0); // don't want to deal with mode-chnage call backs
         
         r = XELPParseKey(&x,XELPKEY_THR);
-        if (LOGTEST( (r!= XELP_S_OK) && (x.mCurMode != XELP_MODE_THR), "XELPParseKey -- mode change to THR")){
+        if (JB_ASSERT( (r!= XELP_S_OK) && (x.mCurMode != XELP_MODE_THR), "XELPParseKey -- mode change to THR")){
             return XELP_E_Err;
         }
 
         XELP_SET_FN_THR(x,dummyOut);
         r = XELPParseKey(&x,'a');
-        if (LOGTEST( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_THR) || (gChar != 'a'), "XELPParseKey --  THR 1")){
+        if (JB_ASSERT( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_THR) || (gChar != 'a'), "XELPParseKey --  THR 1")){
             return XELP_E_Err;
         }
         r = XELPParseKey(&x,'b');
-        if (LOGTEST( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_THR) || (gChar != 'b'), "XELPParseKey --  THR 2")){
+        if (JB_ASSERT( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_THR) || (gChar != 'b'), "XELPParseKey --  THR 2")){
             return XELP_E_Err;
         }
         r = XELPParseKey(&x,XELPKEY_CLI); // change to CLI now THRU function shouldn't be called and dummy value should be unchnaged
-        if (LOGTEST( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_CLI) || (gChar != 'b'), "XELPParseKey --  THR x")){
+        if (JB_ASSERT( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_CLI) || (gChar != 'b'), "XELPParseKey --  THR x")){
             return XELP_E_Err;
         }
 
@@ -585,26 +579,26 @@ XELPRESULT test_XELPParseKey() {
     //test KEY function redirects
     {
         r = XELPParseKey(&x,XELPKEY_KEY);
-        if (LOGTEST( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_KEY) , "XELPParseKey --  KEY 1")){
+        if (JB_ASSERT( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_KEY) , "XELPParseKey --  KEY 1")){
             return XELP_E_Err;
         }
 
         gGlobalCallbackData.k0 = 'x';
         r = XELPParseKey(&x,'0');
-        if (LOGTEST( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_KEY) || (gGlobalCallbackData.k0 != '0'), "XELPParseKey --  THR 0")){
+        if (JB_ASSERT( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_KEY) || (gGlobalCallbackData.k0 != '0'), "XELPParseKey --  THR 0")){
             return XELP_E_Err;
         }
         
         gGlobalCallbackData.k1 = 'y';
         r = XELPParseKey(&x,'1');
-        if (LOGTEST( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_KEY) || (gGlobalCallbackData.k1 != '1'), "XELPParseKey --  THR 1")){
+        if (JB_ASSERT( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_KEY) || (gGlobalCallbackData.k1 != '1'), "XELPParseKey --  THR 1")){
             return XELP_E_Err;
         }
 
         // end of tests ... change mode to CLI and we shouldn't be getting key callbacks anymore
         gGlobalCallbackData.k1 = 'z';
         r = XELPParseKey(&x,XELPKEY_CLI); // change to CLI now THRU function shouldn't be called and dummy value should be unchnaged
-        if (LOGTEST( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_CLI) || (gGlobalCallbackData.k1  != 'z'), "XELPParseKey--  THR x")){
+        if (JB_ASSERT( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_CLI) || (gGlobalCallbackData.k1  != 'z'), "XELPParseKey--  THR x")){
             return XELP_E_Err;
         }
 
@@ -633,33 +627,33 @@ XELPRESULT test_XELPTokN() {
     
     XELP_XBInit(x,c1,XELPStrLen(c1));   
     r = XELPTokN(&x,0,&tok);
-    if (LOGTEST( ((r!=XELP_S_OK) || (XELP_S_OK != XELPStrEq2(tok.s, tok.p,"tok0") )),"XELPTokN get 0th token"))
+    if (JB_ASSERT( ((r!=XELP_S_OK) || (XELP_S_OK != XELPStrEq2(tok.s, tok.p,"tok0") )),"XELPTokN get 0th token"))
         return XELP_E_Err;
 
     r = XELPTokN(&x,3,&tok);
-    if (LOGTEST( ((r!=XELP_S_OK) || (XELP_S_OK != XELPStrEq2(tok.s, tok.p,"tok3") )),"XELPTokN get 3rd token"))
+    if (JB_ASSERT( ((r!=XELP_S_OK) || (XELP_S_OK != XELPStrEq2(tok.s, tok.p,"tok3") )),"XELPTokN get 3rd token"))
         return XELP_E_Err;
 
 
     XELP_XBInit(x,c2,XELPStrLen(c2));   
     r = XELPTokN(&x,3,&tok);
-    if (LOGTEST( ((r!=XELP_S_OK) || (XELP_S_OK != XELPStrEq2(tok.s, tok.p,"tok5") )),"XELPTokN get 3rd token w commented line"))
+    if (JB_ASSERT( ((r!=XELP_S_OK) || (XELP_S_OK != XELPStrEq2(tok.s, tok.p,"tok5") )),"XELPTokN get 3rd token w commented line"))
         return XELP_E_Err;
 
     r = XELPTokN(&x,3,&tok);
     XELP_XBInit(x,c2,XELPStrLen(c3));   
-    if (LOGTEST( ((r!=XELP_S_OK) || (XELP_S_OK != XELPStrEq2(tok.s, tok.p,"tok5") )),"XELPTokN get 3rd token w commented line"))
+    if (JB_ASSERT( ((r!=XELP_S_OK) || (XELP_S_OK != XELPStrEq2(tok.s, tok.p,"tok5") )),"XELPTokN get 3rd token w commented line"))
         return XELP_E_Err;
 
 
     XELP_XBInit(x,c4,XELPStrLen(c4));   
     r = XELPTokN(&x,3,&tok);
-    if (LOGTEST( ((r != XELP_S_OK) || (XELP_S_OK != XELPStrEq2(tok.s, tok.p,"tok5") )),"XELPTokN get 3rd token w commented line w space"))
+    if (JB_ASSERT( ((r != XELP_S_OK) || (XELP_S_OK != XELPStrEq2(tok.s, tok.p,"tok5") )),"XELPTokN get 3rd token w commented line w space"))
         return XELP_E_Err;
 
     XELP_XBInit(x,c4,XELPStrLen(c4));   
     r = XELPTokN(&x,23,&tok);
-    if (LOGTEST( ((r == XELP_S_OK) || (XELP_S_NOTFOUND != XELPStrEq2(tok.s, tok.p,"tok5") )),"XELPTokN get token past buffer"))
+    if (JB_ASSERT( ((r == XELP_S_OK) || (XELP_S_NOTFOUND != XELPStrEq2(tok.s, tok.p,"tok5") )),"XELPTokN get token past buffer"))
         return XELP_E_Err;
 
     return XELP_S_OK;
@@ -679,22 +673,22 @@ XELPRESULT test_XelpNumToks() {
 
     XELP_XBInit(x,c0,XELPStrLen(c0));
     r = XelpNumToks(&x,&n);
-    if (LOGTEST(((r!=XELP_S_OK) || (n !=0)),"XelpNumToks tabs and newlines"))
+    if (JB_ASSERT(((r!=XELP_S_OK) || (n !=0)),"XelpNumToks tabs and newlines"))
         return XELP_E_Err;
 
     XELP_XBInit(x,c1,XELPStrLen(c1));
     r = XelpNumToks(&x,&n);
-    if (LOGTEST(((r!=XELP_S_OK) || (n !=5)),"XelpNumToks tabs and newlines"))
+    if (JB_ASSERT(((r!=XELP_S_OK) || (n !=5)),"XelpNumToks tabs and newlines"))
         return XELP_E_Err;
 
     XELP_XBInit(x,c2,XELPStrLen(c2));
     r = XelpNumToks(&x,&n);
-    if (LOGTEST(((r!=XELP_S_OK) || (n !=4)),"XelpNumToks comment on second line"))
+    if (JB_ASSERT(((r!=XELP_S_OK) || (n !=4)),"XelpNumToks comment on second line"))
         return XELP_E_Err;
 
     XELP_XBInit(x,c3,XELPStrLen(c3));
     r = XelpNumToks(&x,&n);
-    if (LOGTEST(((r!=XELP_S_OK) || (n !=4)),"XelpNumToks comment on second line"))
+    if (JB_ASSERT(((r!=XELP_S_OK) || (n !=4)),"XelpNumToks comment on second line"))
         return XELP_E_Err;
     return XELP_S_OK;
 }
@@ -722,7 +716,7 @@ XELPRESULT test_XELPParse() {
 
     r = XELPParse(&x,s,XELPStrLen(s));
     
-    if (LOGTEST(r!=XELP_S_OK,"XELPParse"))
+    if (JB_ASSERT(r!=XELP_S_OK,"XELPParse"))
         return XELP_E_Err;
 
     return XELP_S_OK;
