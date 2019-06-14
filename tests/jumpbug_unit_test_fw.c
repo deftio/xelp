@@ -413,7 +413,7 @@ int JumpBug_BuildPass() {
 
             JumpBug_YAML_SN(gTestData.mpfPutCharLog,"TotalTestCasesRun",gTestData.totalCases,x);
             JumpBug_YAML_SN(gTestData.mpfPutCharLog,"TotalTestCasesPassed",gTestData.totalPassed ,x);
-            JumpBug_YAML_SN(gTestData.mpfPutCharLog,"TotaltestCasesPassedwithWarnings",gTestData.totalPassedWarn,x);
+            JumpBug_YAML_SN(gTestData.mpfPutCharLog,"TotalTestCasesPassedwithWarnings",gTestData.totalPassedWarn,x);
             JumpBug_YAML_SN(gTestData.mpfPutCharLog,"TotalTestCasesFailed",gTestData.totalCases-gTestData.totalPassed,x);            
         }
 #endif

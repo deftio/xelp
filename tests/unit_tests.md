@@ -27,10 +27,14 @@ This is a simple unit test framework which should run on most embedded systems.
         * programmer (user) must provide setup, teardown. 
             * SET_FN_PUTC_LOG((int*)(f(char c))) 
             * set flush()?
-    * logging format 
-        * md (?)
-        * JSON
+    *(done) logging format 
         * YAML (?) - advantage of YAML is that doesn't need close brace.  so if the execution stops the file is still valid.
+    * report (JumpBug_Report.html)
+        * Add support for url load eg JumpBug_Report?yamldata=filename
+        * Add summary sectiosn for units
+        * Add summary section at top for overall
+        * Add support for multiple modules (e.g. run several modules one after the other) Have YAML support concat
+        * Add support for single table view (e.g. single-table ?singleTable=true)
 * (done) get rid of printf() dependancy --> make SET_FN_PUTC((int *)(f(char c))
     * (done) note to do this we need to hande the %s and %d in the current printf() functions
     * note for posix also add
