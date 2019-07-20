@@ -70,16 +70,20 @@ int JumpBug_OutS( int (*f)(char), const char *s, int max) {
     return JB_FAIL;
 }
 /*****************************************
- * JumpBug_OutSQ (if a quote symbol is encountered emit escaped char)
+ * JumpBug_OutSQ 
+ * Emites quoted string.
+ *   if a " or \ symbol is encountered emit escaped char)
  */
 int JumpBug_OutSQ( int (*f)(char), const char *s, int max) {
     if (f && s && (*s) ) {
         max = max < 0 ? JumpBug_StrLen(s) : max;
+        f('"');
         while ((max--) && (*s != 0)){
-            if (*s=='"')
+            if ((*s=='"') || (*s=='\\'))
                 f('\\');
             f(*s++);
         } 
+        f('"');
         return JB_PASS;
     }
     return JB_FAIL;
@@ -87,8 +91,6 @@ int JumpBug_OutSQ( int (*f)(char), const char *s, int max) {
 /***************************************
  JumpBug_OutN write out a decimal integer
  */
-
-
 int JumpBug_OutN( int (*f)(char), int n ){
     int t=10;
     if (f) {
@@ -162,6 +164,13 @@ int JumpBug_OutH( int (*f)(char), int n ){
  Logging support functions (YAML)
  */
 #ifdef JUMPBUG_LOGGING_SUPPORT 
+int gJumpBug_YAML_indent     = 0;
+int (*gJumpBug_YAML_f)(char) = 0;
+
+/***************************************
+ emit YAML comment
+ eg: #myComment
+ */
 int JumpBug_YAML_Cmt(int (*f)(char), char *comment){                   /* YAML comment and \n e.g.'#my comment \n     */
     if (!f)
         return JB_FAIL;
@@ -170,6 +179,11 @@ int JumpBug_YAML_Cmt(int (*f)(char), char *comment){                   /* YAML c
     f('\n');
     return JB_PASS;
 }
+/***************************************
+ emit YAML block begin
+ eg: myBlock:
+ */
+
 int JumpBug_YAML_Block(int (*f)(char), char *string, int indent){      /* YAML block begin e.g.   '  myblock:\n'      */
     if (!f)
         return JB_FAIL;
@@ -180,6 +194,15 @@ int JumpBug_YAML_Block(int (*f)(char), char *string, int indent){      /* YAML b
     f(':');
     f('\n');
     return JB_PASS;
+}
+
+int JumpBug_YAML_BlockEnd  (int numBlocks) {
+     if (numBlocks >=0) 
+        gJumpBug_YAML_indent  = numBlocks;  
+    else
+        gJumpBug_YAML_indent += numBlocks;
+    
+    return gJumpBug_YAML_indent;
 }
 int JumpBug_YAML_BlockN(int (*f)(char), char *string, int n, int indent){      /* YAML block begin e.g.   '  myblock:\n'      */
     if (!f)
@@ -449,3 +472,6 @@ int JumpBug_PrintResults() {
 }
 
 //end of test loging section
+
+
+

@@ -114,7 +114,7 @@ typedef struct {
     int totalUnitsPassed;
     int totalUnitsPassedWarn;
 
-    /* stats with in currently tested unit         */
+    /* stats in currently tested unit         */
     int curCases;           
     int curCasesPassed;
     int curCasesPassedWarn;
@@ -127,6 +127,7 @@ typedef struct {
     int (*mpfPutChar)(const char);      /* default stream for writing out results (e.g. console)                         */
 #ifdef JUMPBUG_LOGGING_SUPPORT    
     int (*mpfPutCharLog)(const char);   /* if full logging, then this needs to be set.  Can be set equal to mpfPutChar   */
+    int gYAMLIndent;
 #endif
 
 }JB_UnitTestData;
@@ -162,12 +163,15 @@ int JumpBug_PrintResults();                        // print final results
 
 /**************************************************************
  * Support Functions (used internally but can be used anywhere)
+ * Out series of functions write formatted output to a stream function using 
+ * the platform abstraction
  */
-int JumpBug_StrLen (const char* c);                        /* find length of null term stri  */
-int JumpBug_OutS( int (*f)(char), const char *s, int max); /* output a string using the PAL  */
-int JumpBug_OutN( int (*f)(char), int n );           /* output a decimal num using PAL */
-int JumpBug_OutNd(int (*f)(char), int n, int pad );  /* prints an decimal num with up to pad # of spaces (e.g. %8d) */
-int JumpBug_OutH( int (*f)(char), int n );           /* output a hex num using PAL     */
+int JumpBug_StrLen (const char* c);                        /* find length of null term stri                               */
+int JumpBug_OutS( int (*f)(char), const char *s, int max); /* output a string using the PAL                               */
+int JumpBug_OutSQ( int (*f)(char), const char *s, int max);/* output a string w quotes, escapes with using the PAL        */
+int JumpBug_OutN( int (*f)(char), int n );                 /* output a decimal num using PAL                              */
+int JumpBug_OutNd(int (*f)(char), int n, int pad );        /* prints an decimal num with up to pad # of spaces (e.g. %8d) */
+int JumpBug_OutH( int (*f)(char), int n );                 /* output a hex num using PAL                                  */
 
 /**************************************************************
  * The following are used by the logger to output YAML compatable constructs & key-value pairs
@@ -180,23 +184,31 @@ int JumpBug_OutH( int (*f)(char), int n );           /* output a hex num using P
  * 
  */ 
 #ifdef JUMPBUG_LOGGING_SUPPORT 
-#define JUMPBUG_YAML_INDENT ' '                                        /* YAML indent character                       */
-int JumpBug_YAML_Cmt(int (*f)(char), char *comment);                   /* YAML comment and \n e.g.'#my comment \n     */
-int JumpBug_YAML_Block(int (*f)(char), char *string, int indent);      /* YAML block begin e.g.   '  myblock:\n'      */
-int JumpBug_YAML_SS(int (*f)(char), char *key, char *val, int indent); /* YAML string : string eg '   "key":"value"\n'*/
-int JumpBug_YAML_SN(int (*f)(char), char *key, int val, int indent);   /* YAML string : num    eg '   "key":123    \n'*/
+
+#ifndef JUMPBUG_YAML_INDENT
+#define JUMPBUG_YAML_INDENT ' '                                           /* YAML indent character                       */
+#endif 
+
+int JumpBug_YAML_GlobalReset(int (*f)(char));                             /* YAML set stream f, reset indent level       */
+int JumpBug_YAML_Cmt(int   (*f)(char), char *comment);                    /* YAML comment and \n e.g.'#my comment     \n */
+int JumpBug_YAML_Block(int (*f)(char), char *string, int indent);         /* YAML block begin e.g.   '  myblock:      \n'*/
+int JumpBug_YAML_BlockEnd  (int numBlocks);                               /* YAML block end (updates global indent state)*/
+int JumpBug_YAML_SS(int    (*f)(char), char *key, char *val, int indent); /* YAML string : string eg '  key : "value" \n'*/
+int JumpBug_YAML_SN(int    (*f)(char), char *key, int val, int indent);   /* YAML string : num    eg '   key :123     \n'*/
+
 #endif
 
-
-//int JumpBug_TestRunner(JB_Tests *t);
-
-	
-//#define LOGTEST JumpBug_LogTest   
+int JumpBug_TestRunner(JB_Tests *t);
 
 /* this wrapper allows dissolving macro use (e.g. in your makefile just #define JB_ASSRT(r,m) ()) */
-#ifndef JB_ASSRT
+#ifndef JB_ASSERT
 #define JB_ASSERT(result,msg)   JumpBug_LogTestF(result,msg,JUMPBUG_DBG_FILE,JUMPBUG_DBG_LINE)
 #endif
+
+#ifndef JB_ASSERTX
+#define JB_ASSERTX(result,msg)   JumpBug_LogTestF(result,msg,JUMPBUG_DBG_FILE,JUMPBUG_DBG_LINE)
+#endif
+
 
 #define LOGTEST JB_ASSERT
 #ifdef __cplusplus

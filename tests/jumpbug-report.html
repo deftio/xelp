@@ -1,9 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
-<!-- JumpBug test framework
-    simple HTML report
-    (c) M A Chatterjee
-    deftio <at> deftio <dot> com
+<!-- JumpBug test framework :: A simple HTML Report system based on JumpBug YAML output
+    (c) M A Chatterjee   deftio <at> deftio <dot> com  
     deftio.com/jumpbug
  -->
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
@@ -13,17 +11,33 @@
 <script type="text/javascript" src="./js-yaml.min.js"></script>    <!-- YAML parser            (see https://github.com/nodeca/js-yaml)  -->
 </head>
 <body class="bw-def-page-setup bw-font-sans-serif">
-<script>    
-    var testDataRaw = "";  // raw unparsed YAML file.  If something goes wrong w YAML parsing we can always show this...
-    var testData = {};     // global storage for the test case data (after parsing from YAML to js)
+<script> 
+    // page data & setup
+    var gData = {};             // this is the global holder for all page data.  We do this so we can export the whole page data should we want. ==> e.g. bw.saveClientFile("myFilename.json",gData); 
+    gData["testDataRaw"]     = "";  // raw unparsed YAML file.  If something goes wrong w YAML parsing we can always show this...
+    gData["testDataRawHash"] = bw.hashFnv32a(gData["testDataRaw"]); // used in refresh logic
+    gData["testData"]        = {};  // global storage for the test case data (after parsing from YAML to js)
+    gData["testDataFileName"]= bw.getURLParam("testDataYAML","../xelp-test-log.yaml");  // see if testDatafile passed via URL else use default  e.g. jumpbug-report?testDataYAML=path/To/MyTestData.YAML
+    gData["refresh"]         = bw.getURLParam("refresh","none"); 
     
+    // gdata["pageContent"] is the actual page layout
+    gData["pageContent"]     =   [
+            ["h2" ,{id:"title"},"Test Report"],
+            ["div",{id:"testData"},"Waiting for test data to load<br>"],
+            "<br><br>"
+        ];
+    bw.DOM("body", bw.htmla(gData["pageContent"])); // render page template
+    bw.bwSimpleThemes(1);                           // nicen up tables, body styles
+
+    // render a unit section ==========================
     function renderUnit(unit,n) {
         // units result section
         var i, u = [ ["Statistic", "Value"]];
-        for (i in unit) { if (i.substr(0,5).toLowerCase() == "total") {u.push([i,unit[i]])  }}
+        for (i in unit) { if (i.substr(0,5).toLowerCase() == "total") {u.push([i,unit[i]]) }}
         u = bw.htmlTable(u,{
-                atr:{ id:"tableid_"+n,  class:"bw-table-compact", style:"border: 1px solid #888; width:35%" }, 
-                th_atr:{style:"padding: 3px; width:18%"}, // header row cell attributes
+                atr:{ id:"tableid_"+n,  class:"bw-table-compact", style:"border: 1px solid #888; width:30%" }, 
+                sortable:true, // use bitwrench mixed auto sorter, can supply your own function see bitwrench docs
+                th_atr:{style:"padding: 5px; width: 15%"}, // header row cell attributes
             });
         // test cases sortable table
         var t, cases = [["Test Number", "Test Name", "Result", "Test Location", "Test Line Number"]];
@@ -36,32 +50,35 @@
         t= bw.htmlTable(cases,{
                 atr:{ id:"tableid_"+n,  class:"bw-table-compact", style:"border: 1px solid #ddd; width:75%" }, 
                 sortable:true, // use bitwrench mixed auto sorter, can supply your own function see bitwrench docs
-                th_atr:{style:"padding: 8px; width:18%"}, // header row cell attributes
-                td_atr:{style:"padding: 5px"}  //cell attributes
+                th_atr:{style:"padding: 5px; width: 15%"}, // header row cell attributes
+                td_atr:{style:"padding: 5px; width: 15%"}  //cell attributes
             });
-        return bw.htmla([["h3",{},n + ": "+unit.UnitName],u,"<br>",t,"<br><br><hr><br>"]);
+        var bar = bw.html(["hr",{style:"border:none; color:#aaa; background-color:#aaa; height:8px;width:75%;text-align:left;margin=left:0;",align:"left"},""]); 
+        return bw.htmla([["h3",{},n + ": "+unit.UnitName],u,"<br>",t,"<br>",bar]);
     }
 
-    function renderReport(rawData) {
-        var i,s="", u = [ ["Statistic", "Value"]],m;
-        try {
-            testData = jsyaml.load(rawData);     // convert from YAML to javascript            
-            
+    // render the report =================================
+    function renderReport(rawDataFile) {
+        var i,s="", moduleTable = [ ["Statistic", "Value"]],m,testData;
 
+        try {
+            gData["testData"] = jsyaml.load(rawDataFile);     // convert from YAML to javascript            
+            testData = gData["testData"];
             // Generate summary section
             m = testData["ModuleTestResults"];
-            for (i in m) { if (i.substr(0,5).toLowerCase() == "total") {u.push([i,m[i]])  }}
-                u = bw.htmlTable(u,{
-                    atr:{ id:"tableid_module",  class:"bw-table-compact", style:"border: 1px solid #888; width:35%" }, 
-                    th_atr:{style:"padding: 3px; width:18%"}, // header row cell attributes
-                });
-
+            for (i in m) { if (i.substr(0,5).toLowerCase() == "total") {moduleTable.push([i,m[i]])  }}
+            moduleTable = bw.htmlTable(moduleTable,{
+                atr:{ id:"tableid_module",  class:"bw-table-compact", style:" width:30%; " }, 
+                sortable:true, // use bitwrench mixed auto sorter, can supply your own function see bitwrench docs
+                th_atr:{style:"padding: 5px; width: 15%"}, // header row cell attributes
+            });
+            bw.DOM("#title","Test Report for "+ testData["GlobalTestParameters"]["TestModuleName"]);
             s+= bw.htmla([
-                ["h2",{}, "Module Name : " + testData["GlobalTestParameters"]["TestModuleName"]],
-                ["p",{}, "Jumpbug Test Framework version :" + testData["GlobalTestParameters"]["JumpBugFrameworkVersion"].toString(16)],
-                ["p",{}, "Report Generated : " + (new Date()).toUTCString()],
-                ["h3",{},"Module Test Statistics"],
-                u,
+                ["div",{}, "Report Module Name : " + testData["GlobalTestParameters"]["TestModuleName"]],
+                ["div",{}, "Jumpbug Test Framework version :" + testData["GlobalTestParameters"]["JumpBugFrameworkVersion"].toString(16)],
+                ["div",{}, "Report Generated : " + (new Date()).toUTCString()],
+                ["h3" ,{}, "Module Test Statistics"],
+                moduleTable,
                 ["h4",{},"Unit Test Case Results are below."],
                 "<hr><br><br>"
                 ]);
@@ -69,28 +86,40 @@
             //get data for each unit
             for (i in testData) { s += (i.substr(0,4).toLowerCase()== "unit") ? renderUnit(testData[i],i) : "";   }
         }
-        catch (e)  {  // for some reason we couldn't parse the YAML test data.  
-            console.log(e);
-            //console.log("Unable to parse YAML file. see raw data in testDataRaw variable."); 
-            s = [["h3",{},"Unable to parse YAML test data, Showing raw output<br><br><hr><br>"],
-                 ["p",{},rawData.replace(/^[ \t]+/gm, function(x){ return new Array(x.length + 1).join('&nbsp;&nbsp;') }).replace(/\n/g,"<br>")]
-            ].map(function(x){return bw.html(x)}).join("");;
-        }
-        //console.log(s);
-        bw.DOM("#test",s);
-    }
+        catch (e)  {  // for some reason we couldn't parse the YAML test data correctly.  
+            console.log(e); // useful for debugging in browser console
 
-    var fname = bw.getURLParam("testDataYAML","../xelp-test-log.yaml");  // see if testData path passed via URL
-    bw.getFile(fname,function(td){testDataRaw =td; renderReport(td);});  // get the YAML file with the test data
+            //Now make a cleaned up version to show despite not haveing "nice" printing..
+            s = bw.htmla([["h3",{},"Unable to format YAML test data report, Showing raw output<br><br><hr><br>"],
+                 ["p",{},testData.replace(/^[ \t]+/gm, function(x){ return new Array(x.length + 1).join('&nbsp;&nbsp;') }).replace(/\n/g,"<br>")]
+            ]);
+        }
+        bw.DOM("#testData",s);
+    }
     
-    // Page formatting & set up
-    var content =   [
-        ["h2",{},"Testing Pass Output"],
-        ["div",{id:"test"},"Waiting for test data to load<br>"],
-        "<br><br>"
-    ];
-    bw.DOM("body", bw.htmla(content)); // render page.  Note:  ()=>() not supported in ealrly browsers
-    bw.bwSimpleThemes(1) // nicen up tables, body
+    
+    // load test data:
+    function loadTestDataAndRender (filename) {
+        bw.getFile(gData["testDataFileName"],function(td){ // get the YAML file with the test data    
+            if (bw.hashFnv32a(td) != gData["testDataRawHash"]) {// if the data actually changed... 
+                gData["testDataRaw"]        = td;
+                gData["testDataRawHash"]    = bw.hashFnv32a(gData["testDataRaw"]);
+                renderReport(gData["testDataRaw"]);
+            }
+        });  
+    }
+    
+    //load the test data for the 1st time
+
+    loadTestDataAndRender(gData["testDataFileName"]);
+    // auto refresh if enabled 
+    if (gData["refresh"] != "none") {
+        gData["refresh"] = parseInt(gData["refresh"] );
+        if  (bw.typeOf(gData["refresh"]) == "number") { 
+            gData["refresh"] = gData["refresh"] < 250 ? 250 : gData["refresh"] ; // fastest refresh rate allowed is 100ms.
+            setInterval( function(){loadTestDataAndRender( gData["testDataFileName"]);}, gData["refresh"]);
+        }
+    }
 </script>
 </body>
 </html>

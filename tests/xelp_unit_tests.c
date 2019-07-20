@@ -764,6 +764,7 @@ int run_tests() {
    
     JumpBug_PrintResults();
 
+
     
 	return JumpBug_BuildPass(); // return whether we passed for CI purposes.  MOdify gBuildPass() if there is a diff way to report build pass 
 }
@@ -790,6 +791,7 @@ int main()
 		printf ("Tests passed ++++\n\n");
 	else
 		printf ("Tests failed \n\n");
+    
 
     printf("JumpBug..\n size of JumpBug Instance %d (bytes)\n===> %s, %d <===\n",(int)sizeof(JB_UnitTestData),JUMPBUG_DBG_FILE, JUMPBUG_DBG_LINE);
     return result;  /* remember the value 0 is considered passing in a *nix build continuous integration sense */
