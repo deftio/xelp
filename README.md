@@ -1,10 +1,14 @@
+
+<!-- [![xelp](./img/xelp-prompt-med.png)](http://www.deftio.com/xelp)  -->
+
+<a href="www.deftio.com/xelp"><img src="./img/xelp-prompt.png" width="30%"></img></a><br>
+
 [![License](https://img.shields.io/badge/License-BSD%202--Clause-blue.svg)](https://opensource.org/licenses/BSD-2-Clause)
+
 
 # Xelp - A C command line interpreter and script parser
 
-copyright (C) <2012>  <M. A. Chatterjee>  <deftio [at] deftio [dot] com>
 
- 
 ## About XELP
 
 xelp is a simple combined command line interpreter / script interpreter for embedded projects which run "on the metal" or in may not have a formal OS.  This allows the programmer to have a script interpeter available for debugging with the syntax of a command line.  Xelp is meant to work seamlessly with pure C (also C++) so that the programmer can add their own commands which are then available at run time from the xelp script environment.  Passing data from xelp to C functions and from C to xelp scripts is supported.    The xelp parser can run without dynamic memory support which allows its use in interrupts or memory constrained environments such as machine monitors.
@@ -120,7 +124,7 @@ chmod +x xelp-unit-tests.out
 ## FAQ / Questions
 
 Q: I just want to able to use keypresses without being in "ESC" mode or "CLI" mode.
-A: just compile with the "DIO_ENABLE_KEY" #define in xelpcfg.h and comment out "DIO_ENABLE_FULL" in xelpcfg.h
+A: just compile with the "XELP_ENABLE_KEY" #define in xelpcfg.h and comment out "XELP_ENABLE_FULL" in xelpcfg.h
 
 Q: 
 
