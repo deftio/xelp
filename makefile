@@ -27,6 +27,8 @@ SRC_TESTS=\
 	$(TEST_DIR)/jumpbug_unit_test_fw.c\
 	$(TEST_DIR)/xelp_unit_tests.c
 
+#pandoc README.md -f markdown -t html -o index.html
+
 OBJC_TESTS=$(SRC_TESTS:.c=.o)  # object files for C language (not CPP) for tests
 
 tests: $(OBJC_TESTS)
