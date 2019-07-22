@@ -63,12 +63,13 @@ code > span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Inf
   </style>
 </head>
 <body class="bw-def-page-setup bw-font-sans-serif">
-
+<div class="bw-container">
+<div class="bw-col-9">
 <p><a href="www.deftio.com/xelp"><img src="./img/xelp-prompt.png" width="30%"></img></a><br></p>
 <p><a href="https://opensource.org/licenses/BSD-2-Clause"><img src="https://img.shields.io/badge/License-BSD%202--Clause-blue.svg" alt="License" /></a></p>
 <h1 id="xelp---a-c-command-line-interpreter-and-script-parser">Xelp - A C command line interpreter and script parser</h1>
 <h2 id="about-xelp">About XELP</h2>
-<p>xelp is a simple combined command line interpreter / script interpreter for embedded projects which run &quot;on the metal&quot; or in may not have a formal OS. This allows the programmer to have a script interpeter available for debugging with the syntax of a command line. Xelp is meant to work seamlessly with pure C (also C++) so that the programmer can add their own commands which are then available at run time from the xelp script environment. Passing data from xelp to C functions and from C to xelp scripts is supported. The xelp parser can run without dynamic memory support which allows its use in interrupts or memory constrained environments such as machine monitors.</p>
+<p>XELP is a simple combined command line interpreter / script interpreter for embedded projects which run &quot;on the metal&quot; or in may not have a formal OS. This allows the programmer to have a script interpeter available for debugging with the syntax of a command line. Xelp is meant to work seamlessly with pure C (also C++) so that the programmer can add their own commands which are then available at run time from the xelp script environment. Passing data from xelp to C functions and from C to xelp scripts is supported. The xelp parser can run without dynamic memory support which allows its use in interrupts or memory constrained environments such as machine monitors.</p>
 <p>Xelp includes a small set of built-in commands for memory operations, viewing, and pointer operations which can be optionally compiled in.</p>
 <p>Written in pure C with function pointers for adding user called fuctions.<br />
 Compiled sizes range from 900 - 4k bytes depending on options chosen, platform and architecture.</p>
@@ -243,5 +244,7 @@ Compiled sizes range from 900 - 4k bytes depending on options chosen, platform a
 <li><p>Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.</p></li>
 </ul>
 <p>THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS &quot;AS IS&quot; AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.</p>
+</div>
+</div>
 </body>
 </html>
