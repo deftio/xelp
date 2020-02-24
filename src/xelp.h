@@ -37,7 +37,7 @@
 #ifndef __XELPh__
 #define __XELPh__
 
-#include "xelpcfg.h"
+#include "xelpcfg.h"  /* this file has config options such as escape chars and included modules */
 
 #ifdef __cplusplus
 extern "C"
@@ -85,12 +85,17 @@ extern "C"
  If used it takes 115 bytes (incl null terminator) 
  Note: there are 6 rows of 19 chars each for those wanting to use skip-ptr logic for char displays.
 
+ printf style usage:
+ 
+ printf(XELP_BANNER_STR);
+
+
  */
 #define XELP_BANNER_STR  "          _       \n__  _____| |_ __  \n\\ \\/ / _ \\ | '_ \\ \n >  <  __/ | |_) |\n/_/\\_\\___|_| .__/ \n           |_|    \n"
 
 /*****************************************************************************
  error code handling.  {errors < 0, OK==0, warnings > 0}
- Note that success is 0 (like  posix command line return
+ Note that success is 0 (like  posix command line return)
 */
 
 typedef int XELPRESULT; 		
@@ -107,7 +112,7 @@ typedef int XELPREG;
 #define XELP_E_CmdBufFull 	(-2)
 #define XELP_E_CmdNotFound  (-3)
 
-#define XELP_T_OK(r) ((r)>=0) 	/* simple macro for testing OK or warning only */
+#define XELP_T_OK(r) ((r)>=0) 	/* simple macro for testing OK or warning (e.g. not a failure) */
 
 #define XELP_CMDBUFSZ 		(64) 
 
