@@ -62,10 +62,9 @@ int XELPStrLen (const char* c) {
  */
 XELPRESULT XELPOut (XELP *ths, const char* msg, int maxlen)
 {
-	if ((0 == msg) || (0==ths->mpfOut))
-		return XELP_S_OK;
-	while ((*msg !=0) && (maxlen--)){
-		(ths->mpfOut)(*msg++);
+	if ((0 != msg) && (0 !=ths->mpfOut)) {			
+		while ((*msg !=0) && (maxlen--))
+			(ths->mpfOut)(*msg++);
 	}
 	return XELP_S_OK;	
 }
@@ -163,7 +162,11 @@ XELPRESULT XELPStrEq (const char* pbuf, int blen, const char *cmd)
 		return XELP_S_NOTFOUND;
 	return XELP_S_OK;
 }
-
+/********************************************************
+ XELPStrEq2 (pbuf, pend, cmd)
+  takes a string specified by start and stop ptrs pbuf ... penf and compares if equal
+  to null termintaed string cmd.
+ */
 XELPRESULT XELPStrEq2 (const char* pbuf, const char* pend, const char *cmd)
 {
 	while(pbuf<pend){
@@ -178,11 +181,13 @@ XELPRESULT XELPStrEq2 (const char* pbuf, const char* pend, const char *cmd)
 }
 /********************************************************
  XELPBufCmp() : test if 2 buffers have byte for byte equality.  Used for finding if tokens match commands or labels
- 
+ The buffers are specified by their start and end pointers [as .. ae] and [bs .. be]
  cmpType: (comparison type)
  XELP_CMP_TYPE_BUF : both buffers are only tested for byte for byte comparison by length (\0 is not treated as end-of-buf)
- XELP_CMP_TYPE_A0  : buffer a also treats \0 as a end of buffer 
+ XELP_CMP_TYPE_A0  : buffer as..ae also treats \0 as a end of buffer 
  XELP_CMP_TYPE_A0B0  : if either buffer has \0 that is treated as the end of the buffer in addition to reaching the end ptr
+
+ returns XELP_S_OK if they are equal else XELP_S_NOTFOUND 
  
 */
 XELPRESULT XelpBufCmp (const char *as, const char *ae, const char *bs, const char *be, int cmpType) 
@@ -256,6 +261,7 @@ XELPRESULT XELPExecKC(XELP* ths, char key) {
             p++;
         }
     }
+    //TODO call default function() if available
     ths->mR[0] = XELP_S_NOTFOUND;
 	return ths->mR[0];
 }
@@ -456,6 +462,7 @@ XELPRESULT XELPParseXB (XELP* ths, XelpBuf *args) {
         */
         f=ths->mpCLIModeFuncs;
         if (f) { /* make sure fn dispatch table exists */
+        	ths->mR[0] = XELP_E_CmdNotFound;
             while(f->mpCmd) {    
                 if (XELP_S_OK == XELPStrEq(line.s,(int)(line.p-line.s),f->mpCmd)){
                     
@@ -463,6 +470,10 @@ XELPRESULT XELPParseXB (XELP* ths, XelpBuf *args) {
                     break;
                 }
                 f++;
+            }
+            if (ths->mR[0] == XELP_E_CmdNotFound) {
+            	//TODO default handling
+            	// ths->mR[0] = ths->mpfDefCLI(line.s,(int)(line.e-line.s));
             }
         }
 	}
