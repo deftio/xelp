@@ -27,7 +27,7 @@ Next up:
 	[x] funcPtr to map input chars
 	[x] funcPtr to map pass-thru chars  (allows chars typed to be sent to .. somewhere else)
 	[ ] funcPtr for errors (e.g. mpErr(int errCode))  // when the parser is exec'ing a bunch o stuff and something fails it calls this
-		make dissolvable macro to save stack space
+		[ ]	make dissolvable macro to save stack space
 	[x] function to print string (optional len or nul-char)  eg (DCIOut(char* buf, maxlen))  if maxlen=pos int print maxlen chars. if maxlen=0, prints null terminated chars
 	[x] parser-gen state machine stand alone tool.  e.g. takes #defines, full char state machine, creates compact state string and jump table.
 	[x]	for certain symbols, such as quoted ESC, CLI ESC emits #define instead of hard value.  This allows user to just #define in their config what those chars are.
@@ -55,6 +55,7 @@ Next up:
 		[ ] var stack functions (user supplied mem, ints, strings in managed dict, int fns: +-*/^&|)  #TBD...
 	[ ] C++ wrapper, xelp.hpp is included which provides a simpler C++ class style interface.  Both the C++ and C versions are identical in functionality.
 		[ ] C++ includes XelpBuf class
+	[ ] test framework migrate to jetview
 	[ ] xelp base library funcs (separate file?).  library funcs requre *ths for scratchpad ram / var ram?			
 		[0] _peek <addr> <numbytes>  # num bytes optional, if not spec'd returns 2 bytes.  bytes always returned as hex.  grouped in 16 by line.
 		[0] _poke <addr> <values>    # must be hex bytes. poke 34h 03h a3h 34h  //h for hex, else dec.  each item must have h to be hex. first item is addr (required)
@@ -107,51 +108,14 @@ Next up:
 		CLI first search CLI funcs.  Then search built in functions in a single function - not as fptrs.  saves space.
 
 ## Release Tasks
-	[ ] test suite eg unit tests and report
-	[ ] test make file
+	[ ] test suite eg unit tests and report (note migrate to jetview)
+	[ ] lint coverage
+	[ ] makefile update
 	[ ] travis or equivalent continuous integration test
 	[ ] docs
 	[ ] license (change in all files)
 	[ ] change log and versioning
 	[ ] naming 		xelp | xelpcmd | xelp | dci
-			   		scip  | scriptable command interpreter parser.  but .. really just scip!
-			   		clip  | command line intrepreter parser.  
-			   		scim  | scriptable command interpreter module
-			   		sqip
-			   		casm  |
-					quik  |
-					quoo  | from marzi
-					xelp   | nice 'n short, derives from deft i o  :)
-					xelpc
-					xelpp  
-					skim
-					clep  | from marzi
-					flip
-					clip
-					slim
-					gryp
-					grok 
-					meep
-					kwyp  qwip qwyp| phonetic equivalent to quip which is a company bought by salesforce
-					sqid
-					squd
-					wink
-					wynk
-					kees | from marzi
-					qtcl
-					xelpt
-					toos
-					frop
-					xrpt  "excerpt"
-					xypt
-					zypt
-					zoop
-					jwox
-					twig
-					spli  anagram of LISP, scriptable-parser-line-interpreter   
-					slip  scriptable line interpreter parser
-					slyp  (stylisved version of above)
-
 
 ## platforms & CPUs
 	[x]	80x86-64		linux
