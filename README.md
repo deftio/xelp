@@ -1,7 +1,7 @@
 
 <!-- [![xelp](./img/xelp-prompt-med.png)](http://www.deftio.com/xelp)  -->
 
-<a href="www.deftio.com/xelp"><img src="./img/xelp-prompt.png" width="30%"></img></a><br>
+<a href="www.deftio.com/xelp"><img src="./img/xelp-prompt-med.png" width="30%"></img></a><br>
 
 [![License](https://img.shields.io/badge/License-BSD%202--Clause-blue.svg)](https://opensource.org/licenses/BSD-2-Clause)
 
@@ -55,9 +55,69 @@ Compiled sizes range from 900 - 4k bytes depending on options chosen, platform a
 * OSI approved open-source - BSD-2 License  
 
 	
-## usage:
+## usage in C:
+
+The following is a simple posix example. 
+
 ```C
 #include "xelp.h"			/* in the file where xelp calls are to be made */
+
+//some sample functions 
+XELPRESULT cmdHelp (const char* args, int maxlen) {
+	return XELPHelp(&example);
+}
+
+//command to quit
+XELPRESULT cmdExit (const char* args, int maxlen) {
+	gExit = 1;
+	return XELP_S_OK;
+}
+
+//command to print
+XELPRESULT cmdPrintNum (const char *args, int maxlen) {
+	XelpBuf b,tok;
+    int n;
+
+    XELP_XBInit(b,args,maxlen);
+    XELPTokN(&b,1,&tok),
+    
+	printw("[%d]\n",XELPStr2Int(tok.s,tok.p-tok.s));
+	return XELP_S_OK;
+}
+
+//create map of functions, with  {function, "command" , "help string"}
+XELPCLIFuncMapEntry gMyCLICommands[] =
+{
+	{&cmdHelp	 		, "help"    ,  "help"						},
+	{&cmdPrintNum       , "num"     ,  "print a num to console"     },
+	{&cmdExit           , "exit"    ,  "quit demo program"          },
+	XELP_FUNC_ENTRY_LAST
+};
+
+int gExit = 0;
+
+int main (int argc, char *argv[])
+{
+
+	XELP myXelp; //declare an instance of the xelp parser
+
+	XELPInit(&myXelp,	"My Embedded System\ncli : interface."); // set the about string for the interpreter and initialize internal state  
+
+	XELP_SET_FN_BKSP(myXelp,&handleBackspace);
+	XELP_SET_FN_OUT(myXelp,&gPutChar);  
+	XELP_SET_FN_CLI(myXelp,gMyCLICommands);   		// map the cli commands  
+	XELP_SET_VAL_CLI_PROMPT(myXelp,"myprompt>");    // if using per-instance prompt...
+
+	do	{
+	
+		if (Serial.available() > 0) {
+			char c = serial.readChar();
+			XELPParseKey(&example,c);  
+		}
+	}while (!gExit); // gExit is a global variable that is called if the exit command is called ("exit" in CLI mode or "x" in KEY mode)
+	
+}	
+
 ```
 
 compile and link xelp.c
