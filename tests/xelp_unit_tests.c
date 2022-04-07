@@ -217,7 +217,7 @@ XELPRESULT test_XELPStr2Int() {
  */
 
 XELPRESULT test_XelpParseNum() {
-    XELPRESULT r;
+ //   XELPRESULT r;
 
 
 

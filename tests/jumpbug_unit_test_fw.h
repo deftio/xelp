@@ -150,8 +150,8 @@ typedef struct {
  JumpBug API
 
  */
-int JumpBug_InitGlobal(char *moduleName, int (*f)(char), int (*flog)(char));                     // init test case statistics
-int JumpBug_InitStats(JB_UnitTestData *x, char *moduleName, int (*f)(char), int (*flog)(char)) ; // init stats structure for unit tests
+int JumpBug_InitGlobal(char *moduleName, int (*f)(int), int (*flog)(char));                     // init test case statistics
+int JumpBug_InitStats(JB_UnitTestData *x, char *moduleName, int (*f)(int), int (*flog)(char)) ; // init stats structure for unit tests
 int JumpBug_InitUnit();                            // init the test stats before running each unit
 int JumpBug_RunUnit(int (*f)(), char *unitName);   // run a unit test (cases for a function or module)
 int JumpBug_LogTest(int result, char *msg);        // log result of an individual testcase
