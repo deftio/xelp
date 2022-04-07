@@ -290,6 +290,7 @@ typedef struct
  */
 
 XELPRESULT XELPInit (XELP *ths, const char *pAboutMsg);			    /* initialize instance             */
+#define XELP_SET_ABOUT(ths,pAboutMsg)     (ths.mpAboutMsg=pAboutMsg)/* change the about message        */
 
 /*  Macros to set function pointer arrays	  */
 #define XELP_SET_FN_CLI(ths,pfaCLI)	  (ths.mpCLIModeFuncs=pfaCLI)   /* load CLI fns table              */
@@ -337,24 +338,6 @@ XELPRESULT XelpBufCmp (const char *as, const char *ae, const char *bs, const cha
 #define XELP_CMP_TYPE_BUF   (0x00) /* both buffers are only tested for byte for byte comparison by length (\0 is ignored)       */
 #define XELP_CMP_TYPE_A0    (0x01) /* buffer a also treats \0 as a end of buffer                                                */
 #define XELP_CMP_TYPE_A0B0  (0x11) /* if either buffer has \0 that is treated as the end of the buffer like in stdlib::strcmp() */
-
-/*************************************************************************
- * XELP_STACK_MACHINE operations
- * note: XELP_STACK_MACHINE compile option must be defined for these to work.  
- * See xelpcfg.h for enabling XELP_STACK_MACHINE and setting stack depth
- */
-#define XELP_STACK_NOP      0x0000
-#define XELP_STACK_PUSH     0x0100
-#define XELP_STACK_POP      0x0200
-#define XELP_STACK_XOR      0x0300
-#define XELP_STACK_NOT      0x0400
-#define XELP_STACK_ADD      0x0500
-#define XELP_STACK_INC      0x0600
-#define XELP_STACK_DEC      0x0700
-#define XELP_STACK_SUB      0x0800
-#define XELP_STACK_MUL      0x0900
-#define XELP_STACK_AND      0x0A00
-#define XELP_STACK_OR       0x0B00
 
 
 #ifdef __cplusplus

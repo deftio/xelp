@@ -326,3 +326,22 @@ h29830abd323    terminal is <space> | <:> | <;>
 	* mode: single-key at cmd line
 	* mode: parse at cmd line
 	* mode: pass thru at cmdline
+
+
+/*************************************************************************
+ * XELP_STACK_MACHINE operations
+ * note: XELP_STACK_MACHINE compile option must be defined for these to work.  
+ * See xelpcfg.h for enabling XELP_STACK_MACHINE and setting stack depth
+ */
+#define XELP_STACK_NOP      0x0000
+#define XELP_STACK_PUSH     0x0100
+#define XELP_STACK_POP      0x0200
+#define XELP_STACK_XOR      0x0300
+#define XELP_STACK_NOT      0x0400
+#define XELP_STACK_ADD      0x0500
+#define XELP_STACK_INC      0x0600
+#define XELP_STACK_DEC      0x0700
+#define XELP_STACK_SUB      0x0800
+#define XELP_STACK_MUL      0x0900
+#define XELP_STACK_AND      0x0A00
+#define XELP_STACK_OR       0x0B00
