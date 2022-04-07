@@ -734,11 +734,14 @@ int flogout (char x) {
     }
     return 0;
 }
+int putcharc (char x) {
+    return putchar(x);
+}
 int run_tests() {
     
     
     
-    JumpBug_InitGlobal("Xelp", putchar,flogout); // initialize the test case counters
+    JumpBug_InitGlobal("Xelp", putcharc,flogout); // initialize the test case counters
 
     JumpBug_RunUnit(test_XELPStrLen,"XELPStrLen");
 	JumpBug_RunUnit(test_XELPStr2Int,"XELPStr2Int");

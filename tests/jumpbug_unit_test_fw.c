@@ -255,7 +255,7 @@ int JumpBug_FailMsg (const char *c, int n) {
 /***************************************
  *  initialize stats for global ctr
  */ 
-int JumpBug_InitGlobal(char *moduleName, int (*f)(int), int (*flog)(char)) {
+int JumpBug_InitGlobal(char *moduleName, int (*f)(char), int (*flog)(char)) {
     return JumpBug_InitStats(&gTestData, moduleName, f, flog);
 }
 /***************************************
