@@ -30,7 +30,7 @@ Compiled sizes range from 900 - 4k bytes depending on options chosen, platform a
 * Each function can also have an optional help string.
 * Single-key mode for immediate menus or actions (w/o having to pressing ENTER) 
 	* programmer supplied actions (key presses or cmds) switch btw single key or cmd-line modes.
-* Thru-mode allows redirection of key strokes to another peripheral w/o any parsing (useful for debugging modems or other peripherals) 
+* Thru-mode allows redirection of key strokes to another peripheral w/o any parsing (useful for debugging modems or other peripherals with their own command sets) 
 	* thru-mode is switchable on the fly at runtime and can be redirected or compiled out.
 	* example: use thru-mode to on-the-fly connect to a modem and type in AT commands then switch back to CLI mode when done allowing graceful switching between CLI and peripheral command sets
 * Tokenizer output available for user supplied functions that need to parse params
@@ -46,7 +46,7 @@ Compiled sizes range from 900 - 4k bytes depending on options chosen, platform a
 * Supports "quoted strings" in command line (treats as single token), escapes for command line via '`', escapes for quoted strings via '\'.  All escape chars are overridable at compile time.
 * No dynamic memory needed for CLI / script interpreter / tokenizer / command dispatch (eg no malloc/free new/delete)  
 * No globals or global state -- all state is stored in an instance so several instances can be run at the same time
-	* allows a XELP instance to be attached to different serial ports for example.
+	* allows separate XELP instances to be attached to different serial ports for example.
 * Reentrant provided same instance is not used as a CLI for 2 competing threads.  Scripts are reentrant by default unless user supplied functions are not reentrant.
 * Platform independant
 	* No library support required (stdio.h, string.h etc not needed).  

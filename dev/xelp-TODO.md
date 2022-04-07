@@ -32,6 +32,7 @@ Next up:
 	[x] parser-gen state machine stand alone tool.  e.g. takes #defines, full char state machine, creates compact state string and jump table.
 	[x]	for certain symbols, such as quoted ESC, CLI ESC emits #define instead of hard value.  This allows user to just #define in their config what those chars are.
 	[0] function set CR/LF emission characteristic -- decide (won't do)
+	[ ] catchall function for when command isn't recognzied ==> f(str, len)  ==> allows different parser to be called such as making primitive http response
 	[ ] parser grammar formalize
 		<command><space><args><terminal>  --> terminal is ';' from the POV of parser
 			-->` (backtick)  allows escaping of terminal chars so that if we include math ops ^ isn't "taken" out for paths \ or / aren't taken

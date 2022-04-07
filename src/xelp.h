@@ -105,7 +105,7 @@ typedef int XELPREG;
 
 #define XELP_E_Err			(-1)
 #define XELP_E_CmdBufFull 	(-2)
-
+#define XELP_E_CmdNotFound  (-3)
 
 #define XELP_T_OK(r) ((r)>=0) 	/* simple macro for testing OK or warning only */
 

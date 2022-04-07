@@ -204,7 +204,7 @@ int JumpBug_YAML_BlockEnd  (int numBlocks) {
     
     return gJumpBug_YAML_indent;
 }
-int JumpBug_YAML_BlockN(int (*f)(char), char *string, int n, int indent){      /* YAML block begin e.g.   '  myblock:\n'      */
+int JumpBug_YAML_BlockN(int (*f)(char), char *string, int n, int indent){      /* YAML block begin e.g.   '  unit7:\n'       */
     if (!f)
         return JB_FAIL;
     indent <<= 2;
