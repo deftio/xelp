@@ -652,13 +652,51 @@ int XELPStr2Int (const char* s,int  maxlen) {
 	}
 	return r;
 }
-/*
+/********************************************************
+  XelpParseNum()
+  parse a string return an integer
+  345  	--> read as decimal
+  345h 	--> read as hex
+  0x345 --> read as hex
+ */
 XELPRESULT XelpParseNum (const char* s, int maxlen, int* n) {
-    XelpBuf x;
-    XELP_XBInit(x,s,maxlen);
+	const char *p = s+maxlen-1;
+	int r=0,x=0,d, isHex=0;
 
-    //do next token to eat leading white space
+	if ('h' == *p) 
+		isHex = 1;
+	
+	if (('0' == *s) && ('x' == *(s+1))) {
+		isHex = 1;
+		s+=2;
+		p++;
+	}
+
+	if (isHex)
+    { /* hexadecimal */
+		while (s<p) {
+			d = (*s > '9') ? (*s-'a'+0xa) : (*s-'0');
+			r = (r<<4)|d;
+			s++;
+		}
+	}
+	else { /* base 10 */
+		if (*s == '-') {
+			x = -1;
+			s++;
+		} else {
+			if (*s == '+') {
+				s++;
+			}
+		}
+		while (s<=p) {
+			d = *s - '0';
+			r = FR_SMUL10(r) + d;
+			s++;
+		}
+		r = x ? -r : r;
+	}
+	*n = r;
 
     return XELP_S_OK;
 }
-*/

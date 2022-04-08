@@ -250,6 +250,7 @@ int JumpBug_FailMsg (const char *c, int n) {
     OUTN(n);
     OUTS(" FAIL: ");
     OUTS(c);
+    OUTS("\n");
     return JB_PASS;
 }
 /***************************************

@@ -198,16 +198,16 @@ XELPRESULT test_XELPStrEq2() {
  */
 
 XELPRESULT test_XELPStr2Int() {
-	if (JB_ASSERT(XELPStr2Int("90",2) != 90,"Str2Int"))
+	if (JB_ASSERT(XELPStr2Int("90",2) != 90,"Str2Int  90"))
 		return XELP_E_Err;
 
-    if (JB_ASSERT(XELPStr2Int("31h",3) != 49,"Str2Int")) // hex parser
+    if (JB_ASSERT(XELPStr2Int("31h",3) != 49,"Str2Int 31h")) // hex parser
 		return XELP_E_Err;
 
-    if (JB_ASSERT(XELPStr2Int("-87",3) != -87,"Str2Int")) // hex parser
+    if (JB_ASSERT(XELPStr2Int("-87",3) != -87,"Str2Int -87")) // hex parser
 		return XELP_E_Err;
 
-    if (JB_ASSERT(XELPStr2Int("+6546",5) != 6546,"Str2Int")) // hex parser
+    if (JB_ASSERT(XELPStr2Int("+6546",5) != 6546,"Str2Int +6546")) // hex parser
 		return XELP_E_Err;
 
 	return XELP_S_OK;
@@ -217,9 +217,35 @@ XELPRESULT test_XELPStr2Int() {
  */
 
 XELPRESULT test_XelpParseNum() {
- //   XELPRESULT r;
+    int n;
+    XELPRESULT r;
+    
+
+  
+    r = XelpParseNum("90",2, &n); 
+    if (JB_ASSERT( ((n != 90) || ( r != XELP_S_OK)) ,"XELPParseNum 90"))
+        return XELP_E_Err;
 
 
+
+    r = XelpParseNum("3ab30h",6, &n); 
+    if (JB_ASSERT( (n != 0x3ab30) || ( r != XELP_S_OK) ,"XELPParseNum 3ab30h"))
+        return XELP_E_Err;
+
+
+    r = XelpParseNum("0x3ab30",7, &n); 
+    if (JB_ASSERT( (n != 0x3ab30) || ( r != XELP_S_OK) ,"XELPParseNum 0x3ab30"))
+        return XELP_E_Err;
+
+    
+    r = XelpParseNum("-87",3, &n); 
+    if (JB_ASSERT( (n !=  -87) || ( r != XELP_S_OK) ,"XELPParseNum -87"))
+        return XELP_E_Err;
+
+
+    r = XelpParseNum("+6457",5, &n); 
+    if (JB_ASSERT( (n != 6457) || ( r != XELP_S_OK) ,"XELPParseNum +6547"))
+       { return XELP_E_Err;}
 
 	return XELP_S_OK;
 }
@@ -769,7 +795,7 @@ int run_tests() {
 
 
     
-	return JumpBug_BuildPass(); // return whether we passed for CI purposes.  MOdify gBuildPass() if there is a diff way to report build pass 
+	return JumpBug_BuildPass(); // return whether we passed for CI purposes.  Modify gBuildPass() if there is a diff way to report build pass 
 }
 
 /* 
@@ -795,8 +821,8 @@ int main()
 	else
 		printf ("Tests failed \n\n");
     
-
-    printf("JumpBug..\n size of JumpBug Instance %d (bytes)\n===> %s, %d <===\n",(int)sizeof(JB_UnitTestData),JUMPBUG_DBG_FILE, JUMPBUG_DBG_LINE);
+    //print size of the JumpBug test framework
+    //printf("JumpBug..\n size of JumpBug Instance %d (bytes)\n===> %s, %d <===\n",(int)sizeof(JB_UnitTestData),JUMPBUG_DBG_FILE, JUMPBUG_DBG_LINE);
     return result;  /* remember the value 0 is considered passing in a *nix build continuous integration sense */
 
 }

@@ -156,7 +156,7 @@ typedef struct {
 /* XelpBuf const macros (no data changed) */
 #define XELP_XBPCopy(a,b)				 {b.s=a.s; b.p=a.p; b.e=a.e;}                   /* copy params from XelpBuf a to XelpBuf b     */
 #define XELP_XBGetBufPtr(x)              (x.s)                                          /* get start pos                               */
-#define XELP_XBBufLen(x)                 ((int)((x.e)- (x.s))                           /* get length in bytes of XelpBuf              */
+#define XELP_XBBufLen(x)                 ((int)((x.e)- (x.s)))                          /* get length in bytes of XelpBuf              */
 #define XELP_XBGetPos(x)                 ((int)(x.p-x.s))                               /* return current position as int              */
 #define XELP_XBGetBuf(x,ptr,len)         {ptr=x.s; len= (x.e) - (x.s)}                  /* get the start ptr, and total length of the Xelp buf*/
 

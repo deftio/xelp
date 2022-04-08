@@ -202,11 +202,11 @@ int JumpBug_TestRunner(JB_Tests *t);
 
 /* this wrapper allows dissolving macro use (e.g. in your makefile just #define JB_ASSRT(r,m) ()) */
 #ifndef JB_ASSERT
-#define JB_ASSERT(result,msg)   JumpBug_LogTestF(result,msg,JUMPBUG_DBG_FILE,JUMPBUG_DBG_LINE)
+#define JB_ASSERT(result,msg)   JumpBug_LogTestF((result),msg,JUMPBUG_DBG_FILE,JUMPBUG_DBG_LINE)
 #endif
 
 #ifndef JB_ASSERTX
-#define JB_ASSERTX(result,msg)   JumpBug_LogTestF(result,msg,JUMPBUG_DBG_FILE,JUMPBUG_DBG_LINE)
+#define JB_ASSERTX(result,msg)   JumpBug_LogTestF((result),msg,JUMPBUG_DBG_FILE,JUMPBUG_DBG_LINE)
 #endif
 
 
