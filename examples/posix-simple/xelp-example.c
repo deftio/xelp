@@ -269,7 +269,7 @@ XELPRESULT cmdMath (const char* args, int maxlen) {
 		case '%':
 			k=i%j;  break;
 	}
-	printw("%d %d %d",i,j,k);
+	printw("%d %c %d = %d",i,(char) op,j,k);
 	XELPOut(&example,"\n",1);
 	return XELP_S_OK;
 }
