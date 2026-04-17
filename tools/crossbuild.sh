@@ -15,14 +15,15 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 do_build() {
-    echo "Building Docker image '$IMAGE_NAME'..."
-    docker build -t "$IMAGE_NAME" -f "$SCRIPT_DIR/Dockerfile.crossbuild" "$REPO_ROOT"
+    echo "Building Docker image '$IMAGE_NAME' (linux/amd64)..."
+    docker build --platform linux/amd64 \
+        -t "$IMAGE_NAME" -f "$SCRIPT_DIR/Dockerfile.crossbuild" "$REPO_ROOT"
     echo "Image built successfully."
 }
 
 do_run() {
     echo "Running cross-compilation report..."
-    docker run --rm \
+    docker run --rm --platform linux/amd64 \
         -v "$SCRIPT_DIR/compactbuilds-docker.sh:/xelp/tools/compactbuilds-docker.sh:ro" \
         "$IMAGE_NAME"
 }
