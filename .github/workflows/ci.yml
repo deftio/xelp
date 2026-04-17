@@ -32,6 +32,17 @@ jobs:
       - name: Build and run tests
         run: make tests
 
+      - name: Check for compiler warnings
+        run: |
+          BUILD_LOG=$(make clean 2>&1 && make tests 2>&1)
+          WARNINGS=$(echo "$BUILD_LOG" | grep -E "^[^:]+\.(c|h):[0-9]+:[0-9]+: warning:" || true)
+          if [ -n "$WARNINGS" ]; then
+            echo "ERROR: Compiler warnings detected:"
+            echo "$WARNINGS"
+            exit 1
+          fi
+          echo "Zero warnings."
+
       - name: Coverage report (GCC on Ubuntu only)
         if: matrix.os == 'ubuntu-latest' && matrix.compiler == 'gcc'
         run: |

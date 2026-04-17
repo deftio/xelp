@@ -205,19 +205,34 @@ Tested with zero warnings on:
 xelp/
   src/            xelp.c, xelp.h, xelpcfg.h (the library -- add these to your project)
   tests/          unit tests (jumpbug framework), 100% coverage
-  examples/       posix ncurses demo
-  tools/          cross-build scripts, banner generator, state machine generator
+  examples/       posix ncurses demo, bare-metal template, multi-instance
+  tools/          cross-build scripts, release script, banner generator
   docs/           API reference, configuration guide, porting guide
   pages/          GitHub Pages site
   dev/            design notes and planning
-  .github/        CI workflows
+  .github/        CI workflows (build, test, release)
 ```
+
+## Contributing
+
+PRs welcome. `master` is protected -- all changes go through pull requests.
+CI must pass (zero warnings, all tests, coverage) before merge.
+
+```bash
+git checkout -b dev-my-feature master
+# make changes...
+make clean && make tests    # must pass, zero warnings
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for full guidelines: coding standards,
+what we welcome, branch model, and the release process.
 
 ## Documentation
 
 - [API Reference](docs/api-reference.md) -- all public functions, macros, types
 - [Configuration Guide](docs/configuration.md) -- compile-time options
 - [Porting Guide](docs/porting.md) -- bringing up xelp on a new platform
+- [Release Management](release_management.md) -- versioning, CI, release workflow
 - [Tools](tools/README_TOOLS.md) -- build utilities and code generators
 - [Contributing](CONTRIBUTING.md) -- how to contribute
 

@@ -93,23 +93,19 @@ Examples:
 
 Avoid: `update stuff`, `fix`, `wip`, `clean up code`.
 
-## Running tests
+## Building and testing
 
 ```bash
-make tests
+make tests              # build + run unit tests + gcov
+make coverage           # tests + coverage summary
+make clean              # remove all build artifacts
 ```
 
-This builds and runs the unit test suite using the jumpbug test
-framework. All tests must pass.
+The test suite uses the jumpbug framework. All tests must pass with
+**zero compiler warnings** and **100% line coverage** of `xelp.c`
+before a PR will be accepted.
 
-### Coverage
-
-```bash
-make coverage
-```
-
-This runs the tests with gcov instrumentation and prints a coverage
-summary. The full `xelp.c.gcov` file is in `tests/` for line-by-line
+The full `xelp.c.gcov` file is written to `tests/` for line-by-line
 details. Don't let coverage drop when adding new code -- add tests.
 
 ## Compile-time configuration
@@ -121,6 +117,66 @@ When adding new optional features:
 2. Ensure the library still compiles and tests pass with the feature
    disabled.
 3. Document the code size impact in the PR description.
+
+## Branching and pull requests
+
+`master` is the release-ready branch and is **protected**. Only
+maintainers can merge to master. All changes go through pull requests.
+
+```
+master              (protected -- maintainer merge only)
+  └── dev-feature   (your working branch)
+```
+
+Workflow:
+
+1. Fork or clone the repo.
+2. Create a feature branch from `master`:
+   ```bash
+   git checkout -b dev-my-feature master
+   ```
+3. Make your changes. Ensure `make tests` passes with zero warnings
+   and coverage doesn't drop.
+4. Push your branch and open a PR against `master`.
+5. CI will run automatically (Ubuntu + macOS, GCC + Clang, 32-bit).
+   All checks must pass.
+6. A maintainer will review and merge.
+
+## Release process
+
+Releases are driven by `XELP_VERSION` in `src/xelp.h` -- this is the
+single source of truth for the version number. The hex format encodes
+`0xMMmm` (major.minor), e.g. `0x0021` = version 0.33.
+
+Only maintainers create releases. The process is:
+
+1. Bump `XELP_VERSION` in `src/xelp.h`
+2. Move the `[Unreleased]` section in `CHANGELOG.md` to a versioned
+   heading (e.g. `## [0.34] - 2025-07-01`)
+3. Commit, push, merge to `master`
+4. Run the release script from `master`:
+   ```bash
+   bash tools/make_release.sh          # dry run -- validates everything
+   bash tools/make_release.sh --tag    # validates, tags, pushes
+   ```
+5. GitHub Actions picks up the tag push, validates again in CI, and
+   creates a GitHub Release with notes from `CHANGELOG.md`.
+
+See `release_management.md` for full details.
+
+## CI
+
+Every push and PR to `master` triggers GitHub Actions
+(`.github/workflows/ci.yml`):
+
+- Build matrix: Ubuntu + macOS, GCC + Clang
+- 32-bit build: Ubuntu with `-m32`
+- Zero-warning enforcement
+- Coverage report (Ubuntu/GCC)
+
+Tag pushes (`v*`) trigger the release workflow
+(`.github/workflows/release.yml`) which validates and creates a
+GitHub Release automatically.
 
 ## License
 

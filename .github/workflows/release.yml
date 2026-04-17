@@ -1,0 +1,92 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "version=${TAG#v}" >> $GITHUB_OUTPUT
+
+      - name: Verify tag matches XELP_VERSION
+        run: |
+          HEX=$(grep '#define XELP_VERSION' src/xelp.h | grep -o '0x[0-9a-fA-F]*')
+          NUM=$((HEX))
+          MAJOR=$(( (NUM >> 8) & 0xFF ))
+          MINOR=$(( NUM & 0xFF ))
+          SRC_VER="${MAJOR}.${MINOR}"
+          TAG_VER="${GITHUB_REF#refs/tags/v}"
+          echo "Source version: $SRC_VER"
+          echo "Tag version:    $TAG_VER"
+          if [ "$SRC_VER" != "$TAG_VER" ]; then
+            echo "ERROR: Tag $TAG_VER does not match XELP_VERSION $SRC_VER in src/xelp.h"
+            exit 1
+          fi
+
+      - name: Build and run tests
+        run: make tests
+
+      - name: Check for compiler warnings
+        run: |
+          BUILD_LOG=$(make clean 2>&1 && make tests 2>&1)
+          WARNINGS=$(echo "$BUILD_LOG" | grep -E "^[^:]+\.(c|h):[0-9]+:[0-9]+: warning:" || true)
+          if [ -n "$WARNINGS" ]; then
+            echo "ERROR: Compiler warnings detected:"
+            echo "$WARNINGS"
+            exit 1
+          fi
+          echo "Zero warnings."
+
+      - name: Coverage check
+        run: |
+          gcov src/xelp.c
+          echo "--- Coverage Summary ---"
+          gcov src/xelp.c 2>/dev/null | grep -A 1 "File.*xelp.c"
+
+  release:
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract version
+        id: version
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "version=${TAG#v}" >> $GITHUB_OUTPUT
+
+      - name: Extract changelog for this version
+        id: changelog
+        run: |
+          VER="${{ steps.version.outputs.version }}"
+          # Try to extract the section for this version from CHANGELOG.md
+          # If [Unreleased] is the current section, use that
+          NOTES=$(awk '/^## \[/{if(found) exit; found=1; next} found{print}' CHANGELOG.md)
+          if [ -z "$NOTES" ]; then
+            NOTES="Release $VER. See CHANGELOG.md for details."
+          fi
+          # Write to file to preserve formatting
+          echo "$NOTES" > /tmp/release_notes.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: xelp ${{ steps.version.outputs.version }}
+          body_path: /tmp/release_notes.md
+          draft: false
+          prerelease: false

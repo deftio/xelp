@@ -4,17 +4,20 @@
 #
 # The XELP_VERSION macro in src/xelp.h is the single source of truth for
 # the version number. This script reads it, validates the build, and
-# optionally creates a GitHub release.
+# creates a git tag. GitHub Actions (release.yml) then creates the
+# GitHub Release automatically when the tag is pushed.
 #
 # Usage:
 #   bash tools/make_release.sh              # validate only (dry run)
-#   bash tools/make_release.sh --tag        # validate + create git tag
-#   bash tools/make_release.sh --release    # validate + tag + GitHub release
+#   bash tools/make_release.sh --tag        # validate + create + push git tag
+#                                           #   (recommended -- CI creates release)
+#   bash tools/make_release.sh --release    # validate + tag + GitHub release locally
+#                                           #   (manual fallback, requires gh CLI)
 #
 # Prerequisites:
 #   - gcc (for build + tests)
 #   - gcov (for coverage)
-#   - gh CLI (for --release mode)
+#   - gh CLI (for --release mode only)
 
 set -euo pipefail
 
@@ -142,19 +145,20 @@ do_tag() {
     echo ""
     echo "=== Creating tag $VER_TAG ==="
     git -C "$REPO_ROOT" tag -a "$VER_TAG" -m "Release $VER_STRING"
-    echo "Tag $VER_TAG created locally."
-    echo "  Push with: git push origin $VER_TAG"
+    echo "Tag $VER_TAG created."
+    echo ""
+    echo "=== Pushing tag $VER_TAG ==="
+    git -C "$REPO_ROOT" push origin "$VER_TAG"
+    echo "Tag pushed. GitHub Actions will create the release."
 }
 
 do_release() {
     echo ""
-    echo "=== Creating GitHub release ==="
+    echo "=== Creating GitHub release (local fallback) ==="
     if ! command -v gh &>/dev/null; then
         echo "FAIL: gh CLI not found. Install from https://cli.github.com/" >&2
         exit 1
     fi
-
-    git -C "$REPO_ROOT" push origin "$VER_TAG"
 
     gh release create "$VER_TAG" \
         --title "xelp $VER_STRING" \
@@ -176,8 +180,8 @@ case "${1:-}" in
         echo "Usage: bash tools/make_release.sh [--tag|--release]"
         echo ""
         echo "  (no args)    Validate build, tests, coverage (dry run)"
-        echo "  --tag        Validate + create git tag"
-        echo "  --release    Validate + tag + push + GitHub release"
+        echo "  --tag        Validate + tag + push (CI creates release)"
+        echo "  --release    Validate + tag + push + local GitHub release (fallback)"
         exit 0
         ;;
 esac
