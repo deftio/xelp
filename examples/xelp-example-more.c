@@ -163,8 +163,8 @@ XELPRESULT cmdNumToks (const char* args, int maxlen)
  
     int n;
     XELP_XBInit(b,args,maxlen);
-    XelpNumToks(&b,&n);
-	printw(" XelpNumToks %d\n",n);
+    XELPNumToks(&b,&n);
+	printw(" XELPNumToks %d\n",n);
 	
     return XELP_S_OK;
 };
@@ -176,7 +176,7 @@ XELPRESULT cmdPrintR (const char* args, int maxlen){
 
 XELPRESULT cmdPrintS (const char* args, int maxlen){
 	printw("not implemented\n");
-	return XELP_W_Warn;  
+	return XELP_W_WARN;  
 }
 XELPRESULT cmdPrintPokeBuf (const char* args, int maxlen){
 	int i=0;
@@ -195,7 +195,7 @@ XELPRESULT cmdListToks (const char* args, int maxlen)
     int n,i;
     XELPRESULT r;
     XELP_XBInit(b,args,maxlen);
-    XelpNumToks(&b,&n);
+    XELPNumToks(&b,&n);
     XELP_XBTOP(b);
     printw("[%d]",n);
 	for (i=0; i< n; i++) {

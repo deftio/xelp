@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>API Reference — xelp</title>
+  <link rel="stylesheet" href="assets/main.css">
+  <link rel="icon" href="../img/favicon-32x32.png" type="image/png">
+</head>
+<body>
+
+<header>
+  <nav>
+    <a href="index.html"><strong>xelp</strong></a>
+    <a href="tutorial.html">Tutorial</a>
+    <a href="examples.html">Examples</a>
+    <a href="api-reference.html">API Reference</a>
+    <a href="configuration.html">Configuration</a>
+    <a href="porting.html">Porting Guide</a>
+    <a href="releases.html">Releases</a>
+    <a href="https://github.com/deftio/xelp">GitHub</a>
+  </nav>
+</header>
+
+<main>
+
+<h1>API Reference</h1>
+
+<p>All public types, functions, and macros defined in <code>xelp.h</code>.
+Version 0.2.1.</p>
+
+<h2>Types</h2>
+
+<table>
+<thead><tr><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>XELP</code></td><td>Runtime instance of the interpreter. Holds all state.</td></tr>
+<tr><td><code>XELPRESULT</code></td><td>Return type (<code>int</code>). 0 = OK, negative = error, positive = warning.</td></tr>
+<tr><td><code>XELPREG</code></td><td>Register type (default <code>int</code>, overridable in xelpcfg.h).</td></tr>
+<tr><td><code>XelpBuf</code></td><td>Buffer wrapper with start, position, and end pointers.</td></tr>
+<tr><td><code>XELPKeyFuncMapEntry</code></td><td>Single-key command entry: function pointer, key, help string.</td></tr>
+<tr><td><code>XELPCLIFuncMapEntry</code></td><td>CLI command entry: function pointer, command name, help string.</td></tr>
+</tbody>
+</table>
+
+<h2>Return codes</h2>
+
+<table>
+<thead><tr><th>Constant</th><th>Value</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><code>XELP_S_OK</code></td><td>0</td><td>Success</td></tr>
+<tr><td><code>XELP_W_WARN</code></td><td>1</td><td>Warning (still success)</td></tr>
+<tr><td><code>XELP_S_NOTFOUND</code></td><td>2</td><td>Token or command not found</td></tr>
+<tr><td><code>XELP_E_ERR</code></td><td>-1</td><td>General error</td></tr>
+<tr><td><code>XELP_E_CMDBUFFULL</code></td><td>-2</td><td>Command buffer full</td></tr>
+<tr><td><code>XELP_E_CMDNOTFOUND</code></td><td>-3</td><td>Command not found during dispatch</td></tr>
+</tbody>
+</table>
+
+<p><code>XELP_T_OK(r)</code> &mdash; macro that returns true if <code>r &gt;= 0</code> (OK or warning).</p>
+
+<h2>Initialization</h2>
+
+<h3><code>XELPInit</code></h3>
+<pre><code>XELPRESULT XELPInit(XELP *ths, const char *pAboutMsg);
+</code></pre>
+<p>Initialize an XELP instance. Must be called before any other function.
+<code>pAboutMsg</code> is displayed at the start of help output.</p>
+
+<h2>Setup macros</h2>
+
+<table>
+<thead><tr><th>Macro</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr><td><code>XELP_SET_FN_OUT(ths, fn)</code></td><td>Set output function: <code>void fn(char)</code></td></tr>
+<tr><td><code>XELP_SET_FN_ERR(ths, fn)</code></td><td>Set error output function</td></tr>
+<tr><td><code>XELP_SET_FN_BKSP(ths, fn)</code></td><td>Set backspace handler: <code>void fn(void)</code></td></tr>
+<tr><td><code>XELP_SET_FN_THR(ths, fn)</code></td><td>Set pass-through function</td></tr>
+<tr><td><code>XELP_SET_FN_EMCHG(ths, fn)</code></td><td>Set mode-change callback: <code>void fn(int)</code></td></tr>
+<tr><td><code>XELP_SET_FN_CLI(ths, tbl)</code></td><td>Set CLI command table</td></tr>
+<tr><td><code>XELP_SET_FN_KEY(ths, tbl)</code></td><td>Set KEY command table</td></tr>
+<tr><td><code>XELP_SET_VAL_CLI_PROMPT(ths, str)</code></td><td>Set CLI prompt string</td></tr>
+<tr><td><code>XELP_SET_ABOUT(ths, str)</code></td><td>Change the about/help message</td></tr>
+</tbody>
+</table>
+
+<h2>Core functions</h2>
+
+<h3><code>XELPParseKey</code></h3>
+<pre><code>XELPRESULT XELPParseKey(XELP *ths, char key);
+</code></pre>
+<p>Feed a single character from the input stream. This is the main entry
+point for interactive use. Call this for every character received from
+UART, keyboard, BLE, etc.</p>
+
+<h3><code>XELPParse</code></h3>
+<pre><code>XELPRESULT XELPParse(XELP *ths, const char *buf, int blen);
+</code></pre>
+<p>Parse and execute a command string. Used for scripting &mdash; pass a
+complete command or multi-statement script.</p>
+
+<h3><code>XELPParseXB</code></h3>
+<pre><code>XELPRESULT XELPParseXB(XELP *ths, XelpBuf *script);
+</code></pre>
+<p>Same as <code>XELPParse</code> but takes a <code>XelpBuf</code>.</p>
+
+<h3><code>XELPExecKC</code></h3>
+<pre><code>XELPRESULT XELPExecKC(XELP *ths, char key);
+</code></pre>
+<p>Execute a single-key command directly (bypasses mode checking).</p>
+
+<h3><code>XELPOut</code></h3>
+<pre><code>XELPRESULT XELPOut(XELP *ths, const char *msg, int maxlen);
+</code></pre>
+<p>Output a string through the instance&rsquo;s output function. If
+<code>maxlen &gt; 0</code>, prints exactly that many characters. If
+<code>maxlen == 0</code>, prints until null terminator.</p>
+
+<h3><code>XELPHelp</code></h3>
+<pre><code>XELPRESULT XELPHelp(XELP *ths);
+</code></pre>
+<p>Print help listing all registered KEY and CLI commands. Only available
+when <code>XELP_ENABLE_HELP</code> is defined.</p>
+
+<h2>Tokenizer</h2>
+
+<h3><code>XELPTokLineXB</code></h3>
+<pre><code>XELPRESULT XELPTokLineXB(XelpBuf *buf, XelpBuf *tok, int srchType);
+</code></pre>
+<p>Get the next token or line from a buffer. <code>srchType</code> is
+<code>XELP_TOK_ONLY</code> (token) or <code>XELP_TOK_LINE</code> (full line).</p>
+
+<h3><code>XELPTokN</code></h3>
+<pre><code>XELPRESULT XELPTokN(XelpBuf *buf, int n, XelpBuf *tok);
+</code></pre>
+<p>Get the Nth token (0-indexed) from a buffer.</p>
+
+<h3><code>XELPNumToks</code></h3>
+<pre><code>XELPRESULT XELPNumToks(XelpBuf *buf, int *n);
+</code></pre>
+<p>Count the number of tokens in a buffer.</p>
+
+<h2>String utilities</h2>
+
+<h3><code>XELPStrLen</code></h3>
+<pre><code>int XELPStrLen(const char *c);
+</code></pre>
+<p>Compute length of a null-terminated string. No stdlib dependency.</p>
+
+<h3><code>XELPStrEq</code></h3>
+<pre><code>XELPRESULT XELPStrEq(const char *pbuf, int blen, const char *cmd);
+</code></pre>
+<p>Compare a buffer of length <code>blen</code> against a null-terminated
+string <code>cmd</code>. Returns <code>XELP_S_OK</code> if equal.</p>
+
+<h3><code>XELPStr2Int</code></h3>
+<pre><code>int XELPStr2Int(const char *s, int maxlen);
+</code></pre>
+<p>Parse a string to integer. Accepts decimal and hex (<code>FFh</code> suffix
+or <code>0xFF</code> prefix).</p>
+
+<h3><code>XELPParseNum</code></h3>
+<pre><code>XELPRESULT XELPParseNum(const char *s, int maxlen, int *n);
+</code></pre>
+<p>Safer string-to-integer: returns a result code and writes the parsed
+value to <code>*n</code>.</p>
+
+<h3><code>XELPBufCmp</code></h3>
+<pre><code>XELPRESULT XELPBufCmp(const char *as, const char *ae,
+                      const char *bs, const char *be, int cmpType);
+</code></pre>
+<p>Compare two buffers. <code>cmpType</code> controls null-terminator handling:</p>
+<ul>
+  <li><code>XELP_CMP_TYPE_BUF</code> (0x00) &mdash; pure byte comparison by length</li>
+  <li><code>XELP_CMP_TYPE_A0</code> (0x01) &mdash; buffer A also terminates on \0</li>
+  <li><code>XELP_CMP_TYPE_A0B0</code> (0x11) &mdash; both buffers terminate on \0</li>
+</ul>
+
+<h2>XelpBuf macros</h2>
+
+<table>
+<thead><tr><th>Macro</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr><td><code>XELP_XBInit(xb, buf, len)</code></td><td>Initialize from pointer + length</td></tr>
+<tr><td><code>XELP_XBInitPtrs(xb, s, p, e)</code></td><td>Initialize from three pointers</td></tr>
+<tr><td><code>XELP_XBInitBP(xb, buf, pos, len)</code></td><td>Initialize with cursor position</td></tr>
+<tr><td><code>XELP_XBPCopy(a, b)</code></td><td>Copy XelpBuf a to b</td></tr>
+<tr><td><code>XELP_XBBufLen(xb)</code></td><td>Total buffer length</td></tr>
+<tr><td><code>XELP_XBGetPos(xb)</code></td><td>Current position as int offset</td></tr>
+<tr><td><code>XELP_XBPUTC(xb, ch)</code></td><td>Write char with bounds check</td></tr>
+<tr><td><code>XELP_XBTOP(xb)</code></td><td>Reset position to start</td></tr>
+</tbody>
+</table>
+
+<h2>Constants</h2>
+
+<table>
+<thead><tr><th>Constant</th><th>Value</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>XELP_VERSION</code></td><td>0x00000201</td><td>Library version (32-bit hex: <code>0x00MMmmpp</code>)</td></tr>
+<tr><td><code>XELP_VER_MAJOR(v)</code></td><td></td><td>Extract major version byte</td></tr>
+<tr><td><code>XELP_VER_MINOR(v)</code></td><td></td><td>Extract minor version byte</td></tr>
+<tr><td><code>XELP_VER_PATCH(v)</code></td><td></td><td>Extract patch version byte</td></tr>
+<tr><td><code>XELP_CMDBUFSZ</code></td><td>64</td><td>Default command buffer size</td></tr>
+<tr><td><code>XELP_MODE_CLI</code></td><td>0x00</td><td>CLI mode identifier</td></tr>
+<tr><td><code>XELP_MODE_KEY</code></td><td>0x01</td><td>KEY mode identifier</td></tr>
+<tr><td><code>XELP_MODE_THR</code></td><td>0x02</td><td>THRU mode identifier</td></tr>
+</tbody>
+</table>
+
+</main>
+
+<footer>
+  <p>xelp &mdash; <a href="https://github.com/deftio/xelp">github.com/deftio/xelp</a></p>
+</footer>
+
+</body>
+</html>

@@ -175,8 +175,8 @@ XELPRESULT cmdNumToks (const char* args, int maxlen)
  
     int n;
     XELP_XBInit(b,args,maxlen);
-    XelpNumToks(&b,&n);
-	printw(" XelpNumToks %d\n",n);
+    XELPNumToks(&b,&n);
+	printw(" XELPNumToks %d\n",n);
 	
     return XELP_S_OK;
 };
@@ -195,7 +195,7 @@ XELPRESULT cmdListToks (const char* args, int maxlen)
     int n,i;
     XELPRESULT r;
     XELP_XBInit(b,args,maxlen);
-    XelpNumToks(&b,&n);
+    XELPNumToks(&b,&n);
     XELP_XBTOP(b);
     printw("[%d]",n);
 	for (i=0; i< n; i++) {
@@ -269,7 +269,7 @@ XELPRESULT cmdMath (const char* args, int maxlen) {
 		case '%':
 			k=i%j;  break;
 	}
-	printw("%d %d %d",i,j,k);
+	printw("%d %c %d = %d",i,(char) op,j,k);
 	XELPOut(&example,"\n",1);
 	return XELP_S_OK;
 }

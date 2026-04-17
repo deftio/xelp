@@ -43,7 +43,7 @@ local defines (this file only)
 
 
 #ifndef _XOUTC
-#define _XOUTC(x,c)    ({if(x->mpfOut){x->mpfOut(c);}}) /* write a char to output (null ptr safe) */
+#define _XOUTC(x,c)    do{if(x->mpfOut){x->mpfOut(c);}}while(0) /* write a char to output (null ptr safe) */
 #endif
 /***************************************** 
  XELPStrLen() - find length of a string in bytes assuming its null terminated
@@ -62,9 +62,11 @@ int XELPStrLen (const char* c) {
  */
 XELPRESULT XELPOut (XELP *ths, const char* msg, int maxlen)
 {
-	if ((0 != msg) && (0 !=ths->mpfOut)) {			
-		while ((*msg !=0) && (maxlen--))
+	if ((0 != msg) && (0 !=ths->mpfOut)) {
+		while (*msg != 0) {
 			(ths->mpfOut)(*msg++);
+			if ((maxlen > 0) && (--maxlen == 0)) break;
+		}
 	}
 	return XELP_S_OK;	
 }
@@ -90,7 +92,7 @@ XELPRESULT XELPHelp(XELP* ths)
 		XELPOut(ths,XELP_HELP_KEY_STR,x);
 		do 	{
 			_PUTC(e->mKey);
-            //XELPOut(ths,&(e->mKey),1);
+            /* XELPOut(ths,&(e->mKey),1); */
 			_PUTC(':');
 			XELPOut(ths,e->mpHelpString,x);
 			_PUTC('\n');
@@ -190,7 +192,7 @@ XELPRESULT XELPStrEq2 (const char* pbuf, const char* pend, const char *cmd)
  returns XELP_S_OK if they are equal else XELP_S_NOTFOUND 
  
 */
-XELPRESULT XelpBufCmp (const char *as, const char *ae, const char *bs, const char *be, int cmpType) 
+XELPRESULT XELPBufCmp (const char *as, const char *ae, const char *bs, const char *be, int cmpType) 
 {
     while ((as < ae) && (bs < be) ) {
         if (*as != *bs)
@@ -230,7 +232,7 @@ XELPRESULT XELPFindTok(XelpBuf *x, const char *t0s, const char *t0e, int srchTyp
     XelpBuf tok;
     
     while (XELP_S_OK == XELPTokLineXB(x,&tok,srchType)) {
-        if (XELP_S_OK == XelpBufCmp(t0s,t0e,tok.s,tok.p,XELP_CMP_TYPE_BUF))
+        if (XELP_S_OK == XELPBufCmp(t0s,t0e,tok.s,tok.p,XELP_CMP_TYPE_BUF))
             return XELP_S_OK;
     }
     return XELP_S_NOTFOUND;
@@ -261,7 +263,7 @@ XELPRESULT XELPExecKC(XELP* ths, char key) {
             p++;
         }
     }
-    //TODO call default function() if available
+    /* TODO call default function() if available */
     ths->mR[0] = XELP_S_NOTFOUND;
 	return ths->mR[0];
 }
@@ -462,7 +464,7 @@ XELPRESULT XELPParseXB (XELP* ths, XelpBuf *args) {
         */
         f=ths->mpCLIModeFuncs;
         if (f) { /* make sure fn dispatch table exists */
-        	ths->mR[0] = XELP_E_CmdNotFound;
+        	ths->mR[0] = XELP_E_CMDNOTFOUND;
             while(f->mpCmd) {    
                 if (XELP_S_OK == XELPStrEq(line.s,(int)(line.p-line.s),f->mpCmd)){
                     
@@ -471,9 +473,9 @@ XELPRESULT XELPParseXB (XELP* ths, XelpBuf *args) {
                 }
                 f++;
             }
-            if (ths->mR[0] == XELP_E_CmdNotFound) {
-            	//TODO default handling
-            	// ths->mR[0] = ths->mpfDefCLI(line.s,(int)(line.e-line.s));
+            if (ths->mR[0] == XELP_E_CMDNOTFOUND) {
+            	/* TODO default handling */
+            	/* ths->mR[0] = ths->mpfDefCLI(line.s,(int)(line.e-line.s)); */
             }
         }
 	}
@@ -482,8 +484,8 @@ XELPRESULT XELPParseXB (XELP* ths, XelpBuf *args) {
 XELPRESULT XELPParse 		(XELP *ths, const char *buf, int blen)
 {
     XelpBufC args;
-    XELP_XBInit(args,buf,blen); 
-    return XELPParseXB(ths,&args);
+    XELP_XBInit(args,buf,blen);
+    return XELPParseXB(ths,(XelpBuf *)&args);
 }
 /********************************************************
  XELPTokN() find the nth token (if it exists) - useful for parsing arguments
@@ -510,11 +512,11 @@ XELPRESULT XELPTokN (XelpBuf *buf, int n, XelpBuf *tok)
 }
 
 /********************************************************
- XelpNumToks() find the number of tokens in a buffer.
+ XELPNumToks() find the number of tokens in a buffer.
 
  */
 
-XELPRESULT XelpNumToks (XelpBuf *b, int *n)
+XELPRESULT XELPNumToks (XelpBuf *b, int *n)
 {
     XelpBuf t;
     *n=0;
@@ -594,7 +596,7 @@ XELPRESULT XELPParseKey (XELP *ths, char key)
                     
 					if (key == XELPKEY_ENTER )	{
                         
-						//XELP_XBPUTC_RAW(ths->mCmdXB,';'); /* write this explictly b/c XELPKEY_ENTER may not be a parser term */
+						/* XELP_XBPUTC_RAW(ths->mCmdXB,';'); write this explictly b/c XELPKEY_ENTER may not be a parser term */
                         XELP_XBInitPtrs(line,ths->mCmdXB.s,ths->mCmdXB.s,ths->mCmdXB.p);
                         XELPParseXB(ths,&line);
                         line.p=line.s;
@@ -626,10 +628,10 @@ int XELPStr2Int (const char* s,int  maxlen) {
 	const char *p = s+maxlen-1;
 	int r=0,x=0,d;
 
-	if ('h' == *p) 
+	if ('h' == *p)
     { /* hexadecimal */
 		while (s<p) {
-			d = (*s > '9') ? (*s-'a'+0xa) : (*s-'0');
+			d = (*s >= 'a') ? (*s-'a'+0xa) : (*s >= 'A') ? (*s-'A'+0xa) : (*s-'0');
 			r = (r<<4)|d;
 			s++;
 		}
@@ -653,19 +655,19 @@ int XELPStr2Int (const char* s,int  maxlen) {
 	return r;
 }
 /********************************************************
-  XelpParseNum()
+  XELPParseNum()
   parse a string return an integer
   345  	--> read as decimal
   345h 	--> read as hex
   0x345 --> read as hex
  */
-XELPRESULT XelpParseNum (const char* s, int maxlen, int* n) {
+XELPRESULT XELPParseNum (const char* s, int maxlen, int* n) {
 	const char *p = s+maxlen-1;
 	int r=0,x=0,d, isHex=0;
 
-	if ('h' == *p) 
+	if ('h' == *p)
 		isHex = 1;
-	
+
 	if (('0' == *s) && ('x' == *(s+1))) {
 		isHex = 1;
 		s+=2;
@@ -675,7 +677,7 @@ XELPRESULT XelpParseNum (const char* s, int maxlen, int* n) {
 	if (isHex)
     { /* hexadecimal */
 		while (s<p) {
-			d = (*s > '9') ? (*s-'a'+0xa) : (*s-'0');
+			d = (*s >= 'a') ? (*s-'a'+0xa) : (*s >= 'A') ? (*s-'A'+0xa) : (*s-'0');
 			r = (r<<4)|d;
 			s++;
 		}

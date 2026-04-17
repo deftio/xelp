@@ -13,7 +13,7 @@ LIB_DIR=src
 INCLUDES=\
     -I$(LIB_DIR)\
 
-.PHONY: tests clean example
+.PHONY: tests clean example coverage version
 
 %.o: %.c
 	$(CC) $(C_FLAGS)  $(INCLUDES) -c $< -o $@
@@ -34,10 +34,19 @@ OBJC_TESTS=$(SRC_TESTS:.c=.o)  # object files for C language (not CPP) for tests
 tests: $(OBJC_TESTS)
 	$(CC) $(C_FLAGS) $(INCLUDES) $(TEST_FLAGS) $(OBJC_TESTS) -o $(TEST_DIR)/xelp_unit_tests.out
 	@$(TEST_DIR)/xelp_unit_tests.out
-	@$(.)gcov src/xelp.c $(LIB_DIR)/xelp.c
-	@$(.)mv xelp.c.gcov $(TEST_DIR)
-	# @$(TEST_DIR)lcov xelp.c.gcov   ///lcov --coverage --directory . --output-file main_coverage.info
-	# genhtml xelp.info --output-directory $(TEST_DIR)
+	@gcov $(LIB_DIR)/xelp.c
+	@mv -f xelp.c.gcov $(TEST_DIR)/ 2>/dev/null || true
+
+coverage: tests
+	@echo "--- Coverage Summary ---"
+	@gcov $(LIB_DIR)/xelp.c 2>/dev/null | grep -A 1 "File.*xelp.c"
+	@echo "See $(TEST_DIR)/xelp.c.gcov for line-by-line details"
+
+version:
+	@mkdir -p build
+	@$(CC) tools/extract_version.c -I$(LIB_DIR) -o build/extract_version
+	@build/extract_version build/xelp_version.yaml
+	@cat build/xelp_version.yaml
 
 #=======================================================================
 #build simple example in /example/posix-simple folder
@@ -55,9 +64,10 @@ example: $(OBJC_EXAMPLE1)
 #=======================================================================
 # clean deletes all compiled object files and debugging / profiling / listing files
 clean:
-	rm $(OBJC_TESTS) $(OBJC_EXAMPLE1) -f
-	rm $(TEST_DIR)/*.gcda  $(TEST_DIR)/*.gcno $(TEST_DIR)/*.gcov $(TEST_DIR)/*.out -f 
-	rm $(EXAMPLE_POSIX_DIR)/*.gcda  $(EXAMPLE_POSIX_DIR)/*.gcno $(EXAMPLE_POSIX_DIR)/*.gcov $(EXAMPLE_POSIX_DIR)/*.out -f 
-	rm $(LIB_DIR)/*.gcda  $(LIB_DIR)/*.gcno $(LIB_DIR)/*.gcov  $(LIB_DIR)/*.out $(LIB_DIR)/*.asm $(LIB_DIR)/*.rel $(LIB_DIR)/*.s $(LIB_DIR)/*.asm -f 
+	-rm -f $(OBJC_TESTS) $(OBJC_EXAMPLE1)
+	-rm -f $(TEST_DIR)/*.gcda $(TEST_DIR)/*.gcno $(TEST_DIR)/*.gcov $(TEST_DIR)/*.out
+	-rm -f $(EXAMPLE_POSIX_DIR)/*.gcda $(EXAMPLE_POSIX_DIR)/*.gcno $(EXAMPLE_POSIX_DIR)/*.gcov $(EXAMPLE_POSIX_DIR)/*.out
+	-rm -f $(LIB_DIR)/*.gcda $(LIB_DIR)/*.gcno $(LIB_DIR)/*.gcov $(LIB_DIR)/*.out $(LIB_DIR)/*.asm $(LIB_DIR)/*.rel $(LIB_DIR)/*.s
+	-rm -f *.gcov *.gcda *.gcno
 
 

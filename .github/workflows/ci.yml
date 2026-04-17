@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+jobs:
+  build-and-test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        compiler: [gcc, clang]
+        exclude:
+          - os: macos-latest
+            compiler: gcc  # macOS uses Apple Clang natively
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set compiler
+        run: |
+          if [ "${{ matrix.compiler }}" = "gcc" ]; then
+            echo "CC=gcc" >> $GITHUB_ENV
+          else
+            echo "CC=clang" >> $GITHUB_ENV
+          fi
+
+      - name: Build and run tests
+        run: make tests
+
+      - name: Check for compiler warnings
+        run: |
+          BUILD_LOG=$(make clean 2>&1 && make tests 2>&1)
+          WARNINGS=$(echo "$BUILD_LOG" | grep -E "^[^:]+\.(c|h):[0-9]+:[0-9]+: warning:" || true)
+          if [ -n "$WARNINGS" ]; then
+            echo "ERROR: Compiler warnings detected:"
+            echo "$WARNINGS"
+            exit 1
+          fi
+          echo "Zero warnings."
+
+      - name: Coverage report (GCC on Ubuntu only)
+        if: matrix.os == 'ubuntu-latest' && matrix.compiler == 'gcc'
+        run: |
+          gcov src/xelp.c
+          echo "--- Coverage Summary ---"
+          gcov src/xelp.c 2>/dev/null | grep -A 1 "File.*xelp.c"
+
+  test-32bit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install 32-bit support
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-multilib
+
+      - name: Build and run tests (32-bit)
+        run: make tests C_FLAGS="-I. -Wall -g -fprofile-arcs -ftest-coverage -m32"

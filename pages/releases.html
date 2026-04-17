@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Release History — xelp</title>
+  <link rel="stylesheet" href="assets/main.css">
+  <link rel="icon" href="../img/favicon-32x32.png" type="image/png">
+</head>
+<body>
+
+<header>
+  <nav>
+    <a href="index.html"><strong>xelp</strong></a>
+    <a href="tutorial.html">Tutorial</a>
+    <a href="examples.html">Examples</a>
+    <a href="api-reference.html">API Reference</a>
+    <a href="configuration.html">Configuration</a>
+    <a href="porting.html">Porting Guide</a>
+    <a href="releases.html">Releases</a>
+    <a href="https://github.com/deftio/xelp">GitHub</a>
+  </nav>
+</header>
+
+<main>
+
+<h1>Release History</h1>
+
+<p>See also: <a href="https://github.com/deftio/xelp/blob/master/CHANGELOG.md">CHANGELOG.md</a>
+on GitHub for the full changelog.</p>
+
+<h2>v0.2.1 (2024-06-05)</h2>
+<ul>
+  <li>Added <code>XELPParseNum</code> for safer string-to-integer conversion</li>
+  <li>Added Arduino example</li>
+  <li>Added <code>XELPBufCmp</code> buffer comparison with multiple modes</li>
+  <li>Added <code>XELPFindTok</code> token search function</li>
+  <li>Expanded unit test coverage</li>
+</ul>
+
+<h2>v0.2.0 (2024-02-25) &mdash; first GitHub release</h2>
+<ul>
+  <li>Initial public release on GitHub</li>
+  <li>Char-at-a-time CLI parser with KEY, CLI, and THRU modes</li>
+  <li>Tokenizer with quoted strings, escape sequences, comments</li>
+  <li>Command dispatch for both single-key and CLI modes</li>
+  <li>Multi-instance support, no global state</li>
+  <li>No dynamic memory allocation</li>
+  <li>Platform abstraction layer (5 function pointers)</li>
+  <li>Compile-time feature selection via <code>xelpcfg.h</code></li>
+  <li>Posix example with ncurses, unit tests with jumpbug framework</li>
+  <li>Support for 8-bit through 64-bit architectures</li>
+</ul>
+
+<h2>Project history</h2>
+
+<p>xelp predates its GitHub presence by roughly two decades. The original
+code was written around 2005&ndash;2006 as a lightweight debug shell for
+bare-metal embedded projects. It lived in Subversion for many years,
+then migrated to Bitbucket (Mercurial, later Git) as those platforms
+became common in embedded shops.</p>
+
+<p>In 2024 the repository moved to GitHub as a public open-source project.
+The v0.2.0 tag marks the first GitHub release, not the first version of
+the library itself.</p>
+
+<table>
+<thead><tr><th>Era</th><th>Hosting</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>~2005&ndash;2012</td><td>Subversion (private)</td><td>Original development for 8051 and MSP430 targets</td></tr>
+<tr><td>2012&ndash;2023</td><td>Bitbucket (private)</td><td>Migrated to Mercurial, later Git; added ARM, AVR support</td></tr>
+<tr><td>2024&ndash;present</td><td>GitHub (public)</td><td>Open-sourced under BSD 2-Clause; CI, cross-build tooling, docs</td></tr>
+</tbody>
+</table>
+
+</main>
+
+<footer>
+  <p>xelp &mdash; <a href="https://github.com/deftio/xelp">github.com/deftio/xelp</a></p>
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Examples — xelp</title>
+  <link rel="stylesheet" href="assets/main.css">
+  <link rel="icon" href="../img/favicon-32x32.png" type="image/png">
+</head>
+<body>
+
+<header>
+  <nav>
+    <a href="index.html"><strong>xelp</strong></a>
+    <a href="tutorial.html">Tutorial</a>
+    <a href="examples.html">Examples</a>
+    <a href="api-reference.html">API Reference</a>
+    <a href="configuration.html">Configuration</a>
+    <a href="porting.html">Porting Guide</a>
+    <a href="releases.html">Releases</a>
+    <a href="https://github.com/deftio/xelp">GitHub</a>
+  </nav>
+</header>
+
+<main>
+
+<h1>Examples</h1>
+
+<p>Annotated examples showing xelp on different platforms and use cases. Full
+source code is in the
+<a href="https://github.com/deftio/xelp/tree/master/examples"><code>examples/</code></a>
+directory.</p>
+
+<table>
+<thead><tr><th>Example</th><th>Platform</th><th>What it demonstrates</th></tr></thead>
+<tbody>
+<tr><td><a href="#bare-metal">Bare metal</a></td><td>Any MCU</td><td>Minimal porting template with all three modes</td></tr>
+<tr><td><a href="#multi-instance">Multi-instance</a></td><td>Any MCU</td><td>Two independent CLIs on separate UARTs</td></tr>
+<tr><td><a href="#posix-simple">Posix simple</a></td><td>Linux / macOS</td><td>Full interactive demo with ncurses</td></tr>
+<tr><td><a href="#arduino">Arduino</a></td><td>ESP32 / Arduino</td><td>NeoPixel LED control via CLI</td></tr>
+</tbody>
+</table>
+
+<!-- ============================================================ -->
+
+<h2 id="bare-metal">Bare metal</h2>
+
+<p><strong>File:</strong>
+<a href="https://github.com/deftio/xelp/blob/master/examples/bare-metal/bare-metal-example.c"><code>examples/bare-metal/bare-metal-example.c</code></a></p>
+
+<p>The starting point for any new port. Shows the complete xelp integration
+pattern with no dependencies beyond a UART.</p>
+
+<pre><code>#include "xelp.h"
+
+/* 1. Platform stubs -- replace with your hardware */
+static void uart_putc(char c)   { /* UART TX */ }
+static void uart_bksp(void)     { uart_putc('\b'); uart_putc(' '); uart_putc('\b'); }
+static int  uart_rx_ready(void) { return 0; }
+static char uart_getc(void)     { return 0; }
+
+/* 2. KEY mode commands */
+XELPKeyFuncMapEntry key_commands[] = {
+    { &amp;key_help,   '?', "show help"    },
+    { &amp;key_banner, 'b', "print banner" },
+    XELP_FUNC_ENTRY_LAST
+};
+
+/* 3. CLI mode commands */
+XELPCLIFuncMapEntry cli_commands[] = {
+    { &amp;cmd_help, "help", "show help"        },
+    { &amp;cmd_echo, "echo", "echo args back"   },
+    { &amp;cmd_info, "info", "show system info" },
+    XELP_FUNC_ENTRY_LAST
+};
+
+/* 4. Wire everything up */
+XELP cli;
+
+void main(void) {
+    XELPInit(&amp;cli, "My Device v1.0\n");
+
+    XELP_SET_FN_OUT(cli,  &amp;uart_putc);
+    XELP_SET_FN_BKSP(cli, &amp;uart_bksp);
+    XELP_SET_FN_KEY(cli,  key_commands);
+    XELP_SET_FN_CLI(cli,  cli_commands);
+
+    XELPHelp(&amp;cli);
+    XELPParseKey(&amp;cli, '\n');   /* show initial prompt */
+
+    for (;;) {
+        if (uart_rx_ready())
+            XELPParseKey(&amp;cli, uart_getc());
+    }
+}
+</code></pre>
+
+<h3>Key points</h3>
+
+<ul>
+  <li><strong>5 function pointers</strong> are the entire platform abstraction:
+      output, error, backspace, pass-through, mode change. Only output is required.</li>
+  <li>Command tables are NULL-terminated arrays. Use <code>XELP_FUNC_ENTRY_LAST</code>
+      as the sentinel.</li>
+  <li>The main loop just feeds characters. xelp handles line buffering,
+      backspace, mode switching, and dispatch internally.</li>
+</ul>
+
+<!-- ============================================================ -->
+
+<h2 id="multi-instance">Multi-instance</h2>
+
+<p><strong>File:</strong>
+<a href="https://github.com/deftio/xelp/blob/master/examples/multi-instance/multi-instance-example.c"><code>examples/multi-instance/multi-instance-example.c</code></a></p>
+
+<p>Two completely independent CLIs on separate serial ports. Each has its own
+output function, command table, prompt, and internal state.</p>
+
+<pre><code>XELP debug_cli, field_cli;
+
+XELPInit(&amp;debug_cli, "Debug Console (UART0)");
+XELPInit(&amp;field_cli, "Service Port (UART1)");
+
+XELP_SET_FN_OUT(debug_cli, &amp;uart0_putc);
+XELP_SET_FN_OUT(field_cli, &amp;uart1_putc);
+
+XELP_SET_FN_CLI(debug_cli, debug_commands);
+XELP_SET_FN_CLI(field_cli, field_commands);
+
+XELP_SET_VAL_CLI_PROMPT(debug_cli, "dbg&gt;");
+XELP_SET_VAL_CLI_PROMPT(field_cli, "svc&gt;");
+
+/* Poll both UARTs */
+for (;;) {
+    if (uart0_rx_ready()) XELPParseKey(&amp;debug_cli, uart0_getc());
+    if (uart1_rx_ready()) XELPParseKey(&amp;field_cli, uart1_getc());
+}
+</code></pre>
+
+<h3>Use cases</h3>
+<ul>
+  <li>Debug console on one UART, production interface on another</li>
+  <li>Multiple BLE characteristics each with their own CLI</li>
+  <li>USB CDC + UART running independent command sets</li>
+</ul>
+
+<!-- ============================================================ -->
+
+<h2 id="posix-simple">Posix simple</h2>
+
+<p><strong>File:</strong>
+<a href="https://github.com/deftio/xelp/blob/master/examples/posix-simple/xelp-example.c"><code>examples/posix-simple/xelp-example.c</code></a></p>
+
+<p>Full interactive demo for Linux and macOS using ncurses for terminal handling.</p>
+
+<pre><code>make example    # from repo root
+</code></pre>
+
+<p>Requires ncurses: <code>sudo apt-get install libncurses5-dev</code> (Debian/Ubuntu).</p>
+
+<h3>Features demonstrated</h3>
+
+<ul>
+  <li><strong>CLI commands:</strong> <code>echo</code>, <code>banner</code>,
+      <code>help</code>, <code>numtoks</code>, <code>lt</code> (list tokens),
+      math (<code>+</code>, <code>-</code>, <code>*</code>, <code>/</code>),
+      <code>exit</code></li>
+  <li><strong>KEY commands:</strong> <code>h</code> (help), <code>f</code> (fooBar),
+      <code>p</code>/<code>w</code> (print), <code>b</code> (banner),
+      <code>x</code> (exit)</li>
+  <li><strong>Mode switching:</strong> ESC &rarr; KEY, CTRL-P &rarr; CLI, CTRL-T &rarr; THR</li>
+  <li>Backspace handling, mode change callbacks, token parsing, numeric arguments</li>
+</ul>
+
+<h3>Architecture</h3>
+
+<pre><code>stdin (ncurses getch)
+  |
+  v
+XELPParseKey(&amp;example, char)
+  |
+  +--&gt; CLI: line buffer -&gt; tokenize -&gt; dispatch
+  +--&gt; KEY: immediate dispatch
+  +--&gt; THR: pass-through function
+  |
+  v
+gPutChar() -&gt; ncurses addch() -&gt; terminal
+</code></pre>
+
+<!-- ============================================================ -->
+
+<h2 id="arduino">Arduino</h2>
+
+<p><strong>File:</strong>
+<a href="https://github.com/deftio/xelp/blob/master/examples/arduino/arduino-example.ino"><code>examples/arduino/arduino-example.ino</code></a></p>
+
+<p>ESP32-based example controlling a NeoPixel LED via the CLI.</p>
+
+<pre><code>void writeChar(char c) { Serial.write(c); }
+
+void setup() {
+    Serial.begin(115200);
+
+    XELPInit(&amp;cli, "ESP32 Xelp test. 1.0.0\n");
+    XELP_SET_FN_OUT(cli, &amp;writeChar);
+    XELP_SET_FN_CLI(cli, gMyCLICommands);
+    XELP_SET_VAL_CLI_PROMPT(cli, "myprompt&gt;");
+}
+
+void loop() {
+    if (Serial.available() &gt; 0) {
+        char c = Serial.read();
+        XELPParseKey(&amp;cli, c);
+    }
+}
+</code></pre>
+
+<h3>Commands</h3>
+<ul>
+  <li><code>help</code> &mdash; list all commands</li>
+  <li><code>banner</code> &mdash; print xelp ASCII art</li>
+  <li><code>lt &lt;args&gt;</code> &mdash; list parsed tokens</li>
+  <li><code>LED &lt;value&gt;</code> &mdash; set NeoPixel color (hex)</li>
+</ul>
+
+<!-- ============================================================ -->
+
+<h2>Writing your own commands</h2>
+
+<p>All CLI commands have the same signature:</p>
+
+<pre><code>XELPRESULT my_command(const char *args, int maxlen);
+</code></pre>
+
+<ul>
+  <li><code>args</code> &mdash; raw argument string (everything after the command name)</li>
+  <li><code>maxlen</code> &mdash; number of valid bytes in <code>args</code></li>
+  <li>Return <code>XELP_S_OK</code> (0) for success, negative for error</li>
+</ul>
+
+<h3>Pattern: parsing arguments</h3>
+
+<pre><code>XELPRESULT cmd_set(const char *args, int len) {
+    XelpBuf b, tok;
+    int n;
+
+    XELP_XBInit(b, args, len);
+    XELPNumToks(&amp;b, &amp;n);
+
+    if (n &lt; 3) {
+        XELPOut(&amp;cli, "usage: set &lt;key&gt; &lt;value&gt;\n", 0);
+        return XELP_E_ERR;
+    }
+
+    /* Token 0 = "set", Token 1 = key, Token 2 = value */
+    XELP_XBTOP(b);
+    XELPTokN(&amp;b, 1, &amp;tok);
+    /* tok.s .. tok.p is the key string */
+
+    XELP_XBTOP(b);
+    XELPTokN(&amp;b, 2, &amp;tok);
+    int value = XELPStr2Int(tok.s, tok.p - tok.s);
+
+    return XELP_S_OK;
+}
+</code></pre>
+
+<h3>Pattern: output without printf</h3>
+
+<p>xelp has no printf. Use <code>XELPOut</code> for strings. For numbers,
+use your platform&rsquo;s <code>sprintf</code> into a local buffer, or write
+a simple helper:</p>
+
+<pre><code>void print_int(XELP *x, int val) {
+    char buf[12];
+    int i = 0;
+    if (val &lt; 0) { XELPOut(x, "-", 1); val = -val; }
+    if (val == 0) { XELPOut(x, "0", 1); return; }
+    while (val &gt; 0) { buf[i++] = '0' + (val % 10); val /= 10; }
+    while (i &gt; 0) { XELPOut(x, &amp;buf[--i], 1); }
+}
+</code></pre>
+
+<h2>Next steps</h2>
+
+<ul>
+  <li><a href="tutorial.html">Tutorial</a> &mdash; step-by-step guide</li>
+  <li><a href="api-reference.html">API Reference</a> &mdash; complete function docs</li>
+  <li><a href="configuration.html">Configuration</a> &mdash; compile-time options</li>
+  <li><a href="porting.html">Porting Guide</a> &mdash; platform-specific notes</li>
+</ul>
+
+</main>
+
+<footer>
+  <p>xelp &mdash; <a href="https://github.com/deftio/xelp">github.com/deftio/xelp</a></p>
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tutorial — xelp</title>
+  <link rel="stylesheet" href="assets/main.css">
+  <link rel="icon" href="../img/favicon-32x32.png" type="image/png">
+</head>
+<body>
+
+<header>
+  <nav>
+    <a href="index.html"><strong>xelp</strong></a>
+    <a href="tutorial.html">Tutorial</a>
+    <a href="examples.html">Examples</a>
+    <a href="api-reference.html">API Reference</a>
+    <a href="configuration.html">Configuration</a>
+    <a href="porting.html">Porting Guide</a>
+    <a href="releases.html">Releases</a>
+    <a href="https://github.com/deftio/xelp">GitHub</a>
+  </nav>
+</header>
+
+<main>
+
+<h1>Tutorial</h1>
+
+<p>A step-by-step introduction to xelp. By the end you will have a working
+CLI with custom commands, KEY mode shortcuts, scripting, and token parsing.</p>
+
+<h2>1. Hello World &mdash; minimal CLI</h2>
+
+<p>The smallest useful xelp program: one command, one output function.</p>
+
+<pre><code>#include "xelp.h"
+
+/* Platform: write one char. Replace with your UART TX. */
+void my_putc(char c) { putchar(c); }
+void my_bksp(void)   { my_putc('\b'); my_putc(' '); my_putc('\b'); }
+
+/* Your first command */
+XELPRESULT cmd_hello(const char *args, int len) {
+    XELPOut(&amp;cli, "Hello, world!\n", 0);
+    return XELP_S_OK;
+}
+
+/* Command table */
+XELPCLIFuncMapEntry commands[] = {
+    { &amp;cmd_hello, "hello", "say hello" },
+    XELP_FUNC_ENTRY_LAST
+};
+
+XELP cli;
+
+int main(void) {
+    XELPInit(&amp;cli, "Tutorial v1.0");
+    XELP_SET_FN_OUT(cli, &amp;my_putc);
+    XELP_SET_FN_BKSP(cli, &amp;my_bksp);
+    XELP_SET_FN_CLI(cli, commands);
+
+    int c;
+    while ((c = getchar()) != EOF)
+        XELPParseKey(&amp;cli, (char)c);
+    return 0;
+}
+</code></pre>
+
+<p>Compile: <code>gcc -Isrc src/xelp.c tutorial.c -o tutorial</code></p>
+
+<h3>What just happened</h3>
+
+<ol>
+  <li><code>XELPInit</code> zeroes all internal state and stores the about message.</li>
+  <li><code>XELP_SET_FN_OUT</code> tells xelp how to emit characters on this platform.</li>
+  <li><code>XELP_SET_FN_BKSP</code> tells xelp how to handle destructive backspace.</li>
+  <li><code>XELP_SET_FN_CLI</code> registers your command table.</li>
+  <li><code>XELPParseKey</code> feeds one character at a time. When ENTER is received,
+      xelp tokenizes the line and dispatches to the matching command.</li>
+</ol>
+
+<h2>2. Commands with arguments</h2>
+
+<p>Command functions receive the raw argument string and its length. Use the
+tokenizer to extract individual arguments:</p>
+
+<pre><code>XELPRESULT cmd_add(const char *args, int len) {
+    XelpBuf b, tok;
+    int a, result;
+
+    XELP_XBInit(b, args, len);
+
+    /* Token 0 = command name ("add"), 1 = first arg, 2 = second arg */
+    XELP_XBTOP(b);
+    XELPTokN(&amp;b, 1, &amp;tok);
+    a = XELPStr2Int(tok.s, tok.p - tok.s);
+
+    XELP_XBTOP(b);
+    XELPTokN(&amp;b, 2, &amp;tok);
+    result = a + XELPStr2Int(tok.s, tok.p - tok.s);
+
+    /* result now holds the sum */
+    return XELP_S_OK;
+}
+</code></pre>
+
+<p>Register it: <code>{ &amp;cmd_add, "add", "add &lt;a&gt; &lt;b&gt;" }</code></p>
+
+<h3>Tokenizer rules</h3>
+
+<table>
+<thead><tr><th>Syntax</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td>spaces / tabs</td><td>Token separators</td></tr>
+<tr><td><code>"hello world"</code></td><td>Quoted string = single token</td></tr>
+<tr><td><code>#</code></td><td>Comment (rest of line ignored)</td></tr>
+<tr><td><code>;</code></td><td>Statement separator: <code>hello; add 1 2</code></td></tr>
+<tr><td><code>`</code> (backtick)</td><td>Escape next character at CLI</td></tr>
+<tr><td><code>\</code> (backslash)</td><td>Escape inside quoted strings</td></tr>
+</tbody>
+</table>
+
+<h2>3. Counting and iterating tokens</h2>
+
+<pre><code>XELPRESULT cmd_args(const char *args, int len) {
+    XelpBuf b, tok;
+    int n, i;
+
+    XELP_XBInit(b, args, len);
+    XELPNumToks(&amp;b, &amp;n);
+
+    for (i = 0; i &lt; n; i++) {
+        XELP_XBTOP(b);
+        XELPTokN(&amp;b, i, &amp;tok);
+        XELPOut(&amp;cli, tok.s, tok.p - tok.s);
+        XELPOut(&amp;cli, "\n", 0);
+    }
+    return XELP_S_OK;
+}
+</code></pre>
+
+<h2>4. KEY mode &mdash; single keypress actions</h2>
+
+<p>KEY mode fires a function on every keypress, no ENTER needed. Great for
+menus and quick toggles:</p>
+
+<pre><code>XELPRESULT key_toggle_led(int c) {
+    /* toggle your LED here */
+    XELPOut(&amp;cli, "LED toggled\n", 0);
+    return XELP_S_OK;
+}
+
+XELPKeyFuncMapEntry key_commands[] = {
+    { &amp;key_help,       '?', "show help"  },
+    { &amp;key_toggle_led, 'l', "toggle LED" },
+    XELP_FUNC_ENTRY_LAST
+};
+
+XELP_SET_FN_KEY(cli, key_commands);
+</code></pre>
+
+<h3>Mode switching</h3>
+
+<table>
+<thead><tr><th>Key</th><th>Mode</th><th>Behavior</th></tr></thead>
+<tbody>
+<tr><td>ESC</td><td>KEY</td><td>Each keypress = immediate action</td></tr>
+<tr><td>CTRL-P</td><td>CLI</td><td>Line-buffered with prompt, ENTER to execute</td></tr>
+<tr><td>CTRL-T</td><td>THR</td><td>All keys forwarded to pass-through function</td></tr>
+</tbody>
+</table>
+
+<p>These keys are configurable in <code>xelpcfg.h</code>.</p>
+
+<h2>5. Scripting</h2>
+
+<p>Any command sequence can be run as a script. Scripts are const strings &mdash;
+they can live in ROM:</p>
+
+<pre><code>const char *startup = "hello; add 10 20; echo done";
+XELPParse(&amp;cli, startup, XELPStrLen(startup));
+</code></pre>
+
+<p>Multi-line scripts:</p>
+
+<pre><code>const char *script =
+    "# configuration script\n"
+    "set mode 1\n"
+    "set gain 50\n"
+    "echo config complete\n";
+XELPParse(&amp;cli, script, XELPStrLen(script));
+</code></pre>
+
+<h2>6. Help system</h2>
+
+<p>With <code>XELP_ENABLE_HELP</code> defined, <code>XELPHelp(&amp;cli)</code>
+prints all registered KEY and CLI commands. The third field in every command
+table entry is the help text:</p>
+
+<pre><code>{ &amp;cmd_hello, "hello", "say hello" },
+/*                      ^^^^^^^^^^^ shown in help output */
+</code></pre>
+
+<h2>7. Multiple instances</h2>
+
+<p>xelp uses no globals. Run independent CLIs on different ports:</p>
+
+<pre><code>XELP debug_cli, field_cli;
+
+XELPInit(&amp;debug_cli, "Debug Console");
+XELPInit(&amp;field_cli, "Field Service");
+
+XELP_SET_FN_OUT(debug_cli, &amp;uart0_putc);
+XELP_SET_FN_OUT(field_cli, &amp;uart1_putc);
+
+XELP_SET_VAL_CLI_PROMPT(debug_cli, "dbg&gt;");
+XELP_SET_VAL_CLI_PROMPT(field_cli, "svc&gt;");
+</code></pre>
+
+<p>See <a href="examples.html#multi-instance">Multi-instance example</a>.</p>
+
+<h2>8. Numeric parsing</h2>
+
+<p>Decimal, hex with <code>0x</code> prefix, and hex with <code>h</code> suffix:</p>
+
+<pre><code>int val;
+val = XELPStr2Int("255", 3);     /* 255 decimal       */
+val = XELPStr2Int("FFh", 3);     /* 255 hex suffix    */
+val = XELPStr2Int("0xFF", 4);    /* 255 hex prefix    */
+val = XELPStr2Int("0x1A", 4);    /* 26  uppercase hex */
+
+/* Safer variant with error checking */
+XELPRESULT r = XELPParseNum("0xFF", 4, &amp;val);
+if (XELP_T_OK(r)) { /* val == 255 */ }
+</code></pre>
+
+<h2>9. THR (pass-through) mode</h2>
+
+<p>Redirect all keystrokes to another peripheral &mdash; useful for talking
+to a modem or second MCU through the same terminal:</p>
+
+<pre><code>void modem_send(char c) { /* forward to modem UART */ }
+
+XELP_SET_FN_THR(cli, &amp;modem_send);
+</code></pre>
+
+<p>CTRL-T enters THR mode, CTRL-P returns to CLI mode.</p>
+
+<h2>10. Mode change callback</h2>
+
+<pre><code>void on_mode_change(int mode) {
+    if      (mode == XELP_MODE_CLI) XELPOut(&amp;cli, "[CLI]\n", 0);
+    else if (mode == XELP_MODE_KEY) XELPOut(&amp;cli, "[KEY]\n", 0);
+    else if (mode == XELP_MODE_THR) XELPOut(&amp;cli, "[THR]\n", 0);
+}
+
+XELP_SET_FN_EMCHG(cli, &amp;on_mode_change);
+</code></pre>
+
+<h2>Next steps</h2>
+
+<ul>
+  <li><a href="examples.html">Examples</a> &mdash; annotated code for various platforms</li>
+  <li><a href="api-reference.html">API Reference</a> &mdash; complete function docs</li>
+  <li><a href="configuration.html">Configuration Guide</a> &mdash; compile-time options</li>
+  <li><a href="porting.html">Porting Guide</a> &mdash; platform-specific notes</li>
+</ul>
+
+</main>
+
+<footer>
+  <p>xelp &mdash; <a href="https://github.com/deftio/xelp">github.com/deftio/xelp</a></p>
+</footer>
+
+</body>
+</html>
