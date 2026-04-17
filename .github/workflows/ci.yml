@@ -19,7 +19,7 @@ jobs:
             compiler: gcc  # macOS uses Apple Clang natively
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set compiler
         run: |
@@ -53,7 +53,7 @@ jobs:
   test-32bit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install 32-bit support
         run: |
