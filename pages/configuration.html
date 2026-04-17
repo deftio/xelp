@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Configuration Guide — xelp</title>
+  <link rel="stylesheet" href="assets/main.css">
+  <link rel="icon" href="../img/favicon-32x32.png" type="image/png">
+</head>
+<body>
+
+<header>
+  <nav>
+    <a href="index.html"><strong>xelp</strong></a>
+    <a href="api-reference.html">API Reference</a>
+    <a href="configuration.html">Configuration</a>
+    <a href="porting.html">Porting Guide</a>
+    <a href="releases.html">Releases</a>
+    <a href="https://github.com/deftio/xelp">GitHub</a>
+  </nav>
+</header>
+
+<main>
+
+<h1>Configuration Guide</h1>
+
+<p>All compile-time options are controlled in <code>src/xelpcfg.h</code>.
+Comment in or out <code>#define</code> lines to enable or disable features.
+Each feature that is compiled out saves code space.</p>
+
+<h2>Feature flags</h2>
+
+<table>
+<thead><tr><th>Flag</th><th>Purpose</th><th>Size impact</th></tr></thead>
+<tbody>
+<tr><td><code>XELP_ENABLE_CLI</code></td><td>Command line mode with prompt, backspace, and command dispatch</td><td>Required for CLI and scripting</td></tr>
+<tr><td><code>XELP_ENABLE_KEY</code></td><td>Single key press mode (menus, immediate actions)</td><td>~200&ndash;500 bytes</td></tr>
+<tr><td><code>XELP_ENABLE_THR</code></td><td>Pass-through mode (redirect keys to another peripheral)</td><td>~50&ndash;125 bytes</td></tr>
+<tr><td><code>XELP_ENABLE_HELP</code></td><td>Built-in help function listing all commands</td><td>~180&ndash;350 bytes</td></tr>
+<tr><td><code>XELP_ENABLE_LCORE</code></td><td>Language core features: peek, poke, go</td><td>Variable</td></tr>
+<tr><td><code>XELP_ENABLE_FULL</code></td><td>Enable all of the above</td><td>All combined</td></tr>
+</tbody>
+</table>
+
+<h2>Key mappings</h2>
+
+<p>These define which key presses switch between modes at the command line:</p>
+
+<table>
+<thead><tr><th>Define</th><th>Default</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr><td><code>XELPKEY_CLI</code></td><td>CTRL-P (0x10)</td><td>Enter CLI mode</td></tr>
+<tr><td><code>XELPKEY_KEY</code></td><td>ESC (0x1B)</td><td>Enter KEY mode</td></tr>
+<tr><td><code>XELPKEY_THR</code></td><td>CTRL-T (0x14)</td><td>Enter THRU mode</td></tr>
+</tbody>
+</table>
+
+<p>Override by redefining in <code>xelpcfg.h</code>, e.g.
+<code>#define XELPKEY_CLI ('c')</code></p>
+
+<h2>Escape characters</h2>
+
+<table>
+<thead><tr><th>Define</th><th>Default</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr><td><code>XELP_CLI_ESC</code></td><td><code>`</code> (backtick)</td><td>Escape character at command line / in scripts</td></tr>
+<tr><td><code>XELP_QUO_ESC</code></td><td><code>\</code> (backslash)</td><td>Escape character inside quoted strings</td></tr>
+</tbody>
+</table>
+
+<h2>Buffer and register sizes</h2>
+
+<table>
+<thead><tr><th>Define</th><th>Default</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr><td><code>XELP_CMDBUFSZ</code></td><td>64</td><td>Command line buffer size in bytes</td></tr>
+<tr><td><code>XELP_REGS_SZ</code></td><td>2</td><td>Number of integer registers (min 1, R0 is return value)</td></tr>
+<tr><td><code>XELPREG</code></td><td><code>int</code></td><td>Register type (change for platforms where <code>int</code> is not ideal)</td></tr>
+<tr><td><code>XELP_STACK_DEPTH</code></td><td>16</td><td>Stack depth for stack machine operations</td></tr>
+</tbody>
+</table>
+
+<h2>Prompt</h2>
+
+<table>
+<thead><tr><th>Define</th><th>Default</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr><td><code>XELP_CLI_PROMPT</code></td><td><code>"xelp&gt;"</code></td><td>String shown at CLI prompt</td></tr>
+</tbody>
+</table>
+
+<p>For per-instance prompts, set to <code>(ths-&gt;mpPrompt)</code> and use
+<code>XELP_SET_VAL_CLI_PROMPT(myXelp, "myPrompt&gt;")</code> at runtime.</p>
+
+<h2>Help strings</h2>
+
+<table>
+<thead><tr><th>Define</th><th>Default</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr><td><code>XELP_HELP_KEY_STR</code></td><td><code>"\nKey functions\n"</code></td><td>Header for KEY command help section</td></tr>
+<tr><td><code>XELP_HELP_CLI_STR</code></td><td><code>"\nCLI functions\n"</code></td><td>Header for CLI command help section</td></tr>
+<tr><td><code>XELP_HELP_ABT_STR</code></td><td><code>(ths-&gt;mpAboutMsg)</code></td><td>About message shown at top of help</td></tr>
+</tbody>
+</table>
+
+<h2>Config override</h2>
+
+<p>If <code>XELP_CONFIG_OVERRIDE</code> is defined before including
+<code>xelpcfg.h</code>, the file includes <code>xelp_ovr.h</code> instead
+of using its built-in defaults. This allows project-specific configuration
+without modifying the library&rsquo;s <code>xelpcfg.h</code> directly.
+The 8.3 filename convention is used for compatibility with legacy
+filesystems.</p>
+
+<h2>Example configurations</h2>
+
+<h3>Minimal (KEY mode only)</h3>
+<pre><code>/* xelpcfg.h */
+#define XELP_ENABLE_KEY   1
+/* Leave CLI, THR, HELP, LCORE undefined */
+</code></pre>
+<p>Estimated size: ~900 bytes</p>
+
+<h3>CLI with help</h3>
+<pre><code>#define XELP_ENABLE_CLI   1
+#define XELP_ENABLE_HELP  1
+</code></pre>
+<p>Estimated size: ~2 KB</p>
+
+<h3>Full</h3>
+<pre><code>#define XELP_ENABLE_FULL  1
+</code></pre>
+<p>Estimated size: ~3&ndash;4 KB (platform dependent)</p>
+
+</main>
+
+<footer>
+  <p>xelp &mdash; <a href="https://github.com/deftio/xelp">github.com/deftio/xelp</a></p>
+</footer>
+
+</body>
+</html>

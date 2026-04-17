@@ -31,10 +31,9 @@ xelp/
 ├── examples/               Platform-specific examples (posix, arduino)
 ├── tools/                  Code generators and build utilities
 ├── scripts/                Build and run helper scripts
-├── docs/                   Documentation
+├── pages/                  Documentation site (static HTML, GitHub Pages)
 ├── dev/                    Design notes and development planning
 ├── img/                    Branding and icon assets
-├── site/                   Project web page (index.html, libs/)
 ├── .github/workflows/      GitHub Actions CI
 ├── makefile                Build system
 ├── VERSION                 Single source of truth for version

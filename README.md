@@ -64,10 +64,9 @@ xelp/
 ├── examples/               Platform examples (posix, arduino)
 ├── tools/                  Code generators and build utilities
 ├── scripts/                Build and run helper scripts
-├── docs/                   Documentation
+├── pages/                  Documentation site (static HTML, GitHub Pages)
 ├── dev/                    Design notes and development planning
 ├── img/                    Branding and icon assets
-├── site/                   Project web page
 └── .github/workflows/      CI (GitHub Actions)
 ```
 
@@ -224,6 +223,10 @@ A: Compile with the `XELP_ENABLE_KEY` `#define` in `xelpcfg.h` and comment out `
 
 ## Documentation
 
+- [Documentation Site](pages/index.html) - Full HTML documentation
+  - [API Reference](pages/api-reference.html) - All public functions and macros
+  - [Configuration Guide](pages/configuration.html) - Compile-time options
+  - [Porting Guide](pages/porting.html) - How to bring up xelp on a new platform
 - [Release Management](release_management.md) - Build, test, and release workflow
 - [Contributing](CONTRIBUTING.md) - How to contribute
 - [Changelog](CHANGELOG.md) - Version history

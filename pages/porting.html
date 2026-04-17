@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Porting Guide — xelp</title>
+  <link rel="stylesheet" href="assets/main.css">
+  <link rel="icon" href="../img/favicon-32x32.png" type="image/png">
+</head>
+<body>
+
+<header>
+  <nav>
+    <a href="index.html"><strong>xelp</strong></a>
+    <a href="api-reference.html">API Reference</a>
+    <a href="configuration.html">Configuration</a>
+    <a href="porting.html">Porting Guide</a>
+    <a href="releases.html">Releases</a>
+    <a href="https://github.com/deftio/xelp">GitHub</a>
+  </nav>
+</header>
+
+<main>
+
+<h1>Porting Guide</h1>
+
+<p>xelp is designed to be trivially portable. The library has no
+dependencies on standard headers, no assembly, and no dynamic memory.
+Porting requires implementing a small number of function pointers and
+compiling two files.</p>
+
+<h2>Files to include</h2>
+
+<p>Add to your project:</p>
+<ul>
+  <li><code>src/xelp.c</code> &mdash; implementation</li>
+  <li><code>src/xelp.h</code> &mdash; public header</li>
+  <li><code>src/xelpcfg.h</code> &mdash; configuration (edit for your platform)</li>
+</ul>
+
+<h2>Required: output function</h2>
+
+<p>xelp needs a way to emit characters. Provide a function with the
+signature <code>void fn(char c)</code> and register it:</p>
+
+<pre><code>void uart_putc(char c) {
+    while (!UART_TX_READY);
+    UART_TX_REG = c;
+}
+
+XELP_SET_FN_OUT(myXelp, &amp;uart_putc);
+</code></pre>
+
+<h2>Required: character feeding</h2>
+
+<p>Feed received characters one at a time via <code>XELPParseKey</code>:</p>
+
+<pre><code>/* In your UART ISR or main loop */
+void UART_RX_ISR(void) {
+    char c = UART_RX_REG;
+    XELPParseKey(&amp;myXelp, c);
+}
+</code></pre>
+
+<h2>Optional: backspace handler</h2>
+
+<p>If using CLI mode, provide a destructive backspace handler:</p>
+
+<pre><code>void handle_bksp(void) {
+    uart_putc('\b');
+    uart_putc(' ');
+    uart_putc('\b');
+}
+
+XELP_SET_FN_BKSP(myXelp, &amp;handle_bksp);
+</code></pre>
+
+<h2>Optional: other callbacks</h2>
+
+<table>
+<thead><tr><th>Callback</th><th>Signature</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr><td><code>XELP_SET_FN_ERR</code></td><td><code>void fn(char)</code></td><td>Error output (separate channel)</td></tr>
+<tr><td><code>XELP_SET_FN_THR</code></td><td><code>void fn(char)</code></td><td>Pass-through output (modem, etc.)</td></tr>
+<tr><td><code>XELP_SET_FN_EMCHG</code></td><td><code>void fn(int)</code></td><td>Mode change notification</td></tr>
+</tbody>
+</table>
+
+<p>All callbacks default to NULL and are safely skipped if not set.</p>
+
+<h2>Platform-specific notes</h2>
+
+<h3>8051 (SDCC)</h3>
+<pre><code>sdcc -c xelp.c --model-small
+</code></pre>
+<p>xelp automatically adds <code>__reentrant</code> qualifiers when compiled
+with SDCC for 8051 targets. The <code>REENTRANT_SDCC</code> macro handles
+this.</p>
+
+<h3>AVR / Arduino</h3>
+<pre><code>avr-gcc -c xelp.c -Os -mmcu=atmega328p -Isrc
+</code></pre>
+<p>Use <code>-Os</code> for size optimization. Consider using
+<code>PROGMEM</code> for command name and help strings to save RAM.</p>
+
+<h3>ARM (bare metal)</h3>
+<pre><code>arm-none-eabi-gcc -c xelp.c -Os -mthumb -mcpu=cortex-m0 -Isrc
+</code></pre>
+<p>Thumb mode gives the smallest code. No special considerations needed.</p>
+
+<h3>MSP430</h3>
+<pre><code>msp430-gcc -c xelp.c -Os -mmcu=msp430f2012 -Isrc
+</code></pre>
+<p>Watch <code>int</code> size (16-bit on MSP430). If you need 32-bit
+registers, override <code>XELPREG</code> in <code>xelpcfg.h</code>:</p>
+<pre><code>#define XELPREG long
+</code></pre>
+
+<h3>6502 (cc65)</h3>
+<pre><code>cc65 -t none -Os xelp.c
+</code></pre>
+<p>Extremely constrained. Use KEY-only mode to minimize footprint.</p>
+
+<h2>Cross-compilation test</h2>
+
+<p>The <code>tools/compactbuilds.sh</code> script compiles xelp with
+various cross-toolchains and reports code sizes. Run it to verify your
+toolchain produces a clean build:</p>
+
+<pre><code>bash tools/compactbuilds.sh
+</code></pre>
+
+<h2>Minimal example</h2>
+
+<pre><code>#include "xelp.h"
+
+/* Platform HAL */
+void my_putc(char c) { /* ... */ }
+void my_bksp(void)   { /* ... */ }
+
+/* Commands */
+XELPRESULT cmd_hello(const char *args, int len) {
+    XELPOut(&amp;x, "Hello!\n", 0);
+    return XELP_S_OK;
+}
+
+XELPCLIFuncMapEntry cmds[] = {
+    {&amp;cmd_hello, "hello", "say hello"},
+    {0, 0, 0}
+};
+
+XELP x;
+
+void main(void) {
+    XELPInit(&amp;x, "My Device v1.0");
+    XELP_SET_FN_OUT(x, &amp;my_putc);
+    XELP_SET_FN_BKSP(x, &amp;my_bksp);
+    XELP_SET_FN_CLI(x, cmds);
+
+    for (;;) {
+        if (char_available())
+            XELPParseKey(&amp;x, get_char());
+    }
+}
+</code></pre>
+
+</main>
+
+<footer>
+  <p>xelp &mdash; <a href="https://github.com/deftio/xelp">github.com/deftio/xelp</a></p>
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>xelp — embedded CLI and script interpreter</title>
+  <meta name="description" content="xelp is a C language command line interpreter and script parser for embedded systems. No dynamic memory, multi-instance, 900 bytes to 4KB.">
+  <link rel="stylesheet" href="assets/main.css">
+  <link rel="icon" href="../img/favicon-32x32.png" type="image/png">
+</head>
+<body>
+
+<header>
+  <nav>
+    <a href="index.html"><strong>xelp</strong></a>
+    <a href="api-reference.html">API Reference</a>
+    <a href="configuration.html">Configuration</a>
+    <a href="porting.html">Porting Guide</a>
+    <a href="releases.html">Releases</a>
+    <a href="https://github.com/deftio/xelp">GitHub</a>
+  </nav>
+</header>
+
+<main>
+
+<h1>xelp</h1>
+
+<p><strong>A C language command line interpreter and script parser for embedded systems.</strong></p>
+
+<p>
+  <span class="badge"><a href="https://opensource.org/licenses/BSD-2-Clause"><img src="https://img.shields.io/badge/License-BSD%202--Clause-blue.svg" alt="License"></a></span>
+  <span class="badge"><a href="https://github.com/deftio/xelp/actions/workflows/ci.yml"><img src="https://github.com/deftio/xelp/actions/workflows/ci.yml/badge.svg" alt="CI"></a></span>
+</p>
+
+<p>xelp is a combined command line interpreter and script interpreter for
+embedded projects that run &ldquo;on the metal&rdquo; or may not have a formal OS.
+It provides a script interpreter available for debugging with the syntax
+of a command line. xelp works seamlessly with C and C++ so that the
+programmer can add their own commands, available at run time from the
+xelp environment. The parser requires no dynamic memory, making it safe
+for interrupts and memory-constrained environments.</p>
+
+<ul>
+  <li>Pure C (C89/C90/C99 compliant), optional C++ <code>extern "C"</code> support</li>
+  <li>Compiled sizes: 900 bytes &ndash; 4 KB depending on features enabled</li>
+  <li>No <code>malloc</code>, no globals &mdash; all state in an instance struct</li>
+  <li>Multiple independent instances on different serial ports</li>
+  <li>Char-at-a-time parsing &mdash; feed from UART, BLE, or any byte stream</li>
+  <li>Zero dependencies (no stdio.h, string.h, etc.)</li>
+</ul>
+
+<h2>Modes</h2>
+
+<table>
+<thead><tr><th>Mode</th><th>Description</th><th>Compile flag</th></tr></thead>
+<tbody>
+<tr><td>CLI</td><td>Command line with prompt, backspace, command dispatch</td><td><code>XELP_ENABLE_CLI</code></td></tr>
+<tr><td>KEY</td><td>Single key press &rarr; immediate action (menus)</td><td><code>XELP_ENABLE_KEY</code></td></tr>
+<tr><td>THR</td><td>Pass-through to another peripheral (modem, debug port)</td><td><code>XELP_ENABLE_THR</code></td></tr>
+</tbody>
+</table>
+
+<h2>Quick start</h2>
+
+<p>Include <code>xelp.h</code> and <code>xelp.c</code> in your project.
+Configure options in <code>xelpcfg.h</code>:</p>
+
+<pre><code>#include "xelp.h"
+
+XELP myXelp;
+XELPInit(&amp;myXelp, "My System");
+XELP_SET_FN_OUT(myXelp, &amp;myPutChar);
+XELP_SET_FN_CLI(myXelp, myCommands);
+
+/* Feed characters one at a time */
+XELPParseKey(&amp;myXelp, received_char);
+</code></pre>
+
+<h2>Platform support</h2>
+
+<p>xelp has been compiled and tested (with no warnings) on:</p>
+
+<table>
+<thead><tr><th>Architecture</th><th>Compiler</th><th>Word size</th></tr></thead>
+<tbody>
+<tr><td>x86-64</td><td>GCC, Clang, MSVC</td><td>64-bit</td></tr>
+<tr><td>x86-32</td><td>GCC, MSVC</td><td>32-bit</td></tr>
+<tr><td>8086/186/286</td><td>Turbo C++</td><td>16-bit</td></tr>
+<tr><td>ARM32 / Thumb</td><td>GCC</td><td>32-bit</td></tr>
+<tr><td>MSP430</td><td>GCC</td><td>16-bit</td></tr>
+<tr><td>AVR (Arduino)</td><td>avr-gcc</td><td>8-bit</td></tr>
+<tr><td>8051</td><td>SDCC</td><td>8-bit</td></tr>
+<tr><td>PIC18F</td><td>SDCC</td><td>16-bit</td></tr>
+<tr><td>6502</td><td>cc65</td><td>8-bit</td></tr>
+<tr><td>68HC11/12</td><td>GCC</td><td>8-bit</td></tr>
+</tbody>
+</table>
+
+<h2>Building and testing</h2>
+
+<pre><code>make tests        # build and run the unit test suite
+make example      # build and run the posix ncurses example
+make clean        # remove build artifacts
+</code></pre>
+
+<h2>Documentation</h2>
+
+<ul>
+  <li><a href="api-reference.html">API Reference</a> &mdash; all public functions and macros</li>
+  <li><a href="configuration.html">Configuration Guide</a> &mdash; compile-time options in xelpcfg.h</li>
+  <li><a href="porting.html">Porting Guide</a> &mdash; how to bring up xelp on a new platform</li>
+  <li><a href="releases.html">Release History</a></li>
+  <li><a href="https://github.com/deftio/xelp/blob/master/CONTRIBUTING.md">Contributing</a></li>
+</ul>
+
+<h2>License</h2>
+
+<p>BSD 2-Clause &mdash; see <a href="https://github.com/deftio/xelp/blob/master/LICENSE.txt">LICENSE.txt</a>.
+&copy; 2011&ndash;2024 M. A. Chatterjee</p>
+
+</main>
+
+<footer>
+  <p>xelp &mdash; <a href="https://github.com/deftio/xelp">github.com/deftio/xelp</a></p>
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Release History — xelp</title>
+  <link rel="stylesheet" href="assets/main.css">
+  <link rel="icon" href="../img/favicon-32x32.png" type="image/png">
+</head>
+<body>
+
+<header>
+  <nav>
+    <a href="index.html"><strong>xelp</strong></a>
+    <a href="api-reference.html">API Reference</a>
+    <a href="configuration.html">Configuration</a>
+    <a href="porting.html">Porting Guide</a>
+    <a href="releases.html">Releases</a>
+    <a href="https://github.com/deftio/xelp">GitHub</a>
+  </nav>
+</header>
+
+<main>
+
+<h1>Release History</h1>
+
+<p>See also: <a href="https://github.com/deftio/xelp/blob/master/CHANGELOG.md">CHANGELOG.md</a>
+on GitHub for the full changelog.</p>
+
+<h2>v0.2.1 (2024-06-05)</h2>
+<ul>
+  <li>Added <code>XelpParseNum</code> for safer string-to-integer conversion</li>
+  <li>Added Arduino example</li>
+  <li>Added <code>XelpBufCmp</code> buffer comparison with multiple modes</li>
+  <li>Added <code>XELPFindTok</code> token search function</li>
+  <li>Expanded unit test coverage</li>
+</ul>
+
+<h2>v0.2.0 (2024-02-25)</h2>
+<ul>
+  <li>Initial public release on GitHub</li>
+  <li>Char-at-a-time CLI parser with KEY, CLI, and THRU modes</li>
+  <li>Tokenizer with quoted strings, escape sequences, comments</li>
+  <li>Command dispatch for both single-key and CLI modes</li>
+  <li>Multi-instance support, no global state</li>
+  <li>No dynamic memory allocation</li>
+  <li>Platform abstraction layer (5 function pointers)</li>
+  <li>Compile-time feature selection via <code>xelpcfg.h</code></li>
+  <li>Posix example with ncurses, unit tests with jumpbug framework</li>
+  <li>Support for 8-bit through 64-bit architectures</li>
+</ul>
+
+</main>
+
+<footer>
+  <p>xelp &mdash; <a href="https://github.com/deftio/xelp">github.com/deftio/xelp</a></p>
+</footer>
+
+</body>
+</html>
