@@ -3,6 +3,8 @@
 
 [![License](https://img.shields.io/badge/License-BSD%202--Clause-blue.svg)](https://opensource.org/licenses/BSD-2-Clause)
 [![CI](https://github.com/deftio/xelp/actions/workflows/ci.yml/badge.svg)](https://github.com/deftio/xelp/actions/workflows/ci.yml)
+![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen.svg)
+![RISC-V .text](https://img.shields.io/badge/RISC--V%20.text-~2.4KB-informational.svg)
 
 # xelp
 
@@ -229,6 +231,8 @@ what we welcome, branch model, and the release process.
 
 ## Documentation
 
+- [Tutorial](docs/tutorial.md) -- step-by-step introduction to xelp
+- [Examples](docs/examples.md) -- annotated code for various platforms
 - [API Reference](docs/api-reference.md) -- all public functions, macros, types
 - [Configuration Guide](docs/configuration.md) -- compile-time options
 - [Porting Guide](docs/porting.md) -- bringing up xelp on a new platform

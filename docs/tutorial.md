@@ -1,0 +1,296 @@
+# Tutorial
+
+A step-by-step introduction to xelp. By the end you will have a working
+CLI with custom commands, KEY mode shortcuts, scripting, and token parsing.
+
+## Prerequisites
+
+- A C compiler (GCC, Clang, or any C89-compatible toolchain)
+- The three xelp source files: `xelp.c`, `xelp.h`, `xelpcfg.h`
+
+## 1. Hello World -- minimal CLI
+
+The smallest useful xelp program: one command, one output function.
+
+```c
+#include "xelp.h"
+
+/* Platform: write one char. Replace with your UART TX. */
+void my_putc(char c) { putchar(c); }
+void my_bksp(void)   { my_putc('\b'); my_putc(' '); my_putc('\b'); }
+
+/* Your first command */
+XELPRESULT cmd_hello(const char *args, int len) {
+    XELPOut(&cli, "Hello, world!\n", 0);
+    return XELP_S_OK;
+}
+
+/* Command table -- NULL-terminated with XELP_FUNC_ENTRY_LAST */
+XELPCLIFuncMapEntry commands[] = {
+    { &cmd_hello, "hello", "say hello" },
+    XELP_FUNC_ENTRY_LAST
+};
+
+XELP cli;
+
+int main(void) {
+    XELPInit(&cli, "Tutorial v1.0");
+    XELP_SET_FN_OUT(cli, &my_putc);
+    XELP_SET_FN_BKSP(cli, &my_bksp);
+    XELP_SET_FN_CLI(cli, commands);
+
+    /* Feed characters from stdin (or UART, BLE, etc.) */
+    int c;
+    while ((c = getchar()) != EOF)
+        XELPParseKey(&cli, (char)c);
+    return 0;
+}
+```
+
+Compile and run:
+
+```bash
+gcc -Isrc src/xelp.c tutorial.c -o tutorial
+./tutorial
+```
+
+Type `hello` and press ENTER. You should see `Hello, world!`.
+
+### What just happened
+
+1. `XELPInit` zeroes all internal state and stores the about message.
+2. `XELP_SET_FN_OUT` tells xelp how to emit characters on this platform.
+3. `XELP_SET_FN_BKSP` tells xelp how to handle destructive backspace.
+4. `XELP_SET_FN_CLI` registers your command table.
+5. `XELPParseKey` feeds one character at a time into xelp's state machine.
+   When ENTER is received, xelp tokenizes the line and dispatches to the
+   matching command function.
+
+## 2. Commands with arguments
+
+Command functions receive the raw argument string and its length. Use the
+tokenizer to extract individual arguments:
+
+```c
+XELPRESULT cmd_add(const char *args, int len) {
+    XelpBuf b, tok;
+    int a, result;
+
+    XELP_XBInit(b, args, len);
+
+    /* Token 0 is the command name itself ("add").
+       Token 1 is the first argument, token 2 the second. */
+    XELP_XBTOP(b);
+    XELPTokN(&b, 1, &tok);
+    a = XELPStr2Int(tok.s, tok.p - tok.s);
+
+    XELP_XBTOP(b);
+    XELPTokN(&b, 2, &tok);
+    result = a + XELPStr2Int(tok.s, tok.p - tok.s);
+
+    /* Output the result (xelp has no printf -- format manually or
+       use your platform's sprintf into a buffer, then XELPOut) */
+    /* ... */
+    return XELP_S_OK;
+}
+```
+
+Register it:
+
+```c
+{ &cmd_add, "add", "add <a> <b>" },
+```
+
+Usage: `add 10 25`
+
+### Tokenizer rules
+
+- Tokens are separated by whitespace (spaces, tabs)
+- Quoted strings are a single token: `echo "hello world"`
+- `#` starts a comment (rest of line ignored)
+- `;` separates statements on one line: `hello; add 1 2`
+- Backtick (`` ` ``) escapes the next character at the CLI
+- Backslash (`\`) escapes inside quoted strings
+
+## 3. Counting and iterating tokens
+
+```c
+XELPRESULT cmd_args(const char *args, int len) {
+    XelpBuf b, tok;
+    int n, i;
+
+    XELP_XBInit(b, args, len);
+    XELPNumToks(&b, &n);
+
+    /* n includes the command name itself */
+    for (i = 0; i < n; i++) {
+        XELP_XBTOP(b);
+        XELPTokN(&b, i, &tok);
+        XELPOut(&cli, tok.s, tok.p - tok.s);
+        XELPOut(&cli, "\n", 0);
+    }
+    return XELP_S_OK;
+}
+```
+
+## 4. KEY mode -- single keypress actions
+
+KEY mode is for menus and quick toggles. Each keypress fires a function
+immediately (no ENTER needed):
+
+```c
+XELPRESULT key_help(int c) {
+    return XELPHelp(&cli);
+}
+
+XELPRESULT key_toggle_led(int c) {
+    /* toggle your LED here */
+    XELPOut(&cli, "LED toggled\n", 0);
+    return XELP_S_OK;
+}
+
+XELPKeyFuncMapEntry key_commands[] = {
+    { &key_help,       '?', "show help"    },
+    { &key_toggle_led, 'l', "toggle LED"   },
+    XELP_FUNC_ENTRY_LAST
+};
+```
+
+Register with `XELP_SET_FN_KEY(cli, key_commands)`.
+
+### Switching modes
+
+By default:
+- **ESC** switches to KEY mode
+- **CTRL-P** switches to CLI mode
+- **CTRL-T** switches to THR (pass-through) mode
+
+These keys are configurable in `xelpcfg.h`.
+
+## 5. Scripting
+
+Any sequence of commands can be run as a script. Scripts are const
+strings -- they can live in ROM on embedded targets:
+
+```c
+const char *startup = "hello; add 10 20; echo done";
+XELPParse(&cli, startup, XELPStrLen(startup));
+```
+
+Multi-line scripts work too:
+
+```c
+const char *script =
+    "# configuration script\n"
+    "set mode 1\n"
+    "set gain 50\n"
+    "echo config complete\n";
+XELPParse(&cli, script, XELPStrLen(script));
+```
+
+### XelpBuf variant
+
+For scripts already in an `XelpBuf`:
+
+```c
+XelpBuf xb;
+XELP_XBInit(xb, script, XELPStrLen(script));
+XELPParseXB(&cli, &xb);
+```
+
+## 6. Help system
+
+If `XELP_ENABLE_HELP` is defined in `xelpcfg.h`, calling `XELPHelp(&cli)`
+prints a listing of all registered KEY and CLI commands with their help
+strings. This is why the third field in every command table entry matters:
+
+```c
+{ &cmd_hello, "hello", "say hello" },
+/*                      ^^^^^^^^^^^ shown in help output */
+```
+
+## 7. Multiple instances
+
+xelp uses no global state. You can run independent CLIs on different
+serial ports:
+
+```c
+XELP debug_cli;
+XELP field_cli;
+
+XELPInit(&debug_cli, "Debug Console");
+XELPInit(&field_cli, "Field Service");
+
+XELP_SET_FN_OUT(debug_cli, &uart0_putc);
+XELP_SET_FN_OUT(field_cli, &uart1_putc);
+
+XELP_SET_FN_CLI(debug_cli, debug_commands);
+XELP_SET_FN_CLI(field_cli, field_commands);
+
+XELP_SET_VAL_CLI_PROMPT(debug_cli, "dbg>");
+XELP_SET_VAL_CLI_PROMPT(field_cli, "svc>");
+```
+
+Each instance has its own command buffer, mode state, registers, and
+output function. See `examples/multi-instance/` for a complete example.
+
+## 8. Numeric parsing
+
+xelp supports decimal and hexadecimal:
+
+```c
+int val;
+
+/* Quick conversion (no error checking) */
+val = XELPStr2Int("255", 3);       /* decimal: 255 */
+val = XELPStr2Int("FFh", 3);       /* hex suffix: 255 */
+val = XELPStr2Int("0xFF", 4);      /* hex prefix: 255 */
+val = XELPStr2Int("0x1A", 4);      /* uppercase hex: 26 */
+
+/* Safer -- returns XELP_S_OK on success */
+XELPRESULT r = XELPParseNum("0xFF", 4, &val);
+if (XELP_T_OK(r)) {
+    /* val == 255 */
+}
+```
+
+## 9. THR (pass-through) mode
+
+THR mode redirects all keystrokes to another peripheral -- useful for
+interacting with a modem or a second MCU through the same terminal:
+
+```c
+void modem_send(char c) {
+    /* forward to modem UART */
+}
+
+XELP_SET_FN_THR(cli, &modem_send);
+```
+
+When the user presses CTRL-T, all subsequent keystrokes go to
+`modem_send()` instead of the xelp parser. Press CTRL-P to return to
+CLI mode.
+
+## 10. Mode change callback
+
+Get notified when the user switches modes:
+
+```c
+void on_mode_change(int mode) {
+    if (mode == XELP_MODE_CLI)
+        XELPOut(&cli, "[CLI]\n", 0);
+    else if (mode == XELP_MODE_KEY)
+        XELPOut(&cli, "[KEY]\n", 0);
+    else if (mode == XELP_MODE_THR)
+        XELPOut(&cli, "[THR]\n", 0);
+}
+
+XELP_SET_FN_EMCHG(cli, &on_mode_change);
+```
+
+## Next steps
+
+- [API Reference](api-reference.md) -- complete function and macro documentation
+- [Configuration Guide](configuration.md) -- all compile-time options
+- [Porting Guide](porting.md) -- platform-specific integration notes
+- [Examples](examples.md) -- annotated example code for various platforms

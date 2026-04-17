@@ -12,6 +12,8 @@
 <header>
   <nav>
     <a href="index.html"><strong>xelp</strong></a>
+    <a href="tutorial.html">Tutorial</a>
+    <a href="examples.html">Examples</a>
     <a href="api-reference.html">API Reference</a>
     <a href="configuration.html">Configuration</a>
     <a href="porting.html">Porting Guide</a>
@@ -36,7 +38,7 @@ on GitHub for the full changelog.</p>
   <li>Expanded unit test coverage</li>
 </ul>
 
-<h2>v0.2.0 (2024-02-25)</h2>
+<h2>v0.2.0 (2024-02-25) &mdash; first GitHub release</h2>
 <ul>
   <li>Initial public release on GitHub</li>
   <li>Char-at-a-time CLI parser with KEY, CLI, and THRU modes</li>
@@ -49,6 +51,27 @@ on GitHub for the full changelog.</p>
   <li>Posix example with ncurses, unit tests with jumpbug framework</li>
   <li>Support for 8-bit through 64-bit architectures</li>
 </ul>
+
+<h2>Project history</h2>
+
+<p>xelp predates its GitHub presence by roughly two decades. The original
+code was written around 2005&ndash;2006 as a lightweight debug shell for
+bare-metal embedded projects. It lived in Subversion for many years,
+then migrated to Bitbucket (Mercurial, later Git) as those platforms
+became common in embedded shops.</p>
+
+<p>In 2024 the repository moved to GitHub as a public open-source project.
+The v0.2.0 tag marks the first GitHub release, not the first version of
+the library itself.</p>
+
+<table>
+<thead><tr><th>Era</th><th>Hosting</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>~2005&ndash;2012</td><td>Subversion (private)</td><td>Original development for 8051 and MSP430 targets</td></tr>
+<tr><td>2012&ndash;2023</td><td>Bitbucket (private)</td><td>Migrated to Mercurial, later Git; added ARM, AVR support</td></tr>
+<tr><td>2024&ndash;present</td><td>GitHub (public)</td><td>Open-sourced under BSD 2-Clause; CI, cross-build tooling, docs</td></tr>
+</tbody>
+</table>
 
 </main>
 
