@@ -1277,7 +1277,6 @@ x->fn_err("ERR: undefined var\n");
 
 ### Phase 10: Polish
 
-**Duration:** 2-4 hours
 
 1. Final documentation review
 2. Code cleanup (consistent style)

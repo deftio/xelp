@@ -16,10 +16,6 @@
 *.dylib
 *.dll
 
-# Fortran module files
-*.mod
-*.smod
-
 # Compiled Static libraries
 *.lai
 *.la
@@ -37,14 +33,30 @@
 *.asm
 *.rel
 *.s
-*.out
 
-# Coverage files
+# Coverage and profiling
 *.gcov
 *.gcda
 *.gcno
+*.info
+coverage/
 
-# dirs
-.vscode
+# Build directories
+build/
 
+# Test logs
 xelp-test-log.yaml
+
+# Editor and IDE
+.vscode/
+*.swp
+*~
+*.bak
+
+# OS generated
+.DS_Store
+Thumbs.db
+
+# Claude Code local files
+.claude/
+CLAUDE.local.md
