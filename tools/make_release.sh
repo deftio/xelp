@@ -21,6 +21,12 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
 
+# Log all output to build/release-<timestamp>.log
+mkdir -p build
+LOG_FILE="build/release-$(date -u '+%Y%m%d-%H%M%S').log"
+exec > >(tee -a "$LOG_FILE") 2>&1
+echo "Log: $LOG_FILE"
+
 STEP=0
 MODE="full"
 BRANCH=""
