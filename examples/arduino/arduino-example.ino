@@ -40,7 +40,7 @@ XELPRESULT cmdListToks (const char* args_str, int maxlen)
     int aa = (int)(args_str);
     a = (char *)(0+aa);
     XELP_XBInit(b, a,maxlen);
-    XelpNumToks(&b,&n);
+    XELPNumToks(&b,&n);
     XELP_XBTOP(b);
     Serial.print("[");
     Serial.print(n);
@@ -69,12 +69,12 @@ XELPRESULT setColorLED (const char* args_str, int maxlen)
     int aa = (int)(args_str);
     a = (char *)(0+aa);
     XELP_XBInit(b, a,maxlen);
-    XelpNumToks(&b,&n);
+    XELPNumToks(&b,&n);
 
     XELP_XBTOP(b);
     XELPTokN(&b,1,&tok);
     //gLEDColor = XELPStr2Int(tok.s,tok.p-tok.s);
-    XelpParseNum(tok.s,tok.p-tok.s,&gLEDColor );
+    XELPParseNum(tok.s,tok.p-tok.s,&gLEDColor );
 
     Serial.print("LED set to: ");
     Serial.println(gLEDColor);

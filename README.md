@@ -1,262 +1,228 @@
 
-<!-- [![xelp](./img/xelp-prompt-med.png)](http://www.deftio.com/xelp)  -->
-
-<a href="www.deftio.com/xelp"><img src="./img/xelp-prompt-med.png" width="30%"></img></a><br>
+<a href="https://www.deftio.com/xelp"><img src="./img/xelp-prompt-med.png" width="30%"></img></a>
 
 [![License](https://img.shields.io/badge/License-BSD%202--Clause-blue.svg)](https://opensource.org/licenses/BSD-2-Clause)
 [![CI](https://github.com/deftio/xelp/actions/workflows/ci.yml/badge.svg)](https://github.com/deftio/xelp/actions/workflows/ci.yml)
 
+# xelp
 
-# Xelp - A C command line interpreter and script parser
+A command line interpreter and script engine for embedded systems, written in
+pure C. No dynamic memory. No OS required. No standard library dependencies.
+900 bytes to 4 KB compiled depending on features enabled.
 
+xelp gives bare-metal firmware a real interactive CLI, scriptable command
+dispatch, and single-key menus -- in a package small enough for an 8051 or
+ATtiny85.
 
-## About XELP
+## Why xelp
 
-xelp is a simple combined command line interpreter / script interpreter for embedded projects which run "on the metal" or may not have a formal OS.  This allows the programmer to have a script interpreter available for debugging with the syntax of a command line.  Xelp is meant to work seamlessly with pure C (also C++) so that the programmer can add their own commands which are then available at run time from the xelp script environment.  Passing data from xelp to C functions and from C to xelp scripts is supported.  The xelp parser can run without dynamic memory support which allows its use in interrupts or memory constrained environments such as machine monitors.
+Most embedded projects end up with an ad-hoc `if (char == 'x')` debug
+console. xelp replaces that with a proper CLI that:
 
-Xelp includes a small set of built-in commands for memory operations, viewing, and pointer operations which can be optionally compiled in.
-
-Written in pure C with function pointers for adding user called functions.
-Compiled sizes range from 900 - 4K bytes depending on options chosen, platform and architecture.
-
+- Compiles on **8-bit to 64-bit** targets with any C89 compiler
+- Fits in **under 1 KB** in KEY-only mode, **under 4 KB** fully featured
+- Uses **zero dynamic memory** -- no malloc, no heap, works in ISRs
+- Supports **multiple independent instances** -- one per UART, no globals
+- Scripts are **ROM-able** const strings -- the parser never modifies input
+- Function dispatch tables let you **add C functions callable from the CLI**
 
 ## Features
 
-* Command Line Interface (CLI) with C language function calls
-* Scriptable commands
-	* Anything run at commandline or menus can also be called as a script.
-	* Scripts can be ROM-able strings
-	* No script strings are modified during execution by core parser / interpreter (no "strtok() style" processing.)
-* Programmer supplied C-language functions can be called from command line or from script
-* Each function can also have an optional help string.
-* Single-key mode for immediate menus or actions (w/o having to pressing ENTER)
-	* programmer supplied actions (key presses or cmds) switch btw single key or cmd-line modes.
-* Thru-mode allows redirection of key strokes to another peripheral w/o any parsing (useful for debugging modems or other peripherals with their own command sets)
-	* thru-mode is switchable on the fly at runtime and can be redirected or compiled out.
-	* example: use thru-mode to on-the-fly connect to a modem and type in AT commands then switch back to CLI mode when done allowing graceful switching between CLI and peripheral command sets
-* Tokenizer output available for user supplied functions that need to parse params
-* Str2Int tokenizer allows converting numbers, and hex digits to integers.  (123 --> int, or 123h --> int)
-* Single line comments via # symbol  (useful for scripts). Tabs also supported for indentation readability in scripts.
-* Can be configured, at compile time to save space.  See tables in docs for compiled sizes.   See xelpcfg.h to control these options:
-	* (KEY Mode) key-only mode (no CLI just key-press menus)
-	* (CLI Mode) cli-only mode (command line prompt w destructive backspace handling)
-	* (THR Mode) thru support optional (redirect all keys to another peripheral w/o processing)
-	* help function optional (remove to save space, see table)
-	* Override/select key mappings (enter, backspace, etc), also escape char mappings
-	* Settable prompt for CLI (e.g. "myPrompt>")
-* Supports "quoted strings" in command line (treats as single token), escapes for command line via '`', escapes for quoted strings via '\'.  All escape chars are overridable at compile time.
-* No dynamic memory needed for CLI / script interpreter / tokenizer / command dispatch (no malloc/free new/delete)
-* No globals or global state -- all state is stored in an instance so several instances can be run at the same time
-	* allows separate XELP instances to be attached to different serial ports for example.
-* Reentrant provided same instance is not used as a CLI for 2 competing threads.  Scripts are reentrant by default unless user supplied functions are not reentrant.
-* Platform independent
-	* No library support required (stdio.h, string.h etc not needed).
-	* Entirely in C (no assembly) for portability. C89, C90, C99, ANSI compliant (for dealing w older compilers)
-	* Simple platform abstraction layer ("HAL") for porting uses 5 function pointers.
-* OSI approved open-source - BSD-2 License
+| Feature | Description | Size impact |
+|---------|-------------|-------------|
+| **CLI mode** | Line-buffered command prompt with backspace, prompt string, command dispatch | Core (~2 KB) |
+| **KEY mode** | Single keypress menus and actions, no ENTER needed | ~200-500 bytes |
+| **THR mode** | Pass-through redirects all keys to another peripheral (modem, debug port) | ~50-125 bytes |
+| **Scripting** | Parse multi-statement scripts from ROM or RAM strings | Included with CLI |
+| **Help** | Built-in help listing all registered commands | ~180-350 bytes |
+| **Tokenizer** | Quoted strings, escape sequences, comments, semicolons | Included with CLI |
+
+All features are independently compilable via `#define` flags in
+`src/xelpcfg.h`. Disable what you don't need to save space.
+
+## Quick Start
+
+Add three files to your project: `xelp.c`, `xelp.h`, `xelpcfg.h`.
+
+```c
+#include "xelp.h"
+
+/* Your output function -- write one char to UART, LCD, etc. */
+void uart_putc(char c) { UART_TX = c; }
+void uart_bksp(void)   { uart_putc('\b'); uart_putc(' '); uart_putc('\b'); }
+
+/* Commands -- any C function with this signature */
+XELPRESULT cmd_hello(const char *args, int len) {
+    XELPOut(&cli, "Hello!\n", 0);
+    return XELP_S_OK;
+}
+
+XELPRESULT cmd_led(const char *args, int len) {
+    XelpBuf b, tok;
+    XELP_XBInit(b, args, len);
+    XELPTokN(&b, 1, &tok);                  /* get second token */
+    int val = XELPStr2Int(tok.s, tok.p - tok.s);
+    LED_PORT = val;
+    return XELP_S_OK;
+}
+
+/* Command table */
+XELPCLIFuncMapEntry commands[] = {
+    { &cmd_hello, "hello", "say hello"  },
+    { &cmd_led,   "led",   "led <0|1>"  },
+    XELP_FUNC_ENTRY_LAST
+};
+
+XELP cli;
+
+void main(void) {
+    XELPInit(&cli, "My Device v1.0");
+    XELP_SET_FN_OUT(cli, &uart_putc);
+    XELP_SET_FN_BKSP(cli, &uart_bksp);
+    XELP_SET_FN_CLI(cli, commands);
+
+    for (;;) {
+        if (uart_rx_ready())
+            XELPParseKey(&cli, uart_getc());
+    }
+}
+```
+
+At the prompt:
+
+```
+xelp> hello
+Hello!
+xelp> led 1
+xelp>
+```
+
+## Scripting
+
+Anything typed at the CLI can be run as a script. Scripts are const strings
+parsed without modification -- they can live in ROM:
+
+```c
+const char *startup_script = "hello; led 1";
+XELPParse(&cli, startup_script, XELPStrLen(startup_script));
+```
+
+Scripts support semicolons (`;`), newlines, `#` comments, quoted strings
+(`"..."`), and escape characters (backtick at CLI, backslash in quotes).
+
+## Three Modes
+
+```
+         CTRL-P           ESC            CTRL-T
+CLI mode -------> KEY mode -----> THR mode
+   ^                                |
+   +--------------------------------+
+              mode switch keys
+```
+
+- **CLI**: Line-buffered input with prompt. Type commands, press ENTER.
+- **KEY**: Each keypress triggers a command immediately. For menus.
+- **THR**: All keys pass through to another peripheral. For debugging modems, serial devices.
+
+Mode switch keys are configurable in `xelpcfg.h`.
+
+## Building and Testing
+
+```bash
+make tests          # build + run unit tests + coverage report
+make coverage       # tests + coverage summary
+make example        # build + run the posix ncurses example
+make clean          # remove all build artifacts
+```
+
+19 test units, 207 test cases, 100% line coverage of `xelp.c`.
+
+## Cross-Platform Size Table
+
+Compiled sizes with `-Os` (all features enabled):
+
+| Target | Compiler | .text (bytes) |
+|--------|----------|---------------|
+| x86-64 | GCC | ~3200 |
+| x86-32 | GCC | ~2800 |
+| ARM32 Thumb | arm-none-eabi-gcc | ~2200 |
+| ARM64 | aarch64-linux-gnu-gcc | ~3400 |
+| AVR (ATmega328P) | avr-gcc | ~3200 |
+| MSP430 | msp430-gcc | ~2600 |
+| 68HC11 | m68hc11-gcc | ~3800 |
+| PowerPC | powerpc-linux-gnu-gcc | ~3200 |
+
+KEY-only mode: ~900 bytes. Run `bash tools/crossbuild.sh` with Docker
+to reproduce these numbers.
+
+## Configuration
+
+Compile-time options in `src/xelpcfg.h`:
+
+| Flag | Purpose |
+|------|---------|
+| `XELP_ENABLE_CLI` | Command line mode (required for scripting) |
+| `XELP_ENABLE_KEY` | Single keypress mode |
+| `XELP_ENABLE_THR` | Pass-through mode |
+| `XELP_ENABLE_HELP` | Built-in help command |
+| `XELP_ENABLE_LCORE` | Language core (peek, poke, go) |
+| `XELP_ENABLE_FULL` | Enable all of the above |
+
+Buffer size, register count, prompt string, escape characters, and mode
+switch keys are all configurable. See [Configuration Guide](docs/configuration.md).
+
+## Porting
+
+xelp compiles on anything with a C89 compiler. To port:
+
+1. Add `xelp.c`, `xelp.h`, `xelpcfg.h` to your build
+2. Write a `void putc(char c)` function for your output hardware
+3. Call `XELP_SET_FN_OUT()` and `XELPParseKey()` -- that's it
+
+No assembly. No platform `#ifdefs` (except optional SDCC `__reentrant`).
+See [Porting Guide](docs/porting.md).
+
+## Architecture Support
+
+Tested with zero warnings on:
+
+| Architecture | Compiler | Word Size |
+|-------------|----------|-----------|
+| x86-64 | GCC, Clang | 64-bit |
+| x86-32 | GCC, Clang, TCC | 32-bit |
+| ARM64 | aarch64-linux-gnu-gcc | 64-bit |
+| ARM32 / Thumb | arm-none-eabi-gcc | 32-bit |
+| MSP430 | msp430-gcc | 16-bit |
+| AVR (ATmega, ATtiny) | avr-gcc | 8-bit |
+| 8051 | SDCC | 8-bit |
+| 68HC11/12 | m68hc11-gcc | 8-bit |
+| PowerPC | powerpc-linux-gnu-gcc | 32-bit |
+| 6502 | cc65 | 8-bit |
 
 ## Repository Structure
 
 ```
 xelp/
-├── src/                    Core library (xelp.c, xelp.h, xelpcfg.h)
-├── tests/                  Unit tests (jumpbug test framework)
-├── examples/               Platform examples (posix, arduino)
-├── tools/                  Code generators and build utilities
-├── scripts/                Build and run helper scripts
-├── pages/                  Documentation site (static HTML, GitHub Pages)
-├── dev/                    Design notes and development planning
-├── img/                    Branding and icon assets
-└── .github/workflows/      CI (GitHub Actions)
+  src/            xelp.c, xelp.h, xelpcfg.h (the library -- add these to your project)
+  tests/          unit tests (jumpbug framework), 100% coverage
+  examples/       posix ncurses demo
+  tools/          cross-build scripts, banner generator, state machine generator
+  docs/           API reference, configuration guide, porting guide
+  pages/          GitHub Pages site
+  dev/            design notes and planning
+  .github/        CI workflows
 ```
-
-## Quick Start
-
-Include `xelp.h` and `xelp.c` in your project, configure options in `xelpcfg.h`:
-
-```C
-#include "xelp.h"
-
-XELP myXelp;
-XELPInit(&myXelp, "My System");
-XELP_SET_FN_OUT(myXelp, &myPutChar);
-XELP_SET_FN_CLI(myXelp, myCommands);
-
-/* Feed characters one at a time (from UART, serial, etc.) */
-XELPParseKey(&myXelp, received_char);
-```
-
-## Usage in C
-
-The following is a simple posix example.
-
-```C
-#include "xelp.h"			/* in the file where xelp calls are to be made */
-
-//some sample functions
-XELPRESULT cmdHelp (const char* args, int maxlen) {
-	return XELPHelp(&example);
-}
-
-//command to quit
-XELPRESULT cmdExit (const char* args, int maxlen) {
-	gExit = 1;
-	return XELP_S_OK;
-}
-
-//command to print
-XELPRESULT cmdPrintNum (const char *args, int maxlen) {
-	XelpBuf b,tok;
-    int n;
-
-    XELP_XBInit(b,args,maxlen);
-    XELPTokN(&b,1,&tok),
-
-	printw("[%d]\n",XELPStr2Int(tok.s,tok.p-tok.s));
-	return XELP_S_OK;
-}
-
-//create map of functions, with  {function, "command" , "help string"}
-XELPCLIFuncMapEntry gMyCLICommands[] =
-{
-	{&cmdHelp	 		, "help"    ,  "help"						},
-	{&cmdPrintNum       , "num"     ,  "print a num to console"     },
-	{&cmdExit           , "exit"    ,  "quit demo program"          },
-	XELP_FUNC_ENTRY_LAST
-};
-
-int gExit = 0;
-
-int main (int argc, char *argv[])
-{
-
-	XELP myXelp; //declare an instance of the xelp parser
-
-	XELPInit(&myXelp,	"My Embedded System\ncli : interface.");
-
-	XELP_SET_FN_BKSP(myXelp,&handleBackspace);
-	XELP_SET_FN_OUT(myXelp,&gPutChar);
-	XELP_SET_FN_CLI(myXelp,gMyCLICommands);   		// map the cli commands
-	XELP_SET_VAL_CLI_PROMPT(myXelp,"myprompt>");    // if using per-instance prompt...
-
-	do	{
-
-		if (Serial.available() > 0) {
-			char c = serial.readChar();
-			XELPParseKey(&myXelp,c);
-		}
-	}while (!gExit);
-
-}
-
-```
-
-Compile and link xelp.c with your project. No other dependencies are required for embedded operations.
-
-## Building and Testing
-
-### Unit Tests
-
-```bash
-make tests
-```
-
-This builds and runs the unit test suite. See `tests/` for details.
-
-### Posix Example
-
-On Linux, the ncurses library is used for key press handling in the example:
-
-```bash
-sudo apt-get install libncurses5-dev
-make example
-```
-
-### Coverage
-
-```bash
-cd tests
-bash run_coverage_test.sh
-```
-
-There is no binary distribution - include the source in your project along with `xelpcfg.h` to control options.
-
-
-## Platform Support
-
-xelp has been compiled and run (with no warnings) for the following processors / platforms.
-
-### Architecture Support Table
-
-| Processor Arch  | Compiler  | Platform        | Arch           |
-|-----------------|-----------|-----------------|----------------|
-| 80x86-64        | GCC 4.8   | Linux/Ubuntu    | 64 bit     	 |
-| 80x86-64        | Vis C++   | Windows-10      | 64 bit         |
-| 80x86-32        | GCC 4.8   | Linux/Ubuntu    | 32 bit  	     |
-| 80x86-32        | Vis C++   | Win XP          | 32 bit         |
-| 8086 / 186/286  | Turbo C++ | MS DOS          | 16 bit         |
-| ARM32           | GCC       | MBED /Rasp Pi   | 32 bit         |
-| ARM32-Thumb	  | GCC       | "               | 32 bit         |
-| MSP430          | GCC       |                 | 16 bit         |
-| 6502            | cc65      | Super NES / C64 |  8 bit         |
-| PIC18Fxxx       | SDCC      |                 | 16 bit         |
-| 8051x           | SDCC      |                 |  8 bit         |
-| 68HC11/12       | GCC       |                 |  8 bit         |
-
-## Configuration
-
-Compile-time options are controlled in `src/xelpcfg.h`:
-
-| Option | Purpose | Size Impact |
-| --- | --- | --- |
-| `XELP_ENABLE_CLI` | Command line mode | Required for CLI/scripting |
-| `XELP_ENABLE_KEY` | Single key press mode | ~200-500 bytes |
-| `XELP_ENABLE_THR` | Passthrough mode | ~50-125 bytes |
-| `XELP_ENABLE_HELP` | Built-in help function | ~180-350 bytes |
-| `XELP_ENABLE_LCORE` | Language core (peek/poke/go) | Variable |
-| `XELP_ENABLE_FULL` | Enable all features | All of the above |
-
-## FAQ
-
-Q: I just want to be able to use keypresses without being in "ESC" mode or "CLI" mode.
-A: Compile with the `XELP_ENABLE_KEY` `#define` in `xelpcfg.h` and comment out `XELP_ENABLE_FULL`.
 
 ## Documentation
 
-- [Documentation Site](pages/index.html) - Full HTML documentation
-  - [API Reference](pages/api-reference.html) - All public functions and macros
-  - [Configuration Guide](pages/configuration.html) - Compile-time options
-  - [Porting Guide](pages/porting.html) - How to bring up xelp on a new platform
-- [Release Management](release_management.md) - Build, test, and release workflow
-- [Contributing](CONTRIBUTING.md) - How to contribute
-- [Changelog](CHANGELOG.md) - Version history
-- [Design Notes](dev/lang_design.md) - Language design discussion
-- [Modernization Plan](dev/xelp-plan-2025.md) - Xelp 2.0 roadmap
+- [API Reference](docs/api-reference.md) -- all public functions, macros, types
+- [Configuration Guide](docs/configuration.md) -- compile-time options
+- [Porting Guide](docs/porting.md) -- bringing up xelp on a new platform
+- [Tools](tools/README_TOOLS.md) -- build utilities and code generators
+- [Contributing](CONTRIBUTING.md) -- how to contribute
 
 ## License
 
-(OSI Approved BSD 2-clause)
+BSD 2-Clause. See [LICENSE.txt](LICENSE.txt).
 
-Copyright (c) 2011-2024, M. A. Chatterjee <deftio at deftio dot com>
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-* Redistributions of source code must retain the above copyright notice, this
-  list of conditions and the following disclaimer.
-
-* Redistributions in binary form must reproduce the above copyright notice,
-  this list of conditions and the following disclaimer in the documentation
-  and/or other materials provided with the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+Copyright (c) 2011-2025, M. A. Chatterjee

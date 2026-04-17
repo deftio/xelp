@@ -37,7 +37,7 @@ jobs:
         run: |
           gcov src/xelp.c
           echo "--- Coverage Summary ---"
-          head -3 xelp.c.gcov 2>/dev/null || true
+          gcov src/xelp.c 2>/dev/null | grep -A 1 "File.*xelp.c"
 
   test-32bit:
     runs-on: ubuntu-latest

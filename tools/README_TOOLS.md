@@ -119,3 +119,30 @@ Supporting files:
   generator (superseded by the Python version).
 - **`parser-sm-table.c`** -- Generated C output from `make_sm_tab.c`.
 - **`runtab.sh`** -- Convenience script to compile and run `make_sm_tab.c`.
+
+---
+
+## Release Script
+
+**`make_release.sh`** -- Validate the build and optionally create a tagged
+GitHub release. Reads the version from `XELP_VERSION` in `src/xelp.h`.
+
+```
+# Dry run: build, test, coverage check
+bash tools/make_release.sh
+
+# Validate + create git tag
+bash tools/make_release.sh --tag
+
+# Validate + tag + push + GitHub release (requires gh CLI)
+bash tools/make_release.sh --release
+```
+
+The script checks:
+- Clean build with zero warnings
+- All tests pass
+- Coverage report
+- Working tree is clean (for tag/release mode)
+- Tag doesn't already exist
+
+See `release_management.md` for the full release workflow.

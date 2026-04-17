@@ -47,11 +47,11 @@ Version 0.2.1.</p>
 <thead><tr><th>Constant</th><th>Value</th><th>Meaning</th></tr></thead>
 <tbody>
 <tr><td><code>XELP_S_OK</code></td><td>0</td><td>Success</td></tr>
-<tr><td><code>XELP_W_Warn</code></td><td>1</td><td>Warning (still success)</td></tr>
+<tr><td><code>XELP_W_WARN</code></td><td>1</td><td>Warning (still success)</td></tr>
 <tr><td><code>XELP_S_NOTFOUND</code></td><td>2</td><td>Token or command not found</td></tr>
-<tr><td><code>XELP_E_Err</code></td><td>-1</td><td>General error</td></tr>
-<tr><td><code>XELP_E_CmdBufFull</code></td><td>-2</td><td>Command buffer full</td></tr>
-<tr><td><code>XELP_E_CmdNotFound</code></td><td>-3</td><td>Command not found during dispatch</td></tr>
+<tr><td><code>XELP_E_ERR</code></td><td>-1</td><td>General error</td></tr>
+<tr><td><code>XELP_E_CMDBUFFULL</code></td><td>-2</td><td>Command buffer full</td></tr>
+<tr><td><code>XELP_E_CMDNOTFOUND</code></td><td>-3</td><td>Command not found during dispatch</td></tr>
 </tbody>
 </table>
 
@@ -133,8 +133,8 @@ when <code>XELP_ENABLE_HELP</code> is defined.</p>
 </code></pre>
 <p>Get the Nth token (0-indexed) from a buffer.</p>
 
-<h3><code>XelpNumToks</code></h3>
-<pre><code>XELPRESULT XelpNumToks(XelpBuf *buf, int *n);
+<h3><code>XELPNumToks</code></h3>
+<pre><code>XELPRESULT XELPNumToks(XelpBuf *buf, int *n);
 </code></pre>
 <p>Count the number of tokens in a buffer.</p>
 
@@ -157,14 +157,14 @@ string <code>cmd</code>. Returns <code>XELP_S_OK</code> if equal.</p>
 <p>Parse a string to integer. Accepts decimal and hex (<code>FFh</code> suffix
 or <code>0xFF</code> prefix).</p>
 
-<h3><code>XelpParseNum</code></h3>
-<pre><code>XELPRESULT XelpParseNum(const char *s, int maxlen, int *n);
+<h3><code>XELPParseNum</code></h3>
+<pre><code>XELPRESULT XELPParseNum(const char *s, int maxlen, int *n);
 </code></pre>
 <p>Safer string-to-integer: returns a result code and writes the parsed
 value to <code>*n</code>.</p>
 
-<h3><code>XelpBufCmp</code></h3>
-<pre><code>XELPRESULT XelpBufCmp(const char *as, const char *ae,
+<h3><code>XELPBufCmp</code></h3>
+<pre><code>XELPRESULT XELPBufCmp(const char *as, const char *ae,
                       const char *bs, const char *be, int cmpType);
 </code></pre>
 <p>Compare two buffers. <code>cmpType</code> controls null-terminator handling:</p>

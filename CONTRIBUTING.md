@@ -105,13 +105,12 @@ framework. All tests must pass.
 ### Coverage
 
 ```bash
-cd tests
-bash run_coverage_test.sh
+make coverage
 ```
 
-This runs the tests with gcov instrumentation and produces
-`xelp.c.gcov` showing line-by-line coverage. Don't let coverage drop
-when adding new code — add tests.
+This runs the tests with gcov instrumentation and prints a coverage
+summary. The full `xelp.c.gcov` file is in `tests/` for line-by-line
+details. Don't let coverage drop when adding new code -- add tests.
 
 ## Compile-time configuration
 

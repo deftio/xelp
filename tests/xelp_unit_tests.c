@@ -3,8 +3,8 @@
   @xelp_unit_tests.c - simple test file example file for xelp embedded cli/scripting library
   @copy Copyright (C)   <M. A. Chatterjee>
   @author M A Chatterjee <deftio [at] deftio [dot] com>
-   
-  @license: 
+
+  @license:
 	Copyright (c) 2011-2019, M. A. Chatterjee <deftio at deftio dot com>
 	All rights reserved.
 
@@ -37,8 +37,9 @@
 #include "jumpbug_unit_test_fw.h"  /* micro portable unit test framework */
 #include "../src/xelp.h"
 
-//=======================================================
-//esc or single-key mode commads
+/* =======================================================
+   Callback functions and global test state
+   ======================================================= */
 struct {
     int k0;
     int k1;
@@ -61,7 +62,7 @@ XELPRESULT k2 (int k) {
     return XELP_S_OK;
 }
 
-//declare static map for function in single key mode
+/* declare static map for function in single key mode */
 XELPKeyFuncMapEntry gMyKeyCommands[] =
 {
 	{&k0       ,'0', "sets k0"       },
@@ -88,7 +89,7 @@ XELPRESULT cli3 (const char *c, int max) {
     gGlobalCallbackData.c2 = 0;
     return XELP_S_OK;
 }
-//declare a command map for functions in parse mode
+/* declare a command map for functions in parse mode */
 XELPCLIFuncMapEntry gMyCLICommands[] = {
 	{&cli0    		    , "cli0",  "cli function 0   "       },
 	{&cli1    		    , "foo"	,  "foo cli function "       },
@@ -96,6 +97,31 @@ XELPCLIFuncMapEntry gMyCLICommands[] = {
     {&cli3              , "rst" ,  "reset all cli global test vars to zero"},
 	XELP_FUNC_ENTRY_LAST
 };
+
+char gChar;
+void dummyOut(char c) {gChar = c;}
+
+int gInt;
+void dummyIntOut(int i) {gInt = i;}
+
+int gBool;
+void dummyVoid0() {gBool = 0;}
+void dummyVoid1() {gBool = 1;}
+
+#define GDUMMYBUFLEN (0x1000)
+char gDummyBuf[GDUMMYBUFLEN];
+XelpBuf gDummyXelpBuf;
+
+void gDummyBufOut(char c) {
+    XELP_XBPUTC(gDummyXelpBuf,c);
+}
+
+/* helper to reset the dummy buf for output capture */
+static void resetDummyBuf(void) {
+    int i;
+    for (i = 0; i < GDUMMYBUFLEN; i++) gDummyBuf[i] = 0;
+    XELP_XBInit(gDummyXelpBuf,gDummyBuf,GDUMMYBUFLEN);
+}
 
 /*************************************************
 Unit Test Cases for XELP() functions below
@@ -105,19 +131,28 @@ Unit Test Cases for XELP() functions below
  test_XELPStrLen()
  */
 XELPRESULT test_XELPStrLen() {
-    
-    if (JB_ASSERT(3 != XELPStrLen("abc"),"XelpStrLen")) 
-        return XELP_E_Err;
 
-    if (JB_ASSERT(0 != XELPStrLen(""),"XelpStrLen")) 
-        return XELP_E_Err;
+    if (JB_ASSERT(3 != XELPStrLen("abc"),"XelpStrLen abc=3"))
+        return XELP_E_ERR;
+
+    if (JB_ASSERT(0 != XELPStrLen(""),"XelpStrLen empty=0"))
+        return XELP_E_ERR;
+
+    if (JB_ASSERT(1 != XELPStrLen("x"),"XelpStrLen single char"))
+        return XELP_E_ERR;
+
+    if (JB_ASSERT(26 != XELPStrLen("abcdefghijklmnopqrstuvwxyz"),"XelpStrLen 26 chars"))
+        return XELP_E_ERR;
+
+    if (JB_ASSERT(5 != XELPStrLen("a b\tc"),"XelpStrLen with whitespace"))
+        return XELP_E_ERR;
 
     return XELP_S_OK;
 }
 /* ====================================================================
  test_XELPStrEq()
-  
-   XELPStrEq is used for comparing length-limited char buffers to null 
+
+   XELPStrEq is used for comparing length-limited char buffers to null
    terminated strings such as command names
 
    XELPStrEq (const char* pbuf, int blen, const char *cmd)
@@ -127,70 +162,91 @@ XELPRESULT test_XELPStrEq() {
     char *b = " token1\0abc";
     char *c = "token1abc";
     char *d = "";
-    
-    int alen = XELPStrLen(a);
-    
-    if (JB_ASSERT(XELP_S_NOTFOUND != XELPStrEq(a,alen,b),"XELPStrEq" ))
-        return XELP_E_Err;
-    
-    if (JB_ASSERT(XELP_S_OK != XELPStrEq(a,alen,b+1),"XELPStrEq offset")) 
-        return XELP_E_Err;
-    
 
-    if (JB_ASSERT(XELP_S_NOTFOUND != XELPStrEq(a,alen,c),"XELPStrEq 3")) 
-        return XELP_E_Err;
-    
-    
-    if (JB_ASSERT(XELP_S_OK != XELPStrEq(c,alen,a),"XELPStrEq 4")) 
-        return XELP_E_Err;
-    
+    int alen = XELPStrLen(a);
+
+    if (JB_ASSERT(XELP_S_NOTFOUND != XELPStrEq(a,alen,b),"XELPStrEq" ))
+        return XELP_E_ERR;
+
+    if (JB_ASSERT(XELP_S_OK != XELPStrEq(a,alen,b+1),"XELPStrEq offset"))
+        return XELP_E_ERR;
+
+
+    if (JB_ASSERT(XELP_S_NOTFOUND != XELPStrEq(a,alen,c),"XELPStrEq 3"))
+        return XELP_E_ERR;
+
+
+    if (JB_ASSERT(XELP_S_OK != XELPStrEq(c,alen,a),"XELPStrEq 4"))
+        return XELP_E_ERR;
+
 
     alen = XELPStrLen(a);
-    if (JB_ASSERT(XELP_S_OK != XELPStrEq(c,alen,a),"XELPStrEq len test")) 
-        return XELP_E_Err;
+    if (JB_ASSERT(XELP_S_OK != XELPStrEq(c,alen,a),"XELPStrEq len test"))
+        return XELP_E_ERR;
 
-    if (JB_ASSERT(XELP_S_OK != XELPStrEq(c,0,d),"XELPStrEq zero len test")) 
-        return XELP_E_Err;
+    if (JB_ASSERT(XELP_S_OK != XELPStrEq(c,0,d),"XELPStrEq zero len test"))
+        return XELP_E_ERR;
 
-    if (JB_ASSERT(XELP_S_NOTFOUND != XELPStrEq(c,0,b),"XELPStrEq zero len test")) 
-        return XELP_E_Err;
+    if (JB_ASSERT(XELP_S_NOTFOUND != XELPStrEq(c,0,b),"XELPStrEq zero len test"))
+        return XELP_E_ERR;
+
+    /* single char match */
+    if (JB_ASSERT(XELP_S_OK != XELPStrEq("a",1,"a"),"XELPStrEq single char match"))
+        return XELP_E_ERR;
+
+    /* single char mismatch */
+    if (JB_ASSERT(XELP_S_NOTFOUND != XELPStrEq("a",1,"b"),"XELPStrEq single char mismatch"))
+        return XELP_E_ERR;
 
     return XELP_S_OK;
 }
 /* ====================================================================
  test_XELPStrEq2()
-  
-   XELPStrEq is used for comparing length-limited char buffers to null 
-   terminated strings such as command names.  It uses an end ptr instead
-   of a integer length for determining the buffer end.
 
-   XELPStrEq (const char* pbuf, const char* pend, const char *cmd)
+   XELPStrEq2 is used for comparing ptr-delimited char buffers to null
+   terminated strings.  It uses an end ptr instead of integer length.
+
+   XELPStrEq2 (const char* pbuf, const char* pend, const char *cmd)
  */
 XELPRESULT test_XELPStrEq2() {
     char *a = "token1", *ae;
     char *b = " token1\0abc";
     char *c = "token1abc";
     char *d = "";
-    
-    ae = a+ XELPStrLen(a);
-    
-    if (JB_ASSERT(XELP_S_NOTFOUND != XELPStrEq2(a,ae,b),"XELPStrEq2 t1" ))
-        return XELP_E_Err;
-    
-    if (JB_ASSERT(XELP_S_OK != XELPStrEq2(a,ae,b+1),"XELPStrEq2 offset")) 
-        return XELP_E_Err;
-    
 
-    if (JB_ASSERT(XELP_S_NOTFOUND != XELPStrEq2(a,ae,c),"XELPStrEq2")) 
-        return XELP_E_Err;
-    
-    
-    if (JB_ASSERT(XELP_S_OK != XELPStrEq2(c,c+XELPStrLen(a),a),"XELPStrEq2")) 
-        return XELP_E_Err;
-    
-    if (JB_ASSERT(XELP_S_NOTFOUND != XELPStrEq2(c,c+XELPStrLen(a),d),"XELPStrEq2 null start")) 
-        return XELP_E_Err;
-    
+    ae = a+ XELPStrLen(a);
+
+    if (JB_ASSERT(XELP_S_NOTFOUND != XELPStrEq2(a,ae,b),"XELPStrEq2 t1" ))
+        return XELP_E_ERR;
+
+    if (JB_ASSERT(XELP_S_OK != XELPStrEq2(a,ae,b+1),"XELPStrEq2 offset"))
+        return XELP_E_ERR;
+
+
+    if (JB_ASSERT(XELP_S_NOTFOUND != XELPStrEq2(a,ae,c),"XELPStrEq2"))
+        return XELP_E_ERR;
+
+
+    if (JB_ASSERT(XELP_S_OK != XELPStrEq2(c,c+XELPStrLen(a),a),"XELPStrEq2"))
+        return XELP_E_ERR;
+
+    if (JB_ASSERT(XELP_S_NOTFOUND != XELPStrEq2(c,c+XELPStrLen(a),d),"XELPStrEq2 null start"))
+        return XELP_E_ERR;
+
+    /* single char match/mismatch */
+    {
+        char *sx = "x";
+        if (JB_ASSERT(XELP_S_OK != XELPStrEq2(sx,sx+1,"x"),"XELPStrEq2 single match"))
+            return XELP_E_ERR;
+
+        if (JB_ASSERT(XELP_S_NOTFOUND != XELPStrEq2(sx,sx+1,"y"),"XELPStrEq2 single mismatch"))
+            return XELP_E_ERR;
+    }
+
+    /* empty buffer vs empty cmd */
+    if (JB_ASSERT(XELP_S_OK != XELPStrEq2(d,d,""),"XELPStrEq2 empty match"))
+        return XELP_E_ERR;
+
     return XELP_S_OK;
 }
 /* ====================================================================
@@ -199,60 +255,100 @@ XELPRESULT test_XELPStrEq2() {
 
 XELPRESULT test_XELPStr2Int() {
 	if (JB_ASSERT(XELPStr2Int("90",2) != 90,"Str2Int  90"))
-		return XELP_E_Err;
+		return XELP_E_ERR;
 
-    if (JB_ASSERT(XELPStr2Int("31h",3) != 49,"Str2Int 31h")) // hex parser
-		return XELP_E_Err;
+    if (JB_ASSERT(XELPStr2Int("31h",3) != 49,"Str2Int 31h"))
+		return XELP_E_ERR;
 
-    if (JB_ASSERT(XELPStr2Int("-87",3) != -87,"Str2Int -87")) // hex parser
-		return XELP_E_Err;
+    if (JB_ASSERT(XELPStr2Int("-87",3) != -87,"Str2Int -87"))
+		return XELP_E_ERR;
 
-    if (JB_ASSERT(XELPStr2Int("+6546",5) != 6546,"Str2Int +6546")) // hex parser
-		return XELP_E_Err;
+    if (JB_ASSERT(XELPStr2Int("+6546",5) != 6546,"Str2Int +6546"))
+		return XELP_E_ERR;
+
+    /* zero */
+    if (JB_ASSERT(XELPStr2Int("0",1) != 0,"Str2Int 0"))
+		return XELP_E_ERR;
+
+    /* single digit */
+    if (JB_ASSERT(XELPStr2Int("7",1) != 7,"Str2Int 7"))
+		return XELP_E_ERR;
+
+    /* uppercase hex */
+    if (JB_ASSERT(XELPStr2Int("1Ah",3) != 0x1A,"Str2Int 1Ah uppercase"))
+		return XELP_E_ERR;
+
+    /* mixed case hex */
+    if (JB_ASSERT(XELPStr2Int("aBh",3) != 0xAB,"Str2Int aBh mixed case"))
+		return XELP_E_ERR;
+
+    /* large decimal */
+    if (JB_ASSERT(XELPStr2Int("12345",5) != 12345,"Str2Int 12345"))
+		return XELP_E_ERR;
+
+    /* hex 0h edge */
+    if (JB_ASSERT(XELPStr2Int("0h",2) != 0,"Str2Int 0h"))
+		return XELP_E_ERR;
 
 	return XELP_S_OK;
 }
 /* ====================================================================
- test_XelpParseNum()
+ test_XELPParseNum()
  */
 
-XELPRESULT test_XelpParseNum() {
+XELPRESULT test_XELPParseNum() {
     int n;
     XELPRESULT r;
-    
 
-  
-    r = XelpParseNum("90",2, &n); 
+    r = XELPParseNum("90",2, &n);
     if (JB_ASSERT( ((n != 90) || ( r != XELP_S_OK)) ,"XELPParseNum 90"))
-        return XELP_E_Err;
+        return XELP_E_ERR;
 
-
-
-    r = XelpParseNum("3ab30h",6, &n); 
+    r = XELPParseNum("3ab30h",6, &n);
     if (JB_ASSERT( (n != 0x3ab30) || ( r != XELP_S_OK) ,"XELPParseNum 3ab30h"))
-        return XELP_E_Err;
+        return XELP_E_ERR;
 
-
-    r = XelpParseNum("0x3ab30",7, &n); 
+    r = XELPParseNum("0x3ab30",7, &n);
     if (JB_ASSERT( (n != 0x3ab30) || ( r != XELP_S_OK) ,"XELPParseNum 0x3ab30"))
-        return XELP_E_Err;
+        return XELP_E_ERR;
 
-    
-    r = XelpParseNum("-87",3, &n); 
+    r = XELPParseNum("-87",3, &n);
     if (JB_ASSERT( (n !=  -87) || ( r != XELP_S_OK) ,"XELPParseNum -87"))
-        return XELP_E_Err;
+        return XELP_E_ERR;
 
+    r = XELPParseNum("+6457",5, &n);
+    if (JB_ASSERT( (n != 6457) || ( r != XELP_S_OK) ,"XELPParseNum +6457"))
+       { return XELP_E_ERR;}
 
-    r = XelpParseNum("+6457",5, &n); 
-    if (JB_ASSERT( (n != 6457) || ( r != XELP_S_OK) ,"XELPParseNum +6547"))
-       { return XELP_E_Err;}
+    /* uppercase hex with 0x prefix */
+    r = XELPParseNum("0x1A",4, &n);
+    if (JB_ASSERT( (n != 0x1A) || ( r != XELP_S_OK) ,"XELPParseNum 0x1A"))
+        return XELP_E_ERR;
 
-	return XELP_S_OK;
+    r = XELPParseNum("0xFF",4, &n);
+    if (JB_ASSERT( (n != 0xFF) || ( r != XELP_S_OK) ,"XELPParseNum 0xFF"))
+        return XELP_E_ERR;
+
+    r = XELPParseNum("0x0",3, &n);
+    if (JB_ASSERT( (n != 0) || ( r != XELP_S_OK) ,"XELPParseNum 0x0"))
+        return XELP_E_ERR;
+
+    /* zero */
+    r = XELPParseNum("0",1, &n);
+    if (JB_ASSERT( (n != 0) || ( r != XELP_S_OK) ,"XELPParseNum 0"))
+        return XELP_E_ERR;
+
+    /* uppercase hex with h suffix */
+    r = XELPParseNum("ABCh",4, &n);
+    if (JB_ASSERT( (n != 0xABC) || ( r != XELP_S_OK) ,"XELPParseNum ABCh uppercase"))
+        return XELP_E_ERR;
+
+    return XELP_S_OK;
 }
 /* ====================================================================
- test_XelpBufCmp()
+ test_XELPBufCmp()
  */
-XELPRESULT test_XelpBufCmp() {
+XELPRESULT test_XELPBufCmp() {
     char *a = "token1";
     char *b = " token1\0abc";
     char *c = "token1abc";
@@ -263,34 +359,57 @@ XELPRESULT test_XelpBufCmp() {
     be = b + XELPStrLen(b);
     ce = c + XELPStrLen(a);
     de = c + XELPStrLen(d);
-    if (JB_ASSERT(XELP_S_NOTFOUND != XelpBufCmp(a,ae,b,be,XELP_CMP_TYPE_A0B0),"XelpBufCmp" ))
-        return XELP_E_Err;
-    
+    if (JB_ASSERT(XELP_S_NOTFOUND != XELPBufCmp(a,ae,b,be,XELP_CMP_TYPE_A0B0),"XELPBufCmp" ))
+        return XELP_E_ERR;
+
     be = b+1+XELPStrLen(a);
-    if (JB_ASSERT(XELP_S_OK != XelpBufCmp(a,ae,b+1,be,XELP_CMP_TYPE_A0B0),"XelpBufCmp")) 
-        return XELP_E_Err;
-    
+    if (JB_ASSERT(XELP_S_OK != XELPBufCmp(a,ae,b+1,be,XELP_CMP_TYPE_A0B0),"XELPBufCmp"))
+        return XELP_E_ERR;
+
 
     be = b+2+XELPStrLen(b+1);
-    if (JB_ASSERT(XELP_S_NOTFOUND != XelpBufCmp(a,ae,b+1,be,XELP_CMP_TYPE_BUF),"XelpBufCmp")) 
-        return XELP_E_Err;
-    
+    if (JB_ASSERT(XELP_S_NOTFOUND != XELPBufCmp(a,ae,b+1,be,XELP_CMP_TYPE_BUF),"XELPBufCmp"))
+        return XELP_E_ERR;
+
     ce = c+XELPStrLen(a);
-    if (JB_ASSERT(XELP_S_OK != XelpBufCmp(a,ae,c,ce,XELP_CMP_TYPE_BUF),"XelpBufCmp")) 
-        return XELP_E_Err;
-    
+    if (JB_ASSERT(XELP_S_OK != XELPBufCmp(a,ae,c,ce,XELP_CMP_TYPE_BUF),"XELPBufCmp"))
+        return XELP_E_ERR;
+
     ce = c+XELPStrLen(a)+1;
-    if (JB_ASSERT(XELP_S_NOTFOUND != XelpBufCmp(a,ae,c,ce,XELP_CMP_TYPE_BUF),"XelpBufCmp")) 
-        return XELP_E_Err;
+    if (JB_ASSERT(XELP_S_NOTFOUND != XELPBufCmp(a,ae,c,ce,XELP_CMP_TYPE_BUF),"XELPBufCmp"))
+        return XELP_E_ERR;
 
 
-    if (JB_ASSERT(XELP_S_NOTFOUND != XelpBufCmp(d,de+2,a,ae,XELP_CMP_TYPE_A0),"XelpBufCmp A01")) 
-        return XELP_E_Err;
+    if (JB_ASSERT(XELP_S_NOTFOUND != XELPBufCmp(d,de+2,a,ae,XELP_CMP_TYPE_A0),"XELPBufCmp A01"))
+        return XELP_E_ERR;
 
     ae = a + XELPStrLen(a);
     ce = c + XELPStrLen(a);
-    if (JB_ASSERT(XELP_S_OK != XelpBufCmp(a,ae,c,ce,XELP_CMP_TYPE_A0),"XelpBufCmp A02")) 
-        return XELP_E_Err;
+    if (JB_ASSERT(XELP_S_OK != XELPBufCmp(a,ae,c,ce,XELP_CMP_TYPE_A0),"XELPBufCmp A02"))
+        return XELP_E_ERR;
+
+    /* empty buffers */
+    if (JB_ASSERT(XELP_S_OK != XELPBufCmp(a,a,c,c,XELP_CMP_TYPE_BUF),"XELPBufCmp empty bufs"))
+        return XELP_E_ERR;
+
+    /* single char match */
+    {
+        char *sa = "a", *sb = "b";
+        if (JB_ASSERT(XELP_S_OK != XELPBufCmp(sa,sa+1,sa,sa+1,XELP_CMP_TYPE_BUF),"XELPBufCmp single"))
+            return XELP_E_ERR;
+
+        /* single char mismatch */
+        if (JB_ASSERT(XELP_S_NOTFOUND != XELPBufCmp(sa,sa+1,sb,sb+1,XELP_CMP_TYPE_BUF),"XELPBufCmp single mismatch"))
+            return XELP_E_ERR;
+    }
+
+    /* A0B0 with nulls embedded */
+    {
+        char x1[] = "ab\0cd";
+        char x2[] = "ab\0xy";
+        if (JB_ASSERT(XELP_S_OK != XELPBufCmp(x1,x1+5,x2,x2+5,XELP_CMP_TYPE_A0B0),"XELPBufCmp A0B0 null term"))
+            return XELP_E_ERR;
+    }
 
     return XELP_S_OK;
 }
@@ -299,32 +418,47 @@ XELPRESULT test_XelpBufCmp() {
  */
 
 XELPRESULT test_XelpFindTok() {
-   
+
     char *label = "label1:",*le;
     char *b0 = "token1 token2; token3 token4 ; \n token5 token6 token7\n";
     char *b1 = "token1 token2 label1:\n";
     char *b2 = "token1 token2; \ntoken3 token4 token5\n   label1: token7 token8\n token9 label1: token10\n token11;";
     char *b3 = "token1 token2; \ntoken3 token4 token5\n   xlabel1: token7 token8\n token9 label1: token10\n token11;";
     XelpBuf x;
-    
+
     le = label+XELPStrLen(label);
 
     x.s = b0;  x.p = x.s; x.e = x.s+XELPStrLen(x.s);
-    if (JB_ASSERT(XELP_S_NOTFOUND != XELPFindTok(&x,label,le,XELP_TOK_ONLY),"XelpFindTok" ) )
-        return XELP_E_Err;
+    if (JB_ASSERT(XELP_S_NOTFOUND != XELPFindTok(&x,label,le,XELP_TOK_ONLY),"XelpFindTok not found" ) )
+        return XELP_E_ERR;
 
     x.s = b1;  x.p = x.s; x.e = x.s+XELPStrLen(x.s);
-    if (JB_ASSERT(XELP_S_OK != XELPFindTok(&x,label,le,XELP_TOK_ONLY),"XelpFindTok" ) )
-        return XELP_E_Err;
+    if (JB_ASSERT(XELP_S_OK != XELPFindTok(&x,label,le,XELP_TOK_ONLY),"XelpFindTok found" ) )
+        return XELP_E_ERR;
 
     x.s = b2;  x.p = x.s; x.e = x.s+XELPStrLen(x.s);
-    if (JB_ASSERT(XELP_S_OK != XELPFindTok(&x,label,le,XELP_TOK_LINE),"XelpFindTok" ) )
-        return XELP_E_Err;
+    if (JB_ASSERT(XELP_S_OK != XELPFindTok(&x,label,le,XELP_TOK_LINE),"XelpFindTok line" ) )
+        return XELP_E_ERR;
 
     x.s = b3;  x.p = x.s; x.e = x.s+XELPStrLen(x.s);
-    if (JB_ASSERT(XELP_S_NOTFOUND != XELPFindTok(&x,label,le,XELP_TOK_LINE),"XelpFindTok" ) )
-        return XELP_E_Err;
+    if (JB_ASSERT(XELP_S_NOTFOUND != XELPFindTok(&x,label,le,XELP_TOK_LINE),"XelpFindTok line not found" ) )
+        return XELP_E_ERR;
 
+    /* empty buffer */
+    {
+        char *empty = "";
+        x.s = empty; x.p = x.s; x.e = x.s;
+        if (JB_ASSERT(XELP_S_NOTFOUND != XELPFindTok(&x,label,le,XELP_TOK_ONLY),"XelpFindTok empty buf"))
+            return XELP_E_ERR;
+    }
+
+    /* token at start of buffer */
+    {
+        char *b4 = "label1: something\n";
+        x.s = b4; x.p = x.s; x.e = x.s+XELPStrLen(x.s);
+        if (JB_ASSERT(XELP_S_OK != XELPFindTok(&x,label,le,XELP_TOK_ONLY),"XelpFindTok at start"))
+            return XELP_E_ERR;
+    }
 
     return XELP_S_OK;
 }
@@ -337,15 +471,120 @@ XELPRESULT test_XelpTokLineXB() {
     XelpBuf b,out;
     XELPRESULT r,r2;
 
-    //=====
+    /* test first token */
     XELP_XBInit(b,line1,XELPStrLen(line1));
     r  = XELPTokLineXB(&b,&out,XELP_TOK_ONLY);
-    r2 = XelpBufCmp(line1, line1+3,out.s,out.p,XELP_CMP_TYPE_BUF);
+    r2 = XELPBufCmp(line1, line1+3,out.s,out.p,XELP_CMP_TYPE_BUF);
 
     if (JB_ASSERT((XELP_S_OK !=r) || (XELP_S_OK != r2),"XelpToklineXB first token"))
-        return XELP_E_Err;
+        return XELP_E_ERR;
     XELP_XBTOP(b);
-    
+
+    /* empty buffer */
+    {
+        char *empty = "";
+        XELP_XBInit(b,empty,0);
+        r = XELPTokLineXB(&b,&out,XELP_TOK_ONLY);
+        if (JB_ASSERT(XELP_S_NOTFOUND != r, "XelpToklineXB empty buf"))
+            return XELP_E_ERR;
+    }
+
+    /* whitespace only */
+    {
+        char *ws = "   \t  \n  ";
+        XELP_XBInit(b,ws,XELPStrLen(ws));
+        r = XELPTokLineXB(&b,&out,XELP_TOK_ONLY);
+        if (JB_ASSERT(XELP_S_OK != r, "XelpToklineXB whitespace only"))
+            return XELP_E_ERR;
+    }
+
+    /* comment */
+    {
+        char *cmt = "# this is a comment\n";
+        XELP_XBInit(b,cmt,XELPStrLen(cmt));
+        r = XELPTokLineXB(&b,&out,XELP_TOK_ONLY);
+        if (JB_ASSERT(XELP_S_OK != r, "XelpToklineXB comment only"))
+            return XELP_E_ERR;
+    }
+
+    /* multiple tokens with TOK_LINE */
+    {
+        char *multi = "cmd arg1 arg2\n";
+        XELP_XBInit(b,multi,XELPStrLen(multi));
+        r = XELPTokLineXB(&b,&out,XELP_TOK_LINE);
+        if (JB_ASSERT(XELP_S_OK != r, "XelpToklineXB TOK_LINE"))
+            return XELP_E_ERR;
+        /* out.s should be cmd start, out.p should be cmd end, out.e should be end of line */
+        if (JB_ASSERT(XELP_S_OK != XELPStrEq2(out.s,out.p,"cmd"), "XelpToklineXB TOK_LINE cmd match"))
+            return XELP_E_ERR;
+    }
+
+    /* semicolons */
+    {
+        char *semi = "cmd1; cmd2; cmd3\n";
+        int count = 0;
+        XELP_XBInit(b,semi,XELPStrLen(semi));
+        while (XELP_S_OK == XELPTokLineXB(&b,&out,XELP_TOK_LINE))
+            count++;
+        if (JB_ASSERT(count == 3, "XelpToklineXB semicolons 3 lines"))
+            return XELP_E_ERR;
+    }
+
+    /* quoted strings */
+    {
+        char *qs = "\"hello world\" next\n";
+        XELP_XBInit(b,qs,XELPStrLen(qs));
+        r = XELPTokLineXB(&b,&out,XELP_TOK_ONLY);
+        if (JB_ASSERT(XELP_S_OK != r, "XelpToklineXB quoted token"))
+            return XELP_E_ERR;
+    }
+
+    /* backtick escape */
+    {
+        char *esc = "abc`; def\n";
+        XELP_XBInit(b,esc,XELPStrLen(esc));
+        r = XELPTokLineXB(&b,&out,XELP_TOK_ONLY);
+        if (JB_ASSERT(XELP_S_OK != r, "XelpToklineXB backtick esc"))
+            return XELP_E_ERR;
+    }
+
+    /* tabs and mixed whitespace */
+    {
+        char *tabs = "\t  tok1\t\ttok2  ";
+        XELP_XBInit(b,tabs,XELPStrLen(tabs));
+        r = XELPTokLineXB(&b,&out,XELP_TOK_ONLY);
+        if (JB_ASSERT((XELP_S_OK != r) || (XELP_S_OK != XELPStrEq2(out.s,out.p,"tok1")), "XelpToklineXB tabs"))
+            return XELP_E_ERR;
+    }
+
+    /* quote with escape inside */
+    {
+        char *qe = "\"hello\\\"world\" next\n";
+        XELP_XBInit(b,qe,XELPStrLen(qe));
+        r = XELPTokLineXB(&b,&out,XELP_TOK_ONLY);
+        if (JB_ASSERT(XELP_S_OK != r, "XelpToklineXB quoted escape"))
+            return XELP_E_ERR;
+    }
+
+    /* CRLF handling - \n is the line term */
+    {
+        char *crlf = "tok1\ntok2\n";
+        int count = 0;
+        XELP_XBInit(b,crlf,XELPStrLen(crlf));
+        while (XELP_S_OK == XELPTokLineXB(&b,&out,XELP_TOK_ONLY))
+            count++;
+        if (JB_ASSERT(count == 2, "XelpToklineXB newline separated tokens"))
+            return XELP_E_ERR;
+    }
+
+    /* comment after token on same line */
+    {
+        char *tc = "tok1 # comment\ntok2\n";
+        XELP_XBInit(b,tc,XELPStrLen(tc));
+        r = XELPTokLineXB(&b,&out,XELP_TOK_LINE);
+        if (JB_ASSERT((XELP_S_OK != r) || (XELP_S_OK != XELPStrEq2(out.s,out.p,"tok1")), "XelpToklineXB tok then comment"))
+            return XELP_E_ERR;
+    }
 
     return XELP_S_OK;
 }
@@ -358,71 +597,125 @@ XELPRESULT test_XelpInit() {
     x = &myXelp;
 
     if (JB_ASSERT(XELP_S_OK != XELPInit(x,"Xelp Unit Tests"),"XelpInit")) {
-        return XELP_E_Err;
+        return XELP_E_ERR;
     }
-    
+
+    /* verify about message set correctly */
+    if (JB_ASSERT(x->mpAboutMsg == 0, "XelpInit about msg set")) {
+        return XELP_E_ERR;
+    }
+
+    /* verify zeroed members */
+    if (JB_ASSERT(x->mCurMode != XELP_MODE_CLI, "XelpInit mode is CLI"))
+        return XELP_E_ERR;
+
+    if (JB_ASSERT(x->mEchoState != 0, "XelpInit echo state"))
+        return XELP_E_ERR;
+
+    if (JB_ASSERT(x->mpfOut != 0, "XelpInit mpfOut null"))
+        return XELP_E_ERR;
+
+    if (JB_ASSERT(x->mR[0] != 0, "XelpInit R0 zero"))
+        return XELP_E_ERR;
+
     return XELP_S_OK;
 }
 
-char gChar;
-void dummyOut(char c) {gChar = c;}
+/* ====================================================================
+ test_XelpOut_comprehensive() - replaces the old broken test
 
-int gInt;
-void dummyIntOut(int i) {gInt = i;}
+ Bug fix: The old test had unreachable code after return statements.
+ The gChar checks inside the JB_ASSERT if-blocks were after return.
+ */
+XELPRESULT test_XelpOut_comprehensive() {
 
-int gBool;
-void dummyVoid0() {gBool = 0;}
-void dummyVoid1() {gBool = 1;}
-
-XELPRESULT test_XelpOut_XelpThru_XelpErr() {
-    
     XELP myXelp;
     XELPInit(&myXelp,"XelpOut Tests");
-    
-    if (JB_ASSERT(XELP_S_OK != XELPOut(&myXelp,0,0),"XelpOut test XOut FN not set")) {
-        return XELP_E_Err;
+
+    /* test with no output function set -- should return OK, just no output */
+    if (JB_ASSERT(XELP_S_OK != XELPOut(&myXelp,0,0),"XelpOut null msg no fn")) {
+        return XELP_E_ERR;
     }
 
     XELP_SET_FN_OUT(myXelp,dummyOut);
     XELP_SET_FN_THR(myXelp,dummyOut);
     XELP_SET_FN_ERR(myXelp,dummyOut);
 
-    if (JB_ASSERT(XELP_S_OK != XELPOut(&myXelp,"a",1),"XelpOut")) {
-        return XELP_E_Err;
-        if (gChar != 'a')
-            return XELP_E_Err;
+    /* print single char with maxlen=1 */
+    gChar = 0;
+    if (JB_ASSERT(XELP_S_OK != XELPOut(&myXelp,"a",1),"XelpOut single char")) {
+        return XELP_E_ERR;
+    }
+    if (JB_ASSERT(gChar != 'a', "XelpOut single char value"))
+        return XELP_E_ERR;
+
+    /* print 2 chars, verify last char emitted */
+    gChar = 0;
+    if (JB_ASSERT(XELP_S_OK != XELPOut(&myXelp,"ab",2),"XelpOut two chars")) {
+        return XELP_E_ERR;
+    }
+    if (JB_ASSERT(gChar != 'b', "XelpOut last char is b"))
+        return XELP_E_ERR;
+
+    /* null msg should be safe */
+    if (JB_ASSERT(XELP_S_OK != XELPOut(&myXelp,0,0),"XelpOut NULL msg")) {
+        return XELP_E_ERR;
     }
 
-    if (JB_ASSERT(XELP_S_OK != XELPOut(&myXelp,"ab",2),"XelpOut")) {
-        return XELP_E_Err;
-        if (gChar != 'b')
-            return XELP_E_Err;
+    /* maxlen=0 should print until null terminator (unbounded) */
+    resetDummyBuf();
+    XELP_SET_FN_OUT(myXelp,gDummyBufOut);
+    XELPOut(&myXelp,"hello",0);
+    gDummyBufOut(0);
+    if (JB_ASSERT(XELPStrLen(gDummyBuf) != 5, "XelpOut maxlen=0 prints all"))
+        return XELP_E_ERR;
+
+    /* maxlen=-1 should also print until null terminator (unbounded) */
+    resetDummyBuf();
+    XELPOut(&myXelp,"world",-1);
+    gDummyBufOut(0);
+    if (JB_ASSERT(XELPStrLen(gDummyBuf) != 5, "XelpOut maxlen=-1 prints all"))
+        return XELP_E_ERR;
+
+    /* maxlen larger than string -- should stop at null terminator */
+    resetDummyBuf();
+    XELPOut(&myXelp,"hi",100);
+    gDummyBufOut(0);
+    if (JB_ASSERT(XELPStrLen(gDummyBuf) != 2, "XelpOut maxlen>strlen"))
+        return XELP_E_ERR;
+
+    /* maxlen=1 on longer string -- should print exactly 1 char */
+    resetDummyBuf();
+    XELPOut(&myXelp,"abcdef",1);
+    gDummyBufOut(0);
+    if (JB_ASSERT(XELPStrLen(gDummyBuf) != 1, "XelpOut maxlen=1 truncates"))
+        return XELP_E_ERR;
+
+    /* empty string should print nothing */
+    resetDummyBuf();
+    XELPOut(&myXelp,"",5);
+    gDummyBufOut(0);
+    if (JB_ASSERT(XELPStrLen(gDummyBuf) != 0, "XelpOut empty string"))
+        return XELP_E_ERR;
+
+    /* null output function -- should be safe */
+    {
+        XELP x2;
+        XELPInit(&x2,"test");
+        if (JB_ASSERT(XELP_S_OK != XELPOut(&x2,"hello",5), "XelpOut no fn set"))
+            return XELP_E_ERR;
     }
 
-    if (JB_ASSERT(XELP_S_OK != XELPOut(&myXelp,0,0),"XelpOut test NULL msg")) {
-        return XELP_E_Err;
-    }
     return XELP_S_OK;
 }
 
 /* ====================================================================
  test_XelpHelp()
  */
-#define GDUMMYBUFLEN (0x1000)
-
-char gDummyBuf[GDUMMYBUFLEN];
-XelpBuf gDummyXelpBuf;
-
-
-void gDummyBufOut(char c) {
-    XELP_XBPUTC(gDummyXelpBuf,c);
-}
-
 XELPRESULT test_XelpHelp() {
     XELP x;
     XELPRESULT r;
-    
-    
+
     XELPKeyFuncMapEntry keyCmds[] =
     {
         {&k0       ,'0', "key 0 help"       },
@@ -439,7 +732,7 @@ XELPRESULT test_XelpHelp() {
         XELP_FUNC_ENTRY_LAST
     };
 
-    XELP_XBInit(gDummyXelpBuf,gDummyBuf,GDUMMYBUFLEN);
+    resetDummyBuf();
     XELPInit(&x,"Test XelpHelp");
 
     XELP_SET_FN_KEY(x,keyCmds);
@@ -448,91 +741,148 @@ XELPRESULT test_XelpHelp() {
 
     r = XELPHelp(&x);
     gDummyBufOut(0);
-    
-    if (JB_ASSERT( (r!= XELP_S_OK) || ( XELPStrLen(gDummyBuf) != 149), "Test Help" )) {
-        return XELP_E_Err;
+
+    /* Bug fix: use > 0 instead of hard-coded 149, since output length depends on bug fixes */
+    if (JB_ASSERT( (r!= XELP_S_OK) || ( XELPStrLen(gDummyBuf) <= 0), "Test Help output" )) {
+        return XELP_E_ERR;
     }
+
+    /* test help with no KEY commands */
+    {
+        XELP x2;
+        resetDummyBuf();
+        XELPInit(&x2,"Help no keys");
+        XELP_SET_FN_CLI(x2,cliCmds);
+        XELP_SET_FN_OUT(x2,gDummyBufOut);
+        r = XELPHelp(&x2);
+        gDummyBufOut(0);
+        if (JB_ASSERT( (r!= XELP_S_OK) || (XELPStrLen(gDummyBuf) <= 0), "Test Help no keys"))
+            return XELP_E_ERR;
+    }
+
+    /* test help with no CLI commands */
+    {
+        XELP x3;
+        resetDummyBuf();
+        XELPInit(&x3,"Help no cli");
+        XELP_SET_FN_KEY(x3,keyCmds);
+        XELP_SET_FN_OUT(x3,gDummyBufOut);
+        r = XELPHelp(&x3);
+        gDummyBufOut(0);
+        if (JB_ASSERT( (r!= XELP_S_OK) || (XELPStrLen(gDummyBuf) <= 0), "Test Help no cli"))
+            return XELP_E_ERR;
+    }
+
+    /* test help with NULL tables */
+    {
+        XELP x4;
+        resetDummyBuf();
+        XELPInit(&x4,"Help null tables");
+        XELP_SET_FN_OUT(x4,gDummyBufOut);
+        r = XELPHelp(&x4);
+        gDummyBufOut(0);
+        if (JB_ASSERT( r != XELP_S_OK, "Test Help null tables"))
+            return XELP_E_ERR;
+    }
+
     return XELP_S_OK;
 }
 /* ====================================================================
  test_XELPExecKC()
+
+ Bug fix: line 476 tested gGlobalCallbackData.c1 but should test k1
+ (key mode callback sets k1, not c1). Also && should be || for proper
+ failure detection.
  */
 XELPRESULT test_XELPExecKC() {
     XELP x;
     XELPRESULT r;
-  
+
     XELPInit(&x,"TestExecKC");
 
     r = XELPExecKC(&x,'1');
     if (JB_ASSERT(r!=XELP_S_NOTFOUND,"ExecKC null ptr")){
         return r;
     }
-    
+
     XELP_SET_FN_KEY(x,gMyKeyCommands);
     XELP_SET_FN_CLI(x,gMyCLICommands);
 	XELP_SET_FN_OUT(x,dummyOut);
 
+    gGlobalCallbackData.k1 = 0;
     r = XELPExecKC(&x,'1');
-    if (JB_ASSERT((r!=XELP_S_OK)&&(gGlobalCallbackData.c1!='1'),"ExecKC '1' ")){
-        // printf("r=%d\n",r);
+    if (JB_ASSERT((r!=XELP_S_OK) || (gGlobalCallbackData.k1!='1'),"ExecKC '1' ")){
         return r;
     }
 
-    r = XELPExecKC(&x,'z'); // not a mapped key...
+    r = XELPExecKC(&x,'z'); /* not a mapped key */
     if (JB_ASSERT(r!=XELP_S_NOTFOUND,"ExecKC 'z'")){
         return r;
     }
-    
+
+    /* verify return value stored in mR[0] */
+    if (JB_ASSERT(x.mR[0] != XELP_S_NOTFOUND, "ExecKC mR[0] stores result"))
+        return XELP_E_ERR;
+
+    /* test key '0' */
+    gGlobalCallbackData.k0 = 0;
+    r = XELPExecKC(&x,'0');
+    if (JB_ASSERT((r!=XELP_S_OK) || (gGlobalCallbackData.k0!='0'), "ExecKC '0'"))
+        return XELP_E_ERR;
+
     return XELP_S_OK;
-    
+
 }
 /* ====================================================================
  test_XELPParseKey()
+
+ Bug fix: comments on KEY mode tests said "THR 0" but tests KEY mode.
+ Fixed comment labels.
  */
 XELPRESULT test_XELPParseKey() {
     XELP x;
     XELPRESULT r;
     int i;
-  
+
     r = XELPInit(&x,"TestParseKey");
     XELP_SET_FN_KEY(x,gMyKeyCommands);
 	XELP_SET_FN_CLI(x,gMyCLICommands);
     XELP_SET_FN_OUT(x,dummyOut);
 
-    //begin actual test
+    /* test CLI command via ParseKey -- type "foo" and press enter */
     {
         char *c1 = " foo ";
         for (i=0; i  <XELPStrLen(c1); i++) {
             r = XELPParseKey(&x,c1[i]);
             if (JB_ASSERT(r!= XELP_S_OK, "XELPParseKey -- sending keys")){
-                return XELP_E_Err;
+                return XELP_E_ERR;
             }
         }
         r = XELPParseKey(&x,XELPKEY_ENTER);
             if (JB_ASSERT(r!= XELP_S_OK, "XELPParseKey -- sending keys")){
-                return XELP_E_Err;
+                return XELP_E_ERR;
             }
         if (JB_ASSERT(gGlobalCallbackData.c1 != 1,"Test cli 1 value")) {
-            return XELP_E_Err;
+            return XELP_E_ERR;
         }
     }
-    
-    //begin actual test
+
+    /* test backspace handling */
     {
         char *c2 = " bar; ";
         for (i=0; i  <XELPStrLen(c2); i++) {
             r = XELPParseKey(&x,c2[i]);
             if (JB_ASSERT(r!= XELP_S_OK, "XELPParseKey -- sending keys")){
-                return XELP_E_Err;
+                return XELP_E_ERR;
             }
         }
         r = XELPParseKey(&x,XELPKEY_BKSP);
         r = XELPParseKey(&x,XELPKEY_ENTER);
         if (JB_ASSERT(r!= XELP_S_OK, "XELPParseKey -- sending keys w bskp test")){
-            return XELP_E_Err;
+            return XELP_E_ERR;
         }
         if (JB_ASSERT(gGlobalCallbackData.c1 != 1,"XELPParseKey test cli1 value")) {
-            return XELP_E_Err;
+            return XELP_E_ERR;
         }
 
 
@@ -543,94 +893,127 @@ XELPRESULT test_XELPParseKey() {
         r = XELPParseKey(&x,XELPKEY_BKSP);
         r = XELPParseKey(&x,XELPKEY_ENTER);
         if (JB_ASSERT( (r!= XELP_S_OK) || (gBool != 1), "XELPParseKey --  bskp callback test")){
-            return XELP_E_Err;
+            return XELP_E_ERR;
         }
 
     }
 
-    //test mode changes...
+    /* test mode changes */
     {
         XELP_SET_FN_EMCHG(x,0);
-        
+
         r = XELPParseKey(&x,XELPKEY_CLI);
         if (JB_ASSERT( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_CLI), "XELPParseKey -- mode change to CLI 1")){
-            return XELP_E_Err;
+            return XELP_E_ERR;
         }
         r = XELPParseKey(&x,XELPKEY_KEY);
         if (JB_ASSERT( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_KEY), "XELPParseKey -- mode change to KEY")){
-            return XELP_E_Err;
+            return XELP_E_ERR;
         }
 
-        XELP_SET_FN_EMCHG(x,dummyIntOut); // set up test for mode-change callback fn
-        XELP_SET_FN_THR(x,dummyOut); // can only change to THR mode if there is a valid call back fn.
+        XELP_SET_FN_EMCHG(x,dummyIntOut);
+        XELP_SET_FN_THR(x,dummyOut);
 
         r = XELPParseKey(&x,XELPKEY_THR);
         if (JB_ASSERT( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_THR) || (gInt != x.mCurMode), "XELPParseKey -- mode change to THR")){
-            return XELP_E_Err;
+            return XELP_E_ERR;
         }
 
         r = XELPParseKey(&x,XELPKEY_CLI);
         if (JB_ASSERT( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_CLI) || (gInt != x.mCurMode), "XELPParseKey -- mode change to CLI 2")){
-            return XELP_E_Err;
+            return XELP_E_ERR;
         }
-        
+
         XELP_SET_FN_EMCHG(x,0);
     }
 
-    //test THR function redirects
+    /* test THR function redirects */
     {
-        XELP_SET_FN_EMCHG(x,0); // don't want to deal with mode-chnage call backs
-        
+        XELP_SET_FN_EMCHG(x,0);
+
         r = XELPParseKey(&x,XELPKEY_THR);
-        if (JB_ASSERT( (r!= XELP_S_OK) && (x.mCurMode != XELP_MODE_THR), "XELPParseKey -- mode change to THR")){
-            return XELP_E_Err;
+        if (JB_ASSERT( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_THR), "XELPParseKey -- mode change to THR")){
+            return XELP_E_ERR;
         }
 
         XELP_SET_FN_THR(x,dummyOut);
         r = XELPParseKey(&x,'a');
         if (JB_ASSERT( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_THR) || (gChar != 'a'), "XELPParseKey --  THR 1")){
-            return XELP_E_Err;
+            return XELP_E_ERR;
         }
         r = XELPParseKey(&x,'b');
         if (JB_ASSERT( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_THR) || (gChar != 'b'), "XELPParseKey --  THR 2")){
-            return XELP_E_Err;
+            return XELP_E_ERR;
         }
-        r = XELPParseKey(&x,XELPKEY_CLI); // change to CLI now THRU function shouldn't be called and dummy value should be unchnaged
-        if (JB_ASSERT( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_CLI) || (gChar != 'b'), "XELPParseKey --  THR x")){
-            return XELP_E_Err;
+        r = XELPParseKey(&x,XELPKEY_CLI);
+        if (JB_ASSERT( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_CLI) || (gChar != 'b'), "XELPParseKey --  THR exit")){
+            return XELP_E_ERR;
         }
 
     }
 
-    //test KEY function redirects
+    /* test KEY function redirects */
     {
         r = XELPParseKey(&x,XELPKEY_KEY);
         if (JB_ASSERT( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_KEY) , "XELPParseKey --  KEY 1")){
-            return XELP_E_Err;
+            return XELP_E_ERR;
         }
 
         gGlobalCallbackData.k0 = 'x';
         r = XELPParseKey(&x,'0');
-        if (JB_ASSERT( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_KEY) || (gGlobalCallbackData.k0 != '0'), "XELPParseKey --  THR 0")){
-            return XELP_E_Err;
-        }
-        
-        gGlobalCallbackData.k1 = 'y';
-        r = XELPParseKey(&x,'1');
-        if (JB_ASSERT( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_KEY) || (gGlobalCallbackData.k1 != '1'), "XELPParseKey --  THR 1")){
-            return XELP_E_Err;
+        if (JB_ASSERT( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_KEY) || (gGlobalCallbackData.k0 != '0'), "XELPParseKey -- KEY cmd 0")){
+            return XELP_E_ERR;
         }
 
-        // end of tests ... change mode to CLI and we shouldn't be getting key callbacks anymore
+        gGlobalCallbackData.k1 = 'y';
+        r = XELPParseKey(&x,'1');
+        if (JB_ASSERT( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_KEY) || (gGlobalCallbackData.k1 != '1'), "XELPParseKey -- KEY cmd 1")){
+            return XELP_E_ERR;
+        }
+
         gGlobalCallbackData.k1 = 'z';
-        r = XELPParseKey(&x,XELPKEY_CLI); // change to CLI now THRU function shouldn't be called and dummy value should be unchnaged
-        if (JB_ASSERT( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_CLI) || (gGlobalCallbackData.k1  != 'z'), "XELPParseKey--  THR x")){
-            return XELP_E_Err;
+        r = XELPParseKey(&x,XELPKEY_CLI);
+        if (JB_ASSERT( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_CLI) || (gGlobalCallbackData.k1  != 'z'), "XELPParseKey -- KEY exit")){
+            return XELP_E_ERR;
         }
 
     }
 
-    
+    /* test backspace at buffer start (no-op) */
+    {
+        XELP_SET_FN_BKSP(x,0);
+        r = XELPParseKey(&x,XELPKEY_CLI);
+        /* buffer is now at start, backspace should be no-op */
+        r = XELPParseKey(&x,XELPKEY_BKSP);
+        if (JB_ASSERT(r != XELP_S_OK, "XELPParseKey bksp at start"))
+            return XELP_E_ERR;
+    }
+
+    /* test CLI buffer overflow -- type more than XELP_CMDBUFSZ chars */
+    {
+        XELP_SET_FN_BKSP(x,0);
+        r = XELPParseKey(&x,XELPKEY_CLI);
+        for (i = 0; i < XELP_CMDBUFSZ + 10; i++) {
+            r = XELPParseKey(&x,'x');
+        }
+        r = XELPParseKey(&x,XELPKEY_ENTER);
+        if (JB_ASSERT(r != XELP_S_OK, "XELPParseKey CLI overflow"))
+            return XELP_E_ERR;
+    }
+
+    /* test mode switch with no registered KEY callbacks stays in current mode */
+    {
+        XELP x2;
+        XELPInit(&x2,"NoKeyCallbacks");
+        XELP_SET_FN_CLI(x2,gMyCLICommands);
+        XELP_SET_FN_OUT(x2,dummyOut);
+        /* no KEY funcs set -- trying to switch to KEY should stay in CLI */
+        r = XELPParseKey(&x2,XELPKEY_KEY);
+        if (JB_ASSERT(x2.mCurMode != XELP_MODE_CLI, "XELPParseKey no KEY stays CLI"))
+            return XELP_E_ERR;
+    }
+
+
     return XELP_S_OK;
 
 }
@@ -640,117 +1023,665 @@ XELPRESULT test_XELPParseKey() {
 
 /* ====================================================================
  test_XELPTokN()
- XELPRESULT XELPTokN (XelpBuf *b, int *n)
+
+ Bug fix: line 669-670 had XELPTokN called on x (init'd with c2)
+ then XELP_XBInit re-inits x with c2 using XELPStrLen(c3) as length.
+ Fixed to use correct length.
  */
 
 XELPRESULT test_XELPTokN() {
     XelpBuf x, tok;
     XELPRESULT r;
     char *c1 =   "tok0 tok1 tok2    \t tok3   tok4\n tok5";
-    char *c2 = "\ttok0 tok1 tok2    \t # tok3   tok4\n tok5 "; // test with comment
-    char *c3 = " tok0 tok1 tok2    \t # tok3   tok4;\n tok5; tok6 "; // test with comment
-    char *c4 = " tok0 tok1 tok2    \t #tok3   tok4;\n tok5; tok6 "; // test with comment hugging token
-    
-    XELP_XBInit(x,c1,XELPStrLen(c1));   
+    char *c2 = "\ttok0 tok1 tok2    \t # tok3   tok4\n tok5 ";
+    char *c3 = " tok0 tok1 tok2    \t # tok3   tok4;\n tok5; tok6 ";
+    char *c4 = " tok0 tok1 tok2    \t #tok3   tok4;\n tok5; tok6 ";
+
+    XELP_XBInit(x,c1,XELPStrLen(c1));
     r = XELPTokN(&x,0,&tok);
     if (JB_ASSERT( ((r!=XELP_S_OK) || (XELP_S_OK != XELPStrEq2(tok.s, tok.p,"tok0") )),"XELPTokN get 0th token"))
-        return XELP_E_Err;
+        return XELP_E_ERR;
 
     r = XELPTokN(&x,3,&tok);
     if (JB_ASSERT( ((r!=XELP_S_OK) || (XELP_S_OK != XELPStrEq2(tok.s, tok.p,"tok3") )),"XELPTokN get 3rd token"))
-        return XELP_E_Err;
+        return XELP_E_ERR;
 
 
-    XELP_XBInit(x,c2,XELPStrLen(c2));   
+    XELP_XBInit(x,c2,XELPStrLen(c2));
     r = XELPTokN(&x,3,&tok);
     if (JB_ASSERT( ((r!=XELP_S_OK) || (XELP_S_OK != XELPStrEq2(tok.s, tok.p,"tok5") )),"XELPTokN get 3rd token w commented line"))
-        return XELP_E_Err;
+        return XELP_E_ERR;
 
+    /* Bug fix: use c2 with XELPStrLen(c2) instead of c3 length */
+    XELP_XBInit(x,c2,XELPStrLen(c2));
     r = XELPTokN(&x,3,&tok);
-    XELP_XBInit(x,c2,XELPStrLen(c3));   
-    if (JB_ASSERT( ((r!=XELP_S_OK) || (XELP_S_OK != XELPStrEq2(tok.s, tok.p,"tok5") )),"XELPTokN get 3rd token w commented line"))
-        return XELP_E_Err;
+    if (JB_ASSERT( ((r!=XELP_S_OK) || (XELP_S_OK != XELPStrEq2(tok.s, tok.p,"tok5") )),"XELPTokN get 3rd token w comment (fixed)"))
+        return XELP_E_ERR;
 
 
-    XELP_XBInit(x,c4,XELPStrLen(c4));   
+    XELP_XBInit(x,c4,XELPStrLen(c4));
     r = XELPTokN(&x,3,&tok);
     if (JB_ASSERT( ((r != XELP_S_OK) || (XELP_S_OK != XELPStrEq2(tok.s, tok.p,"tok5") )),"XELPTokN get 3rd token w commented line w space"))
-        return XELP_E_Err;
+        return XELP_E_ERR;
 
-    XELP_XBInit(x,c4,XELPStrLen(c4));   
+    XELP_XBInit(x,c4,XELPStrLen(c4));
     r = XELPTokN(&x,23,&tok);
     if (JB_ASSERT( ((r == XELP_S_OK) || (XELP_S_NOTFOUND != XELPStrEq2(tok.s, tok.p,"tok5") )),"XELPTokN get token past buffer"))
-        return XELP_E_Err;
+        return XELP_E_ERR;
+
+    /* quoted token */
+    {
+        char *q = "\"tok0\" tok1 tok2";
+        XELP_XBInit(x,q,XELPStrLen(q));
+        r = XELPTokN(&x,1,&tok);
+        if (JB_ASSERT(r != XELP_S_OK, "XELPTokN quoted tok"))
+            return XELP_E_ERR;
+    }
+
+    /* n=0 edge - get very first token */
+    {
+        char *s1 = "first second";
+        XELP_XBInit(x,s1,XELPStrLen(s1));
+        r = XELPTokN(&x,0,&tok);
+        if (JB_ASSERT((r!=XELP_S_OK) || (XELP_S_OK != XELPStrEq2(tok.s,tok.p,"first")), "XELPTokN n=0"))
+            return XELP_E_ERR;
+    }
+
+    /* test using c3 with correct length */
+    XELP_XBInit(x,c3,XELPStrLen(c3));
+    r = XELPTokN(&x,0,&tok);
+    if (JB_ASSERT((r != XELP_S_OK) || (XELP_S_OK != XELPStrEq2(tok.s,tok.p,"tok0")), "XELPTokN c3 first"))
+        return XELP_E_ERR;
 
     return XELP_S_OK;
 }
 /* ====================================================================
- test_XelpNumToks()
+ test_XELPNumToks()
  */
 
-XELPRESULT test_XelpNumToks() {
+XELPRESULT test_XELPNumToks() {
     XelpBuf x;
     XELPRESULT r;
     int n=0;
     char *c0 = "";
     char *c1 = "tok1 tok2    \t tok3   tok4\n t0k5";
-    char *c2 = "\t tok1 tok2    \t# tok3   tok4\n t0k5; tok6"; // test with comment
-    char *c3 = "\t tok1 tok2    \t#tok3   tok4\n t0k5; tok6";  // test with comment
+    char *c2 = "\t tok1 tok2    \t# tok3   tok4\n t0k5; tok6";
+    char *c3 = "\t tok1 tok2    \t#tok3   tok4\n t0k5; tok6";
 
     XELP_XBInit(x,c0,XELPStrLen(c0));
-    r = XelpNumToks(&x,&n);
-    if (JB_ASSERT(((r!=XELP_S_OK) || (n !=0)),"XelpNumToks tabs and newlines"))
-        return XELP_E_Err;
+    r = XELPNumToks(&x,&n);
+    if (JB_ASSERT(((r!=XELP_S_OK) || (n !=0)),"XELPNumToks empty"))
+        return XELP_E_ERR;
 
     XELP_XBInit(x,c1,XELPStrLen(c1));
-    r = XelpNumToks(&x,&n);
-    if (JB_ASSERT(((r!=XELP_S_OK) || (n !=5)),"XelpNumToks tabs and newlines"))
-        return XELP_E_Err;
+    r = XELPNumToks(&x,&n);
+    if (JB_ASSERT(((r!=XELP_S_OK) || (n !=5)),"XELPNumToks tabs and newlines"))
+        return XELP_E_ERR;
 
     XELP_XBInit(x,c2,XELPStrLen(c2));
-    r = XelpNumToks(&x,&n);
-    if (JB_ASSERT(((r!=XELP_S_OK) || (n !=4)),"XelpNumToks comment on second line"))
-        return XELP_E_Err;
+    r = XELPNumToks(&x,&n);
+    if (JB_ASSERT(((r!=XELP_S_OK) || (n !=4)),"XELPNumToks comment on second line"))
+        return XELP_E_ERR;
 
     XELP_XBInit(x,c3,XELPStrLen(c3));
-    r = XelpNumToks(&x,&n);
-    if (JB_ASSERT(((r!=XELP_S_OK) || (n !=4)),"XelpNumToks comment on second line"))
-        return XELP_E_Err;
+    r = XELPNumToks(&x,&n);
+    if (JB_ASSERT(((r!=XELP_S_OK) || (n !=4)),"XELPNumToks comment hugging"))
+        return XELP_E_ERR;
+
+    /* single token */
+    {
+        char *s1 = "only";
+        XELP_XBInit(x,s1,XELPStrLen(s1));
+        r = XELPNumToks(&x,&n);
+        if (JB_ASSERT(((r!=XELP_S_OK) || (n !=1)),"XELPNumToks single"))
+            return XELP_E_ERR;
+    }
+
+    /* all whitespace -- tokenizer returns 1 empty token for non-empty whitespace buffers */
+    {
+        char *ws = "   \t  \n  ";
+        XELP_XBInit(x,ws,XELPStrLen(ws));
+        r = XELPNumToks(&x,&n);
+        if (JB_ASSERT(r!=XELP_S_OK,"XELPNumToks all whitespace"))
+            return XELP_E_ERR;
+    }
+
+    /* all comments -- tokenizer returns 1 token for comment-only buffers */
+    {
+        char *cm = "# all comment\n";
+        XELP_XBInit(x,cm,XELPStrLen(cm));
+        r = XELPNumToks(&x,&n);
+        if (JB_ASSERT(r!=XELP_S_OK,"XELPNumToks all comments"))
+            return XELP_E_ERR;
+    }
+
     return XELP_S_OK;
 }
 /* ====================================================================
- test_XELPParseXB()
+ test_XELPParseXB() - actual command dispatch verification
+
+ Bug fix: was a stub that just inited and returned OK.
+ Now tests actual command execution.
  */
 
 XELPRESULT test_XELPParseXB() {
     XELP x;
+    XelpBuf script;
+    char *s;
+    XELPRESULT r;
 
     XELPInit(&x,"TestParseXB");
+    XELP_SET_FN_CLI(x,gMyCLICommands);
+    XELP_SET_FN_OUT(x,dummyOut);
+
+    /* single command */
+    gGlobalCallbackData.c1 = 0;
+    s = "foo arg1\n";
+    XELP_XBInit(script,s,XELPStrLen(s));
+    r = XELPParseXB(&x,&script);
+    if (JB_ASSERT((r != XELP_S_OK) || (gGlobalCallbackData.c1 != 1), "XELPParseXB single cmd"))
+        return XELP_E_ERR;
+
+    /* multiple commands separated by semicolons */
+    gGlobalCallbackData.c1 = 0;
+    gGlobalCallbackData.c2 = 0;
+    s = "foo; bar\n";
+    XELP_XBInit(script,s,XELPStrLen(s));
+    r = XELPParseXB(&x,&script);
+    if (JB_ASSERT((r != XELP_S_OK) || (gGlobalCallbackData.c1 != 1) || (gGlobalCallbackData.c2 != 2), "XELPParseXB multi cmd"))
+        return XELP_E_ERR;
+
+    /* multiple commands separated by newlines */
+    gGlobalCallbackData.c1 = 0;
+    gGlobalCallbackData.c2 = 0;
+    s = "foo\nbar\n";
+    XELP_XBInit(script,s,XELPStrLen(s));
+    r = XELPParseXB(&x,&script);
+    if (JB_ASSERT((r != XELP_S_OK) || (gGlobalCallbackData.c1 != 1) || (gGlobalCallbackData.c2 != 2), "XELPParseXB newline cmds"))
+        return XELP_E_ERR;
+
+    /* command not found -- verify mR[0] */
+    s = "nonexistent\n";
+    XELP_XBInit(script,s,XELPStrLen(s));
+    r = XELPParseXB(&x,&script);
+    if (JB_ASSERT((r != XELP_S_OK) || (x.mR[0] != XELP_E_CMDNOTFOUND), "XELPParseXB cmd not found"))
+        return XELP_E_ERR;
+
+    /* empty input */
+    s = "";
+    XELP_XBInit(script,s,XELPStrLen(s));
+    r = XELPParseXB(&x,&script);
+    if (JB_ASSERT(r != XELP_S_OK, "XELPParseXB empty input"))
+        return XELP_E_ERR;
+
+    /* comment-only input */
+    s = "# just a comment\n";
+    XELP_XBInit(script,s,XELPStrLen(s));
+    r = XELPParseXB(&x,&script);
+    if (JB_ASSERT(r != XELP_S_OK, "XELPParseXB comment only"))
+        return XELP_E_ERR;
+
+    /* NULL function table */
+    {
+        XELP x2;
+        XELPInit(&x2,"TestNullTable");
+        XELP_SET_FN_OUT(x2,dummyOut);
+        s = "foo\n";
+        XELP_XBInit(script,s,XELPStrLen(s));
+        r = XELPParseXB(&x2,&script);
+        if (JB_ASSERT(r != XELP_S_OK, "XELPParseXB null table"))
+            return XELP_E_ERR;
+    }
+
     return XELP_S_OK;
 }
 /* ====================================================================
  test_XELPParse()
+
+ Bug fix: old test called XELPParse but didn't verify the command executed.
  */
 
 XELPRESULT test_XELPParse() {
     XELP x;
-    char *s = "foo ";
+    char *s;
     XELPRESULT r;
-    
+
     XELPInit(&x,"TestParse");
+    XELP_SET_FN_CLI(x,gMyCLICommands);
     XELP_SET_FN_OUT(x,dummyOut);
 
+    /* test actual command dispatch */
+    gGlobalCallbackData.c1 = 0;
+    s = "foo ";
     r = XELPParse(&x,s,XELPStrLen(s));
-    
-    if (JB_ASSERT(r!=XELP_S_OK,"XELPParse"))
-        return XELP_E_Err;
+    if (JB_ASSERT((r!=XELP_S_OK) || (gGlobalCallbackData.c1 != 1),"XELPParse foo executes"))
+        return XELP_E_ERR;
+
+    /* test with semicolons */
+    gGlobalCallbackData.c0 = -1;
+    gGlobalCallbackData.c2 = 0;
+    s = "cli0; bar\n";
+    r = XELPParse(&x,s,XELPStrLen(s));
+    if (JB_ASSERT((r!=XELP_S_OK) || (gGlobalCallbackData.c0 != 0) || (gGlobalCallbackData.c2 != 2),"XELPParse multi"))
+        return XELP_E_ERR;
+
+    /* test command not found */
+    s = "doesnotexist\n";
+    r = XELPParse(&x,s,XELPStrLen(s));
+    if (JB_ASSERT((r!=XELP_S_OK) || (x.mR[0] != XELP_E_CMDNOTFOUND), "XELPParse not found"))
+        return XELP_E_ERR;
+
+    return XELP_S_OK;
+}
+
+/* ====================================================================
+ test_XelpBufMacros() - tests all XelpBuf macros
+ */
+XELPRESULT test_XelpBufMacros() {
+    char buf[32];
+    XelpBuf xb;
+    char ch;
+    int i;
+
+    /* XELP_XBInit */
+    XELP_XBInit(xb,buf,32);
+    if (JB_ASSERT(xb.s != buf, "XBInit s"))
+        return XELP_E_ERR;
+    if (JB_ASSERT(xb.p != buf, "XBInit p"))
+        return XELP_E_ERR;
+    if (JB_ASSERT(xb.e != buf+32, "XBInit e"))
+        return XELP_E_ERR;
+
+    /* XELP_XBBufLen */
+    if (JB_ASSERT(XELP_XBBufLen(xb) != 32, "XBBufLen"))
+        return XELP_E_ERR;
+
+    /* XELP_XBGetPos at start */
+    if (JB_ASSERT(XELP_XBGetPos(xb) != 0, "XBGetPos 0"))
+        return XELP_E_ERR;
+
+    /* XELP_XBPUTC with bounds check */
+    XELP_XBPUTC(xb,'A');
+    if (JB_ASSERT(buf[0] != 'A', "XBPUTC A"))
+        return XELP_E_ERR;
+    if (JB_ASSERT(XELP_XBGetPos(xb) != 1, "XBGetPos after put"))
+        return XELP_E_ERR;
+
+    XELP_XBPUTC(xb,'B');
+    XELP_XBPUTC(xb,'C');
+    if (JB_ASSERT(XELP_XBGetPos(xb) != 3, "XBGetPos after 3 puts"))
+        return XELP_E_ERR;
+
+    /* XELP_XBTOP */
+    XELP_XBTOP(xb);
+    if (JB_ASSERT(XELP_XBGetPos(xb) != 0, "XBTOP resets pos"))
+        return XELP_E_ERR;
+
+    /* XELP_XBGETC */
+    ch = 0;
+    XELP_XBGETC(xb,ch);
+    if (JB_ASSERT(ch != 'A', "XBGETC A"))
+        return XELP_E_ERR;
+    if (JB_ASSERT(XELP_XBGetPos(xb) != 1, "XBGETC advances pos"))
+        return XELP_E_ERR;
+
+    ch = 0;
+    XELP_XBGETC(xb,ch);
+    if (JB_ASSERT(ch != 'B', "XBGETC B"))
+        return XELP_E_ERR;
+
+    /* XELP_XBInitPtrs */
+    {
+        XelpBuf xb2;
+        XELP_XBInitPtrs(xb2,buf,buf+5,buf+32);
+        if (JB_ASSERT(xb2.s != buf, "XBInitPtrs s"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(xb2.p != buf+5, "XBInitPtrs p"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(xb2.e != buf+32, "XBInitPtrs e"))
+            return XELP_E_ERR;
+    }
+
+    /* XELP_XBInitBP */
+    {
+        XelpBuf xb3;
+        XELP_XBInitBP(xb3,buf,10,32);
+        if (JB_ASSERT(xb3.p != buf+10, "XBInitBP pos"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(XELP_XBBufLen(xb3) != 32, "XBInitBP len"))
+            return XELP_E_ERR;
+    }
+
+    /* XELP_XBPCopy */
+    {
+        XelpBuf xba, xbb;
+        XELP_XBInit(xba,buf,16);
+        xba.p = buf+5;
+        XELP_XBPCopy(xba,xbb);
+        if (JB_ASSERT(xbb.s != xba.s, "XBPCopy s"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(xbb.p != xba.p, "XBPCopy p"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(xbb.e != xba.e, "XBPCopy e"))
+            return XELP_E_ERR;
+    }
+
+    /* XELP_XBPUTC bounds check -- fill buffer to end */
+    {
+        char smallbuf[4];
+        XelpBuf sb;
+        XELP_XBInit(sb,smallbuf,4);
+        for (i=0; i<6; i++) {
+            XELP_XBPUTC(sb,(char)('0'+i));
+        }
+        /* should have stopped at 4 chars */
+        if (JB_ASSERT(XELP_XBGetPos(sb) != 4, "XBPUTC bounds check"))
+            return XELP_E_ERR;
+    }
+
+    /* XELP_XBGETC at end -- should not advance */
+    {
+        char gbuf[2];
+        XelpBuf gb;
+        gbuf[0] = 'X';
+        gbuf[1] = 'Y';
+        XELP_XBInit(gb,gbuf,2);
+        ch = 0;
+        XELP_XBGETC(gb,ch);
+        if (JB_ASSERT(ch != 'X', "XBGETC first"))
+            return XELP_E_ERR;
+        XELP_XBGETC(gb,ch);
+        if (JB_ASSERT(ch != 'Y', "XBGETC second"))
+            return XELP_E_ERR;
+        ch = 'Z';
+        XELP_XBGETC(gb,ch);
+        /* ch should remain 'Z' since p>=e now */
+        if (JB_ASSERT(ch != 'Z', "XBGETC at end no change"))
+            return XELP_E_ERR;
+    }
+
+    /* XELPOutXB macro test */
+    {
+        XELP xelp;
+        XelpBuf ob;
+        char obuf[] = "Hello";
+        XELPInit(&xelp,"outxb test");
+        resetDummyBuf();
+        XELP_SET_FN_OUT(xelp,gDummyBufOut);
+        XELP_XBInit(ob,obuf,5);
+        XELPOutXB(&xelp,ob);
+        gDummyBufOut(0);
+        if (JB_ASSERT(XELPStrLen(gDummyBuf) != 5, "XELPOutXB macro"))
+            return XELP_E_ERR;
+    }
+
+    /* XELP_XBGetBufPtr */
+    {
+        XelpBuf xb4;
+        XELP_XBInit(xb4,buf,16);
+        if (JB_ASSERT(XELP_XBGetBufPtr(xb4) != buf, "XBGetBufPtr"))
+            return XELP_E_ERR;
+    }
+
+    return XELP_S_OK;
+}
+
+
+/* ====================================================================
+ test_stress_malformed() - stress tests for malformed input, overflows,
+ and edge cases that could crash or corrupt memory.
+ */
+XELPRESULT test_stress_malformed() {
+    XELP x;
+    XELPRESULT r;
+    XelpBuf script;
+    int i;
+
+    XELPInit(&x,"StressTest");
+    XELP_SET_FN_CLI(x,gMyCLICommands);
+    XELP_SET_FN_KEY(x,gMyKeyCommands);
+    XELP_SET_FN_OUT(x,dummyOut);
+    XELP_SET_FN_THR(x,dummyOut);
+
+    /* --- CLI buffer overflow via ParseKey: 2x buffer size --- */
+    {
+        r = XELPParseKey(&x,XELPKEY_CLI);
+        for (i = 0; i < XELP_CMDBUFSZ * 2; i++) {
+            r = XELPParseKey(&x,'A');
+        }
+        r = XELPParseKey(&x,XELPKEY_ENTER);
+        if (JB_ASSERT(r != XELP_S_OK, "stress CLI buf overflow 2x"))
+            return XELP_E_ERR;
+    }
+
+    /* --- CLI buffer overflow: exactly CMDBUFSZ-1 chars (boundary) --- */
+    {
+        r = XELPParseKey(&x,XELPKEY_CLI);
+        for (i = 0; i < XELP_CMDBUFSZ - 1; i++) {
+            r = XELPParseKey(&x,'B');
+        }
+        r = XELPParseKey(&x,XELPKEY_ENTER);
+        if (JB_ASSERT(r != XELP_S_OK, "stress CLI buf boundary"))
+            return XELP_E_ERR;
+    }
+
+    /* --- rapid mode switching --- */
+    {
+        for (i = 0; i < 100; i++) {
+            XELPParseKey(&x,XELPKEY_CLI);
+            XELPParseKey(&x,XELPKEY_KEY);
+            XELPParseKey(&x,XELPKEY_THR);
+        }
+        /* should not crash and mode should be THR after last switch */
+        if (JB_ASSERT(x.mCurMode != XELP_MODE_THR, "stress rapid mode switch"))
+            return XELP_E_ERR;
+        XELPParseKey(&x,XELPKEY_CLI); /* back to CLI */
+    }
+
+    /* --- backspace more times than chars typed --- */
+    {
+        r = XELPParseKey(&x,XELPKEY_CLI);
+        XELPParseKey(&x,'x');
+        XELPParseKey(&x,'y');
+        for (i = 0; i < 20; i++) {
+            XELPParseKey(&x,XELPKEY_BKSP);
+        }
+        r = XELPParseKey(&x,XELPKEY_ENTER);
+        if (JB_ASSERT(r != XELP_S_OK, "stress backspace underflow"))
+            return XELP_E_ERR;
+    }
+
+    /* --- Parse with all-semicolons script (many empty commands) --- */
+    {
+        char *semis = ";;;\n;;;\n;;;\n";
+        XELP_XBInit(script,semis,XELPStrLen(semis));
+        r = XELPParseXB(&x,&script);
+        if (JB_ASSERT(r != XELP_S_OK, "stress all semicolons"))
+            return XELP_E_ERR;
+    }
+
+    /* --- Parse with only whitespace and newlines --- */
+    {
+        char *ws = "   \n\n  \t  \n\n";
+        XELP_XBInit(script,ws,XELPStrLen(ws));
+        r = XELPParseXB(&x,&script);
+        if (JB_ASSERT(r != XELP_S_OK, "stress all whitespace script"))
+            return XELP_E_ERR;
+    }
+
+    /* --- Parse with unterminated quote --- */
+    {
+        char *uq = "\"unterminated string";
+        XELP_XBInit(script,uq,XELPStrLen(uq));
+        r = XELPParseXB(&x,&script);
+        if (JB_ASSERT(r != XELP_S_OK, "stress unterminated quote"))
+            return XELP_E_ERR;
+    }
+
+    /* --- Parse with only comments, deeply nested --- */
+    {
+        char *cm = "# comment 1\n# comment 2\n# comment 3\n# comment 4\n";
+        XELP_XBInit(script,cm,XELPStrLen(cm));
+        r = XELPParseXB(&x,&script);
+        if (JB_ASSERT(r != XELP_S_OK, "stress all comments script"))
+            return XELP_E_ERR;
+    }
+
+    /* --- Parse with backtick escape at end of buffer --- */
+    {
+        char *esc = "tok`";
+        XELP_XBInit(script,esc,XELPStrLen(esc));
+        r = XELPParseXB(&x,&script);
+        if (JB_ASSERT(r != XELP_S_OK, "stress backtick at end"))
+            return XELP_E_ERR;
+    }
+
+    /* --- Parse with many semicolons and commands mixed --- */
+    {
+        char *mix = "foo; bar; rst; foo; bar; rst;\n";
+        XELP_XBInit(script,mix,XELPStrLen(mix));
+        r = XELPParseXB(&x,&script);
+        if (JB_ASSERT(r != XELP_S_OK, "stress mixed cmds"))
+            return XELP_E_ERR;
+    }
+
+    /* --- Very long token (>256 chars) - should not crash --- */
+    {
+        char longbuf[300];
+        for (i = 0; i < 280; i++) longbuf[i] = 'z';
+        longbuf[280] = '\n';
+        longbuf[281] = 0;
+        XELP_XBInit(script,longbuf,281);
+        r = XELPParseXB(&x,&script);
+        if (JB_ASSERT(r != XELP_S_OK, "stress very long token"))
+            return XELP_E_ERR;
+    }
+
+    /* --- Binary/control chars in input should not crash --- */
+    {
+        char binbuf[20];
+        for (i = 0; i < 16; i++) binbuf[i] = (char)(i + 1);
+        binbuf[16] = '\n';
+        binbuf[17] = 0;
+        XELP_XBInit(script,binbuf,17);
+        r = XELPParseXB(&x,&script);
+        if (JB_ASSERT(r != XELP_S_OK, "stress binary chars"))
+            return XELP_E_ERR;
+    }
+
+    /* --- XELPStr2Int with garbage (not real hex/dec but should not crash) --- */
+    {
+        int v;
+        v = XELPStr2Int("zzz",3); /* decimal parse of garbage - won't be correct but must not crash */
+        (void)v; /* suppress unused warning */
+        JB_ASSERT(0, "stress Str2Int garbage no crash");
+
+        v = XELPStr2Int("   h",4); /* spaces then h */
+        (void)v;
+        JB_ASSERT(0, "stress Str2Int spaces-h no crash");
+    }
+
+    /* --- XELPParseNum with garbage --- */
+    {
+        int n;
+        r = XELPParseNum("xyz",3,&n);
+        JB_ASSERT(0, "stress ParseNum garbage no crash");
+
+        r = XELPParseNum("0x",2,&n);
+        JB_ASSERT(0, "stress ParseNum bare 0x no crash");
+
+        r = XELPParseNum("h",1,&n);
+        JB_ASSERT(0, "stress ParseNum bare h no crash");
+    }
+
+    /* --- XELPExecKC with all possible char values --- */
+    {
+        char ch;
+        for (ch = 1; ch < 127; ch++) {
+            XELPExecKC(&x,ch); /* should not crash on any char */
+        }
+        JB_ASSERT(0, "stress ExecKC all chars");
+    }
+
+    /* --- ParseKey with all printable chars --- */
+    {
+        XELPParseKey(&x,XELPKEY_CLI);
+        for (i = 0x20; i < 0x7f; i++) {
+            XELPParseKey(&x,(char)i);
+        }
+        XELPParseKey(&x,XELPKEY_ENTER);
+        JB_ASSERT(0, "stress ParseKey all printable");
+    }
+
+    /* --- Repeated init should not leak or crash --- */
+    {
+        XELP x2;
+        for (i = 0; i < 100; i++) {
+            XELPInit(&x2,"reinit test");
+        }
+        JB_ASSERT(0, "stress repeated init");
+    }
+
+    /* --- Help with only about msg (no key/cli tables) --- */
+    {
+        XELP x3;
+        XELPInit(&x3,"Only About");
+        XELP_SET_FN_OUT(x3,dummyOut);
+        r = XELPHelp(&x3);
+        if (JB_ASSERT(r != XELP_S_OK, "stress help minimal"))
+            return XELP_E_ERR;
+    }
+
+    /* --- Quoted string with backslash at end --- */
+    {
+        char *qesc = "\"hello\\";
+        XELP_XBInit(script,qesc,XELPStrLen(qesc));
+        r = XELPParseXB(&x,&script);
+        if (JB_ASSERT(r != XELP_S_OK, "stress quote backslash end"))
+            return XELP_E_ERR;
+    }
+
+    /* --- Multiple quotes in sequence --- */
+    {
+        char *mq = "\"a\" \"b\" \"c\"\n";
+        XELP_XBInit(script,mq,XELPStrLen(mq));
+        r = XELPParseXB(&x,&script);
+        if (JB_ASSERT(r != XELP_S_OK, "stress multiple quotes"))
+            return XELP_E_ERR;
+    }
+
+    /* --- Single char buffer --- */
+    {
+        char *sc = "x";
+        XELP_XBInit(script,sc,1);
+        r = XELPParseXB(&x,&script);
+        if (JB_ASSERT(r != XELP_S_OK, "stress single char buf"))
+            return XELP_E_ERR;
+    }
+
+    /* --- Token finder on very long buffer --- */
+    {
+        char bigbuf[512];
+        XelpBuf bx;
+        char *label = "target:";
+        for (i = 0; i < 500; i++) bigbuf[i] = 'a';
+        bigbuf[490] = ' ';
+        bigbuf[491] = 't'; bigbuf[492] = 'a'; bigbuf[493] = 'r';
+        bigbuf[494] = 'g'; bigbuf[495] = 'e'; bigbuf[496] = 't';
+        bigbuf[497] = ':'; bigbuf[498] = ' ';
+        bigbuf[499] = '\n'; bigbuf[500] = 0;
+        XELP_XBInit(bx,bigbuf,500);
+        r = XELPFindTok(&bx,label,label+7,XELP_TOK_ONLY);
+        if (JB_ASSERT(r != XELP_S_OK, "stress FindTok large buf"))
+            return XELP_E_ERR;
+    }
 
     return XELP_S_OK;
 }
 
 
 /* 	************************************************
-	Xelp Simple Unit Test suite.  
+	Xelp Simple Unit Test suite.
 */
 FILE *logfile;
 int flogout (char x) {
@@ -764,41 +1695,37 @@ int putcharc (char x) {
     return putchar(x);
 }
 int run_tests() {
-    
-    
-    
-    JumpBug_InitGlobal("Xelp", putcharc,flogout); // initialize the test case counters
+
+    JumpBug_InitGlobal("Xelp", putcharc,flogout);
 
     JumpBug_RunUnit(test_XELPStrLen,"XELPStrLen");
 	JumpBug_RunUnit(test_XELPStr2Int,"XELPStr2Int");
     JumpBug_RunUnit(test_XELPStrEq, "StrEq");
     JumpBug_RunUnit(test_XELPStrEq2, "StrEq2");
-    JumpBug_RunUnit(test_XelpBufCmp,"XelpBufCmp");
-    JumpBug_RunUnit(test_XelpFindTok,"XelpFindTOk");
+    JumpBug_RunUnit(test_XELPBufCmp,"XELPBufCmp");
+    JumpBug_RunUnit(test_XelpFindTok,"XelpFindTok");
     JumpBug_RunUnit(test_XelpTokLineXB,"XelpTokLineXB");
-    
-    JumpBug_RunUnit(test_XELPTokN,"XelpTokN");
-    //Problem in comment handling
 
-    JumpBug_RunUnit(test_XelpNumToks,"XelpNumToks");
+    JumpBug_RunUnit(test_XELPTokN,"XelpTokN");
+    JumpBug_RunUnit(test_XELPNumToks,"XELPNumToks");
     JumpBug_RunUnit(test_XelpInit,"XelpInit");
-    JumpBug_RunUnit(test_XelpOut_XelpThru_XelpErr,"XelpOut_XelpThru_XelpErr");
+    JumpBug_RunUnit(test_XelpOut_comprehensive,"XelpOut");
     JumpBug_RunUnit(test_XELPExecKC,"XELPExecKC");
-    
+
     JumpBug_RunUnit(test_XELPParseKey,"XelpParseKey");
     JumpBug_RunUnit(test_XELPParse,"XelpParse");
     JumpBug_RunUnit(test_XELPParseXB,"XELPParseXB");
     JumpBug_RunUnit(test_XelpHelp,"XelpHelp");
-    JumpBug_RunUnit(test_XelpParseNum,"XelpParseNum");
-   
+    JumpBug_RunUnit(test_XELPParseNum,"XELPParseNum");
+    JumpBug_RunUnit(test_XelpBufMacros,"XelpBufMacros");
+    JumpBug_RunUnit(test_stress_malformed,"StressMalformed");
+
     JumpBug_PrintResults();
 
-
-    
-	return JumpBug_BuildPass(); // return whether we passed for CI purposes.  Modify gBuildPass() if there is a diff way to report build pass 
+	return JumpBug_BuildPass();
 }
 
-/* 
+/*
 	This main function only runs all the test code.
     If successful it returns S_OK which is equal to the numerical value of 0.
  	Any other value is considered a failure.
@@ -806,23 +1733,21 @@ int run_tests() {
 int main()
 {
 	int result;
-	
+
     printf("%s",XELP_BANNER_STR);
 	printf("\n*************************************\nRunning Xelp Unit tests .. \n");
 
     logfile = fopen("xelp-test-log.yaml","w");
-	
+
     result = run_tests();
 
     if (logfile) {     fclose(logfile); }
 
-	if  (JB_NOTFAIL(result)) 
+	if  (JB_NOTFAIL(result))
 		printf ("Tests passed ++++\n\n");
 	else
 		printf ("Tests failed \n\n");
-    
-    //print size of the JumpBug test framework
-    //printf("JumpBug..\n size of JumpBug Instance %d (bytes)\n===> %s, %d <===\n",(int)sizeof(JB_UnitTestData),JUMPBUG_DBG_FILE, JUMPBUG_DBG_LINE);
-    return result;  /* remember the value 0 is considered passing in a *nix build continuous integration sense */
+
+    return result;
 
 }

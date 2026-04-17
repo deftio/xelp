@@ -111,7 +111,7 @@
  simple math an variable passing.
  XELP_STACK_DEPTH specifies depth in integers of the machine
  */
-#define XELP_STACK_OPS 
+#define XELP_STACK_MACHINE
 #define XELP_STACK_DEPTH  (16)   
 
 
@@ -126,7 +126,7 @@
  */
 
 
-//#define XELP_ENABLE_FULL	  1
+/* #define XELP_ENABLE_FULL	  1 */
 
 
 #endif	/* XELP_CONFIG_OVERRIDE (not used)*/

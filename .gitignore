@@ -33,6 +33,10 @@
 *.asm
 *.rel
 *.s
+*.hex
+*.bin
+*.elf
+*.map
 
 # Coverage and profiling
 *.gcov

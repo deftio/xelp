@@ -5,26 +5,49 @@ All notable changes to xelp will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+The version source of truth is `XELP_VERSION` in `src/xelp.h` (hex format).
+
 ## [Unreleased]
 
+### Fixed
+- Fixed 10 bugs across xelp.h, xelp.c, xelpcfg.h:
+  - `XELPOutXB` macro parentheses
+  - `XELP_XBGETC` macro read from wrong pointer
+  - `_XOUTC` macro used GCC-only statement expressions
+  - `XELPOut` with maxlen=0 printed nothing (now prints until null)
+  - `XELPStr2Int` and `XELPParseNum` did not handle uppercase hex (A-F)
+  - Duplicate `XELP_T_OK` macro definition
+  - `XELP_STACK_OPS` / `XELP_STACK_MACHINE` name mismatch in xelpcfg.h
+  - C89-incompatible `//` comment in xelpcfg.h
+- Fixed 7 bugs in unit tests (unreachable code, wrong fields, stubs, etc.)
+- Fixed all remaining `//` comments in src/ for C89 compliance
+
 ### Changed
-- Reorganized repository structure
-  - Moved web assets (index.html, libs/) to `site/`
-  - Moved build/utility scripts to `scripts/` and `tools/`
-  - Moved visual QA report files to `tests/qa_visual_report/`
-  - Moved extra example code to `examples/`
+- **API naming consistency**: all public functions now use `XELP` prefix
+  - `XelpNumToks` -> `XELPNumToks`
+  - `XelpParseNum` -> `XELPParseNum`
+  - `XelpBufCmp` -> `XELPBufCmp`
+- **Status code naming**: all uppercase per C convention
+  - `XELP_W_Warn` -> `XELP_W_WARN`
+  - `XELP_E_Err` -> `XELP_E_ERR`
+  - `XELP_E_CmdBufFull` -> `XELP_E_CMDBUFFULL`
+  - `XELP_E_CmdNotFound` -> `XELP_E_CMDNOTFOUND`
+- Reorganized repository structure (pages/, docs/, tools/, dev/)
 - Replaced defunct Travis CI with GitHub Actions CI
-- Updated `.gitignore` to cover build artifacts, OS files, editor files
-- Removed tracked build artifacts (.gcda, .DS_Store) from repository
-- Removed obsolete files (old makefiles, naming brainstorm, code fragments, favicon zips)
+- Updated `.gitignore` for build artifacts
+- Rewrote README.md
+- `XELP_VERSION` in xelp.h is now the sole version source of truth
 
 ### Added
-- `VERSION` file as single source of truth for version string
-- `release_management.md` documenting the build, test, and release workflow
-- `CONTRIBUTING.md` with contribution guidelines
-- `CHANGELOG.md` (this file)
-- `.github/workflows/ci.yml` for automated testing on push/PR
-- `tests/qa_visual_report/README.md` explaining retained visual report assets
+- 100% line coverage of xelp.c (207 test cases across 19 units)
+- Stress and hardening tests for malformed input
+- Makefile `coverage` target
+- Markdown documentation: API reference, configuration guide, porting guide
+- Docker cross-compilation tooling (`tools/crossbuild.sh`)
+- Banner generator tool (`tools/generate_banner.py`)
+- Release script (`tools/make_release.sh`)
+- Bare-metal and multi-instance examples
+- `CONTRIBUTING.md`, `CHANGELOG.md`
 
 ## [0.2.1] - 2024-06-05
 

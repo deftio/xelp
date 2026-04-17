@@ -105,14 +105,12 @@ typedef int XELPREG;
 #endif
 
 #define XELP_S_NOTFOUND	    (2)
-#define XELP_W_Warn   		(1)
+#define XELP_W_WARN   		(1)
 #define XELP_S_OK	 		(0)
 
-#define XELP_E_Err			(-1)
-#define XELP_E_CmdBufFull 	(-2)
-#define XELP_E_CmdNotFound  (-3)
-
-#define XELP_T_OK(r) ((r)>=0) 	/* simple macro for testing OK or warning only */
+#define XELP_E_ERR			(-1)
+#define XELP_E_CMDBUFFULL 	(-2)
+#define XELP_E_CMDNOTFOUND  (-3)
 
 #define XELP_T_OK(r) ((r)>=0) 	/* simple macro for testing OK or warning (e.g. not a failure) */
 
@@ -163,7 +161,7 @@ typedef struct {
 /* XelpBuf writing and setting */
 #define XELP_XBPUTC(x,ch)                {if (x.p<x.e){*(x.p)++ =ch;}}                   /* write char to buf */
 #define XELP_XBPUTC_RAW(x,ch)            {*(x.p)++=ch;}                                  /* write char to buf no bounds check*/
-#define XELP_XBGETC(x,ch)                {if (x.p<x.e)(ch=(*x.e);x.e++})                 /* get next char */
+#define XELP_XBGETC(x,ch)                {if (x.p<x.e){ch=(*x.p);x.p++;}}                /* get next char */
 #define XELP_XBTOP(x)                    {x.p=x.s;}                                      /* set pos ptr to beginning */
 
 
@@ -311,7 +309,7 @@ XELPRESULT XELPHelp	        (XELP *ths);                             /* print on
 
 /* Xelp API functions */
 XELPRESULT XELPOut 		    (XELP *ths, const char* msg, int maxlen);/* print function                  */
-#define XELPOutXB(x,xb)     (XELPOut(x,xb.p,(int((xb.e-xb.p)))       /* print a XelpBuf from cur pos    */
+#define XELPOutXB(x,xb)     (XELPOut(x,xb.p,(int)(xb.e-xb.p)))       /* print a XelpBuf from cur pos    */
 XELPRESULT XELPExecKC		(XELP *ths, char key);				     /* execute key command             */
 XELPRESULT XELPParse 		(XELP *ths, const char *buf, int blen);  /* execute CLI or script commands  */
 XELPRESULT XELPParseXB      (XELP *ths, XelpBuf *script);            /* execute CLI or script commands  */
@@ -319,22 +317,22 @@ XELPRESULT XELPParseKey 	(XELP *ths, char key);				     /* handle keypress at CL
 
 /* XELPTokLine is the main tokenizer which can get next token or line at time                           */
 /* XELPRESULT XELPTokLine (const char *buf, int blen, const char **t0s, const char **t0e, const char **eol, int srchType); */
-//XELPRESULT XELPTokLine ( char *buf, char *bufend, const char **t0s, const char **t0e, const char **eol, int srchType); 
+/* XELPRESULT XELPTokLine ( char *buf, char *bufend, const char **t0s, const char **t0e, const char **eol, int srchType); */
 XELPRESULT XELPTokLineXB (XelpBuf *buf, XelpBuf *tok, int srchType);
 XELPRESULT XELPTokN (XelpBuf *buf, int n, XelpBuf *tok);
-XELPRESULT XelpNumToks (XelpBuf *buf, int *n);
+XELPRESULT XELPNumToks (XelpBuf *buf, int *n);
 
 /* XELPNEXTTOK get next token in a string buffer.  This is just a macro call to XELPTokLine             */
-//#define    XELPNEXTTOK(buf,blen,tok_s,tok_e)    (XELPTokLine(buf, buf+blen, tok_s, tok_e, 0, XELP_TOK_ONLY))
+/* #define    XELPNEXTTOK(buf,blen,tok_s,tok_e)    (XELPTokLine(buf, buf+blen, tok_s, tok_e, 0, XELP_TOK_ONLY)) */
 int        XELPStrLen(const char* c);                               /* compute length of null terminated string. */ 
 XELPRESULT XELPStrEq (const char* pbuf, int blen, const char *cmd);
 XELPRESULT XELPStrEq2 (const char* pbuf, const char* pend, const char *cmd);
 int        XELPStr2Int(const char* s,int  maxlen);                  /* parse a str->int accepts hex as 123h or signed decimal num.  no safety for non-num chars */   
-XELPRESULT XelpParseNum (const char* s, int maxlen, int* n);        /* parse a str returns a number if successful */
+XELPRESULT XELPParseNum (const char* s, int maxlen, int* n);        /* parse a str returns a number if successful */
 XELPRESULT XELPFindTok(XelpBuf *x, const char *t0s, const char *t0e, int srchType); /* find matching tok (next tok || next label) */
 
-/* XelpBufCmp() compare buffers / string */
-XELPRESULT XelpBufCmp (const char *as, const char *ae, const char *bs, const char * be, int cmpType); 
+/* XELPBufCmp() compare buffers / string */
+XELPRESULT XELPBufCmp (const char *as, const char *ae, const char *bs, const char * be, int cmpType); 
 #define XELP_CMP_TYPE_BUF   (0x00) /* both buffers are only tested for byte for byte comparison by length (\0 is ignored)       */
 #define XELP_CMP_TYPE_A0    (0x01) /* buffer a also treats \0 as a end of buffer                                                */
 #define XELP_CMP_TYPE_A0B0  (0x11) /* if either buffer has \0 that is treated as the end of the buffer like in stdlib::strcmp() */
