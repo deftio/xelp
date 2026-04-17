@@ -1,3 +1,4 @@
+#!/bin/bash
 echo "building all architectures..."
 make clean
 

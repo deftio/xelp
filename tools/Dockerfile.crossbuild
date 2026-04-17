@@ -1,0 +1,25 @@
+FROM ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    gcc \
+    clang \
+    gcc-multilib \
+    gcc-aarch64-linux-gnu \
+    gcc-arm-none-eabi \
+    gcc-msp430 \
+    gcc-avr \
+    gcc-m68hc1x \
+    gcc-powerpc-linux-gnu \
+    tcc \
+    binutils \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /xelp
+
+COPY src/ src/
+COPY tools/compactbuilds-docker.sh tools/compactbuilds-docker.sh
+
+CMD ["/bin/bash", "/xelp/tools/compactbuilds-docker.sh"]
