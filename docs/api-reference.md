@@ -203,7 +203,10 @@ Compare two buffers. `cmpType` controls null-terminator handling:
 
 | Constant | Value | Description |
 |----------|-------|-------------|
-| `XELP_VERSION` | 0x0021 | Library version (hex: MM.mm) |
+| `XELP_VERSION` | 0x00000201 | Library version (32-bit hex: `0x00MMmmpp`) |
+| `XELP_VER_MAJOR(v)` | | Extract major version byte |
+| `XELP_VER_MINOR(v)` | | Extract minor version byte |
+| `XELP_VER_PATCH(v)` | | Extract patch version byte |
 | `XELP_CMDBUFSZ` | 64 | Default command buffer size |
 | `XELP_MODE_CLI` | 0x00 | CLI mode identifier |
 | `XELP_MODE_KEY` | 0x01 | KEY mode identifier |

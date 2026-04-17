@@ -44,7 +44,10 @@ extern "C"
 {
 #endif
 
-#define XELP_VERSION (0x0021)  /* HEX internal version 00.00 */
+#define XELP_VERSION      (0x00000201UL) /* 32-bit version: 0x00MMmmpp (major.minor.patch) */
+#define XELP_VER_MAJOR(v) (((v) >> 16) & 0xFF)
+#define XELP_VER_MINOR(v) (((v) >>  8) & 0xFF)
+#define XELP_VER_PATCH(v) ( (v)        & 0xFF)
 
 #if defined (__SDCC_mcs51)   /* the SDCC 8051 compiler needs this for setting  */
 #define REENTRANT_SDCC __reentrant 

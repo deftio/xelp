@@ -14,20 +14,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Extract version from tag
+      - name: Extract version from xelp.h
         id: version
         run: |
-          TAG="${GITHUB_REF#refs/tags/}"
-          echo "tag=$TAG" >> $GITHUB_OUTPUT
-          echo "version=${TAG#v}" >> $GITHUB_OUTPUT
+          mkdir -p build
+          gcc tools/extract_version.c -Isrc -o build/extract_version
+          build/extract_version build/xelp_version.yaml
+          cat build/xelp_version.yaml
+          echo "src_version=$(grep '^version:' build/xelp_version.yaml | cut -d'\"' -f2)" >> $GITHUB_OUTPUT
+          echo "src_tag=$(grep '^tag:' build/xelp_version.yaml | cut -d'\"' -f2)" >> $GITHUB_OUTPUT
 
       - name: Verify tag matches XELP_VERSION
         run: |
-          HEX=$(grep '#define XELP_VERSION' src/xelp.h | grep -o '0x[0-9a-fA-F]*')
-          NUM=$((HEX))
-          MAJOR=$(( (NUM >> 8) & 0xFF ))
-          MINOR=$(( NUM & 0xFF ))
-          SRC_VER="${MAJOR}.${MINOR}"
+          SRC_VER="${{ steps.version.outputs.src_version }}"
           TAG_VER="${GITHUB_REF#refs/tags/v}"
           echo "Source version: $SRC_VER"
           echo "Tag version:    $TAG_VER"
@@ -65,21 +64,21 @@ jobs:
       - name: Extract version
         id: version
         run: |
+          mkdir -p build
+          gcc tools/extract_version.c -Isrc -o build/extract_version
+          build/extract_version build/xelp_version.yaml
           TAG="${GITHUB_REF#refs/tags/}"
           echo "tag=$TAG" >> $GITHUB_OUTPUT
-          echo "version=${TAG#v}" >> $GITHUB_OUTPUT
+          echo "version=$(grep '^version:' build/xelp_version.yaml | cut -d'\"' -f2)" >> $GITHUB_OUTPUT
 
       - name: Extract changelog for this version
         id: changelog
         run: |
           VER="${{ steps.version.outputs.version }}"
-          # Try to extract the section for this version from CHANGELOG.md
-          # If [Unreleased] is the current section, use that
           NOTES=$(awk '/^## \[/{if(found) exit; found=1; next} found{print}' CHANGELOG.md)
           if [ -z "$NOTES" ]; then
             NOTES="Release $VER. See CHANGELOG.md for details."
           fi
-          # Write to file to preserve formatting
           echo "$NOTES" > /tmp/release_notes.md
 
       - name: Create GitHub Release

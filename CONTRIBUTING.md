@@ -146,7 +146,7 @@ Workflow:
 
 Releases are driven by `XELP_VERSION` in `src/xelp.h` -- this is the
 single source of truth for the version number. The hex format encodes
-`0xMMmm` (major.minor), e.g. `0x0021` = version 0.33.
+`0x00MMmmpp` (major.minor.patch), e.g. `0x00000201` = version 0.2.1.
 
 Only maintainers create releases. The process is:
 

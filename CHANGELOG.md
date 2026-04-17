@@ -32,6 +32,8 @@ The version source of truth is `XELP_VERSION` in `src/xelp.h` (hex format).
   - `XELP_E_Err` -> `XELP_E_ERR`
   - `XELP_E_CmdBufFull` -> `XELP_E_CMDBUFFULL`
   - `XELP_E_CmdNotFound` -> `XELP_E_CMDNOTFOUND`
+- `XELP_VERSION` format changed from 16-bit (`0xMMmm`) to 32-bit (`0x00MMmmpp`)
+  with accessor macros `XELP_VER_MAJOR`, `XELP_VER_MINOR`, `XELP_VER_PATCH`
 - Reorganized repository structure (pages/, docs/, tools/, dev/)
 - Replaced defunct Travis CI with GitHub Actions CI
 - Updated `.gitignore` for build artifacts

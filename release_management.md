@@ -7,11 +7,23 @@ Reference for building, testing, and releasing xelp.
 The `XELP_VERSION` macro in `src/xelp.h` is the single source of truth:
 
 ```c
-#define XELP_VERSION (0x0021)  /* HEX: 0xMMmm -> major.minor */
+#define XELP_VERSION      (0x00000201UL) /* 32-bit: 0x00MMmmpp */
+#define XELP_VER_MAJOR(v) (((v) >> 16) & 0xFF)
+#define XELP_VER_MINOR(v) (((v) >>  8) & 0xFF)
+#define XELP_VER_PATCH(v) ( (v)        & 0xFF)
 ```
 
-The hex format encodes major version in the upper byte and minor in the
-lower byte. Example: `0x0100` = version 1.0, `0x0021` = version 0.33.
+The 32-bit hex format encodes `0x00MMmmpp` (major.minor.patch), one byte
+each. Example: `0x00010000` = version 1.0.0, `0x00000201` = version 0.2.1.
+Accessor macros resolve to constants at compile time on all targets.
+
+The build tool `tools/extract_version.c` reads the version via the C
+preprocessor and writes `build/xelp_version.yaml`.  All scripts and CI
+workflows use this tool instead of parsing `xelp.h` with regex.
+
+```bash
+make version   # compile + run, writes build/xelp_version.yaml
+```
 
 ## Quick Reference
 
@@ -19,6 +31,7 @@ lower byte. Example: `0x0100` = version 1.0, `0x0021` = version 0.33.
 | --- | --- |
 | `make tests` | Build + run unit tests + gcov |
 | `make coverage` | Tests + coverage summary |
+| `make version` | Extract version to build/xelp_version.yaml |
 | `make example` | Build + run posix ncurses example |
 | `make clean` | Remove all build artifacts |
 | `bash tools/make_release.sh` | Validate build for release (dry run) |
@@ -39,30 +52,31 @@ make coverage                   # check coverage didn't drop
 
 1. Bump `XELP_VERSION` in `src/xelp.h`
 2. Update `CHANGELOG.md` with release notes
-3. Commit and push to a release branch
-4. Open PR to master, get CI green, merge
+3. Commit on your working branch
 
-Then release:
+Then run the guided release script:
 
 ```bash
-# 1. Dry run -- validates build, tests, coverage, git state
 bash tools/make_release.sh
-
-# 2. Tag + push -- CI creates the GitHub Release automatically
-bash tools/make_release.sh --tag
 ```
 
-The `--tag` path is the recommended workflow. The script validates locally
-(clean build, zero warnings, all tests pass, coverage, clean git, no
-duplicate tag), then creates an annotated tag and pushes it. GitHub Actions
-picks up the tag push, validates again in CI, and creates the GitHub Release
-with notes extracted from `CHANGELOG.md`.
+The script walks through every step: local validation, push, PR, CI,
+merge, tag, and waits for the GitHub Release to appear. It pauses for
+confirmation before anything that affects the remote.
 
-For manual override (e.g. CI unavailable):
+For local validation only (no git, no PR):
 
 ```bash
-bash tools/make_release.sh --release   # tag + push + gh release locally
+bash tools/make_release.sh --validate
 ```
+
+For manual fallback (e.g. GitHub Actions unavailable):
+
+```bash
+bash tools/make_release.sh --release-local
+```
+
+See `tools/make-release.md` for full documentation and troubleshooting.
 
 ## Branching Model
 

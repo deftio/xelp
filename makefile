@@ -13,7 +13,7 @@ LIB_DIR=src
 INCLUDES=\
     -I$(LIB_DIR)\
 
-.PHONY: tests clean example coverage
+.PHONY: tests clean example coverage version
 
 %.o: %.c
 	$(CC) $(C_FLAGS)  $(INCLUDES) -c $< -o $@
@@ -41,6 +41,12 @@ coverage: tests
 	@echo "--- Coverage Summary ---"
 	@gcov $(LIB_DIR)/xelp.c 2>/dev/null | grep -A 1 "File.*xelp.c"
 	@echo "See $(TEST_DIR)/xelp.c.gcov for line-by-line details"
+
+version:
+	@mkdir -p build
+	@$(CC) tools/extract_version.c -I$(LIB_DIR) -o build/extract_version
+	@build/extract_version build/xelp_version.yaml
+	@cat build/xelp_version.yaml
 
 #=======================================================================
 #build simple example in /example/posix-simple folder

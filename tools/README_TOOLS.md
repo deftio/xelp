@@ -122,27 +122,64 @@ Supporting files:
 
 ---
 
+## Version Extractor
+
+**`extract_version.c`** -- Tiny C program that `#include`s `xelp.h` and
+emits the version as machine-readable YAML.  The version is resolved by the
+C preprocessor, not by regex -- so it is always consistent with the compiled
+library.
+
+Requires only a C compiler (gcc, clang, tcc, etc.).
+
+```
+# Via make (writes build/xelp_version.yaml)
+make version
+
+# Manually
+gcc tools/extract_version.c -Isrc -o build/extract_version
+build/extract_version                      # YAML to stdout
+build/extract_version build/version.yaml   # YAML to file
+```
+
+Output example:
+
+```yaml
+# Auto-generated from XELP_VERSION in src/xelp.h -- do not edit
+version_hex: "0x00000201"
+major: 0
+minor: 2
+patch: 1
+version: "0.2.1"
+tag: "v0.2.1"
+```
+
+Used by `make_release.sh` and the GitHub Actions release workflow.  Any
+CI/CD step that needs the version should compile and run this tool rather
+than parsing `xelp.h` directly.
+
+---
+
 ## Release Script
 
-**`make_release.sh`** -- Validate the build and optionally create a tagged
-GitHub release. Reads the version from `XELP_VERSION` in `src/xelp.h`.
+**`make_release.sh`** -- Guided release pipeline. Walks through every step
+from local validation to published GitHub Release, pausing for confirmation
+before anything visible to others. Uses `extract_version.c` to read the
+version from `xelp.h` via the C preprocessor.
 
 ```
-# Dry run: build, test, coverage check
+# Full guided release (recommended)
 bash tools/make_release.sh
 
-# Validate + create git tag
-bash tools/make_release.sh --tag
+# Local validation only (build, tests, coverage)
+bash tools/make_release.sh --validate
 
-# Validate + tag + push + GitHub release (requires gh CLI)
-bash tools/make_release.sh --release
+# Full flow but create GH release locally (fallback if CI unavailable)
+bash tools/make_release.sh --release-local
 ```
 
-The script checks:
-- Clean build with zero warnings
-- All tests pass
-- Coverage report
-- Working tree is clean (for tag/release mode)
-- Tag doesn't already exist
+The full flow: extract version, validate build, check git state, push
+branch, open PR, wait for CI, merge, switch to master, verify, tag, wait
+for release.  Each step prints what it's doing and prompts before actions
+that affect the remote.
 
-See `release_management.md` for the full release workflow.
+See `tools/make-release.md` for detailed documentation and troubleshooting.
