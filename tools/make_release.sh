@@ -25,6 +25,7 @@ STEP=0
 MODE="full"
 BRANCH=""
 ON_MASTER=false
+TAG_EXISTS=false
 
 # -----------------------------------------------------------------------
 # Helpers
@@ -58,6 +59,14 @@ pass() {
     echo "  PASS: $1"
 }
 
+# Print a command before running it so the user sees exactly what executes.
+# Usage: run_cmd make clean
+#        run_cmd git push -u origin "$BRANCH"
+run_cmd() {
+    echo "  \$ $*"
+    "$@"
+}
+
 # -----------------------------------------------------------------------
 # Step 1: Extract version
 # -----------------------------------------------------------------------
@@ -65,13 +74,11 @@ pass() {
 do_extract_version() {
     step_header "Extract version from xelp.h"
 
-    mkdir -p "$REPO_ROOT/build"
-    gcc "$REPO_ROOT/tools/extract_version.c" \
-        -I"$REPO_ROOT/src" \
-        -o "$REPO_ROOT/build/extract_version" \
+    mkdir -p build
+    run_cmd gcc tools/extract_version.c -Isrc -o build/extract_version \
         || fail "Could not compile extract_version.c"
 
-    "$REPO_ROOT/build/extract_version" "$REPO_ROOT/build/xelp_version.yaml" \
+    run_cmd build/extract_version build/xelp_version.yaml \
         || fail "extract_version failed"
 
     VER_HEX=$(grep '^version_hex:' build/xelp_version.yaml | cut -d'"' -f2)
@@ -93,13 +100,14 @@ do_validate() {
     step_header "Local validation (build, tests, warnings, coverage)"
 
     echo "  --- Clean build + tests ---"
-    make clean >/dev/null 2>&1
-    make tests 2>&1
+    run_cmd make clean >/dev/null 2>&1
+    run_cmd make tests 2>&1
     pass "All tests passed."
 
     echo ""
     echo "  --- Zero-warning check ---"
     local build_log warnings
+    echo "  \$ make clean && make tests  (capturing output for warning scan)"
     build_log=$(make clean 2>&1 && make tests 2>&1)
     warnings=$(echo "$build_log" | grep -E "^[^:]+\.(c|h):[0-9]+:[0-9]+: warning:" || true)
     if [ -n "$warnings" ]; then
@@ -111,6 +119,7 @@ do_validate() {
     echo ""
     echo "  --- Coverage ---"
     local cov_line pct
+    echo "  \$ gcov src/xelp.c"
     cov_line=$(gcov src/xelp.c 2>/dev/null | grep "Lines executed" | head -1)
     pct=$(echo "$cov_line" | grep -o '[0-9]*\.[0-9]*%' | head -1)
     pass "Coverage: $pct"
@@ -123,6 +132,7 @@ do_validate() {
 do_check_git() {
     step_header "Check git state"
 
+    echo "  \$ git rev-parse --abbrev-ref HEAD"
     BRANCH=$(git rev-parse --abbrev-ref HEAD)
     echo "  Branch: $BRANCH"
 
@@ -131,19 +141,37 @@ do_check_git() {
         echo "  Already on $BRANCH -- will skip PR steps."
     fi
 
-    # Tag collision check
+    # Tag check
+    echo "  \$ git tag -l $VER_TAG"
     if git tag -l "$VER_TAG" | grep -q "$VER_TAG"; then
-        fail "Tag $VER_TAG already exists. Bump XELP_VERSION in src/xelp.h first."
+        echo "  Tag $VER_TAG already exists."
+        if [ "$MODE" != "validate" ]; then
+            # Already tagged -- check if release exists too
+            local existing_release
+            existing_release=$(gh release view "$VER_TAG" --json url --jq '.url' 2>/dev/null || true)
+            if [ -n "$existing_release" ]; then
+                echo ""
+                pass "Release already published: $existing_release"
+                echo "  Nothing to do. Bump XELP_VERSION for the next release."
+                exit 0
+            fi
+            echo "  Tag exists but no GitHub Release yet -- will skip to release step."
+            TAG_EXISTS=true
+        else
+            fail "Tag $VER_TAG already exists. Bump XELP_VERSION in src/xelp.h first."
+        fi
+    else
+        pass "Tag $VER_TAG does not exist yet."
     fi
-    pass "Tag $VER_TAG does not exist yet."
 
     # Working tree
     local status
+    echo "  \$ git status --porcelain"
     status=$(git status --porcelain)
     if [ -n "$status" ]; then
         echo ""
         echo "  Uncommitted changes:"
-        git status --short
+        run_cmd git status --short
         if [ "$MODE" = "validate" ]; then
             echo "  (validate mode -- continuing with warning)"
             return 0
@@ -182,7 +210,7 @@ do_push_branch() {
     fi
 
     confirm "Push $BRANCH to origin?"
-    git push -u origin "$BRANCH"
+    run_cmd git push -u origin "$BRANCH"
     pass "Pushed."
 }
 
@@ -201,17 +229,19 @@ do_open_pr() {
 
     # Check for existing PR
     local existing
+    echo "  \$ gh pr list --head $BRANCH --base master --state open"
     existing=$(gh pr list --head "$BRANCH" --base master --state open --json number --jq '.[0].number' 2>/dev/null || true)
     if [ -n "$existing" ]; then
         echo "  PR #$existing already exists."
         PR_NUM="$existing"
-        gh pr view "$PR_NUM" --json title,url --jq '"  " + .title + "\n  " + .url'
+        run_cmd gh pr view "$PR_NUM" --json title,url --jq '"  " + .title + "\n  " + .url'
         return 0
     fi
 
     echo "  No open PR found for $BRANCH -> master."
     confirm "Create PR?"
 
+    echo "  \$ gh pr create --base master --head $BRANCH --title \"Release $VER_STRING\""
     local pr_url
     pr_url=$(gh pr create \
         --base master \
@@ -236,6 +266,7 @@ do_wait_ci() {
 
     while true; do
         local checks_json status_summary
+        echo "  \$ gh pr checks $PR_NUM"
         checks_json=$(gh pr checks "$PR_NUM" --json name,state 2>/dev/null || true)
 
         if [ -z "$checks_json" ] || [ "$checks_json" = "[]" ]; then
@@ -290,29 +321,59 @@ print('yes' if any(c['state'] == 'FAILURE' for c in checks) else 'no')
 do_merge_pr() {
     if $ON_MASTER; then return 0; fi
 
-    step_header "Merge PR #$PR_NUM to master"
+    step_header "Enable auto-merge on PR #$PR_NUM"
 
-    confirm "Merge PR #$PR_NUM (squash)?"
-    gh pr merge "$PR_NUM" --squash --delete-branch
-    pass "Merged and branch deleted on remote."
+    # Check if PR is already merged (re-run scenario)
+    local pr_state
+    pr_state=$(gh pr view "$PR_NUM" --json state --jq '.state' 2>/dev/null || true)
+    if [ "$pr_state" = "MERGED" ]; then
+        pass "PR #$PR_NUM is already merged."
+        return 0
+    fi
+
+    confirm "Enable auto-merge (squash) for PR #$PR_NUM?"
+    run_cmd gh pr merge "$PR_NUM" --auto --squash --delete-branch
+    pass "Auto-merge enabled. Will merge when all requirements are met."
 }
 
 # -----------------------------------------------------------------------
-# Step 8: Switch to master
+# Step 8: Wait for merge, switch to master
 # -----------------------------------------------------------------------
 
 do_switch_master() {
     if $ON_MASTER; then
         echo ""
         echo "  (Already on master, pulling latest)"
-        git pull --ff-only origin master
+        run_cmd git pull --ff-only origin master
         return 0
     fi
 
-    step_header "Switch to master and pull"
+    step_header "Wait for PR merge, then switch to master"
+    echo "  Polling every 15s for merge completion..."
 
-    git checkout master
-    git pull --ff-only origin master
+    local attempts=0
+    while [ $attempts -lt 80 ]; do
+        local pr_state
+        echo "  \$ gh pr view $PR_NUM --json state"
+        pr_state=$(gh pr view "$PR_NUM" --json state --jq '.state' 2>/dev/null || true)
+        if [ "$pr_state" = "MERGED" ]; then
+            echo ""
+            pass "PR #$PR_NUM merged."
+            break
+        elif [ "$pr_state" = "CLOSED" ]; then
+            fail "PR #$PR_NUM was closed without merging."
+        fi
+        attempts=$((attempts + 1))
+        echo "  ... PR state: ${pr_state:-unknown} (attempt $attempts/80)"
+        sleep 15
+    done
+
+    if [ $attempts -ge 80 ]; then
+        fail "Timed out waiting for PR to merge. Check branch protection requirements."
+    fi
+
+    run_cmd git checkout master
+    run_cmd git pull --ff-only origin master
     BRANCH="master"
     ON_MASTER=true
     pass "On master at $(git rev-parse --short HEAD)."
@@ -325,8 +386,8 @@ do_switch_master() {
 do_verify_master() {
     step_header "Verify build on master"
 
-    make clean >/dev/null 2>&1
-    make tests 2>&1
+    run_cmd make clean >/dev/null 2>&1
+    run_cmd make tests 2>&1
     pass "All tests pass on master."
 }
 
@@ -338,8 +399,8 @@ do_tag() {
     step_header "Create and push tag $VER_TAG"
 
     confirm "Create annotated tag $VER_TAG and push to origin?"
-    git tag -a "$VER_TAG" -m "Release $VER_STRING"
-    git push origin "$VER_TAG"
+    run_cmd git tag -a "$VER_TAG" -m "Release $VER_STRING"
+    run_cmd git push origin "$VER_TAG"
     pass "Tag $VER_TAG pushed. Release workflow triggered."
 }
 
@@ -350,7 +411,7 @@ do_tag() {
 do_wait_release() {
     if [ "$MODE" = "release-local" ]; then
         step_header "Create GitHub release (local)"
-        gh release create "$VER_TAG" \
+        run_cmd gh release create "$VER_TAG" \
             --title "xelp $VER_STRING" \
             --notes "Release $VER_STRING. See CHANGELOG.md for details."
         pass "Release created locally."
@@ -363,6 +424,7 @@ do_wait_release() {
     local attempts=0
     while [ $attempts -lt 40 ]; do
         local release_url
+        echo "  \$ gh release view $VER_TAG"
         release_url=$(gh release view "$VER_TAG" --json url --jq '.url' 2>/dev/null || true)
         if [ -n "$release_url" ]; then
             echo ""
@@ -450,12 +512,19 @@ fi
 
 # -- Full release flow --
 do_check_git
-do_push_branch
-do_open_pr
-do_wait_ci
-do_merge_pr
-do_switch_master
-do_verify_master
-do_tag
-do_wait_release
-do_done
+
+if $TAG_EXISTS; then
+    # Re-run: tag exists but release doesn't -- just wait for it
+    do_wait_release
+    do_done
+else
+    do_push_branch
+    do_open_pr
+    do_wait_ci
+    do_merge_pr
+    do_switch_master
+    do_verify_master
+    do_tag
+    do_wait_release
+    do_done
+fi

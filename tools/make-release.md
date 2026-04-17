@@ -30,8 +30,8 @@ bash tools/make_release.sh --validate
 | 4. Push branch | Pushes current branch to origin | Yes |
 | 5. Open PR | Creates a PR to `master` (or shows existing PR) | Yes |
 | 6. Wait for CI | Polls `gh pr checks` until all checks pass or fail | Auto (Ctrl-C to abort) |
-| 7. Merge PR | Merges the PR to master (squash merge) | Yes |
-| 8. Switch to master | Checks out master and pulls | No |
+| 7. Auto-merge | Enables auto-merge (squash). Merge happens when CI passes. | Yes |
+| 8. Wait + switch | Polls until PR merges, then checks out master and pulls | Auto |
 | 9. Verify on master | Clean build + tests on the merged master | No |
 | 10. Tag + push | Creates annotated tag `vX.Y.Z`, pushes to origin | Yes |
 | 11. Wait for release | Polls until GitHub Release appears (created by `release.yml`) | Auto (Ctrl-C to abort) |
