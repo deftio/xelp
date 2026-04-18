@@ -263,9 +263,12 @@ XELPRESULT XELPExecKC(XELP* ths, char key) {
             p++;
         }
     }
-    /* TODO call default function() if available */
-    ths->mR[0] = XELP_S_NOTFOUND;
-	return ths->mR[0];
+    if (ths->mpfDefKey) {
+        ths->mR[0] = ths->mpfDefKey((int)key);
+    } else {
+        ths->mR[0] = XELP_S_NOTFOUND;
+    }
+    return ths->mR[0];
 }
 #endif
 
@@ -398,11 +401,6 @@ XELPRESULT XELPTokLineXB (XelpBuf *buf, XelpBuf *tok, int srchType) {
 	char cs=_PS_SEEK,prev=_PS_SEEK,tmp;   
 	int tm=1; /*  (token mode) allows capture of t0e, t0s only for first token seen */
 
-    /* NOT needed remove... these two lines after full testing
-    tok->s=buf->s;
-    tok->p=buf->s;
-    */
-
     if ((buf->p) >= (buf->e)) {  return XELP_S_NOTFOUND; }
 
 
@@ -435,10 +433,13 @@ XELPRESULT XELPTokLineXB (XelpBuf *buf, XelpBuf *tok, int srchType) {
 
 		(buf->p)++; /* advance char ptr */
 	}
+    /* buffer exhausted: if still seeking (no token started) or in a comment, nothing was found */
+    if (tm && (cs == _PS_SEEK || cs == _PS_CMNT))
+        return XELP_S_NOTFOUND;
     if (tm)
         tok->p  = buf->p;
-    tok->e  = buf->p; 
-    
+    tok->e  = buf->p;
+
     return XELP_S_OK;
     
 }
@@ -453,15 +454,6 @@ XELPRESULT XELPParseXB (XELP* ths, XelpBuf *args) {
 
 	while (XELP_S_OK ==  XELPTokLineXB(args,&line,XELP_TOK_LINE) ) { /* for each logical line */
         
-        /* DEBUG REMOVE
-        XELPOut(ths,"(",-1);
-        XELPOut(ths,line.s,(int)(line.p-line.s));
-        XELPOut(ths,")",-1);
-
-        XELPOut(ths,">>>",-1);
-        XELPOut(ths,line.s,(int)(line.e-line.s));
-        XELPOut(ths,"<<<\n",-1);
-        */
         f=ths->mpCLIModeFuncs;
         if (f) { /* make sure fn dispatch table exists */
         	ths->mR[0] = XELP_E_CMDNOTFOUND;
@@ -474,8 +466,8 @@ XELPRESULT XELPParseXB (XELP* ths, XelpBuf *args) {
                 f++;
             }
             if (ths->mR[0] == XELP_E_CMDNOTFOUND) {
-            	/* TODO default handling */
-            	/* ths->mR[0] = ths->mpfDefCLI(line.s,(int)(line.e-line.s)); */
+            	if (ths->mpfDefCLI)
+            		ths->mR[0] = ths->mpfDefCLI(line.s,(int)(line.e-line.s));
             }
         }
 	}

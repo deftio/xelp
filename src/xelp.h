@@ -44,7 +44,7 @@ extern "C"
 {
 #endif
 
-#define XELP_VERSION      (0x00000202UL) /* 32-bit version: 0x00MMmmpp (major.minor.patch) */
+#define XELP_VERSION      (0x00000203UL) /* 32-bit version: 0x00MMmmpp (major.minor.patch) */
 #define XELP_VER_MAJOR(v) (((v) >> 16) & 0xFF)
 #define XELP_VER_MINOR(v) (((v) >>  8) & 0xFF)
 #define XELP_VER_PATCH(v) ( (v)        & 0xFF)
@@ -252,10 +252,12 @@ typedef struct
 
 #ifdef XELP_ENABLE_KEY						 /* if single-key commands enabled              */
 	XELPKeyFuncMapEntry		*mpKeyModeFuncs; /* key mode function dispatch                  */
+	XELPRESULT (*mpfDefKey)(int) REENTRANT_SDCC; /* default handler for unmapped keys        */
 #endif
-	
+
 #ifdef XELP_ENABLE_CLI						 /* if CLI and script support enabled           */
 	XELPCLIFuncMapEntry		*mpCLIModeFuncs; /* command mode function dispatch              */
+	XELPRESULT (*mpfDefCLI)(const char *, int) REENTRANT_SDCC; /* default handler for unknown commands */
 	char					mCmdMsgBuf[XELP_CMDBUFSZ]; 	/* cli string buffer storage        */
     XelpBuf                 mCmdXB;          /* buffer ptrs for parsing                     */
 #endif
@@ -294,8 +296,10 @@ XELPRESULT XELPInit (XELP *ths, const char *pAboutMsg);			    /* initialize inst
 #define XELP_SET_ABOUT(ths,pAboutMsg)     (ths.mpAboutMsg=pAboutMsg)/* change the about message        */
 
 /*  Macros to set function pointer arrays	  */
-#define XELP_SET_FN_CLI(ths,pfaCLI)	  (ths.mpCLIModeFuncs=pfaCLI)   /* load CLI fns table              */
-#define XELP_SET_FN_KEY(ths,pfaKey)	  (ths.mpKeyModeFuncs=pfaKey)   /* load KEY fns table              */
+#define XELP_SET_FN_CLI(ths,pfaCLI)	     (ths.mpCLIModeFuncs=pfaCLI)   /* load CLI fns table              */
+#define XELP_SET_FN_KEY(ths,pfaKey)	     (ths.mpKeyModeFuncs=pfaKey)   /* load KEY fns table              */
+#define XELP_SET_FN_DEF_CLI(ths,pfDef)   (ths.mpfDefCLI=pfDef)        /* default handler for unknown cmds*/
+#define XELP_SET_FN_DEF_KEY(ths,pfDef)   (ths.mpfDefKey=pfDef)        /* default handler for unmapped keys*/
 
 /*  Macros to set Platform Abstraction Layer Functions */
 #define XELP_SET_FN_OUT(ths,pfOut)     (ths.mpfOut=pfOut)           /* print out chars                 */

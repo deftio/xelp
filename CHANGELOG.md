@@ -9,6 +9,8 @@ The version source of truth is `XELP_VERSION` in `src/xelp.h` (hex format).
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-04-17
+
 ### Fixed
 - Fixed 10 bugs across xelp.h, xelp.c, xelpcfg.h:
   - `XELPOutXB` macro parentheses
@@ -19,8 +21,12 @@ The version source of truth is `XELP_VERSION` in `src/xelp.h` (hex format).
   - Duplicate `XELP_T_OK` macro definition
   - `XELP_STACK_OPS` / `XELP_STACK_MACHINE` name mismatch in xelpcfg.h
   - C89-incompatible `//` comment in xelpcfg.h
+- Fixed `XELPTokLineXB` phantom line bug: tokenizer returned `XELP_S_OK`
+  for trailing whitespace/newlines after last command, causing spurious
+  command dispatch and incorrect default handler invocations
 - Fixed 7 bugs in unit tests (unreachable code, wrong fields, stubs, etc.)
 - Fixed all remaining `//` comments in src/ for C89 compliance
+- Removed stale DEBUG code block and dead comments from xelp.c
 
 ### Changed
 - **API naming consistency**: all public functions now use `XELP` prefix
@@ -41,8 +47,14 @@ The version source of truth is `XELP_VERSION` in `src/xelp.h` (hex format).
 - `XELP_VERSION` in xelp.h is now the sole version source of truth
 
 ### Added
-- 100% line coverage of xelp.c (207 test cases across 19 units)
+- Default command handlers: `mpfDefKey` and `mpfDefCLI` function pointers
+  called when no matching key/command is found, with setter macros
+  `XELP_SET_FN_DEF_KEY` and `XELP_SET_FN_DEF_CLI`
+- 100% line coverage of xelp.c (269 test cases across 21 units)
+- Comprehensive buffer boundary tests (20 cases verifying buffer limits
+  are never exceeded across ParseKey, ParseXB, Parse, and XelpBuf macros)
 - Stress and hardening tests for malformed input
+- Default handler tests (22 cases covering KEY and CLI handlers)
 - Makefile `coverage` target
 - Markdown documentation: API reference, configuration guide, porting guide
 - Docker cross-compilation tooling (`tools/crossbuild.sh`)

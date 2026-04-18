@@ -87,15 +87,25 @@ do_extract_version() {
     run_cmd build/extract_version build/xelp_version.yaml \
         || fail "extract_version failed"
 
-    VER_HEX=$(grep '^version_hex:' build/xelp_version.yaml | cut -d'"' -f2)
-    VER_STRING=$(grep '^version:' build/xelp_version.yaml | cut -d'"' -f2)
-    VER_TAG=$(grep '^tag:' build/xelp_version.yaml | cut -d'"' -f2)
+    VER_HEX=$(sed -n 's/^version_hex: "\(.*\)"/\1/p' build/xelp_version.yaml)
+    VER_STRING=$(sed -n 's/^version: "\(.*\)"/\1/p' build/xelp_version.yaml)
+    VER_TAG=$(sed -n 's/^tag: "\(.*\)"/\1/p' build/xelp_version.yaml)
 
     [ -n "$VER_STRING" ] || fail "No version string produced"
 
     echo "  Version: $VER_STRING ($VER_HEX)"
     echo "  Tag:     $VER_TAG"
     cat build/xelp_version.yaml
+}
+
+# -----------------------------------------------------------------------
+# Step 1b: Update version badges
+# -----------------------------------------------------------------------
+
+do_update_badges() {
+    echo "==> Updating version badges..."
+    python3 tools/update_badges.py
+    git add README.md pages/index.html
 }
 
 # -----------------------------------------------------------------------
@@ -459,10 +469,11 @@ do_wait_release() {
     fi
 
     step_header "Wait for GitHub Release (created by release.yml)"
-    echo "  Polling every 30s (Ctrl-C to abort)..."
+    echo "  Polling every 30s..."
 
     local attempts=0
     while [ $attempts -lt 40 ]; do
+        # Check if release exists
         local release_url
         echo "  \$ gh release view $VER_TAG"
         release_url=$(gh release view "$VER_TAG" --json url --jq '.url' 2>/dev/null || true)
@@ -472,6 +483,32 @@ do_wait_release() {
             echo "  $release_url"
             return 0
         fi
+
+        # Check if Release workflow failed
+        local run_conclusion
+        run_conclusion=$(gh api repos/:owner/:repo/actions/runs \
+            --jq ".workflow_runs[] | select(.name==\"Release\" and .head_branch==\"$VER_TAG\") | .conclusion" \
+            2>/dev/null | head -1 || true)
+        if [ "$run_conclusion" = "failure" ]; then
+            echo ""
+            echo "  Release workflow FAILED. Fetching error log..."
+            local run_id
+            run_id=$(gh api repos/:owner/:repo/actions/runs \
+                --jq ".workflow_runs[] | select(.name==\"Release\" and .head_branch==\"$VER_TAG\") | .id" \
+                2>/dev/null | head -1 || true)
+            if [ -n "$run_id" ]; then
+                gh run view "$run_id" --log-failed 2>&1 | tail -20
+                echo ""
+                echo "  Full log: gh run view $run_id --log-failed"
+            fi
+            echo ""
+            echo "  Fix the issue, delete the tag, and re-run:"
+            echo "    git tag -d $VER_TAG && git push origin :refs/tags/$VER_TAG"
+            echo "  Or create the release manually:"
+            echo "    gh release create $VER_TAG --title 'xelp $VER_STRING' --notes 'See CHANGELOG.md'"
+            exit 1
+        fi
+
         attempts=$((attempts + 1))
         echo "  ... not yet (attempt $attempts/40)"
         sleep 30
@@ -539,6 +576,7 @@ echo "============================================"
 
 # -- Always run --
 do_extract_version
+do_update_badges
 do_validate
 
 if [ "$MODE" = "validate" ]; then
