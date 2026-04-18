@@ -5,7 +5,7 @@
 [![License](https://img.shields.io/badge/License-BSD%202--Clause-blue.svg)](https://opensource.org/licenses/BSD-2-Clause)
 [![CI](https://github.com/deftio/xelp/actions/workflows/ci.yml/badge.svg)](https://github.com/deftio/xelp/actions/workflows/ci.yml)
 ![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen.svg)
-![RISC-V .text](https://img.shields.io/badge/RISC--V%20.text-~2.4KB-informational.svg)
+![RISC-V](https://img.shields.io/badge/RISC--V-1.9KB-informational.svg)
 
 # xelp
 
@@ -144,19 +144,23 @@ make clean          # remove all build artifacts
 
 Compiled sizes with `-Os` (all features enabled):
 
-| Target | Compiler | .text (bytes) |
-|--------|----------|---------------|
-| x86-64 | GCC | ~3200 |
-| x86-32 | GCC | ~2800 |
-| ARM32 Thumb | arm-none-eabi-gcc | ~2200 |
-| ARM64 | aarch64-linux-gnu-gcc | ~3400 |
-| AVR (ATmega328P) | avr-gcc | ~3200 |
-| MSP430 | msp430-gcc | ~2600 |
-| 68HC11 | m68hc11-gcc | ~3800 |
-| PowerPC | powerpc-linux-gnu-gcc | ~3200 |
+| Target | Compiler | Code size (bytes) |
+|--------|----------|-------------------|
+| ARM32 Thumb | arm-none-eabi-gcc | 1488 |
+| MSP430 | msp430-gcc | 1804 |
+| RISC-V (rv64) | riscv64-linux-gnu-gcc | 1960 |
+| ARM32 | arm-none-eabi-gcc | 2372 |
+| AVR (ATtiny85) | avr-gcc | 2420 |
+| AVR (ATmega328P) | avr-gcc | 2452 |
+| x86-64 | GCC | 2775 |
+| x86-32 | GCC | 2826 |
+| x86-64 | Clang | 3003 |
+| ARM64 | aarch64-linux-gnu-gcc | 3148 |
+| PowerPC | powerpc-linux-gnu-gcc | 3778 |
+| 68HC11 | m68hc11-gcc | 4247 |
 
-KEY-only mode: ~900 bytes. Run `bash tools/crossbuild.sh` with Docker
-to reproduce these numbers.
+Sizes measured via Docker cross-compilation. KEY-only mode: 900 bytes.
+Run `bash tools/crossbuild.sh` to reproduce.
 
 ## Configuration
 
@@ -195,6 +199,7 @@ Tested with zero warnings on:
 | x86-32 | GCC, Clang, TCC | 32-bit |
 | ARM64 | aarch64-linux-gnu-gcc | 64-bit |
 | ARM32 / Thumb | arm-none-eabi-gcc | 32-bit |
+| RISC-V | riscv64-linux-gnu-gcc | 64-bit |
 | MSP430 | msp430-gcc | 16-bit |
 | AVR (ATmega, ATtiny) | avr-gcc | 8-bit |
 | 8051 | SDCC | 8-bit |

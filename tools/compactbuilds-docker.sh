@@ -9,8 +9,10 @@ SRC=/xelp/src/xelp.c
 INCLUDE="-I/xelp/src"
 OBJ=/tmp/xelp.o
 
-# Separator width
 SEP="============================================================"
+
+# Accumulate summary rows: "label|text_size"
+SUMMARY=""
 
 print_sizes() {
     local label="$1"
@@ -20,12 +22,14 @@ print_sizes() {
     echo "$SEP"
     if [ ! -f "$OBJ" ]; then
         echo "  (build failed)"
+        SUMMARY="${SUMMARY}${label}|FAIL\n"
         return
     fi
     OBJ_SIZE=$(stat -c%s "$OBJ" 2>/dev/null || wc -c < "$OBJ")
     TEXT_SIZE=$(size "$OBJ" 2>/dev/null | awk 'FNR==2{print $1}')
     printf "  obj file size: %6s bytes\n" "$OBJ_SIZE"
     printf "  .text section: %6s bytes\n" "$TEXT_SIZE"
+    SUMMARY="${SUMMARY}${label}|${TEXT_SIZE}\n"
     rm -f "$OBJ"
 }
 
@@ -34,50 +38,53 @@ echo "xelp cross-compilation size report"
 echo "Date: $(date -u '+%Y-%m-%d %H:%M UTC')"
 echo ""
 
-# --- x86-64 ---
+# --- x86 ---
 gcc -c $SRC $INCLUDE -Os -Wall -o $OBJ 2>&1 && true
-print_sizes "GCC x86-64 -Os"
+print_sizes "GCC x86-64"
 
 clang -c $SRC $INCLUDE -Os -Wall -o $OBJ 2>&1 && true
-print_sizes "Clang x86-64 -Os"
+print_sizes "Clang x86-64"
 
-# --- x86-32 ---
 gcc -c $SRC $INCLUDE -Os -m32 -Wall -o $OBJ 2>&1 && true
-print_sizes "GCC x86-32 -Os"
+print_sizes "GCC x86-32"
 
 tcc -c $SRC $INCLUDE -o $OBJ 2>&1 && true
-print_sizes "TCC (Tiny C Compiler)"
+print_sizes "TCC x86"
 
 # --- ARM ---
 aarch64-linux-gnu-gcc -c $SRC $INCLUDE -Os -Wall -o $OBJ 2>&1 && true
-print_sizes "GCC AArch64 (ARM64) -Os"
+print_sizes "GCC AArch64 (ARM64)"
 
 arm-none-eabi-gcc -c $SRC $INCLUDE -Os -Wall -o $OBJ 2>&1 && true
-print_sizes "GCC ARM32 (bare metal) -Os"
+print_sizes "GCC ARM32"
 
 arm-none-eabi-gcc -c $SRC $INCLUDE -Os -mthumb -Wall -o $OBJ 2>&1 && true
-print_sizes "GCC ARM32 Thumb -Os"
+print_sizes "GCC ARM32 Thumb"
 
 # --- MSP430 ---
 msp430-gcc -c $SRC $INCLUDE -Os -Wall -o $OBJ 2>&1 && true
-print_sizes "GCC MSP430 -Os"
+print_sizes "GCC MSP430"
 
 # --- AVR ---
 avr-gcc -c $SRC $INCLUDE -Os -mmcu=avr5 -Wall -o $OBJ 2>&1 && true
-print_sizes "GCC AVR5 (ATmega328P) -Os"
+print_sizes "GCC AVR5 (ATmega328P)"
 
 avr-gcc -c $SRC $INCLUDE -Os -mmcu=attiny85 -Wall -o $OBJ 2>&1 && true
-print_sizes "GCC AVR ATtiny85 -Os"
+print_sizes "GCC AVR ATtiny85"
 
 # --- 68HC11 ---
 m68hc11-gcc -c $SRC $INCLUDE -Os -o $OBJ 2>&1 && true
-print_sizes "GCC 68HC11 -Os"
+print_sizes "GCC 68HC11"
 
 # --- PowerPC ---
 powerpc-linux-gnu-gcc -c $SRC $INCLUDE -Os -Wall -o $OBJ 2>&1 && true
-print_sizes "GCC PowerPC -Os"
+print_sizes "GCC PowerPC"
 
-# --- Summary function table (native GCC) ---
+# --- RISC-V ---
+riscv64-linux-gnu-gcc -c $SRC $INCLUDE -Os -Wall -o $OBJ 2>&1 && true
+print_sizes "GCC RISC-V (rv64)"
+
+# --- Function size table (native GCC) ---
 echo ""
 echo "$SEP"
 echo "Function size table (GCC x86-64)"
@@ -85,6 +92,18 @@ echo "$SEP"
 gcc -c $SRC $INCLUDE -Os -Wall -o $OBJ 2>&1
 nm $OBJ -n -S --size-sort -f sysv -t d 2>/dev/null | grep -E "FUNC" || true
 rm -f $OBJ
+
+# --- Summary table ---
+echo ""
+echo "$SEP"
+echo "Summary: code size (bytes), compiled with -Os, all features"
+echo "$SEP"
+printf "  %-28s %s\n" "Target" "Code size"
+printf "  %-28s %s\n" "----------------------------" "---------"
+echo -e "$SUMMARY" | while IFS='|' read -r label size; do
+    [ -z "$label" ] && continue
+    printf "  %-28s %s\n" "$label" "$size"
+done
 
 echo ""
 echo "Done."

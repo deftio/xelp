@@ -33,7 +33,7 @@
     <a href="https://opensource.org/licenses/BSD-2-Clause"><img src="https://img.shields.io/badge/License-BSD%202--Clause-blue.svg" alt="License"></a>
     <a href="https://github.com/deftio/xelp/actions/workflows/ci.yml"><img src="https://github.com/deftio/xelp/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
     <img src="https://img.shields.io/badge/coverage-100%25-brightgreen.svg" alt="Coverage">
-    <img src="https://img.shields.io/badge/RISC--V%20.text-~2.4KB-informational.svg" alt="RISC-V build size">
+    <img src="https://img.shields.io/badge/RISC--V-1.9KB-informational.svg" alt="RISC-V code size">
   </div>
 </div>
 
@@ -158,25 +158,25 @@ void main(void) {
 <p>Compiled with <code>-Os</code>, all features enabled:</p>
 
 <table>
-<thead><tr><th>Architecture</th><th>Compiler</th><th>Word size</th><th>.text (bytes)</th></tr></thead>
+<thead><tr><th>Architecture</th><th>Compiler</th><th>Word size</th><th>Code size (bytes)</th></tr></thead>
 <tbody>
-<tr><td>x86-64</td><td>GCC, Clang</td><td>64-bit</td><td>~3200</td></tr>
-<tr><td>x86-32</td><td>GCC, Clang</td><td>32-bit</td><td>~2800</td></tr>
-<tr><td>ARM32 / Thumb</td><td>arm-none-eabi-gcc</td><td>32-bit</td><td>~2200</td></tr>
-<tr><td>ARM64</td><td>aarch64-linux-gnu-gcc</td><td>64-bit</td><td>~3400</td></tr>
-<tr><td>MSP430</td><td>msp430-gcc</td><td>16-bit</td><td>~2600</td></tr>
-<tr><td>AVR (Arduino)</td><td>avr-gcc</td><td>8-bit</td><td>~3200</td></tr>
-<tr><td>8051</td><td>SDCC</td><td>8-bit</td><td>~3600</td></tr>
-<tr><td>PIC18F</td><td>SDCC</td><td>16-bit</td><td>~3400</td></tr>
-<tr><td>6502</td><td>cc65</td><td>8-bit</td><td>~3800</td></tr>
-<tr><td>68HC11/12</td><td>m68hc11-gcc</td><td>8-bit</td><td>~3800</td></tr>
-<tr><td>RISC-V</td><td>riscv64-linux-gnu-gcc</td><td>32/64-bit</td><td>~2400</td></tr>
-<tr><td>PowerPC</td><td>powerpc-linux-gnu-gcc</td><td>32-bit</td><td>~3200</td></tr>
+<tr><td>ARM32 Thumb</td><td>arm-none-eabi-gcc</td><td>32-bit</td><td>1488</td></tr>
+<tr><td>MSP430</td><td>msp430-gcc</td><td>16-bit</td><td>1804</td></tr>
+<tr><td>RISC-V (rv64)</td><td>riscv64-linux-gnu-gcc</td><td>64-bit</td><td>1960</td></tr>
+<tr><td>ARM32</td><td>arm-none-eabi-gcc</td><td>32-bit</td><td>2372</td></tr>
+<tr><td>AVR (ATtiny85)</td><td>avr-gcc</td><td>8-bit</td><td>2420</td></tr>
+<tr><td>AVR (ATmega328P)</td><td>avr-gcc</td><td>8-bit</td><td>2452</td></tr>
+<tr><td>x86-64</td><td>GCC</td><td>64-bit</td><td>2775</td></tr>
+<tr><td>x86-32</td><td>GCC</td><td>32-bit</td><td>2826</td></tr>
+<tr><td>x86-64</td><td>Clang</td><td>64-bit</td><td>3003</td></tr>
+<tr><td>ARM64</td><td>aarch64-linux-gnu-gcc</td><td>64-bit</td><td>3148</td></tr>
+<tr><td>PowerPC</td><td>powerpc-linux-gnu-gcc</td><td>32-bit</td><td>3778</td></tr>
+<tr><td>68HC11</td><td>m68hc11-gcc</td><td>8-bit</td><td>4247</td></tr>
 </tbody>
 </table>
 
-<p>KEY-only mode: <strong>~900 bytes</strong>. Run <code>bash tools/crossbuild.sh</code>
-with Docker to reproduce.</p>
+<p>Sizes measured via Docker cross-compilation (<code>bash tools/crossbuild.sh</code>).
+KEY-only mode: <strong>900 bytes</strong>.</p>
 
 <h2>Building and testing</h2>
 

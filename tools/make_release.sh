@@ -21,6 +21,12 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
 
+# Log all output to build/release-<timestamp>.log
+mkdir -p build
+LOG_FILE="build/release-$(date -u '+%Y%m%d-%H%M%S').log"
+exec > >(tee -a "$LOG_FILE") 2>&1
+echo "Log: $LOG_FILE"
+
 STEP=0
 MODE="full"
 BRANCH=""
@@ -187,14 +193,39 @@ do_check_git() {
 }
 
 # -----------------------------------------------------------------------
-# Step 4: Push branch
+# Step 4: Sync with master and push branch
 # -----------------------------------------------------------------------
 
 do_push_branch() {
     if $ON_MASTER; then return 0; fi
 
-    step_header "Push branch '$BRANCH' to origin"
+    step_header "Sync with master and push branch '$BRANCH'"
 
+    # Merge master into branch to avoid conflicts and ensure CI runs
+    run_cmd git fetch origin master
+    local behind
+    behind=$(git rev-list --count "HEAD..origin/master" 2>/dev/null || echo "0")
+    if [ "$behind" -gt 0 ]; then
+        echo "  Branch is $behind commit(s) behind origin/master."
+        echo "  Merging origin/master (preferring branch on conflicts)..."
+        if ! run_cmd git merge origin/master -X ours --no-edit; then
+            # Handle modify/delete conflicts: keep our versions
+            local unresolved
+            unresolved=$(git diff --name-only --diff-filter=U 2>/dev/null || true)
+            if [ -n "$unresolved" ]; then
+                echo "  Resolving remaining conflicts (keeping branch versions)..."
+                echo "$unresolved" | while read -r f; do
+                    git checkout --ours "$f" 2>/dev/null && git add "$f" || git add "$f"
+                done
+                run_cmd git commit --no-edit
+            fi
+        fi
+        pass "Merged origin/master into $BRANCH."
+    else
+        pass "Branch is up to date with master."
+    fi
+
+    # Push
     local tracking
     tracking=$(git rev-parse --abbrev-ref --symbolic-full-name "@{u}" 2>/dev/null || true)
     if [ -n "$tracking" ]; then
@@ -261,16 +292,19 @@ do_wait_ci() {
     if $ON_MASTER; then return 0; fi
 
     step_header "Wait for CI on PR #$PR_NUM"
-    echo "  Polling every 30s (Ctrl-C to abort)..."
+    echo "  Polling every 30s..."
     echo ""
 
-    while true; do
+    local attempts=0
+    local max_attempts=40
+    while [ $attempts -lt $max_attempts ]; do
         local checks_json status_summary
         echo "  \$ gh pr checks $PR_NUM"
         checks_json=$(gh pr checks "$PR_NUM" --json name,state 2>/dev/null || true)
 
         if [ -z "$checks_json" ] || [ "$checks_json" = "[]" ]; then
-            echo "  Waiting for checks to start..."
+            attempts=$((attempts + 1))
+            echo "  Waiting for checks to start... (attempt $attempts/$max_attempts)"
             sleep 30
             continue
         fi
@@ -308,10 +342,16 @@ print('yes' if any(c['state'] == 'FAILURE' for c in checks) else 'no')
             return 0
         fi
 
-        echo "  ... waiting 30s"
+        attempts=$((attempts + 1))
+        echo "  ... waiting 30s (attempt $attempts/$max_attempts)"
         echo ""
         sleep 30
     done
+
+    echo ""
+    echo "  Timed out waiting for CI checks after $max_attempts attempts."
+    echo "  CI may not be configured to run on this branch."
+    confirm "Continue without CI? (not recommended)"
 }
 
 # -----------------------------------------------------------------------

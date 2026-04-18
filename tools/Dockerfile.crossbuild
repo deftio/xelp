@@ -1,18 +1,23 @@
-FROM ubuntu:22.04
+FROM --platform=linux/amd64 ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
+# Use libc6-dev-i386 instead of gcc-multilib to avoid conflicts
+# with cross-compiler packages (gcc-multilib conflicts with
+# gcc-aarch64-linux-gnu on 22.04)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     gcc \
     clang \
-    gcc-multilib \
+    libc6-dev-i386 \
+    lib32gcc-s1 \
     gcc-aarch64-linux-gnu \
     gcc-arm-none-eabi \
     gcc-msp430 \
     gcc-avr \
     gcc-m68hc1x \
     gcc-powerpc-linux-gnu \
+    gcc-riscv64-linux-gnu \
     tcc \
     binutils \
     && rm -rf /var/lib/apt/lists/*
