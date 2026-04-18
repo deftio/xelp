@@ -21,8 +21,8 @@ jobs:
           gcc tools/extract_version.c -Isrc -o build/extract_version
           build/extract_version build/xelp_version.yaml
           cat build/xelp_version.yaml
-          echo "src_version=$(grep '^version:' build/xelp_version.yaml | cut -d'\"' -f2)" >> $GITHUB_OUTPUT
-          echo "src_tag=$(grep '^tag:' build/xelp_version.yaml | cut -d'\"' -f2)" >> $GITHUB_OUTPUT
+          echo "src_version=$(sed -n 's/^version: "\(.*\)"/\1/p' build/xelp_version.yaml)" >> $GITHUB_OUTPUT
+          echo "src_tag=$(sed -n 's/^tag: "\(.*\)"/\1/p' build/xelp_version.yaml)" >> $GITHUB_OUTPUT
 
       - name: Verify tag matches XELP_VERSION
         run: |
@@ -69,7 +69,7 @@ jobs:
           build/extract_version build/xelp_version.yaml
           TAG="${GITHUB_REF#refs/tags/}"
           echo "tag=$TAG" >> $GITHUB_OUTPUT
-          echo "version=$(grep '^version:' build/xelp_version.yaml | cut -d'\"' -f2)" >> $GITHUB_OUTPUT
+          echo "version=$(sed -n 's/^version: "\(.*\)"/\1/p' build/xelp_version.yaml)" >> $GITHUB_OUTPUT
 
       - name: Extract changelog for this version
         id: changelog
