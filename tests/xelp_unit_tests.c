@@ -198,6 +198,10 @@ XELPRESULT test_XELPStrEq() {
     if (JB_ASSERT(XELP_S_NOTFOUND != XELPStrEq("a",1,"b"),"XELPStrEq single char mismatch"))
         return XELP_E_ERR;
 
+    /* buffer longer than command -- cmd ends before blen exhausted */
+    if (JB_ASSERT(XELP_S_NOTFOUND != XELPStrEq("foobar",6,"foo"),"XELPStrEq buf longer than cmd"))
+        return XELP_E_ERR;
+
     return XELP_S_OK;
 }
 /* ====================================================================
@@ -489,21 +493,21 @@ XELPRESULT test_XelpTokLineXB() {
             return XELP_E_ERR;
     }
 
-    /* whitespace only */
+    /* whitespace only -- no token found */
     {
         char *ws = "   \t  \n  ";
         XELP_XBInit(b,ws,XELPStrLen(ws));
         r = XELPTokLineXB(&b,&out,XELP_TOK_ONLY);
-        if (JB_ASSERT(XELP_S_OK != r, "XelpToklineXB whitespace only"))
+        if (JB_ASSERT(XELP_S_NOTFOUND != r, "XelpToklineXB whitespace only"))
             return XELP_E_ERR;
     }
 
-    /* comment */
+    /* comment -- no token found */
     {
         char *cmt = "# this is a comment\n";
         XELP_XBInit(b,cmt,XELPStrLen(cmt));
         r = XELPTokLineXB(&b,&out,XELP_TOK_ONLY);
-        if (JB_ASSERT(XELP_S_OK != r, "XelpToklineXB comment only"))
+        if (JB_ASSERT(XELP_S_NOTFOUND != r, "XelpToklineXB comment only"))
             return XELP_E_ERR;
     }
 
@@ -526,7 +530,7 @@ XELPRESULT test_XelpTokLineXB() {
         XELP_XBInit(b,semi,XELPStrLen(semi));
         while (XELP_S_OK == XELPTokLineXB(&b,&out,XELP_TOK_LINE))
             count++;
-        if (JB_ASSERT(count == 3, "XelpToklineXB semicolons 3 lines"))
+        if (JB_ASSERT(count != 3, "XelpToklineXB semicolons 3 lines"))
             return XELP_E_ERR;
     }
 
@@ -573,7 +577,7 @@ XELPRESULT test_XelpTokLineXB() {
         XELP_XBInit(b,crlf,XELPStrLen(crlf));
         while (XELP_S_OK == XELPTokLineXB(&b,&out,XELP_TOK_ONLY))
             count++;
-        if (JB_ASSERT(count == 2, "XelpToklineXB newline separated tokens"))
+        if (JB_ASSERT(count != 2, "XelpToklineXB newline separated tokens"))
             return XELP_E_ERR;
     }
 
@@ -1428,6 +1432,529 @@ XELPRESULT test_XelpBufMacros() {
 
 
 /* ====================================================================
+ test_default_handlers() - tests for default KEY and CLI handlers
+ that are called when no matching command/key is found.
+ */
+
+/* default handler callback globals */
+static int gDefKeyVal;
+static const char *gDefCLIArgs;
+static int gDefCLILen;
+
+XELPRESULT defKeyHandler(int key) {
+    gDefKeyVal = key;
+    return XELP_W_WARN;
+}
+
+XELPRESULT defCLIHandler(const char *args, int len) {
+    gDefCLIArgs = args;
+    gDefCLILen = len;
+    return XELP_W_WARN;
+}
+
+XELPRESULT test_default_handlers() {
+    XELP x;
+    XELPRESULT r;
+    XelpBuf script;
+    char *s;
+
+    /* ---- KEY default handler tests ---- */
+
+    /* unmapped key with no default handler -- should return NOTFOUND */
+    XELPInit(&x,"TestDefHandlers");
+    XELP_SET_FN_KEY(x,gMyKeyCommands);
+    XELP_SET_FN_OUT(x,dummyOut);
+
+    r = XELPExecKC(&x,'z');
+    if (JB_ASSERT(r != XELP_S_NOTFOUND, "DefKey null handler returns NOTFOUND"))
+        return XELP_E_ERR;
+    if (JB_ASSERT(x.mR[0] != XELP_S_NOTFOUND, "DefKey null handler mR[0]"))
+        return XELP_E_ERR;
+
+    /* set default KEY handler -- unmapped key should call it */
+    XELP_SET_FN_DEF_KEY(x,defKeyHandler);
+    gDefKeyVal = 0;
+    r = XELPExecKC(&x,'z');
+    if (JB_ASSERT(r != XELP_W_WARN, "DefKey handler called return"))
+        return XELP_E_ERR;
+    if (JB_ASSERT(gDefKeyVal != 'z', "DefKey handler received key"))
+        return XELP_E_ERR;
+    if (JB_ASSERT(x.mR[0] != XELP_W_WARN, "DefKey handler mR[0] stores result"))
+        return XELP_E_ERR;
+
+    /* mapped key should NOT call default handler */
+    gDefKeyVal = 0;
+    gGlobalCallbackData.k1 = 0;
+    r = XELPExecKC(&x,'1');
+    if (JB_ASSERT(r != XELP_S_OK, "DefKey mapped key returns OK"))
+        return XELP_E_ERR;
+    if (JB_ASSERT(gGlobalCallbackData.k1 != '1', "DefKey mapped key calls fn"))
+        return XELP_E_ERR;
+    if (JB_ASSERT(gDefKeyVal != 0, "DefKey handler NOT called for mapped key"))
+        return XELP_E_ERR;
+
+    /* default KEY handler with NULL fn table */
+    {
+        XELP x2;
+        XELPInit(&x2,"TestDefKeyNoTable");
+        XELP_SET_FN_OUT(x2,dummyOut);
+        XELP_SET_FN_DEF_KEY(x2,defKeyHandler);
+        gDefKeyVal = 0;
+        r = XELPExecKC(&x2,'q');
+        if (JB_ASSERT(r != XELP_W_WARN, "DefKey no table calls default"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(gDefKeyVal != 'q', "DefKey no table received key"))
+            return XELP_E_ERR;
+    }
+
+    /* default KEY handler via ParseKey in KEY mode */
+    {
+        XELP x3;
+        XELPInit(&x3,"TestDefKeyParseKey");
+        XELP_SET_FN_KEY(x3,gMyKeyCommands);
+        XELP_SET_FN_CLI(x3,gMyCLICommands);
+        XELP_SET_FN_OUT(x3,dummyOut);
+        XELP_SET_FN_DEF_KEY(x3,defKeyHandler);
+        XELPParseKey(&x3,XELPKEY_KEY); /* switch to KEY mode */
+        gDefKeyVal = 0;
+        XELPParseKey(&x3,'q'); /* unmapped key */
+        if (JB_ASSERT(gDefKeyVal != 'q', "DefKey via ParseKey"))
+            return XELP_E_ERR;
+    }
+
+    /* ---- CLI default handler tests ---- */
+
+    /* unknown command with no default CLI handler -- mR[0] = CMDNOTFOUND */
+    XELPInit(&x,"TestDefCLI");
+    XELP_SET_FN_CLI(x,gMyCLICommands);
+    XELP_SET_FN_OUT(x,dummyOut);
+
+    s = "unknowncmd arg1\n";
+    XELP_XBInit(script,s,XELPStrLen(s));
+    r = XELPParseXB(&x,&script);
+    if (JB_ASSERT(x.mR[0] != XELP_E_CMDNOTFOUND, "DefCLI null handler CMDNOTFOUND"))
+        return XELP_E_ERR;
+
+    /* set default CLI handler -- unknown command should call it */
+    XELP_SET_FN_DEF_CLI(x,defCLIHandler);
+    gDefCLIArgs = 0;
+    gDefCLILen = 0;
+    s = "unknowncmd arg1\n";
+    XELP_XBInit(script,s,XELPStrLen(s));
+    r = XELPParseXB(&x,&script);
+    if (JB_ASSERT(r != XELP_S_OK, "DefCLI handler called"))
+        return XELP_E_ERR;
+    if (JB_ASSERT(x.mR[0] != XELP_W_WARN, "DefCLI handler mR[0]"))
+        return XELP_E_ERR;
+    if (JB_ASSERT(gDefCLIArgs == 0, "DefCLI handler received args"))
+        return XELP_E_ERR;
+    if (JB_ASSERT(gDefCLILen == 0, "DefCLI handler received len"))
+        return XELP_E_ERR;
+
+    /* known command should NOT call default CLI handler */
+    gDefCLIArgs = 0;
+    gDefCLILen = 0;
+    gGlobalCallbackData.c1 = 0;
+    s = "foo arg\n";
+    XELP_XBInit(script,s,XELPStrLen(s));
+    r = XELPParseXB(&x,&script);
+    if (JB_ASSERT(gGlobalCallbackData.c1 != 1, "DefCLI known cmd dispatched"))
+        return XELP_E_ERR;
+    if (JB_ASSERT(gDefCLIArgs != 0, "DefCLI handler NOT called for known cmd"))
+        return XELP_E_ERR;
+
+    /* multiple commands: one known, one unknown -- default handler called for unknown only */
+    gDefCLIArgs = 0;
+    gGlobalCallbackData.c1 = 0;
+    s = "foo; badcmd\n";
+    XELP_XBInit(script,s,XELPStrLen(s));
+    r = XELPParseXB(&x,&script);
+    if (JB_ASSERT(gGlobalCallbackData.c1 != 1, "DefCLI mixed: known ran"))
+        return XELP_E_ERR;
+    if (JB_ASSERT(x.mR[0] != XELP_W_WARN, "DefCLI mixed: default handler ran"))
+        return XELP_E_ERR;
+
+    /* default CLI handler with NULL fn table */
+    {
+        XELP x4;
+        XELPInit(&x4,"TestDefCLINoTable");
+        XELP_SET_FN_OUT(x4,dummyOut);
+        XELP_SET_FN_DEF_CLI(x4,defCLIHandler);
+        /* no CLI table set -- command should NOT dispatch (no table to search) */
+        gDefCLIArgs = 0;
+        s = "anything\n";
+        XELP_XBInit(script,s,XELPStrLen(s));
+        r = XELPParseXB(&x4,&script);
+        /* with null fn table the dispatch loop is skipped entirely */
+        if (JB_ASSERT(r != XELP_S_OK, "DefCLI null table returns OK"))
+            return XELP_E_ERR;
+    }
+
+    /* default CLI handler via ParseKey (type unknown cmd + enter) */
+    {
+        XELP x5;
+        int i;
+        char *cmd = "badcmd";
+        XELPInit(&x5,"TestDefCLIParseKey");
+        XELP_SET_FN_CLI(x5,gMyCLICommands);
+        XELP_SET_FN_OUT(x5,dummyOut);
+        XELP_SET_FN_DEF_CLI(x5,defCLIHandler);
+        gDefCLIArgs = 0;
+        for (i = 0; i < XELPStrLen(cmd); i++)
+            XELPParseKey(&x5,cmd[i]);
+        XELPParseKey(&x5,XELPKEY_ENTER);
+        if (JB_ASSERT(x5.mR[0] != XELP_W_WARN, "DefCLI via ParseKey"))
+            return XELP_E_ERR;
+    }
+
+    return XELP_S_OK;
+}
+
+/* ====================================================================
+ test_buffer_boundaries() - verify that buffer limits are never exceeded
+ across all API entry points. Exercises exact boundary conditions for:
+ - CLI command buffer (XELP_CMDBUFSZ) via ParseKey
+ - XELPParseXB / XELPParse with various buffer sizes
+ - XelpBuf macros at boundaries
+ - Command handler received length is correctly bounded
+ - Tokenizer never reads past buffer end
+ */
+
+/* handler that records received buffer pointer and length for boundary checks */
+static const char *gBndArgs;
+static int gBndLen;
+static int gBndCallCount;
+
+XELPRESULT bndHandler(const char *args, int len) {
+    gBndArgs = args;
+    gBndLen = len;
+    gBndCallCount++;
+    return XELP_S_OK;
+}
+
+XELPRESULT test_buffer_boundaries() {
+    XELP x;
+    XELPRESULT r;
+    XelpBuf script;
+    int i;
+
+    XELPCLIFuncMapEntry bndCmds[] = {
+        {&bndHandler, "cmd", "test cmd"},
+        XELP_FUNC_ENTRY_LAST
+    };
+
+    /* === CLI buffer via ParseKey === */
+
+    /* 1. Type exactly XELP_CMDBUFSZ-2 chars + enter (buffer inited with CMDBUFSZ-1 capacity) */
+    {
+        XELPInit(&x,"BndTest");
+        XELP_SET_FN_CLI(x,bndCmds);
+        XELP_SET_FN_OUT(x,dummyOut);
+
+        gBndCallCount = 0;
+        for (i = 0; i < XELP_CMDBUFSZ - 2; i++)
+            XELPParseKey(&x,'A');
+        XELPParseKey(&x,XELPKEY_ENTER);
+        /* the typed chars should have been captured and parsed */
+        if (JB_ASSERT(XELP_XBGetPos(x.mCmdXB) != 0, "bnd CLI reset after enter"))
+            return XELP_E_ERR;
+    }
+
+    /* 2. Type exactly XELP_CMDBUFSZ-1 chars (fill to capacity) + enter */
+    {
+        XELPInit(&x,"BndTest2");
+        XELP_SET_FN_CLI(x,bndCmds);
+        XELP_SET_FN_OUT(x,dummyOut);
+
+        for (i = 0; i < XELP_CMDBUFSZ - 1; i++)
+            XELPParseKey(&x,'B');
+        /* buffer should be exactly full now */
+        if (JB_ASSERT(XELP_XBGetPos(x.mCmdXB) != XELP_CMDBUFSZ - 1, "bnd CLI full"))
+            return XELP_E_ERR;
+        XELPParseKey(&x,XELPKEY_ENTER);
+        if (JB_ASSERT(XELP_XBGetPos(x.mCmdXB) != 0, "bnd CLI reset after full"))
+            return XELP_E_ERR;
+    }
+
+    /* 3. Overflow: type XELP_CMDBUFSZ * 2 chars -- buffer must not exceed capacity */
+    {
+        XELPInit(&x,"BndTest3");
+        XELP_SET_FN_CLI(x,bndCmds);
+        XELP_SET_FN_OUT(x,dummyOut);
+
+        for (i = 0; i < XELP_CMDBUFSZ * 2; i++)
+            XELPParseKey(&x,'C');
+        /* XELP_XBPUTC bounds check should have prevented overflow */
+        if (JB_ASSERT(XELP_XBGetPos(x.mCmdXB) != XELP_CMDBUFSZ - 1, "bnd CLI overflow stopped"))
+            return XELP_E_ERR;
+        /* verify buffer end ptr is correct */
+        if (JB_ASSERT(x.mCmdXB.p > x.mCmdXB.e, "bnd CLI ptr within bounds"))
+            return XELP_E_ERR;
+        XELPParseKey(&x,XELPKEY_ENTER);
+    }
+
+    /* 4. Backspace at empty buffer -- p must not go below s */
+    {
+        XELPInit(&x,"BndTest4");
+        XELP_SET_FN_CLI(x,bndCmds);
+        XELP_SET_FN_OUT(x,dummyOut);
+
+        for (i = 0; i < 10; i++)
+            XELPParseKey(&x,XELPKEY_BKSP);
+        if (JB_ASSERT(x.mCmdXB.p < x.mCmdXB.s, "bnd bksp at empty no underflow"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(XELP_XBGetPos(x.mCmdXB) != 0, "bnd bksp stays at 0"))
+            return XELP_E_ERR;
+    }
+
+    /* 5. Type, backspace to empty, type again -- buffer reuse */
+    {
+        XELPInit(&x,"BndTest5");
+        XELP_SET_FN_CLI(x,bndCmds);
+        XELP_SET_FN_OUT(x,dummyOut);
+
+        XELPParseKey(&x,'x');
+        XELPParseKey(&x,'y');
+        XELPParseKey(&x,'z');
+        if (JB_ASSERT(XELP_XBGetPos(x.mCmdXB) != 3, "bnd type 3 chars"))
+            return XELP_E_ERR;
+        for (i = 0; i < 10; i++)
+            XELPParseKey(&x,XELPKEY_BKSP);
+        if (JB_ASSERT(XELP_XBGetPos(x.mCmdXB) != 0, "bnd bksp to empty"))
+            return XELP_E_ERR;
+        XELPParseKey(&x,'a');
+        if (JB_ASSERT(XELP_XBGetPos(x.mCmdXB) != 1, "bnd retype after bksp"))
+            return XELP_E_ERR;
+        XELPParseKey(&x,XELPKEY_ENTER);
+    }
+
+    /* === Command handler receives correctly bounded length === */
+
+    /* 6. handler len matches actual token+args length */
+    {
+        XELPInit(&x,"BndTest6");
+        XELP_SET_FN_CLI(x,bndCmds);
+        XELP_SET_FN_OUT(x,dummyOut);
+
+        gBndArgs = 0;
+        gBndLen = 0;
+        gBndCallCount = 0;
+        {
+            char *s = "cmd arg1 arg2\n";
+            XELP_XBInit(script,s,XELPStrLen(s));
+            r = XELPParseXB(&x,&script);
+        }
+        if (JB_ASSERT(gBndCallCount != 1, "bnd handler called once"))
+            return XELP_E_ERR;
+        /* len should be distance from line start to line end (before \n) */
+        if (JB_ASSERT(gBndLen != 13, "bnd handler len=13"))
+            return XELP_E_ERR;
+        /* args ptr should point into the input buffer */
+        if (JB_ASSERT(gBndArgs == 0, "bnd handler got args ptr"))
+            return XELP_E_ERR;
+    }
+
+    /* 7. handler len for command with no args */
+    {
+        gBndLen = -1;
+        {
+            char *s = "cmd\n";
+            XELP_XBInit(script,s,XELPStrLen(s));
+            r = XELPParseXB(&x,&script);
+        }
+        if (JB_ASSERT(gBndLen != 3, "bnd handler cmd-only len=3"))
+            return XELP_E_ERR;
+    }
+
+    /* 8. handler len for single-char line (no newline, just "cmd") */
+    {
+        gBndLen = -1;
+        {
+            char *s = "cmd";
+            XELP_XBInit(script,s,XELPStrLen(s));
+            r = XELPParseXB(&x,&script);
+        }
+        if (JB_ASSERT(gBndLen != 3, "bnd handler no-newline len=3"))
+            return XELP_E_ERR;
+    }
+
+    /* 9. handler len with semicolons -- each command gets its own length */
+    {
+        gBndCallCount = 0;
+        gBndLen = -1;
+        {
+            char *s = "cmd a; cmd bb\n";
+            XELP_XBInit(script,s,XELPStrLen(s));
+            r = XELPParseXB(&x,&script);
+        }
+        if (JB_ASSERT(gBndCallCount != 2, "bnd semicolon 2 calls"))
+            return XELP_E_ERR;
+        /* last call should have been for "cmd bb" */
+        if (JB_ASSERT(gBndLen != 6, "bnd semicolon second len=6"))
+            return XELP_E_ERR;
+    }
+
+    /* === XELPParse boundary -- len parameter respected === */
+
+    /* 10. XELPParse with exact length */
+    {
+        gBndCallCount = 0;
+        gBndLen = -1;
+        r = XELPParse(&x,"cmd x\n",6);
+        if (JB_ASSERT(gBndCallCount != 1, "bnd Parse exact len"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(gBndLen != 5, "bnd Parse handler len=5"))
+            return XELP_E_ERR;
+    }
+
+    /* 11. XELPParse with shorter length than string -- should only parse up to len */
+    {
+        gBndCallCount = 0;
+        r = XELPParse(&x,"cmd xyz extra\n",3);  /* only "cmd" visible */
+        if (JB_ASSERT(gBndCallCount != 1, "bnd Parse truncated calls"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(gBndLen != 3, "bnd Parse truncated len=3"))
+            return XELP_E_ERR;
+    }
+
+    /* 12. XELPParse with len=0 -- nothing to parse */
+    {
+        gBndCallCount = 0;
+        r = XELPParse(&x,"cmd\n",0);
+        if (JB_ASSERT(gBndCallCount != 0, "bnd Parse len=0 no call"))
+            return XELP_E_ERR;
+    }
+
+    /* === XelpBuf boundary checks === */
+
+    /* 13. XELP_XBPUTC at exact capacity -- should accept */
+    {
+        char buf[4];
+        XelpBuf xb;
+        XELP_XBInit(xb,buf,4);
+        XELP_XBPUTC(xb,'a');
+        XELP_XBPUTC(xb,'b');
+        XELP_XBPUTC(xb,'c');
+        XELP_XBPUTC(xb,'d');
+        if (JB_ASSERT(XELP_XBGetPos(xb) != 4, "bnd XBPUTC fill to cap"))
+            return XELP_E_ERR;
+        /* 5th write should be ignored */
+        XELP_XBPUTC(xb,'e');
+        if (JB_ASSERT(XELP_XBGetPos(xb) != 4, "bnd XBPUTC past cap ignored"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(buf[3] != 'd', "bnd XBPUTC no overwrite"))
+            return XELP_E_ERR;
+    }
+
+    /* 14. XELP_XBGETC at end -- should not advance */
+    {
+        char buf[2];
+        XelpBuf xb;
+        char ch;
+        buf[0] = 'X';
+        buf[1] = 'Y';
+        XELP_XBInit(xb,buf,2);
+        ch = 0; XELP_XBGETC(xb,ch);
+        ch = 0; XELP_XBGETC(xb,ch);
+        if (JB_ASSERT(XELP_XBGetPos(xb) != 2, "bnd XBGETC at end pos"))
+            return XELP_E_ERR;
+        ch = 'Z';
+        XELP_XBGETC(xb,ch);
+        if (JB_ASSERT(ch != 'Z', "bnd XBGETC at end unchanged"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(XELP_XBGetPos(xb) != 2, "bnd XBGETC at end no advance"))
+            return XELP_E_ERR;
+    }
+
+    /* 15. zero-length buffer */
+    {
+        char buf[1];
+        XelpBuf xb;
+        XELP_XBInit(xb,buf,0);
+        if (JB_ASSERT(XELP_XBBufLen(xb) != 0, "bnd zero-len buflen"))
+            return XELP_E_ERR;
+        XELP_XBPUTC(xb,'x');
+        if (JB_ASSERT(XELP_XBGetPos(xb) != 0, "bnd zero-len put ignored"))
+            return XELP_E_ERR;
+    }
+
+    /* === Tokenizer boundary === */
+
+    /* 16. single-char buffer */
+    {
+        XelpBuf b, tok;
+        char *s = "x";
+        XELP_XBInit(b,s,1);
+        r = XELPTokLineXB(&b,&tok,XELP_TOK_ONLY);
+        if (JB_ASSERT(r != XELP_S_OK, "bnd tok single char"))
+            return XELP_E_ERR;
+    }
+
+    /* 17. tokenizer with exact-length buffer (no trailing space) */
+    {
+        XelpBuf b, tok;
+        char *s = "tok1";
+        XELP_XBInit(b,s,4);
+        r = XELPTokLineXB(&b,&tok,XELP_TOK_ONLY);
+        if (JB_ASSERT(r != XELP_S_OK, "bnd tok exact len"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(XELP_S_OK != XELPStrEq2(tok.s,tok.p,"tok1"), "bnd tok exact match"))
+            return XELP_E_ERR;
+    }
+
+    /* 18. repeated parse cycles -- buffer resets correctly each time */
+    {
+        XELPInit(&x,"BndRepeat");
+        XELP_SET_FN_CLI(x,bndCmds);
+        XELP_SET_FN_OUT(x,dummyOut);
+
+        for (i = 0; i < 50; i++) {
+            int j;
+            for (j = 0; j < 3; j++)
+                XELPParseKey(&x,'c');
+            XELPParseKey(&x,XELPKEY_ENTER);
+        }
+        /* after 50 cycles the buffer should still be valid */
+        if (JB_ASSERT(XELP_XBGetPos(x.mCmdXB) != 0, "bnd 50 cycles reset"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(x.mCmdXB.p < x.mCmdXB.s, "bnd 50 cycles p >= s"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(x.mCmdXB.p > x.mCmdXB.e, "bnd 50 cycles p <= e"))
+            return XELP_E_ERR;
+    }
+
+    /* 19. ParseKey: fill buffer to exact capacity, then enter */
+    {
+        XELPInit(&x,"BndExact");
+        XELP_SET_FN_CLI(x,bndCmds);
+        XELP_SET_FN_OUT(x,dummyOut);
+
+        gBndCallCount = 0;
+        /* XELPInit sets mCmdXB capacity to XELP_CMDBUFSZ-1 */
+        for (i = 0; i < XELP_CMDBUFSZ - 1; i++)
+            XELPParseKey(&x,'D');
+        /* one more should be dropped by XBPUTC bounds check */
+        XELPParseKey(&x,'E');
+        if (JB_ASSERT(XELP_XBGetPos(x.mCmdXB) != XELP_CMDBUFSZ - 1, "bnd exact cap+1"))
+            return XELP_E_ERR;
+        XELPParseKey(&x,XELPKEY_ENTER);
+        if (JB_ASSERT(XELP_XBGetPos(x.mCmdXB) != 0, "bnd exact cap enter reset"))
+            return XELP_E_ERR;
+    }
+
+    /* 20. XELPParse: verify handler cannot see beyond supplied length */
+    {
+        char mixed[] = "cmd SECRET";  /* 10 chars total */
+        gBndLen = -1;
+        r = XELPParse(&x, mixed, 3);  /* only "cmd" visible */
+        if (JB_ASSERT(gBndLen != 3, "bnd Parse hides trailing data"))
+            return XELP_E_ERR;
+    }
+
+    return XELP_S_OK;
+}
+
+/* ====================================================================
  test_stress_malformed() - stress tests for malformed input, overflows,
  and edge cases that could crash or corrupt memory.
  */
@@ -1718,6 +2245,8 @@ int run_tests() {
     JumpBug_RunUnit(test_XelpHelp,"XelpHelp");
     JumpBug_RunUnit(test_XELPParseNum,"XELPParseNum");
     JumpBug_RunUnit(test_XelpBufMacros,"XelpBufMacros");
+    JumpBug_RunUnit(test_default_handlers,"DefaultHandlers");
+    JumpBug_RunUnit(test_buffer_boundaries,"BufferBoundaries");
     JumpBug_RunUnit(test_stress_malformed,"StressMalformed");
 
     JumpBug_PrintResults();

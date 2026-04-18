@@ -343,39 +343,10 @@ int JumpBug_RunUnit( int (*f)(), char *unitName) {
 }
 
 /***************************************
- * log test result
+ * log test result (delegates to JumpBug_LogTestF)
 */
 int JumpBug_LogTest (int result, char *msg) {
-
-#ifdef JUMPBUG_LOGGING_SUPPORT
-            JumpBug_YAML_BlockN (gTestData.mpfPutCharLog,"TestCase",gTestData.curCases,2);
-#endif            
-    gTestData.totalCases++; /* global individual test cases count */
-    gTestData.curCases++;   /* global unit count...               */
-#ifdef JUMPBUG_LOGGING_SUPPORT
-            JumpBug_YAML_SS (gTestData.mpfPutCharLog,"testName",msg,3);
-#endif                
-    if (JB_NOTFAIL(result)) { /* pass */
-        gTestData.totalPassed++;
-        gTestData.curCasesPassed++;
-        if (result != JB_PASS) {
-            gTestData.totalPassedWarn++;
-            gTestData.curCasesPassedWarn++;
-#ifdef JUMPBUG_LOGGING_SUPPORT
-            JumpBug_YAML_SS (gTestData.mpfPutCharLog,"result","PASSWARN",3);
-#endif            
-        }
-#ifdef JUMPBUG_LOGGING_SUPPORT
-            JumpBug_YAML_SS (gTestData.mpfPutCharLog,"result","PASS",3);
-#endif                    
-    }
-    else {
-#ifdef JUMPBUG_LOGGING_SUPPORT
-            JumpBug_YAML_SS (gTestData.mpfPutCharLog,"result","FAIL",4);
-#endif         
-        JumpBug_FailMsg(msg,gTestData.curCases);
-    }
-    return result;
+    return JumpBug_LogTestF(result, msg, (char*)0, -1);
 }
 /***************************************
     JumpBug_LogTestF 
@@ -420,7 +391,22 @@ int JumpBug_LogTestF(int result, char *msg, char *fname, int lineno ) {
 
 }
 /***************************************
- * Test whether the build passed 
+ * log equality test -- delegates to LogTestF, prints values on failure
+*/
+int JumpBug_LogTestEq(int actual, int expected, char *msg, char *fname, int lineno) {
+    int result = (actual == expected) ? JB_PASS : JB_FAIL;
+    result = JumpBug_LogTestF(result, msg, fname, lineno);
+    if (result < 0) {
+        OUTS("  expected: ");
+        OUTN(expected);
+        OUTS(", actual: ");
+        OUTN(actual);
+        OUTS("\n");
+    }
+    return result;
+}
+/***************************************
+ * Test whether the build passed
 */
 
 int JumpBug_BuildPass() {

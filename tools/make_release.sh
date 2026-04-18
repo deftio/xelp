@@ -99,6 +99,16 @@ do_extract_version() {
 }
 
 # -----------------------------------------------------------------------
+# Step 1b: Update version badges
+# -----------------------------------------------------------------------
+
+do_update_badges() {
+    echo "==> Updating version badges..."
+    python3 tools/update_badges.py
+    git add README.md pages/index.html
+}
+
+# -----------------------------------------------------------------------
 # Step 2: Local validation
 # -----------------------------------------------------------------------
 
@@ -566,6 +576,7 @@ echo "============================================"
 
 # -- Always run --
 do_extract_version
+do_update_badges
 do_validate
 
 if [ "$MODE" = "validate" ]; then

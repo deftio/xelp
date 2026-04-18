@@ -211,6 +211,25 @@ int JumpBug_TestRunner(JB_Tests *t);
 
 
 #define LOGTEST JB_ASSERT
+
+/**************************************************************
+ * Convenience assertion macros
+ *
+ * JB_ASSERT_RET     -- assert + return-on-fail in one statement
+ * JB_ASSERT_EQ      -- equality check, prints both values on failure
+ * JB_ASSERT_EQ_RET  -- equality check + return-on-fail
+ */
+#define JB_ASSERT_RET(result, msg, retval) \
+    do { if (JB_ASSERT((result), (msg)) < 0) return (retval); } while(0)
+
+#define JB_ASSERT_EQ(actual, expected, msg) \
+    JumpBug_LogTestEq((actual), (expected), (msg), JUMPBUG_DBG_FILE, JUMPBUG_DBG_LINE)
+
+#define JB_ASSERT_EQ_RET(actual, expected, msg, retval) \
+    do { if (JB_ASSERT_EQ((actual), (expected), (msg)) < 0) return (retval); } while(0)
+
+int JumpBug_LogTestEq(int actual, int expected, char *msg, char *fname, int lineno);
+
 #ifdef __cplusplus
 }
 #endif
