@@ -24,6 +24,18 @@ UART.
 Two independent xelp instances on separate UARTs, each with their own
 prompt, command table, and state. Demonstrates that xelp uses no globals.
 
+## scripting
+
+Demonstrates the difference between **scripting mode** (`XELPParse` /
+`XELPParseXB` -- execute a buffer of commands at once) and **interactive
+mode** (`XELPParseKey` -- character-by-character terminal input). Shows
+startup scripts, one-liner macros with semicolons, and the `XelpBuf` API.
+
+```bash
+gcc -Wall -Isrc examples/scripting/scripting-example.c src/xelp.c -o scripting-example
+./scripting-example
+```
+
 ## arduino
 
 ESP32/Arduino example with NeoPixel LED control via CLI commands. Uses
