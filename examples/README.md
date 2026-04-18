@@ -38,8 +38,9 @@ gcc -Wall -Isrc examples/scripting/scripting-example.c src/xelp.c -o scripting-e
 
 ## arduino
 
-ESP32/Arduino example with NeoPixel LED control via CLI commands. Uses
-Arduino `Serial` for I/O.
+Basic xelp example using the raw C API. Works on any Arduino board
+with a Serial port -- LED control, token listing, and built-in help.
+No external library dependencies.
 
 ## arduino-cpp
 

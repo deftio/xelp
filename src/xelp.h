@@ -281,9 +281,6 @@ typedef struct
 	void (*mpfBksp)();			  /* function to handle destructive backspace at CLI prompt  */
 #endif
 
-#ifdef XELP_STACK_MACHINE
-	int 					mS[XELP_STACK_DEPTH]; /* integer stack for XelpStackMachine 	 */
-#endif 
 }XELP;
 
 
