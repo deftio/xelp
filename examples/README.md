@@ -40,3 +40,11 @@ gcc -Wall -Isrc examples/scripting/scripting-example.c src/xelp.c -o scripting-e
 
 ESP32/Arduino example with NeoPixel LED control via CLI commands. Uses
 Arduino `Serial` for I/O.
+
+## arduino-cpp
+
+Same idea as the `arduino` example but uses the `XelpCLI` C++ wrapper
+class from `src/XelpArduino.h`. Eliminates boilerplate: no manual
+`XELP_SET_FN_*` macros, no `Serial.available()` loop -- just `begin()`,
+`setCommands()`, and `poll(Serial)`. Also demonstrates `run()` for
+executing a startup script.
