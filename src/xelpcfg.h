@@ -106,19 +106,21 @@
 #define XELPREG int    /* can change this to a valid C type for your plaform. eg. short, long, _int64 */
 
 
-/**************************************************************************************************** 
- XELP Stack Operations is a lightweight stack machine interpreter allowing one to run true commands from the CLI/script including 
- simple math an variable passing.
- XELP_STACK_DEPTH specifies depth in integers of the machine
+/****************************************************************************************************
+ XELP Stack Operations is a lightweight stack machine interpreter allowing one to run true commands
+ from the CLI/script including simple math and variable passing.
+ XELP_STACK_DEPTH specifies depth in integers of the machine.
+ Not yet implemented -- see dev/xelp_deferred_features.md
  */
-#define XELP_STACK_MACHINE
-#define XELP_STACK_DEPTH  (16)   
+/* #define XELP_STACK_MACHINE   */
+/* #define XELP_STACK_DEPTH  (16) */
 
 
-/**************************************************************************************************** 
- enable built-in language features such poke, peek, go 
+/****************************************************************************************************
+ enable built-in language features such poke, peek, go.
+ Not yet implemented -- see dev/xelp_deferred_features.md
  */
-#define XELP_ENABLE_LCORE  1
+/* #define XELP_ENABLE_LCORE  1 */
 
 
 /**

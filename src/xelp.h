@@ -60,7 +60,6 @@ extern "C"
 #define XELP_ENABLE_CLI         1   /* enable command line prompt, scripting abilities         */
 #define XELP_ENABLE_THR 		1   /* enable THRU mode (redirect to other perphierals)        */
 #define XELP_ENABLE_HELP		1   /* compile in built-in help function.               	   */
-#define XELP_ENABLE_LCORE       1   /* enable script language features such poke, peek, go     */
 #endif
 
 #ifndef XELP_REGS_SZ
