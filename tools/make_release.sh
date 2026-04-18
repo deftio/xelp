@@ -193,14 +193,39 @@ do_check_git() {
 }
 
 # -----------------------------------------------------------------------
-# Step 4: Push branch
+# Step 4: Sync with master and push branch
 # -----------------------------------------------------------------------
 
 do_push_branch() {
     if $ON_MASTER; then return 0; fi
 
-    step_header "Push branch '$BRANCH' to origin"
+    step_header "Sync with master and push branch '$BRANCH'"
 
+    # Merge master into branch to avoid conflicts and ensure CI runs
+    run_cmd git fetch origin master
+    local behind
+    behind=$(git rev-list --count "HEAD..origin/master" 2>/dev/null || echo "0")
+    if [ "$behind" -gt 0 ]; then
+        echo "  Branch is $behind commit(s) behind origin/master."
+        echo "  Merging origin/master (preferring branch on conflicts)..."
+        if ! run_cmd git merge origin/master -X ours --no-edit; then
+            # Handle modify/delete conflicts: keep our versions
+            local unresolved
+            unresolved=$(git diff --name-only --diff-filter=U 2>/dev/null || true)
+            if [ -n "$unresolved" ]; then
+                echo "  Resolving remaining conflicts (keeping branch versions)..."
+                echo "$unresolved" | while read -r f; do
+                    git checkout --ours "$f" 2>/dev/null && git add "$f" || git add "$f"
+                done
+                run_cmd git commit --no-edit
+            fi
+        fi
+        pass "Merged origin/master into $BRANCH."
+    else
+        pass "Branch is up to date with master."
+    fi
+
+    # Push
     local tracking
     tracking=$(git rev-parse --abbrev-ref --symbolic-full-name "@{u}" 2>/dev/null || true)
     if [ -n "$tracking" ]; then
