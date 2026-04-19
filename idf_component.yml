@@ -21,7 +21,7 @@
 #
 # See: https://docs.espressif.com/projects/idf-component-manager/en/latest/reference/manifest_file.html
 
-version: "0.3.0"
+version: "0.3"
 description: >-
   Tiny CLI and script interpreter for embedded systems.
   2KB flash, zero malloc, multi-instance.
