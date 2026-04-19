@@ -130,7 +130,7 @@ XELPRESULT XELPInit 	 (
 		*p++=0;
 	
 	ths->mpAboutMsg = pAboutMsg;
-	XELP_XBInit(ths->mCmdXB,ths->mCmdMsgBuf,XELP_CMDBUFSZ-1);
+	XELP_XB_INIT(ths->mCmdXB,ths->mCmdMsgBuf,XELP_CMDBUFSZ-1);
 	/* comand mode mssage index 
 	ths->mCmdMsgIndex = 0;  //set to 0 by ptr loop at top
 	*/
@@ -257,14 +257,14 @@ XELPRESULT XELPExecKC(XELP* ths, char key) {
     {          
         while (p->mFunPtr) {
             if (p->mKey == key)			{
-                ths->mR[0] = p->mFunPtr((int)key);
+                ths->mR[0] = p->mFunPtr(ths, (int)key);
                 return ths->mR[0];
             }
             p++;
         }
     }
     if (ths->mpfDefKey) {
-        ths->mR[0] = ths->mpfDefKey((int)key);
+        ths->mR[0] = ths->mpfDefKey(ths, (int)key);
     } else {
         ths->mR[0] = XELP_S_NOTFOUND;
     }
@@ -379,7 +379,7 @@ XELPRESULT XELPTokLine(char* bs, char* be, const char **t0s, const char **t0e, c
     XelpBuf xc,tok;
     XELPRESULT r;
 
-    XELP_XBInitPtrs(xc,bs,bs,be);
+    XELP_XB_INIT_PTRS(xc,bs,bs,be);
 
     r=XELPTokLineXB(&xc,&tok,srchType);
     *t0s = tok.s;
@@ -460,14 +460,14 @@ XELPRESULT XELPParseXB (XELP* ths, XelpBuf *args) {
             while(f->mpCmd) {    
                 if (XELP_S_OK == XELPStrEq(line.s,(int)(line.p-line.s),f->mpCmd)){
                     
-                    ths->mR[0] = (f->mFunPtr)(line.s,(int)(line.e-line.s));	
+                    ths->mR[0] = (f->mFunPtr)(ths, line.s,(int)(line.e-line.s));
                     break;
                 }
                 f++;
             }
             if (ths->mR[0] == XELP_E_CMDNOTFOUND) {
             	if (ths->mpfDefCLI)
-            		ths->mR[0] = ths->mpfDefCLI(line.s,(int)(line.e-line.s));
+            		ths->mR[0] = ths->mpfDefCLI(ths, line.s,(int)(line.e-line.s));
             }
         }
 	}
@@ -476,7 +476,7 @@ XELPRESULT XELPParseXB (XELP* ths, XelpBuf *args) {
 XELPRESULT XELPParse 		(XELP *ths, const char *buf, int blen)
 {
     XelpBufC args;
-    XELP_XBInit(args,buf,blen);
+    XELP_XB_INIT(args,buf,blen);
     return XELPParseXB(ths,(XelpBuf *)&args);
 }
 /********************************************************
@@ -588,17 +588,17 @@ XELPRESULT XELPParseKey (XELP *ths, char key)
                     
 					if (key == XELPKEY_ENTER )	{
                         
-						/* XELP_XBPUTC_RAW(ths->mCmdXB,';'); write this explictly b/c XELPKEY_ENTER may not be a parser term */
-                        XELP_XBInitPtrs(line,ths->mCmdXB.s,ths->mCmdXB.s,ths->mCmdXB.p);
+						/* XELP_XB_PUTC_RAW(ths->mCmdXB,';'); write this explictly b/c XELPKEY_ENTER may not be a parser term */
+                        XELP_XB_INIT_PTRS(line,ths->mCmdXB.s,ths->mCmdXB.s,ths->mCmdXB.p);
                         XELPParseXB(ths,&line);
                         line.p=line.s;
-                        XELP_XBTOP(ths->mCmdXB);/* reset command buf to beginning */
+                        XELP_XB_TOP(ths->mCmdXB);/* reset command buf to beginning */
 #ifdef XELP_CLI_PROMPT
 						XELPOut(ths,XELP_CLI_PROMPT,-1);
 #endif
 					}
 					else {
-                        XELP_XBPUTC(ths->mCmdXB,key);
+                        XELP_XB_PUTC(ths->mCmdXB,key);
 					}
 				}
 #endif

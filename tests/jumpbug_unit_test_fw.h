@@ -18,7 +18,7 @@
  
   
   @license: 
-	Copyright (c) 2011-2019, M. A. Chatterjee <deftio at deftio dot com>
+	Copyright (c) 2011-2026, M. A. Chatterjee <deftio at deftio dot com>
 	All rights reserved.
 
 	Redistribution and use in source and binary forms, with or without

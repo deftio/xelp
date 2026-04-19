@@ -44,16 +44,16 @@ static char uart_getc(void)
 /* KEY mode commands (single keypress, no ENTER)                       */
 /* ------------------------------------------------------------------ */
 
-static XELPRESULT key_help(int c)
+static XELPRESULT key_help(XELP *ths, int c)
 {
-    extern XELP cli;
-    return XELPHelp(&cli);
+    (void)c;
+    return XELPHelp(ths);
 }
 
-static XELPRESULT key_banner(int c)
+static XELPRESULT key_banner(XELP *ths, int c)
 {
-    extern XELP cli;
-    XELPOut(&cli, XELP_BANNER_STR, 0);
+    (void)c;
+    XELPOut(ths, XELP_BANNER_STR, 0);
     return XELP_S_OK;
 }
 
@@ -67,26 +67,25 @@ XELPKeyFuncMapEntry key_commands[] = {
 /* CLI mode commands (type command, press ENTER)                        */
 /* ------------------------------------------------------------------ */
 
-static XELPRESULT cmd_help(const char *args, int len)
+static XELPRESULT cmd_help(XELP *ths, const char *args, int len)
 {
-    extern XELP cli;
-    return XELPHelp(&cli);
+    (void)args; (void)len;
+    return XELPHelp(ths);
 }
 
-static XELPRESULT cmd_echo(const char *args, int len)
+static XELPRESULT cmd_echo(XELP *ths, const char *args, int len)
 {
-    extern XELP cli;
-    XELPOut(&cli, args, len);
-    XELPOut(&cli, "\n", 0);
+    XELPOut(ths, args, len);
+    XELPOut(ths, "\n", 0);
     return XELP_S_OK;
 }
 
-static XELPRESULT cmd_info(const char *args, int len)
+static XELPRESULT cmd_info(XELP *ths, const char *args, int len)
 {
-    extern XELP cli;
-    XELPOut(&cli, "XELP size: ", 0);
+    (void)args; (void)len;
+    XELPOut(ths, "XELP size: ", 0);
     /* On a real target you'd format sizeof(XELP) here */
-    XELPOut(&cli, " bytes\n", 0);
+    XELPOut(ths, " bytes\n", 0);
     return XELP_S_OK;
 }
 

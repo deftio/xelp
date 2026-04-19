@@ -1,6 +1,6 @@
 # API Reference
 
-All public types, functions, and macros defined in `xelp.h`. Version 0.2.1.
+All public types, functions, and macros defined in `xelp.h`. Version 0.3.0.
 
 ## Types
 
@@ -10,8 +10,8 @@ All public types, functions, and macros defined in `xelp.h`. Version 0.2.1.
 | `XELPRESULT` | Return type (`int`). 0 = OK, negative = error, positive = warning. |
 | `XELPREG` | Register type (default `int`, overridable in xelpcfg.h). |
 | `XelpBuf` | Buffer wrapper with start, position, and end pointers. |
-| `XELPKeyFuncMapEntry` | Single-key command entry: function pointer, key, help string. |
-| `XELPCLIFuncMapEntry` | CLI command entry: function pointer, command name, help string. |
+| `XELPKeyFuncMapEntry` | Single-key command entry: `XELPRESULT fn(XELP *ths, int key)`, key, help string. |
+| `XELPCLIFuncMapEntry` | CLI command entry: `XELPRESULT fn(XELP *ths, const char *args, int len)`, command name, help string. |
 
 ## Return Codes
 
@@ -48,8 +48,8 @@ Initialize an XELP instance. Must be called before any other function.
 | `XELP_SET_FN_EMCHG(ths, fn)` | Set mode-change callback: `void fn(int)` |
 | `XELP_SET_FN_CLI(ths, tbl)` | Set CLI command table |
 | `XELP_SET_FN_KEY(ths, tbl)` | Set KEY command table |
-| `XELP_SET_VAL_CLI_PROMPT(ths, str)` | Set CLI prompt string |
-| `XELP_SET_ABOUT(ths, str)` | Change the about/help message |
+| `XELP_SET_VAL_CLI_PROMPT(ths, str)` | Set CLI prompt string (stored by pointer, must be null-terminated and remain valid) |
+| `XELP_SET_ABOUT(ths, str)` | Change the about/help message (stored by pointer, must be null-terminated and remain valid) |
 
 ## Core Functions
 
@@ -188,22 +188,22 @@ Compare two buffers. `cmpType` controls null-terminator handling:
 
 | Macro | Purpose |
 |-------|---------|
-| `XELP_XBInit(xb, buf, len)` | Initialize from pointer + length |
-| `XELP_XBInitPtrs(xb, s, p, e)` | Initialize from three pointers |
-| `XELP_XBInitBP(xb, buf, pos, len)` | Initialize with cursor position |
-| `XELP_XBPCopy(a, b)` | Copy XelpBuf a to b |
-| `XELP_XBBufLen(xb)` | Total buffer length |
-| `XELP_XBGetPos(xb)` | Current position as int offset |
-| `XELP_XBPUTC(xb, ch)` | Write char with bounds check |
-| `XELP_XBGETC(xb, ch)` | Read char and advance position |
-| `XELP_XBTOP(xb)` | Reset position to start |
-| `XELPOutXB(x, xb)` | Print XelpBuf contents from current position |
+| `XELP_XB_INIT(xb, buf, len)` | Initialize from pointer + length |
+| `XELP_XB_INIT_PTRS(xb, s, p, e)` | Initialize from three pointers |
+| `XELP_XB_INIT_BP(xb, buf, pos, len)` | Initialize with cursor position |
+| `XELP_XB_COPY(a, b)` | Copy XelpBuf a to b |
+| `XELP_XB_LEN(xb)` | Total buffer length |
+| `XELP_XB_POS(xb)` | Current position as int offset |
+| `XELP_XB_PUTC(xb, ch)` | Write char with bounds check |
+| `XELP_XB_GETC(xb, ch)` | Read char and advance position |
+| `XELP_XB_TOP(xb)` | Reset position to start |
+| `XELP_XB_OUT(x, xb)` | Print XelpBuf contents from current position |
 
 ## Constants
 
 | Constant | Value | Description |
 |----------|-------|-------------|
-| `XELP_VERSION` | 0x00000201 | Library version (32-bit hex: `0x00MMmmpp`) |
+| `XELP_VERSION` | 0x00000300 | Library version (32-bit hex: `0x00MMmmpp`) |
 | `XELP_VER_MAJOR(v)` | | Extract major version byte |
 | `XELP_VER_MINOR(v)` | | Extract minor version byte |
 | `XELP_VER_PATCH(v)` | | Extract patch version byte |

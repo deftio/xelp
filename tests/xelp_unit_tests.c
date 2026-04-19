@@ -5,7 +5,7 @@
   @author M A Chatterjee <deftio [at] deftio [dot] com>
 
   @license:
-	Copyright (c) 2011-2019, M. A. Chatterjee <deftio at deftio dot com>
+	Copyright (c) 2011-2026, M. A. Chatterjee <deftio at deftio dot com>
 	All rights reserved.
 
 	Redistribution and use in source and binary forms, with or without
@@ -49,15 +49,18 @@ struct {
     int c2;
 }gGlobalCallbackData;
 
-XELPRESULT k0 (int k) {
+XELPRESULT k0 (XELP *ths, int k) {
+    (void)ths;
     gGlobalCallbackData.k0 = k;
     return XELP_S_OK;
 }
-XELPRESULT k1 (int k) {
+XELPRESULT k1 (XELP *ths, int k) {
+    (void)ths;
     gGlobalCallbackData.k1 = k;
     return XELP_S_OK;
 }
-XELPRESULT k2 (int k) {
+XELPRESULT k2 (XELP *ths, int k) {
+    (void)ths;
     gGlobalCallbackData.k2 = k;
     return XELP_S_OK;
 }
@@ -71,19 +74,23 @@ XELPKeyFuncMapEntry gMyKeyCommands[] =
 	XELP_FUNC_ENTRY_LAST
 };
 
-XELPRESULT cli0 (const char *c, int max) {
+XELPRESULT cli0 (XELP *ths, const char *c, int max) {
+    (void)ths;
     gGlobalCallbackData.c0 = 0;
     return XELP_S_OK;
 }
-XELPRESULT cli1 (const char *c, int max) {
+XELPRESULT cli1 (XELP *ths, const char *c, int max) {
+    (void)ths;
     gGlobalCallbackData.c1 = 1;
     return XELP_S_OK;
 }
-XELPRESULT cli2 (const char *c, int max) {
+XELPRESULT cli2 (XELP *ths, const char *c, int max) {
+    (void)ths;
     gGlobalCallbackData.c2 = 2;
     return XELP_S_OK;
 }
-XELPRESULT cli3 (const char *c, int max) {
+XELPRESULT cli3 (XELP *ths, const char *c, int max) {
+    (void)ths;
     gGlobalCallbackData.c0 = 0;
     gGlobalCallbackData.c1 = 0;
     gGlobalCallbackData.c2 = 0;
@@ -113,14 +120,14 @@ char gDummyBuf[GDUMMYBUFLEN];
 XelpBuf gDummyXelpBuf;
 
 void gDummyBufOut(char c) {
-    XELP_XBPUTC(gDummyXelpBuf,c);
+    XELP_XB_PUTC(gDummyXelpBuf,c);
 }
 
 /* helper to reset the dummy buf for output capture */
 static void resetDummyBuf(void) {
     int i;
     for (i = 0; i < GDUMMYBUFLEN; i++) gDummyBuf[i] = 0;
-    XELP_XBInit(gDummyXelpBuf,gDummyBuf,GDUMMYBUFLEN);
+    XELP_XB_INIT(gDummyXelpBuf,gDummyBuf,GDUMMYBUFLEN);
 }
 
 /*************************************************
@@ -476,18 +483,18 @@ XELPRESULT test_XelpTokLineXB() {
     XELPRESULT r,r2;
 
     /* test first token */
-    XELP_XBInit(b,line1,XELPStrLen(line1));
+    XELP_XB_INIT(b,line1,XELPStrLen(line1));
     r  = XELPTokLineXB(&b,&out,XELP_TOK_ONLY);
     r2 = XELPBufCmp(line1, line1+3,out.s,out.p,XELP_CMP_TYPE_BUF);
 
     if (JB_ASSERT((XELP_S_OK !=r) || (XELP_S_OK != r2),"XelpToklineXB first token"))
         return XELP_E_ERR;
-    XELP_XBTOP(b);
+    XELP_XB_TOP(b);
 
     /* empty buffer */
     {
         char *empty = "";
-        XELP_XBInit(b,empty,0);
+        XELP_XB_INIT(b,empty,0);
         r = XELPTokLineXB(&b,&out,XELP_TOK_ONLY);
         if (JB_ASSERT(XELP_S_NOTFOUND != r, "XelpToklineXB empty buf"))
             return XELP_E_ERR;
@@ -496,7 +503,7 @@ XELPRESULT test_XelpTokLineXB() {
     /* whitespace only -- no token found */
     {
         char *ws = "   \t  \n  ";
-        XELP_XBInit(b,ws,XELPStrLen(ws));
+        XELP_XB_INIT(b,ws,XELPStrLen(ws));
         r = XELPTokLineXB(&b,&out,XELP_TOK_ONLY);
         if (JB_ASSERT(XELP_S_NOTFOUND != r, "XelpToklineXB whitespace only"))
             return XELP_E_ERR;
@@ -505,7 +512,7 @@ XELPRESULT test_XelpTokLineXB() {
     /* comment -- no token found */
     {
         char *cmt = "# this is a comment\n";
-        XELP_XBInit(b,cmt,XELPStrLen(cmt));
+        XELP_XB_INIT(b,cmt,XELPStrLen(cmt));
         r = XELPTokLineXB(&b,&out,XELP_TOK_ONLY);
         if (JB_ASSERT(XELP_S_NOTFOUND != r, "XelpToklineXB comment only"))
             return XELP_E_ERR;
@@ -514,7 +521,7 @@ XELPRESULT test_XelpTokLineXB() {
     /* multiple tokens with TOK_LINE */
     {
         char *multi = "cmd arg1 arg2\n";
-        XELP_XBInit(b,multi,XELPStrLen(multi));
+        XELP_XB_INIT(b,multi,XELPStrLen(multi));
         r = XELPTokLineXB(&b,&out,XELP_TOK_LINE);
         if (JB_ASSERT(XELP_S_OK != r, "XelpToklineXB TOK_LINE"))
             return XELP_E_ERR;
@@ -527,7 +534,7 @@ XELPRESULT test_XelpTokLineXB() {
     {
         char *semi = "cmd1; cmd2; cmd3\n";
         int count = 0;
-        XELP_XBInit(b,semi,XELPStrLen(semi));
+        XELP_XB_INIT(b,semi,XELPStrLen(semi));
         while (XELP_S_OK == XELPTokLineXB(&b,&out,XELP_TOK_LINE))
             count++;
         if (JB_ASSERT(count != 3, "XelpToklineXB semicolons 3 lines"))
@@ -537,7 +544,7 @@ XELPRESULT test_XelpTokLineXB() {
     /* quoted strings */
     {
         char *qs = "\"hello world\" next\n";
-        XELP_XBInit(b,qs,XELPStrLen(qs));
+        XELP_XB_INIT(b,qs,XELPStrLen(qs));
         r = XELPTokLineXB(&b,&out,XELP_TOK_ONLY);
         if (JB_ASSERT(XELP_S_OK != r, "XelpToklineXB quoted token"))
             return XELP_E_ERR;
@@ -546,7 +553,7 @@ XELPRESULT test_XelpTokLineXB() {
     /* backtick escape */
     {
         char *esc = "abc`; def\n";
-        XELP_XBInit(b,esc,XELPStrLen(esc));
+        XELP_XB_INIT(b,esc,XELPStrLen(esc));
         r = XELPTokLineXB(&b,&out,XELP_TOK_ONLY);
         if (JB_ASSERT(XELP_S_OK != r, "XelpToklineXB backtick esc"))
             return XELP_E_ERR;
@@ -555,7 +562,7 @@ XELPRESULT test_XelpTokLineXB() {
     /* tabs and mixed whitespace */
     {
         char *tabs = "\t  tok1\t\ttok2  ";
-        XELP_XBInit(b,tabs,XELPStrLen(tabs));
+        XELP_XB_INIT(b,tabs,XELPStrLen(tabs));
         r = XELPTokLineXB(&b,&out,XELP_TOK_ONLY);
         if (JB_ASSERT((XELP_S_OK != r) || (XELP_S_OK != XELPStrEq2(out.s,out.p,"tok1")), "XelpToklineXB tabs"))
             return XELP_E_ERR;
@@ -564,7 +571,7 @@ XELPRESULT test_XelpTokLineXB() {
     /* quote with escape inside */
     {
         char *qe = "\"hello\\\"world\" next\n";
-        XELP_XBInit(b,qe,XELPStrLen(qe));
+        XELP_XB_INIT(b,qe,XELPStrLen(qe));
         r = XELPTokLineXB(&b,&out,XELP_TOK_ONLY);
         if (JB_ASSERT(XELP_S_OK != r, "XelpToklineXB quoted escape"))
             return XELP_E_ERR;
@@ -574,7 +581,7 @@ XELPRESULT test_XelpTokLineXB() {
     {
         char *crlf = "tok1\ntok2\n";
         int count = 0;
-        XELP_XBInit(b,crlf,XELPStrLen(crlf));
+        XELP_XB_INIT(b,crlf,XELPStrLen(crlf));
         while (XELP_S_OK == XELPTokLineXB(&b,&out,XELP_TOK_ONLY))
             count++;
         if (JB_ASSERT(count != 2, "XelpToklineXB newline separated tokens"))
@@ -584,7 +591,7 @@ XELPRESULT test_XelpTokLineXB() {
     /* comment after token on same line */
     {
         char *tc = "tok1 # comment\ntok2\n";
-        XELP_XBInit(b,tc,XELPStrLen(tc));
+        XELP_XB_INIT(b,tc,XELPStrLen(tc));
         r = XELPTokLineXB(&b,&out,XELP_TOK_LINE);
         if (JB_ASSERT((XELP_S_OK != r) || (XELP_S_OK != XELPStrEq2(out.s,out.p,"tok1")), "XelpToklineXB tok then comment"))
             return XELP_E_ERR;
@@ -1029,7 +1036,7 @@ XELPRESULT test_XELPParseKey() {
  test_XELPTokN()
 
  Bug fix: line 669-670 had XELPTokN called on x (init'd with c2)
- then XELP_XBInit re-inits x with c2 using XELPStrLen(c3) as length.
+ then XELP_XB_INIT re-inits x with c2 using XELPStrLen(c3) as length.
  Fixed to use correct length.
  */
 
@@ -1041,7 +1048,7 @@ XELPRESULT test_XELPTokN() {
     char *c3 = " tok0 tok1 tok2    \t # tok3   tok4;\n tok5; tok6 ";
     char *c4 = " tok0 tok1 tok2    \t #tok3   tok4;\n tok5; tok6 ";
 
-    XELP_XBInit(x,c1,XELPStrLen(c1));
+    XELP_XB_INIT(x,c1,XELPStrLen(c1));
     r = XELPTokN(&x,0,&tok);
     if (JB_ASSERT( ((r!=XELP_S_OK) || (XELP_S_OK != XELPStrEq2(tok.s, tok.p,"tok0") )),"XELPTokN get 0th token"))
         return XELP_E_ERR;
@@ -1051,24 +1058,24 @@ XELPRESULT test_XELPTokN() {
         return XELP_E_ERR;
 
 
-    XELP_XBInit(x,c2,XELPStrLen(c2));
+    XELP_XB_INIT(x,c2,XELPStrLen(c2));
     r = XELPTokN(&x,3,&tok);
     if (JB_ASSERT( ((r!=XELP_S_OK) || (XELP_S_OK != XELPStrEq2(tok.s, tok.p,"tok5") )),"XELPTokN get 3rd token w commented line"))
         return XELP_E_ERR;
 
     /* Bug fix: use c2 with XELPStrLen(c2) instead of c3 length */
-    XELP_XBInit(x,c2,XELPStrLen(c2));
+    XELP_XB_INIT(x,c2,XELPStrLen(c2));
     r = XELPTokN(&x,3,&tok);
     if (JB_ASSERT( ((r!=XELP_S_OK) || (XELP_S_OK != XELPStrEq2(tok.s, tok.p,"tok5") )),"XELPTokN get 3rd token w comment (fixed)"))
         return XELP_E_ERR;
 
 
-    XELP_XBInit(x,c4,XELPStrLen(c4));
+    XELP_XB_INIT(x,c4,XELPStrLen(c4));
     r = XELPTokN(&x,3,&tok);
     if (JB_ASSERT( ((r != XELP_S_OK) || (XELP_S_OK != XELPStrEq2(tok.s, tok.p,"tok5") )),"XELPTokN get 3rd token w commented line w space"))
         return XELP_E_ERR;
 
-    XELP_XBInit(x,c4,XELPStrLen(c4));
+    XELP_XB_INIT(x,c4,XELPStrLen(c4));
     r = XELPTokN(&x,23,&tok);
     if (JB_ASSERT( ((r == XELP_S_OK) || (XELP_S_NOTFOUND != XELPStrEq2(tok.s, tok.p,"tok5") )),"XELPTokN get token past buffer"))
         return XELP_E_ERR;
@@ -1076,7 +1083,7 @@ XELPRESULT test_XELPTokN() {
     /* quoted token */
     {
         char *q = "\"tok0\" tok1 tok2";
-        XELP_XBInit(x,q,XELPStrLen(q));
+        XELP_XB_INIT(x,q,XELPStrLen(q));
         r = XELPTokN(&x,1,&tok);
         if (JB_ASSERT(r != XELP_S_OK, "XELPTokN quoted tok"))
             return XELP_E_ERR;
@@ -1085,14 +1092,14 @@ XELPRESULT test_XELPTokN() {
     /* n=0 edge - get very first token */
     {
         char *s1 = "first second";
-        XELP_XBInit(x,s1,XELPStrLen(s1));
+        XELP_XB_INIT(x,s1,XELPStrLen(s1));
         r = XELPTokN(&x,0,&tok);
         if (JB_ASSERT((r!=XELP_S_OK) || (XELP_S_OK != XELPStrEq2(tok.s,tok.p,"first")), "XELPTokN n=0"))
             return XELP_E_ERR;
     }
 
     /* test using c3 with correct length */
-    XELP_XBInit(x,c3,XELPStrLen(c3));
+    XELP_XB_INIT(x,c3,XELPStrLen(c3));
     r = XELPTokN(&x,0,&tok);
     if (JB_ASSERT((r != XELP_S_OK) || (XELP_S_OK != XELPStrEq2(tok.s,tok.p,"tok0")), "XELPTokN c3 first"))
         return XELP_E_ERR;
@@ -1112,22 +1119,22 @@ XELPRESULT test_XELPNumToks() {
     char *c2 = "\t tok1 tok2    \t# tok3   tok4\n t0k5; tok6";
     char *c3 = "\t tok1 tok2    \t#tok3   tok4\n t0k5; tok6";
 
-    XELP_XBInit(x,c0,XELPStrLen(c0));
+    XELP_XB_INIT(x,c0,XELPStrLen(c0));
     r = XELPNumToks(&x,&n);
     if (JB_ASSERT(((r!=XELP_S_OK) || (n !=0)),"XELPNumToks empty"))
         return XELP_E_ERR;
 
-    XELP_XBInit(x,c1,XELPStrLen(c1));
+    XELP_XB_INIT(x,c1,XELPStrLen(c1));
     r = XELPNumToks(&x,&n);
     if (JB_ASSERT(((r!=XELP_S_OK) || (n !=5)),"XELPNumToks tabs and newlines"))
         return XELP_E_ERR;
 
-    XELP_XBInit(x,c2,XELPStrLen(c2));
+    XELP_XB_INIT(x,c2,XELPStrLen(c2));
     r = XELPNumToks(&x,&n);
     if (JB_ASSERT(((r!=XELP_S_OK) || (n !=4)),"XELPNumToks comment on second line"))
         return XELP_E_ERR;
 
-    XELP_XBInit(x,c3,XELPStrLen(c3));
+    XELP_XB_INIT(x,c3,XELPStrLen(c3));
     r = XELPNumToks(&x,&n);
     if (JB_ASSERT(((r!=XELP_S_OK) || (n !=4)),"XELPNumToks comment hugging"))
         return XELP_E_ERR;
@@ -1135,7 +1142,7 @@ XELPRESULT test_XELPNumToks() {
     /* single token */
     {
         char *s1 = "only";
-        XELP_XBInit(x,s1,XELPStrLen(s1));
+        XELP_XB_INIT(x,s1,XELPStrLen(s1));
         r = XELPNumToks(&x,&n);
         if (JB_ASSERT(((r!=XELP_S_OK) || (n !=1)),"XELPNumToks single"))
             return XELP_E_ERR;
@@ -1144,7 +1151,7 @@ XELPRESULT test_XELPNumToks() {
     /* all whitespace -- tokenizer returns 1 empty token for non-empty whitespace buffers */
     {
         char *ws = "   \t  \n  ";
-        XELP_XBInit(x,ws,XELPStrLen(ws));
+        XELP_XB_INIT(x,ws,XELPStrLen(ws));
         r = XELPNumToks(&x,&n);
         if (JB_ASSERT(r!=XELP_S_OK,"XELPNumToks all whitespace"))
             return XELP_E_ERR;
@@ -1153,7 +1160,7 @@ XELPRESULT test_XELPNumToks() {
     /* all comments -- tokenizer returns 1 token for comment-only buffers */
     {
         char *cm = "# all comment\n";
-        XELP_XBInit(x,cm,XELPStrLen(cm));
+        XELP_XB_INIT(x,cm,XELPStrLen(cm));
         r = XELPNumToks(&x,&n);
         if (JB_ASSERT(r!=XELP_S_OK,"XELPNumToks all comments"))
             return XELP_E_ERR;
@@ -1181,7 +1188,7 @@ XELPRESULT test_XELPParseXB() {
     /* single command */
     gGlobalCallbackData.c1 = 0;
     s = "foo arg1\n";
-    XELP_XBInit(script,s,XELPStrLen(s));
+    XELP_XB_INIT(script,s,XELPStrLen(s));
     r = XELPParseXB(&x,&script);
     if (JB_ASSERT((r != XELP_S_OK) || (gGlobalCallbackData.c1 != 1), "XELPParseXB single cmd"))
         return XELP_E_ERR;
@@ -1190,7 +1197,7 @@ XELPRESULT test_XELPParseXB() {
     gGlobalCallbackData.c1 = 0;
     gGlobalCallbackData.c2 = 0;
     s = "foo; bar\n";
-    XELP_XBInit(script,s,XELPStrLen(s));
+    XELP_XB_INIT(script,s,XELPStrLen(s));
     r = XELPParseXB(&x,&script);
     if (JB_ASSERT((r != XELP_S_OK) || (gGlobalCallbackData.c1 != 1) || (gGlobalCallbackData.c2 != 2), "XELPParseXB multi cmd"))
         return XELP_E_ERR;
@@ -1199,28 +1206,28 @@ XELPRESULT test_XELPParseXB() {
     gGlobalCallbackData.c1 = 0;
     gGlobalCallbackData.c2 = 0;
     s = "foo\nbar\n";
-    XELP_XBInit(script,s,XELPStrLen(s));
+    XELP_XB_INIT(script,s,XELPStrLen(s));
     r = XELPParseXB(&x,&script);
     if (JB_ASSERT((r != XELP_S_OK) || (gGlobalCallbackData.c1 != 1) || (gGlobalCallbackData.c2 != 2), "XELPParseXB newline cmds"))
         return XELP_E_ERR;
 
     /* command not found -- verify mR[0] */
     s = "nonexistent\n";
-    XELP_XBInit(script,s,XELPStrLen(s));
+    XELP_XB_INIT(script,s,XELPStrLen(s));
     r = XELPParseXB(&x,&script);
     if (JB_ASSERT((r != XELP_S_OK) || (x.mR[0] != XELP_E_CMDNOTFOUND), "XELPParseXB cmd not found"))
         return XELP_E_ERR;
 
     /* empty input */
     s = "";
-    XELP_XBInit(script,s,XELPStrLen(s));
+    XELP_XB_INIT(script,s,XELPStrLen(s));
     r = XELPParseXB(&x,&script);
     if (JB_ASSERT(r != XELP_S_OK, "XELPParseXB empty input"))
         return XELP_E_ERR;
 
     /* comment-only input */
     s = "# just a comment\n";
-    XELP_XBInit(script,s,XELPStrLen(s));
+    XELP_XB_INIT(script,s,XELPStrLen(s));
     r = XELPParseXB(&x,&script);
     if (JB_ASSERT(r != XELP_S_OK, "XELPParseXB comment only"))
         return XELP_E_ERR;
@@ -1231,7 +1238,7 @@ XELPRESULT test_XELPParseXB() {
         XELPInit(&x2,"TestNullTable");
         XELP_SET_FN_OUT(x2,dummyOut);
         s = "foo\n";
-        XELP_XBInit(script,s,XELPStrLen(s));
+        XELP_XB_INIT(script,s,XELPStrLen(s));
         r = XELPParseXB(&x2,&script);
         if (JB_ASSERT(r != XELP_S_OK, "XELPParseXB null table"))
             return XELP_E_ERR;
@@ -1287,8 +1294,8 @@ XELPRESULT test_XelpBufMacros() {
     char ch;
     int i;
 
-    /* XELP_XBInit */
-    XELP_XBInit(xb,buf,32);
+    /* XELP_XB_INIT */
+    XELP_XB_INIT(xb,buf,32);
     if (JB_ASSERT(xb.s != buf, "XBInit s"))
         return XELP_E_ERR;
     if (JB_ASSERT(xb.p != buf, "XBInit p"))
@@ -1296,48 +1303,48 @@ XELPRESULT test_XelpBufMacros() {
     if (JB_ASSERT(xb.e != buf+32, "XBInit e"))
         return XELP_E_ERR;
 
-    /* XELP_XBBufLen */
-    if (JB_ASSERT(XELP_XBBufLen(xb) != 32, "XBBufLen"))
+    /* XELP_XB_LEN */
+    if (JB_ASSERT(XELP_XB_LEN(xb) != 32, "XBBufLen"))
         return XELP_E_ERR;
 
-    /* XELP_XBGetPos at start */
-    if (JB_ASSERT(XELP_XBGetPos(xb) != 0, "XBGetPos 0"))
+    /* XELP_XB_POS at start */
+    if (JB_ASSERT(XELP_XB_POS(xb) != 0, "XBGetPos 0"))
         return XELP_E_ERR;
 
-    /* XELP_XBPUTC with bounds check */
-    XELP_XBPUTC(xb,'A');
+    /* XELP_XB_PUTC with bounds check */
+    XELP_XB_PUTC(xb,'A');
     if (JB_ASSERT(buf[0] != 'A', "XBPUTC A"))
         return XELP_E_ERR;
-    if (JB_ASSERT(XELP_XBGetPos(xb) != 1, "XBGetPos after put"))
+    if (JB_ASSERT(XELP_XB_POS(xb) != 1, "XBGetPos after put"))
         return XELP_E_ERR;
 
-    XELP_XBPUTC(xb,'B');
-    XELP_XBPUTC(xb,'C');
-    if (JB_ASSERT(XELP_XBGetPos(xb) != 3, "XBGetPos after 3 puts"))
+    XELP_XB_PUTC(xb,'B');
+    XELP_XB_PUTC(xb,'C');
+    if (JB_ASSERT(XELP_XB_POS(xb) != 3, "XBGetPos after 3 puts"))
         return XELP_E_ERR;
 
-    /* XELP_XBTOP */
-    XELP_XBTOP(xb);
-    if (JB_ASSERT(XELP_XBGetPos(xb) != 0, "XBTOP resets pos"))
+    /* XELP_XB_TOP */
+    XELP_XB_TOP(xb);
+    if (JB_ASSERT(XELP_XB_POS(xb) != 0, "XBTOP resets pos"))
         return XELP_E_ERR;
 
-    /* XELP_XBGETC */
+    /* XELP_XB_GETC */
     ch = 0;
-    XELP_XBGETC(xb,ch);
+    XELP_XB_GETC(xb,ch);
     if (JB_ASSERT(ch != 'A', "XBGETC A"))
         return XELP_E_ERR;
-    if (JB_ASSERT(XELP_XBGetPos(xb) != 1, "XBGETC advances pos"))
+    if (JB_ASSERT(XELP_XB_POS(xb) != 1, "XBGETC advances pos"))
         return XELP_E_ERR;
 
     ch = 0;
-    XELP_XBGETC(xb,ch);
+    XELP_XB_GETC(xb,ch);
     if (JB_ASSERT(ch != 'B', "XBGETC B"))
         return XELP_E_ERR;
 
-    /* XELP_XBInitPtrs */
+    /* XELP_XB_INIT_PTRS */
     {
         XelpBuf xb2;
-        XELP_XBInitPtrs(xb2,buf,buf+5,buf+32);
+        XELP_XB_INIT_PTRS(xb2,buf,buf+5,buf+32);
         if (JB_ASSERT(xb2.s != buf, "XBInitPtrs s"))
             return XELP_E_ERR;
         if (JB_ASSERT(xb2.p != buf+5, "XBInitPtrs p"))
@@ -1346,22 +1353,22 @@ XELPRESULT test_XelpBufMacros() {
             return XELP_E_ERR;
     }
 
-    /* XELP_XBInitBP */
+    /* XELP_XB_INIT_BP */
     {
         XelpBuf xb3;
-        XELP_XBInitBP(xb3,buf,10,32);
+        XELP_XB_INIT_BP(xb3,buf,10,32);
         if (JB_ASSERT(xb3.p != buf+10, "XBInitBP pos"))
             return XELP_E_ERR;
-        if (JB_ASSERT(XELP_XBBufLen(xb3) != 32, "XBInitBP len"))
+        if (JB_ASSERT(XELP_XB_LEN(xb3) != 32, "XBInitBP len"))
             return XELP_E_ERR;
     }
 
-    /* XELP_XBPCopy */
+    /* XELP_XB_COPY */
     {
         XelpBuf xba, xbb;
-        XELP_XBInit(xba,buf,16);
+        XELP_XB_INIT(xba,buf,16);
         xba.p = buf+5;
-        XELP_XBPCopy(xba,xbb);
+        XELP_XB_COPY(xba,xbb);
         if (JB_ASSERT(xbb.s != xba.s, "XBPCopy s"))
             return XELP_E_ERR;
         if (JB_ASSERT(xbb.p != xba.p, "XBPCopy p"))
@@ -1370,41 +1377,41 @@ XELPRESULT test_XelpBufMacros() {
             return XELP_E_ERR;
     }
 
-    /* XELP_XBPUTC bounds check -- fill buffer to end */
+    /* XELP_XB_PUTC bounds check -- fill buffer to end */
     {
         char smallbuf[4];
         XelpBuf sb;
-        XELP_XBInit(sb,smallbuf,4);
+        XELP_XB_INIT(sb,smallbuf,4);
         for (i=0; i<6; i++) {
-            XELP_XBPUTC(sb,(char)('0'+i));
+            XELP_XB_PUTC(sb,(char)('0'+i));
         }
         /* should have stopped at 4 chars */
-        if (JB_ASSERT(XELP_XBGetPos(sb) != 4, "XBPUTC bounds check"))
+        if (JB_ASSERT(XELP_XB_POS(sb) != 4, "XBPUTC bounds check"))
             return XELP_E_ERR;
     }
 
-    /* XELP_XBGETC at end -- should not advance */
+    /* XELP_XB_GETC at end -- should not advance */
     {
         char gbuf[2];
         XelpBuf gb;
         gbuf[0] = 'X';
         gbuf[1] = 'Y';
-        XELP_XBInit(gb,gbuf,2);
+        XELP_XB_INIT(gb,gbuf,2);
         ch = 0;
-        XELP_XBGETC(gb,ch);
+        XELP_XB_GETC(gb,ch);
         if (JB_ASSERT(ch != 'X', "XBGETC first"))
             return XELP_E_ERR;
-        XELP_XBGETC(gb,ch);
+        XELP_XB_GETC(gb,ch);
         if (JB_ASSERT(ch != 'Y', "XBGETC second"))
             return XELP_E_ERR;
         ch = 'Z';
-        XELP_XBGETC(gb,ch);
+        XELP_XB_GETC(gb,ch);
         /* ch should remain 'Z' since p>=e now */
         if (JB_ASSERT(ch != 'Z', "XBGETC at end no change"))
             return XELP_E_ERR;
     }
 
-    /* XELPOutXB macro test */
+    /* XELP_XB_OUT macro test */
     {
         XELP xelp;
         XelpBuf ob;
@@ -1412,18 +1419,18 @@ XELPRESULT test_XelpBufMacros() {
         XELPInit(&xelp,"outxb test");
         resetDummyBuf();
         XELP_SET_FN_OUT(xelp,gDummyBufOut);
-        XELP_XBInit(ob,obuf,5);
-        XELPOutXB(&xelp,ob);
+        XELP_XB_INIT(ob,obuf,5);
+        XELP_XB_OUT(&xelp,ob);
         gDummyBufOut(0);
-        if (JB_ASSERT(XELPStrLen(gDummyBuf) != 5, "XELPOutXB macro"))
+        if (JB_ASSERT(XELPStrLen(gDummyBuf) != 5, "XELP_XB_OUT macro"))
             return XELP_E_ERR;
     }
 
-    /* XELP_XBGetBufPtr */
+    /* XELP_XB_PTR */
     {
         XelpBuf xb4;
-        XELP_XBInit(xb4,buf,16);
-        if (JB_ASSERT(XELP_XBGetBufPtr(xb4) != buf, "XBGetBufPtr"))
+        XELP_XB_INIT(xb4,buf,16);
+        if (JB_ASSERT(XELP_XB_PTR(xb4) != buf, "XBGetBufPtr"))
             return XELP_E_ERR;
     }
 
@@ -1441,12 +1448,14 @@ static int gDefKeyVal;
 static const char *gDefCLIArgs;
 static int gDefCLILen;
 
-XELPRESULT defKeyHandler(int key) {
+XELPRESULT defKeyHandler(XELP *ths, int key) {
+    (void)ths;
     gDefKeyVal = key;
     return XELP_W_WARN;
 }
 
-XELPRESULT defCLIHandler(const char *args, int len) {
+XELPRESULT defCLIHandler(XELP *ths, const char *args, int len) {
+    (void)ths;
     gDefCLIArgs = args;
     gDefCLILen = len;
     return XELP_W_WARN;
@@ -1530,7 +1539,7 @@ XELPRESULT test_default_handlers() {
     XELP_SET_FN_OUT(x,dummyOut);
 
     s = "unknowncmd arg1\n";
-    XELP_XBInit(script,s,XELPStrLen(s));
+    XELP_XB_INIT(script,s,XELPStrLen(s));
     r = XELPParseXB(&x,&script);
     if (JB_ASSERT(x.mR[0] != XELP_E_CMDNOTFOUND, "DefCLI null handler CMDNOTFOUND"))
         return XELP_E_ERR;
@@ -1540,7 +1549,7 @@ XELPRESULT test_default_handlers() {
     gDefCLIArgs = 0;
     gDefCLILen = 0;
     s = "unknowncmd arg1\n";
-    XELP_XBInit(script,s,XELPStrLen(s));
+    XELP_XB_INIT(script,s,XELPStrLen(s));
     r = XELPParseXB(&x,&script);
     if (JB_ASSERT(r != XELP_S_OK, "DefCLI handler called"))
         return XELP_E_ERR;
@@ -1556,7 +1565,7 @@ XELPRESULT test_default_handlers() {
     gDefCLILen = 0;
     gGlobalCallbackData.c1 = 0;
     s = "foo arg\n";
-    XELP_XBInit(script,s,XELPStrLen(s));
+    XELP_XB_INIT(script,s,XELPStrLen(s));
     r = XELPParseXB(&x,&script);
     if (JB_ASSERT(gGlobalCallbackData.c1 != 1, "DefCLI known cmd dispatched"))
         return XELP_E_ERR;
@@ -1567,7 +1576,7 @@ XELPRESULT test_default_handlers() {
     gDefCLIArgs = 0;
     gGlobalCallbackData.c1 = 0;
     s = "foo; badcmd\n";
-    XELP_XBInit(script,s,XELPStrLen(s));
+    XELP_XB_INIT(script,s,XELPStrLen(s));
     r = XELPParseXB(&x,&script);
     if (JB_ASSERT(gGlobalCallbackData.c1 != 1, "DefCLI mixed: known ran"))
         return XELP_E_ERR;
@@ -1583,7 +1592,7 @@ XELPRESULT test_default_handlers() {
         /* no CLI table set -- command should NOT dispatch (no table to search) */
         gDefCLIArgs = 0;
         s = "anything\n";
-        XELP_XBInit(script,s,XELPStrLen(s));
+        XELP_XB_INIT(script,s,XELPStrLen(s));
         r = XELPParseXB(&x4,&script);
         /* with null fn table the dispatch loop is skipped entirely */
         if (JB_ASSERT(r != XELP_S_OK, "DefCLI null table returns OK"))
@@ -1625,7 +1634,8 @@ static const char *gBndArgs;
 static int gBndLen;
 static int gBndCallCount;
 
-XELPRESULT bndHandler(const char *args, int len) {
+XELPRESULT bndHandler(XELP *ths, const char *args, int len) {
+    (void)ths;
     gBndArgs = args;
     gBndLen = len;
     gBndCallCount++;
@@ -1656,7 +1666,7 @@ XELPRESULT test_buffer_boundaries() {
             XELPParseKey(&x,'A');
         XELPParseKey(&x,XELPKEY_ENTER);
         /* the typed chars should have been captured and parsed */
-        if (JB_ASSERT(XELP_XBGetPos(x.mCmdXB) != 0, "bnd CLI reset after enter"))
+        if (JB_ASSERT(XELP_XB_POS(x.mCmdXB) != 0, "bnd CLI reset after enter"))
             return XELP_E_ERR;
     }
 
@@ -1669,10 +1679,10 @@ XELPRESULT test_buffer_boundaries() {
         for (i = 0; i < XELP_CMDBUFSZ - 1; i++)
             XELPParseKey(&x,'B');
         /* buffer should be exactly full now */
-        if (JB_ASSERT(XELP_XBGetPos(x.mCmdXB) != XELP_CMDBUFSZ - 1, "bnd CLI full"))
+        if (JB_ASSERT(XELP_XB_POS(x.mCmdXB) != XELP_CMDBUFSZ - 1, "bnd CLI full"))
             return XELP_E_ERR;
         XELPParseKey(&x,XELPKEY_ENTER);
-        if (JB_ASSERT(XELP_XBGetPos(x.mCmdXB) != 0, "bnd CLI reset after full"))
+        if (JB_ASSERT(XELP_XB_POS(x.mCmdXB) != 0, "bnd CLI reset after full"))
             return XELP_E_ERR;
     }
 
@@ -1684,8 +1694,8 @@ XELPRESULT test_buffer_boundaries() {
 
         for (i = 0; i < XELP_CMDBUFSZ * 2; i++)
             XELPParseKey(&x,'C');
-        /* XELP_XBPUTC bounds check should have prevented overflow */
-        if (JB_ASSERT(XELP_XBGetPos(x.mCmdXB) != XELP_CMDBUFSZ - 1, "bnd CLI overflow stopped"))
+        /* XELP_XB_PUTC bounds check should have prevented overflow */
+        if (JB_ASSERT(XELP_XB_POS(x.mCmdXB) != XELP_CMDBUFSZ - 1, "bnd CLI overflow stopped"))
             return XELP_E_ERR;
         /* verify buffer end ptr is correct */
         if (JB_ASSERT(x.mCmdXB.p > x.mCmdXB.e, "bnd CLI ptr within bounds"))
@@ -1703,7 +1713,7 @@ XELPRESULT test_buffer_boundaries() {
             XELPParseKey(&x,XELPKEY_BKSP);
         if (JB_ASSERT(x.mCmdXB.p < x.mCmdXB.s, "bnd bksp at empty no underflow"))
             return XELP_E_ERR;
-        if (JB_ASSERT(XELP_XBGetPos(x.mCmdXB) != 0, "bnd bksp stays at 0"))
+        if (JB_ASSERT(XELP_XB_POS(x.mCmdXB) != 0, "bnd bksp stays at 0"))
             return XELP_E_ERR;
     }
 
@@ -1716,14 +1726,14 @@ XELPRESULT test_buffer_boundaries() {
         XELPParseKey(&x,'x');
         XELPParseKey(&x,'y');
         XELPParseKey(&x,'z');
-        if (JB_ASSERT(XELP_XBGetPos(x.mCmdXB) != 3, "bnd type 3 chars"))
+        if (JB_ASSERT(XELP_XB_POS(x.mCmdXB) != 3, "bnd type 3 chars"))
             return XELP_E_ERR;
         for (i = 0; i < 10; i++)
             XELPParseKey(&x,XELPKEY_BKSP);
-        if (JB_ASSERT(XELP_XBGetPos(x.mCmdXB) != 0, "bnd bksp to empty"))
+        if (JB_ASSERT(XELP_XB_POS(x.mCmdXB) != 0, "bnd bksp to empty"))
             return XELP_E_ERR;
         XELPParseKey(&x,'a');
-        if (JB_ASSERT(XELP_XBGetPos(x.mCmdXB) != 1, "bnd retype after bksp"))
+        if (JB_ASSERT(XELP_XB_POS(x.mCmdXB) != 1, "bnd retype after bksp"))
             return XELP_E_ERR;
         XELPParseKey(&x,XELPKEY_ENTER);
     }
@@ -1741,7 +1751,7 @@ XELPRESULT test_buffer_boundaries() {
         gBndCallCount = 0;
         {
             char *s = "cmd arg1 arg2\n";
-            XELP_XBInit(script,s,XELPStrLen(s));
+            XELP_XB_INIT(script,s,XELPStrLen(s));
             r = XELPParseXB(&x,&script);
         }
         if (JB_ASSERT(gBndCallCount != 1, "bnd handler called once"))
@@ -1759,7 +1769,7 @@ XELPRESULT test_buffer_boundaries() {
         gBndLen = -1;
         {
             char *s = "cmd\n";
-            XELP_XBInit(script,s,XELPStrLen(s));
+            XELP_XB_INIT(script,s,XELPStrLen(s));
             r = XELPParseXB(&x,&script);
         }
         if (JB_ASSERT(gBndLen != 3, "bnd handler cmd-only len=3"))
@@ -1771,7 +1781,7 @@ XELPRESULT test_buffer_boundaries() {
         gBndLen = -1;
         {
             char *s = "cmd";
-            XELP_XBInit(script,s,XELPStrLen(s));
+            XELP_XB_INIT(script,s,XELPStrLen(s));
             r = XELPParseXB(&x,&script);
         }
         if (JB_ASSERT(gBndLen != 3, "bnd handler no-newline len=3"))
@@ -1784,7 +1794,7 @@ XELPRESULT test_buffer_boundaries() {
         gBndLen = -1;
         {
             char *s = "cmd a; cmd bb\n";
-            XELP_XBInit(script,s,XELPStrLen(s));
+            XELP_XB_INIT(script,s,XELPStrLen(s));
             r = XELPParseXB(&x,&script);
         }
         if (JB_ASSERT(gBndCallCount != 2, "bnd semicolon 2 calls"))
@@ -1827,42 +1837,42 @@ XELPRESULT test_buffer_boundaries() {
 
     /* === XelpBuf boundary checks === */
 
-    /* 13. XELP_XBPUTC at exact capacity -- should accept */
+    /* 13. XELP_XB_PUTC at exact capacity -- should accept */
     {
         char buf[4];
         XelpBuf xb;
-        XELP_XBInit(xb,buf,4);
-        XELP_XBPUTC(xb,'a');
-        XELP_XBPUTC(xb,'b');
-        XELP_XBPUTC(xb,'c');
-        XELP_XBPUTC(xb,'d');
-        if (JB_ASSERT(XELP_XBGetPos(xb) != 4, "bnd XBPUTC fill to cap"))
+        XELP_XB_INIT(xb,buf,4);
+        XELP_XB_PUTC(xb,'a');
+        XELP_XB_PUTC(xb,'b');
+        XELP_XB_PUTC(xb,'c');
+        XELP_XB_PUTC(xb,'d');
+        if (JB_ASSERT(XELP_XB_POS(xb) != 4, "bnd XBPUTC fill to cap"))
             return XELP_E_ERR;
         /* 5th write should be ignored */
-        XELP_XBPUTC(xb,'e');
-        if (JB_ASSERT(XELP_XBGetPos(xb) != 4, "bnd XBPUTC past cap ignored"))
+        XELP_XB_PUTC(xb,'e');
+        if (JB_ASSERT(XELP_XB_POS(xb) != 4, "bnd XBPUTC past cap ignored"))
             return XELP_E_ERR;
         if (JB_ASSERT(buf[3] != 'd', "bnd XBPUTC no overwrite"))
             return XELP_E_ERR;
     }
 
-    /* 14. XELP_XBGETC at end -- should not advance */
+    /* 14. XELP_XB_GETC at end -- should not advance */
     {
         char buf[2];
         XelpBuf xb;
         char ch;
         buf[0] = 'X';
         buf[1] = 'Y';
-        XELP_XBInit(xb,buf,2);
-        ch = 0; XELP_XBGETC(xb,ch);
-        ch = 0; XELP_XBGETC(xb,ch);
-        if (JB_ASSERT(XELP_XBGetPos(xb) != 2, "bnd XBGETC at end pos"))
+        XELP_XB_INIT(xb,buf,2);
+        ch = 0; XELP_XB_GETC(xb,ch);
+        ch = 0; XELP_XB_GETC(xb,ch);
+        if (JB_ASSERT(XELP_XB_POS(xb) != 2, "bnd XBGETC at end pos"))
             return XELP_E_ERR;
         ch = 'Z';
-        XELP_XBGETC(xb,ch);
+        XELP_XB_GETC(xb,ch);
         if (JB_ASSERT(ch != 'Z', "bnd XBGETC at end unchanged"))
             return XELP_E_ERR;
-        if (JB_ASSERT(XELP_XBGetPos(xb) != 2, "bnd XBGETC at end no advance"))
+        if (JB_ASSERT(XELP_XB_POS(xb) != 2, "bnd XBGETC at end no advance"))
             return XELP_E_ERR;
     }
 
@@ -1870,11 +1880,11 @@ XELPRESULT test_buffer_boundaries() {
     {
         char buf[1];
         XelpBuf xb;
-        XELP_XBInit(xb,buf,0);
-        if (JB_ASSERT(XELP_XBBufLen(xb) != 0, "bnd zero-len buflen"))
+        XELP_XB_INIT(xb,buf,0);
+        if (JB_ASSERT(XELP_XB_LEN(xb) != 0, "bnd zero-len buflen"))
             return XELP_E_ERR;
-        XELP_XBPUTC(xb,'x');
-        if (JB_ASSERT(XELP_XBGetPos(xb) != 0, "bnd zero-len put ignored"))
+        XELP_XB_PUTC(xb,'x');
+        if (JB_ASSERT(XELP_XB_POS(xb) != 0, "bnd zero-len put ignored"))
             return XELP_E_ERR;
     }
 
@@ -1884,7 +1894,7 @@ XELPRESULT test_buffer_boundaries() {
     {
         XelpBuf b, tok;
         char *s = "x";
-        XELP_XBInit(b,s,1);
+        XELP_XB_INIT(b,s,1);
         r = XELPTokLineXB(&b,&tok,XELP_TOK_ONLY);
         if (JB_ASSERT(r != XELP_S_OK, "bnd tok single char"))
             return XELP_E_ERR;
@@ -1894,7 +1904,7 @@ XELPRESULT test_buffer_boundaries() {
     {
         XelpBuf b, tok;
         char *s = "tok1";
-        XELP_XBInit(b,s,4);
+        XELP_XB_INIT(b,s,4);
         r = XELPTokLineXB(&b,&tok,XELP_TOK_ONLY);
         if (JB_ASSERT(r != XELP_S_OK, "bnd tok exact len"))
             return XELP_E_ERR;
@@ -1915,7 +1925,7 @@ XELPRESULT test_buffer_boundaries() {
             XELPParseKey(&x,XELPKEY_ENTER);
         }
         /* after 50 cycles the buffer should still be valid */
-        if (JB_ASSERT(XELP_XBGetPos(x.mCmdXB) != 0, "bnd 50 cycles reset"))
+        if (JB_ASSERT(XELP_XB_POS(x.mCmdXB) != 0, "bnd 50 cycles reset"))
             return XELP_E_ERR;
         if (JB_ASSERT(x.mCmdXB.p < x.mCmdXB.s, "bnd 50 cycles p >= s"))
             return XELP_E_ERR;
@@ -1935,10 +1945,10 @@ XELPRESULT test_buffer_boundaries() {
             XELPParseKey(&x,'D');
         /* one more should be dropped by XBPUTC bounds check */
         XELPParseKey(&x,'E');
-        if (JB_ASSERT(XELP_XBGetPos(x.mCmdXB) != XELP_CMDBUFSZ - 1, "bnd exact cap+1"))
+        if (JB_ASSERT(XELP_XB_POS(x.mCmdXB) != XELP_CMDBUFSZ - 1, "bnd exact cap+1"))
             return XELP_E_ERR;
         XELPParseKey(&x,XELPKEY_ENTER);
-        if (JB_ASSERT(XELP_XBGetPos(x.mCmdXB) != 0, "bnd exact cap enter reset"))
+        if (JB_ASSERT(XELP_XB_POS(x.mCmdXB) != 0, "bnd exact cap enter reset"))
             return XELP_E_ERR;
     }
 
@@ -2021,7 +2031,7 @@ XELPRESULT test_stress_malformed() {
     /* --- Parse with all-semicolons script (many empty commands) --- */
     {
         char *semis = ";;;\n;;;\n;;;\n";
-        XELP_XBInit(script,semis,XELPStrLen(semis));
+        XELP_XB_INIT(script,semis,XELPStrLen(semis));
         r = XELPParseXB(&x,&script);
         if (JB_ASSERT(r != XELP_S_OK, "stress all semicolons"))
             return XELP_E_ERR;
@@ -2030,7 +2040,7 @@ XELPRESULT test_stress_malformed() {
     /* --- Parse with only whitespace and newlines --- */
     {
         char *ws = "   \n\n  \t  \n\n";
-        XELP_XBInit(script,ws,XELPStrLen(ws));
+        XELP_XB_INIT(script,ws,XELPStrLen(ws));
         r = XELPParseXB(&x,&script);
         if (JB_ASSERT(r != XELP_S_OK, "stress all whitespace script"))
             return XELP_E_ERR;
@@ -2039,7 +2049,7 @@ XELPRESULT test_stress_malformed() {
     /* --- Parse with unterminated quote --- */
     {
         char *uq = "\"unterminated string";
-        XELP_XBInit(script,uq,XELPStrLen(uq));
+        XELP_XB_INIT(script,uq,XELPStrLen(uq));
         r = XELPParseXB(&x,&script);
         if (JB_ASSERT(r != XELP_S_OK, "stress unterminated quote"))
             return XELP_E_ERR;
@@ -2048,7 +2058,7 @@ XELPRESULT test_stress_malformed() {
     /* --- Parse with only comments, deeply nested --- */
     {
         char *cm = "# comment 1\n# comment 2\n# comment 3\n# comment 4\n";
-        XELP_XBInit(script,cm,XELPStrLen(cm));
+        XELP_XB_INIT(script,cm,XELPStrLen(cm));
         r = XELPParseXB(&x,&script);
         if (JB_ASSERT(r != XELP_S_OK, "stress all comments script"))
             return XELP_E_ERR;
@@ -2057,7 +2067,7 @@ XELPRESULT test_stress_malformed() {
     /* --- Parse with backtick escape at end of buffer --- */
     {
         char *esc = "tok`";
-        XELP_XBInit(script,esc,XELPStrLen(esc));
+        XELP_XB_INIT(script,esc,XELPStrLen(esc));
         r = XELPParseXB(&x,&script);
         if (JB_ASSERT(r != XELP_S_OK, "stress backtick at end"))
             return XELP_E_ERR;
@@ -2066,7 +2076,7 @@ XELPRESULT test_stress_malformed() {
     /* --- Parse with many semicolons and commands mixed --- */
     {
         char *mix = "foo; bar; rst; foo; bar; rst;\n";
-        XELP_XBInit(script,mix,XELPStrLen(mix));
+        XELP_XB_INIT(script,mix,XELPStrLen(mix));
         r = XELPParseXB(&x,&script);
         if (JB_ASSERT(r != XELP_S_OK, "stress mixed cmds"))
             return XELP_E_ERR;
@@ -2078,7 +2088,7 @@ XELPRESULT test_stress_malformed() {
         for (i = 0; i < 280; i++) longbuf[i] = 'z';
         longbuf[280] = '\n';
         longbuf[281] = 0;
-        XELP_XBInit(script,longbuf,281);
+        XELP_XB_INIT(script,longbuf,281);
         r = XELPParseXB(&x,&script);
         if (JB_ASSERT(r != XELP_S_OK, "stress very long token"))
             return XELP_E_ERR;
@@ -2090,7 +2100,7 @@ XELPRESULT test_stress_malformed() {
         for (i = 0; i < 16; i++) binbuf[i] = (char)(i + 1);
         binbuf[16] = '\n';
         binbuf[17] = 0;
-        XELP_XBInit(script,binbuf,17);
+        XELP_XB_INIT(script,binbuf,17);
         r = XELPParseXB(&x,&script);
         if (JB_ASSERT(r != XELP_S_OK, "stress binary chars"))
             return XELP_E_ERR;
@@ -2162,7 +2172,7 @@ XELPRESULT test_stress_malformed() {
     /* --- Quoted string with backslash at end --- */
     {
         char *qesc = "\"hello\\";
-        XELP_XBInit(script,qesc,XELPStrLen(qesc));
+        XELP_XB_INIT(script,qesc,XELPStrLen(qesc));
         r = XELPParseXB(&x,&script);
         if (JB_ASSERT(r != XELP_S_OK, "stress quote backslash end"))
             return XELP_E_ERR;
@@ -2171,7 +2181,7 @@ XELPRESULT test_stress_malformed() {
     /* --- Multiple quotes in sequence --- */
     {
         char *mq = "\"a\" \"b\" \"c\"\n";
-        XELP_XBInit(script,mq,XELPStrLen(mq));
+        XELP_XB_INIT(script,mq,XELPStrLen(mq));
         r = XELPParseXB(&x,&script);
         if (JB_ASSERT(r != XELP_S_OK, "stress multiple quotes"))
             return XELP_E_ERR;
@@ -2180,7 +2190,7 @@ XELPRESULT test_stress_malformed() {
     /* --- Single char buffer --- */
     {
         char *sc = "x";
-        XELP_XBInit(script,sc,1);
+        XELP_XB_INIT(script,sc,1);
         r = XELPParseXB(&x,&script);
         if (JB_ASSERT(r != XELP_S_OK, "stress single char buf"))
             return XELP_E_ERR;
@@ -2197,7 +2207,7 @@ XELPRESULT test_stress_malformed() {
         bigbuf[494] = 'g'; bigbuf[495] = 'e'; bigbuf[496] = 't';
         bigbuf[497] = ':'; bigbuf[498] = ' ';
         bigbuf[499] = '\n'; bigbuf[500] = 0;
-        XELP_XBInit(bx,bigbuf,500);
+        XELP_XB_INIT(bx,bigbuf,500);
         r = XELPFindTok(&bx,label,label+7,XELP_TOK_ONLY);
         if (JB_ASSERT(r != XELP_S_OK, "stress FindTok large buf"))
             return XELP_E_ERR;

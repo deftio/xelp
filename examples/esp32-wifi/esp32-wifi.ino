@@ -112,138 +112,143 @@ static bool jsonNum(const char *key, char *dest, int maxlen)
 /* CLI commands                                                        */
 /* ------------------------------------------------------------------ */
 
-XELPRESULT cmdHelp(const char *args, int len)
+XELPRESULT cmdHelp(XELP *ths, const char *args, int len)
 {
-    return cli.help();
+    (void)args; (void)len;
+    return XELPHelp(ths);
 }
 
-XELPRESULT cmdSsid(const char *args, int len)
+XELPRESULT cmdSsid(XELP *ths, const char *args, int len)
 {
     XelpBuf b, tok;
-    XELP_XBInit(b, (char *)args, len);
+    XELP_XB_INIT(b, (char *)args, len);
     if (XELPTokN(&b, 1, &tok) == XELP_S_OK) {
         tokCopy(gSsid, sizeof(gSsid), tok.s, tok.p);
-        cli.print("SSID set: ");
-        cli.print(gSsid);
-        cli.print("\n");
+        XELPOut(ths, "SSID set: ", 0);
+        XELPOut(ths, gSsid, 0);
+        XELPOut(ths, "\n", 0);
     } else {
-        cli.print("usage: ssid <name>\n");
+        XELPOut(ths, "usage: ssid <name>\n", 0);
     }
     return XELP_S_OK;
 }
 
-XELPRESULT cmdPass(const char *args, int len)
+XELPRESULT cmdPass(XELP *ths, const char *args, int len)
 {
     XelpBuf b, tok;
-    XELP_XBInit(b, (char *)args, len);
+    XELP_XB_INIT(b, (char *)args, len);
     if (XELPTokN(&b, 1, &tok) == XELP_S_OK) {
         tokCopy(gPass, sizeof(gPass), tok.s, tok.p);
-        cli.print("Password set\n");
+        XELPOut(ths, "Password set\n", 0);
     } else {
-        cli.print("usage: pass <password>\n");
+        XELPOut(ths, "usage: pass <password>\n", 0);
     }
     return XELP_S_OK;
 }
 
-XELPRESULT cmdConnect(const char *args, int len)
+XELPRESULT cmdConnect(XELP *ths, const char *args, int len)
 {
+    (void)args; (void)len;
     if (gSsid[0] == '\0') {
-        cli.print("Set SSID first: ssid <name>\n");
+        XELPOut(ths, "Set SSID first: ssid <name>\n", 0);
         return XELP_E_ERR;
     }
-    cli.print("Connecting to ");
-    cli.print(gSsid);
-    cli.print("...");
+    XELPOut(ths, "Connecting to ", 0);
+    XELPOut(ths, gSsid, 0);
+    XELPOut(ths, "...", 0);
 
     WiFi.begin(gSsid, gPass);
 
     int timeout = 40; /* 40 * 250ms = 10 seconds */
     while (WiFi.status() != WL_CONNECTED && timeout > 0) {
         delay(250);
-        cli.print(".");
+        XELPOut(ths, ".", 0);
         timeout--;
     }
 
     if (WiFi.status() == WL_CONNECTED) {
-        cli.print(" OK\nIP: ");
-        cli.print(WiFi.localIP().toString().c_str());
-        cli.print("\n");
+        XELPOut(ths, " OK\nIP: ", 0);
+        XELPOut(ths, WiFi.localIP().toString().c_str(), 0);
+        XELPOut(ths, "\n", 0);
         cli.setPrompt("wifi>");
     } else {
-        cli.print(" FAILED\n");
+        XELPOut(ths, " FAILED\n", 0);
     }
     return XELP_S_OK;
 }
 
-XELPRESULT cmdDisconnect(const char *args, int len)
+XELPRESULT cmdDisconnect(XELP *ths, const char *args, int len)
 {
+    (void)args; (void)len;
     WiFi.disconnect();
-    cli.print("Disconnected\n");
+    XELPOut(ths, "Disconnected\n", 0);
     cli.setPrompt("esp32>");
     return XELP_S_OK;
 }
 
-XELPRESULT cmdStatus(const char *args, int len)
+XELPRESULT cmdStatus(XELP *ths, const char *args, int len)
 {
+    (void)args; (void)len;
     if (WiFi.status() == WL_CONNECTED) {
-        cli.print("WiFi: connected\nSSID: ");
-        cli.print(gSsid);
-        cli.print("\nIP: ");
-        cli.print(WiFi.localIP().toString().c_str());
+        XELPOut(ths, "WiFi: connected\nSSID: ", 0);
+        XELPOut(ths, gSsid, 0);
+        XELPOut(ths, "\nIP: ", 0);
+        XELPOut(ths, WiFi.localIP().toString().c_str(), 0);
         char rssi[16];
         snprintf(rssi, sizeof(rssi), "\nRSSI: %d dBm\n", WiFi.RSSI());
-        cli.print(rssi);
+        XELPOut(ths, rssi, 0);
     } else {
-        cli.print("WiFi: not connected\n");
+        XELPOut(ths, "WiFi: not connected\n", 0);
         if (gSsid[0]) {
-            cli.print("SSID: ");
-            cli.print(gSsid);
-            cli.print(" (saved)\n");
+            XELPOut(ths, "SSID: ", 0);
+            XELPOut(ths, gSsid, 0);
+            XELPOut(ths, " (saved)\n", 0);
         }
     }
     return XELP_S_OK;
 }
 
-XELPRESULT cmdTime(const char *args, int len)
+XELPRESULT cmdTime(XELP *ths, const char *args, int len)
 {
+    (void)args; (void)len;
     if (WiFi.status() != WL_CONNECTED) {
-        cli.print("Not connected. Use: connect\n");
+        XELPOut(ths, "Not connected. Use: connect\n", 0);
         return XELP_E_ERR;
     }
 
-    cli.print("Fetching time...\n");
+    XELPOut(ths, "Fetching time...\n", 0);
     if (httpGet("http://worldtimeapi.org/api/ip") < 0) {
-        cli.print("HTTP error\n");
+        XELPOut(ths, "HTTP error\n", 0);
         return XELP_E_ERR;
     }
 
     char datetime[40], tz[48];
     if (jsonStr("datetime", datetime, sizeof(datetime))) {
-        cli.print(datetime);
+        XELPOut(ths, datetime, 0);
     }
     if (jsonStr("timezone", tz, sizeof(tz))) {
-        cli.print(" (");
-        cli.print(tz);
-        cli.print(")");
+        XELPOut(ths, " (", 0);
+        XELPOut(ths, tz, 0);
+        XELPOut(ths, ")", 0);
     }
-    cli.print("\n");
+    XELPOut(ths, "\n", 0);
     return XELP_S_OK;
 }
 
-XELPRESULT cmdWeather(const char *args, int len)
+XELPRESULT cmdWeather(XELP *ths, const char *args, int len)
 {
     if (WiFi.status() != WL_CONNECTED) {
-        cli.print("Not connected. Use: connect\n");
+        XELPOut(ths, "Not connected. Use: connect\n", 0);
         return XELP_E_ERR;
     }
 
     XelpBuf b, tok1, tok2;
-    XELP_XBInit(b, (char *)args, len);
-    XELP_XBTOP(b);
+    XELP_XB_INIT(b, (char *)args, len);
+    XELP_XB_TOP(b);
     if (XELPTokN(&b, 1, &tok1) != XELP_S_OK ||
-        (XELP_XBTOP(b), XELPTokN(&b, 2, &tok2) != XELP_S_OK)) {
-        cli.print("usage: weather <lat> <lon>\n");
-        cli.print("  e.g. weather 37.77 -122.42\n");
+        (XELP_XB_TOP(b), XELPTokN(&b, 2, &tok2) != XELP_S_OK)) {
+        XELPOut(ths, "usage: weather <lat> <lon>\n", 0);
+        XELPOut(ths, "  e.g. weather 37.77 -122.42\n", 0);
         return XELP_E_ERR;
     }
 
@@ -256,46 +261,46 @@ XELPRESULT cmdWeather(const char *args, int len)
         "http://api.open-meteo.com/v1/forecast?"
         "latitude=%s&longitude=%s&current_weather=true", lat, lon);
 
-    cli.print("Fetching weather...\n");
+    XELPOut(ths, "Fetching weather...\n", 0);
     if (httpGet(url) < 0) {
-        cli.print("HTTP error\n");
+        XELPOut(ths, "HTTP error\n", 0);
         return XELP_E_ERR;
     }
 
     char temp[12], wind[12], code[8];
     if (jsonNum("temperature", temp, sizeof(temp))) {
-        cli.print("Temperature: ");
-        cli.print(temp);
-        cli.print(" C\n");
+        XELPOut(ths, "Temperature: ", 0);
+        XELPOut(ths, temp, 0);
+        XELPOut(ths, " C\n", 0);
     }
     if (jsonNum("windspeed", wind, sizeof(wind))) {
-        cli.print("Wind: ");
-        cli.print(wind);
-        cli.print(" km/h\n");
+        XELPOut(ths, "Wind: ", 0);
+        XELPOut(ths, wind, 0);
+        XELPOut(ths, " km/h\n", 0);
     }
     if (jsonNum("weathercode", code, sizeof(code))) {
-        cli.print("Weather code: ");
-        cli.print(code);
+        XELPOut(ths, "Weather code: ", 0);
+        XELPOut(ths, code, 0);
         int wc = atoi(code);
-        if      (wc == 0)             cli.print(" (clear sky)");
-        else if (wc <= 3)             cli.print(" (partly cloudy)");
-        else if (wc >= 51 && wc <= 67) cli.print(" (rain)");
-        else if (wc >= 71 && wc <= 77) cli.print(" (snow)");
-        else if (wc >= 95)            cli.print(" (thunderstorm)");
-        cli.print("\n");
+        if      (wc == 0)             XELPOut(ths, " (clear sky)", 0);
+        else if (wc <= 3)             XELPOut(ths, " (partly cloudy)", 0);
+        else if (wc >= 51 && wc <= 67) XELPOut(ths, " (rain)", 0);
+        else if (wc >= 71 && wc <= 77) XELPOut(ths, " (snow)", 0);
+        else if (wc >= 95)            XELPOut(ths, " (thunderstorm)", 0);
+        XELPOut(ths, "\n", 0);
     }
     return XELP_S_OK;
 }
 
-XELPRESULT cmdLed(const char *args, int len)
+XELPRESULT cmdLed(XELP *ths, const char *args, int len)
 {
     XelpBuf b, tok;
     int val;
-    XELP_XBInit(b, (char *)args, len);
+    XELP_XB_INIT(b, (char *)args, len);
     if (XELPTokN(&b, 1, &tok) == XELP_S_OK) {
         XELPParseNum(tok.s, (int)(tok.p - tok.s), &val);
         digitalWrite(LED_BUILTIN, val ? HIGH : LOW);
-        cli.print(val ? "LED ON\n" : "LED OFF\n");
+        XELPOut(ths, val ? "LED ON\n" : "LED OFF\n", 0);
     }
     return XELP_S_OK;
 }

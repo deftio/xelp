@@ -44,7 +44,7 @@ extern "C"
 {
 #endif
 
-#define XELP_VERSION      (0x00000206UL) /* 32-bit version: 0x00MMmmpp (major.minor.patch) */
+#define XELP_VERSION      (0x00000300UL) /* 32-bit version: 0x00MMmmpp (major.minor.patch) */
 #define XELP_VER_MAJOR(v) (((v) >> 16) & 0xFF)
 #define XELP_VER_MINOR(v) (((v) >>  8) & 0xFF)
 #define XELP_VER_PATCH(v) ( (v)        & 0xFF)
@@ -149,23 +149,27 @@ typedef struct {
 #define XelpBuf XelpBufW
 
 /* XelpBuf MACROS */
-#define XELP_XBInit(xb,buf,buflen)       {xb.s=buf; xb.p=buf; xb.e = xb.s+buflen;}      /* init from raw ptr  with length              */
-#define XELP_XBInitPtrs(xb,bs,bp,be)     {xb.s=bs; xb.p=bp; xb.e=be;}                   /* init from 3 raw pointrs                     */
-#define XELP_XBInitBP(xb,buf,pos,buflen) {xb.s=buf; xb.p=buf+pos; xb.e = xb.s+buflen;}  /* init from raw pts and set 'cursor' position */
+#define XELP_XB_INIT(xb,buf,buflen)       {xb.s=buf; xb.p=buf; xb.e = xb.s+buflen;}      /* init from raw ptr  with length              */
+#define XELP_XB_INIT_PTRS(xb,bs,bp,be)    {xb.s=bs; xb.p=bp; xb.e=be;}                   /* init from 3 raw pointrs                     */
+#define XELP_XB_INIT_BP(xb,buf,pos,buflen) {xb.s=buf; xb.p=buf+pos; xb.e = xb.s+buflen;} /* init from raw pts and set 'cursor' position */
 
 /* XelpBuf const macros (no data changed) */
-#define XELP_XBPCopy(a,b)				 {b.s=a.s; b.p=a.p; b.e=a.e;}                   /* copy params from XelpBuf a to XelpBuf b     */
-#define XELP_XBGetBufPtr(x)              (x.s)                                          /* get start pos                               */
-#define XELP_XBBufLen(x)                 ((int)((x.e)- (x.s)))                          /* get length in bytes of XelpBuf              */
-#define XELP_XBGetPos(x)                 ((int)(x.p-x.s))                               /* return current position as int              */
-#define XELP_XBGetBuf(x,ptr,len)         {ptr=x.s; len= (x.e) - (x.s)}                  /* get the start ptr, and total length of the Xelp buf*/
+#define XELP_XB_COPY(a,b)                 {b.s=a.s; b.p=a.p; b.e=a.e;}                   /* copy params from XelpBuf a to XelpBuf b     */
+#define XELP_XB_PTR(x)                    (x.s)                                           /* get start pos                               */
+#define XELP_XB_LEN(x)                    ((int)((x.e)- (x.s)))                           /* get length in bytes of XelpBuf              */
+#define XELP_XB_POS(x)                    ((int)(x.p-x.s))                                /* return current position as int              */
 
 /* XelpBuf writing and setting */
-#define XELP_XBPUTC(x,ch)                {if (x.p<x.e){*(x.p)++ =ch;}}                   /* write char to buf */
-#define XELP_XBPUTC_RAW(x,ch)            {*(x.p)++=ch;}                                  /* write char to buf no bounds check*/
-#define XELP_XBGETC(x,ch)                {if (x.p<x.e){ch=(*x.p);x.p++;}}                /* get next char */
-#define XELP_XBTOP(x)                    {x.p=x.s;}                                      /* set pos ptr to beginning */
+#define XELP_XB_PUTC(x,ch)                {if (x.p<x.e){*(x.p)++ =ch;}}                  /* write char to buf */
+#define XELP_XB_PUTC_RAW(x,ch)            {*(x.p)++=ch;}                                  /* write char to buf no bounds check*/
+#define XELP_XB_GETC(x,ch)                {if (x.p<x.e){ch=(*x.p);x.p++;}}               /* get next char */
+#define XELP_XB_TOP(x)                    {x.p=x.s;}                                      /* set pos ptr to beginning */
 
+
+/*****************************************************************************
+ Forward declaration -- allows function pointers to reference the XELP instance
+ */
+struct XELP_tag;
 
 /*****************************************************************************
  KeyFuncMap declares single key launched functions
@@ -173,7 +177,7 @@ typedef struct {
  */
 typedef struct
 {
-	XELPRESULT (*mFunPtr)(int) REENTRANT_SDCC;	/* function pointer to user-supplied fnc(int) */
+	XELPRESULT (*mFunPtr)(struct XELP_tag *, int) REENTRANT_SDCC;	/* function pointer to user-supplied fnc(ths, int) */
 	char  mKey;								    /* key press code                             */
 	char* mpHelpString;						    /* use NULL or 0 if no help string is to be provided */
 }XELPKeyFuncMapEntry;
@@ -189,7 +193,7 @@ typedef struct
  */
 typedef struct
 {
-	XELPRESULT (*mFunPtr)(const char *pArgString, int maxbuflen) REENTRANT_SDCC ;	/* fn ptr to command */
+	XELPRESULT (*mFunPtr)(struct XELP_tag *, const char *pArgString, int maxbuflen) REENTRANT_SDCC ;	/* fn ptr to command */
 	char* mpCmd;                               /* name of cmd at run-time / in script                    */
 	char* mpHelpString;                        /* optional help string                                   */
 }XELPCLIFuncMapEntry; 
@@ -239,7 +243,7 @@ typedef struct
  see xelpcfg.h for configuration options.
 */
 
-typedef struct
+typedef struct XELP_tag
 {
 	/* commandline state managemment [CLI | KEY | THR] */
 	int						mCurMode;	     /* current mode of Xelp inst - skc/CLI/thru    */
@@ -251,12 +255,12 @@ typedef struct
 
 #ifdef XELP_ENABLE_KEY						 /* if single-key commands enabled              */
 	XELPKeyFuncMapEntry		*mpKeyModeFuncs; /* key mode function dispatch                  */
-	XELPRESULT (*mpfDefKey)(int) REENTRANT_SDCC; /* default handler for unmapped keys        */
+	XELPRESULT (*mpfDefKey)(struct XELP_tag *, int) REENTRANT_SDCC; /* default handler for unmapped keys        */
 #endif
 
 #ifdef XELP_ENABLE_CLI						 /* if CLI and script support enabled           */
 	XELPCLIFuncMapEntry		*mpCLIModeFuncs; /* command mode function dispatch              */
-	XELPRESULT (*mpfDefCLI)(const char *, int) REENTRANT_SDCC; /* default handler for unknown commands */
+	XELPRESULT (*mpfDefCLI)(struct XELP_tag *, const char *, int) REENTRANT_SDCC; /* default handler for unknown commands */
 	char					mCmdMsgBuf[XELP_CMDBUFSZ]; 	/* cli string buffer storage        */
     XelpBuf                 mCmdXB;          /* buffer ptrs for parsing                     */
 #endif
@@ -304,7 +308,7 @@ XELPRESULT XELPInit (XELP *ths, const char *pAboutMsg);			    /* initialize inst
 #define XELP_SET_FN_EMCHG(ths,pfEMCHG) (ths.mpfEditModeChg=pfEMCHG) /* Entry Mode Change               */
 #define XELP_SET_FN_BKSP(ths,pfBKSP)   (ths.mpfBksp=pfBKSP)	        /* Handle Backspace                */
 
-#define XELP_SET_VAL_CLI_PROMPT(ths,prompt)	(ths.mpPrompt=prompt)   /* set per instnce prompt if enabled in xelpcfg.h  */
+#define XELP_SET_VAL_CLI_PROMPT(ths,prompt)	(ths.mpPrompt=prompt)   /* stored by ptr: must be \0 terminated, must outlive instance */
 
 #ifdef XELP_ENABLE_HELP
 XELPRESULT XELPHelp	        (XELP *ths);                             /* print online help (if avail)    */
@@ -312,7 +316,7 @@ XELPRESULT XELPHelp	        (XELP *ths);                             /* print on
 
 /* Xelp API functions */
 XELPRESULT XELPOut 		    (XELP *ths, const char* msg, int maxlen);/* print function                  */
-#define XELPOutXB(x,xb)     (XELPOut(x,xb.p,(int)(xb.e-xb.p)))       /* print a XelpBuf from cur pos    */
+#define XELP_XB_OUT(x,xb)   (XELPOut(x,xb.p,(int)(xb.e-xb.p)))       /* print a XelpBuf from cur pos    */
 XELPRESULT XELPExecKC		(XELP *ths, char key);				     /* execute key command             */
 XELPRESULT XELPParse 		(XELP *ths, const char *buf, int blen);  /* execute CLI or script commands  */
 XELPRESULT XELPParseXB      (XELP *ths, XelpBuf *script);            /* execute CLI or script commands  */

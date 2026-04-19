@@ -40,8 +40,8 @@ void my_putc(char c) { putchar(c); }
 void my_bksp(void)   { my_putc('\b'); my_putc(' '); my_putc('\b'); }
 
 /* Your first command */
-XELPRESULT cmd_hello(const char *args, int len) {
-    XELPOut(&amp;cli, "Hello, world!\n", 0);
+XELPRESULT cmd_hello(XELP *ths, const char *args, int len) {
+    XELPOut(ths, "Hello, world!\n", 0);
     return XELP_S_OK;
 }
 
@@ -84,18 +84,18 @@ int main(void) {
 <p>Command functions receive the raw argument string and its length. Use the
 tokenizer to extract individual arguments:</p>
 
-<pre><code>XELPRESULT cmd_add(const char *args, int len) {
+<pre><code>XELPRESULT cmd_add(XELP *ths, const char *args, int len) {
     XelpBuf b, tok;
     int a, result;
 
-    XELP_XBInit(b, args, len);
+    XELP_XB_INIT(b, args, len);
 
     /* Token 0 = command name ("add"), 1 = first arg, 2 = second arg */
-    XELP_XBTOP(b);
+    XELP_XB_TOP(b);
     XELPTokN(&amp;b, 1, &amp;tok);
     a = XELPStr2Int(tok.s, tok.p - tok.s);
 
-    XELP_XBTOP(b);
+    XELP_XB_TOP(b);
     XELPTokN(&amp;b, 2, &amp;tok);
     result = a + XELPStr2Int(tok.s, tok.p - tok.s);
 
@@ -122,18 +122,18 @@ tokenizer to extract individual arguments:</p>
 
 <h2>3. Counting and iterating tokens</h2>
 
-<pre><code>XELPRESULT cmd_args(const char *args, int len) {
+<pre><code>XELPRESULT cmd_args(XELP *ths, const char *args, int len) {
     XelpBuf b, tok;
     int n, i;
 
-    XELP_XBInit(b, args, len);
+    XELP_XB_INIT(b, args, len);
     XELPNumToks(&amp;b, &amp;n);
 
     for (i = 0; i &lt; n; i++) {
-        XELP_XBTOP(b);
+        XELP_XB_TOP(b);
         XELPTokN(&amp;b, i, &amp;tok);
-        XELPOut(&amp;cli, tok.s, tok.p - tok.s);
-        XELPOut(&amp;cli, "\n", 0);
+        XELPOut(ths, tok.s, tok.p - tok.s);
+        XELPOut(ths, "\n", 0);
     }
     return XELP_S_OK;
 }
@@ -144,9 +144,10 @@ tokenizer to extract individual arguments:</p>
 <p>KEY mode fires a function on every keypress, no ENTER needed. Great for
 menus and quick toggles:</p>
 
-<pre><code>XELPRESULT key_toggle_led(int c) {
+<pre><code>XELPRESULT key_toggle_led(XELP *ths, int c) {
+    (void)c;
     /* toggle your LED here */
-    XELPOut(&amp;cli, "LED toggled\n", 0);
+    XELPOut(ths, "LED toggled\n", 0);
     return XELP_S_OK;
 }
 

@@ -281,6 +281,14 @@ convention and can be rejected with a single-character check. Procs
 are checked before C functions so users can override C commands with
 script functions (useful for testing, wrapping, adding logging).
 
+**Lookup is linear scan, deliberately.** A binary search variant was
+prototyped (`XELP_USE_BSEARCH` in `xelp-plan-2025.md`) but abandoned
+-- it requires command tables to be sorted, which means a compilation
+step or manual discipline, and the payoff is negligible for typical
+table sizes (< 30 commands). If you need dispatch performance, the VM
+path is the right answer, not optimizing text lookup. See section
+17.9 for the full rationale.
+
 ### 5.3 Call Frames
 
 When a proc is called, a frame is pushed to preserve the caller's state.
@@ -459,6 +467,16 @@ Byte 1:  name_len
 Bytes 2..2+name_len-1:  name (NOT null-terminated in storage)
 Bytes 2+name_len..:     payload (type-dependent)
 ```
+
+**NOTE (see 17.0B for revised thinking):** The `lang_design.md` notes
+pack the tag and name length into a single byte: 3 high bits for type,
+5 low bits for name length. This caps names at 31 characters. If we
+adopt that packing, the entry header shrinks from 2 bytes to 1 byte.
+For reference, Commodore 64 BASIC only compared the first 2 characters
+of variable names -- `SCORE` and `SCREAM` were the same variable.
+31 characters is generous. On a tight heap, short names save real
+space: `_set co 42` costs 16 fewer heap bytes than
+`_set calibration_offset 42`, which adds up with 20+ variables.
 
 #### Entry types
 
@@ -1087,9 +1105,21 @@ non-fatal errors (undefined variable) but halts on fatal errors
 | + WHILE                      | ~0.3 KB        | 0                    |
 | Arena allocator + compactor  | ~0.5 KB        | 0                    |
 | **All scripting features**   | **~4.3 KB**    | **HEAPSZ + ~120**    |
+| + `()` expression evaluator  | ~0.5 KB        | 0                    |
+| + `_readln` (blocking)       | ~0.2 KB        | 0                    |
+| + string-as-code dispatch    | ~0.3 KB        | 0                    |
+| **Full script engine**       | **~5.3 KB**    | **HEAPSZ + ~120**    |
 
 The "+~120 bytes" covers the label table, execution state pointers,
 and arena management counters that live in the struct outside the heap.
+
+**Revised estimate (post-reconciliation):** The 4.3 KB figure assumed
+integer-only variables and no expression evaluator. With the
+everything-is-a-string model, paren expressions, `_readln`, and
+string-as-code dispatch, a realistic total is **~6-8 KB** including
+safety margins and platform variance. The 8 KB ceiling is a hard
+design target -- if it grows past that, something has been
+over-engineered.
 
 ---
 
@@ -1135,3 +1165,1244 @@ and arena management counters that live in the struct outside the heap.
    provides external buffer via `XELPScriptInitExt(ths, buf, len)`."
    This loses relocatability but allows runtime-sized heaps for
    platforms with dynamic memory. Could support both modes.
+
+---
+
+## 17. Design Scratchpad
+
+Working notes and ideas that need to be explored before implementation.
+Nothing here is decided -- it's a thinking-out-loud capture to avoid
+losing threads.
+
+### 17.0 Reconciliation with lang_design.md
+
+The file `dev/lang_design.md` contains earlier design notes (circa
+2012-2016) that reached several conclusions independently. This section
+reconciles those insights with the current design and flags where the
+current doc needs to change.
+
+#### A. Function signature: `ths` as first argument (DECIDED)
+
+The old notes explored multiple C function signatures:
+
+```c
+funcName(int)                                         // KEY mode only
+funcName(xelp *ths, int)                              // KEY + instance
+funcName(char *args, int alen)                        // CLI, no instance
+funcName(xelp *ths, char *args, int alen)             // CLI + instance  ← winner
+funcName(xelp *ths, char *args, int alen,
+         char *buf, int blen, int bpos)               // full context
+```
+
+**Conclusion (both then and now):** The canonical CLI function
+signature should be `XELPRESULT fn(XELP *ths, const char *args, int len)`.
+This is a **breaking change** from the current signature
+`XELPRESULT fn(const char *args, int len)` but solves multi-instance
+and makes script integration natural:
+
+- C functions can read/write variables: `XELPGetVar(ths, ...)`
+- C functions can return values to script: `ths->mR[0] = val`
+- C functions can output to the correct serial port: `XELPOut(ths, ...)`
+- Multi-instance (serial + BLE, two UARTs, etc.) just works
+
+This should happen as part of the scripting feature release. All
+examples and the C++ wrapper (`XelpArduino.h`) need updating.
+
+**Return values from C to script:**
+
+```c
+XELPRESULT cmdAdc(XELP *ths, const char *args, int len) {
+    int val = adc_read(0);
+    ths->mR[0] = val;       // script sees this as $?
+    return XELP_S_OK;
+}
+```
+
+Convenience macro: `#define XELP_RETURN(ths, val) ((ths)->mR[0] = (val), XELP_S_OK)`
+
+From script: `_set reading (adc 0)` -- the `(...)` evaluator calls
+`cmdAdc`, grabs `ths->mR[0]`, substitutes the result.
+
+**NULL-instance degradation (COMPILE-TIME SAFETY):**
+
+If `ths` is `NULL` (0), the function degrades gracefully -- it can
+still do its pure-C work but cannot call `XELPOut`, `XELPGetVar`,
+`ths->mR[0]`, etc. This enables a compile-time footgun removal
+pattern:
+
+```c
+XELPRESULT cmdLed(XELP *ths, const char *args, int len) {
+    int pin = XELPStr2Int(args, len);
+    gpio_toggle(pin);              // pure C, always works
+    if (ths) {                     // guard: only if xelp instance exists
+        ths->mR[0] = gpio_read(pin);
+        XELPOut(ths, "toggled\n", 0);
+    }
+    return XELP_S_OK;
+}
+```
+
+Why this matters: a project can define `XELP_DISABLE_SCRIPT` (or
+similar) and still use the same C function signatures. The dispatch
+layer passes `NULL` instead of an instance pointer. Functions that
+only do hardware work continue to compile and run. Functions that
+need the interpreter degrade to no-output. With one compile flag, you
+get a "headless" mode where the CLI functions are reusable library
+code without any xelp runtime overhead.
+
+Use cases:
+- Unit testing command handlers without a full xelp instance
+- Stripping the interpreter for production builds that only need
+  the C functions
+- Calling the same function from both xelp-managed and bare-metal
+  code paths
+
+The convenience macro handles this:
+```c
+#define XELP_RETURN(ths, val) \
+    ((ths) ? ((ths)->mR[0] = (val), XELP_S_OK) : XELP_S_OK)
+```
+
+#### B. Variables and functions are the same thing (KEY INSIGHT)
+
+The old notes describe this variable packing:
+
+```
+Byte 0:
+  3 high bits = type (000=string, 001=code, 010=int, 011=float)
+  5 low bits  = name length
+```
+
+The critical realization: **type 000 (string) and type 001 (code) have
+identical storage.** A "function" is just a string variable with the
+code bit set. When you call a name and it resolves to a code-typed
+variable, the interpreter feeds the string to `XELPParse` with the
+arguments.
+
+This eliminates the separate `TAG_PROC` mechanism from section 5.
+Instead:
+
+```
+_set blink "led @1; delay @2; led 0; delay @2"     # code variable
+blink 1 500                                          # call it
+```
+
+The resolver finds `blink` in the variable table, sees it's a string,
+and executes it. **No separate proc table, no separate `_proc`
+command, no separate storage.** Variables and functions are unified.
+
+**Impact on the current design:** Sections 5.1 (proc storage), 5.2
+(command resolution), and the arena entry types (section 6.3) need
+revision. `TAG_PROC` is replaced by `TAG_SVAR` with a code flag.
+Or even simpler: ALL variables are byte sequences. The type tag tells
+the expansion/evaluation logic how to interpret them.
+
+**Naming convention:** The old notes used `$name` for retrieving a
+value and considered `_set` for storing. This is consistent with the
+current design. A possible simplification: `_set` determines the type
+from the value syntax:
+
+```
+_set x 42                    # integer (no quotes)
+_set x 0xFF                  # integer (hex)
+_set msg "hello world"       # string (quoted)
+_set blink "led @1; delay @2"  # also a string -- becomes code when called
+```
+
+No need for `_sets` vs `_set` vs `_proc`. One command, type inferred
+from value syntax. Quoted = string/code, unquoted = integer (or
+variable reference if starts with `$`).
+
+#### C. Positional args: `@` not `$` (RECONSIDER)
+
+The old notes used `@0 @1 @2` for positional arguments, not `$1 $2`.
+The advantage: `$1` could be confused with "variable named 1" vs
+"first argument." Using `@` makes the distinction clear:
+
+```
+$name     → named variable lookup
+@0        → function name ($FUNCNAME equivalent)
+@1 @2 @3  → positional arguments
+@#        → argument count
+$?        → last return value (alias for mR[0])
+```
+
+This avoids the bash ambiguity where `$1` in a function shadows `$1`
+at global scope. In xelp, `$x` always means the global variable `x`,
+and `@1` always means "my first argument." Clean separation.
+
+**Impact:** Sections 3 and 4 of the current design use `$1` notation.
+Should be reconsidered for `@1`.
+
+#### D. Namespace resolution order (RECONSIDER)
+
+Old notes had this priority:
+
+```
+1. Runtime script functions (user-defined at CLI)
+2. Static script functions (defined in C as strings)
+3. Programmer-supplied C functions
+4. Language builtins (_goto, _if, etc.)
+```
+
+Current design (section 5.2) has:
+
+```
+1. Script builtins (_set, _if, etc.)
+2. Proc table (user-defined)
+3. C function table
+4. Default handler
+```
+
+The old order lets users override C functions with script wrappers.
+The new order protects builtins from being overridden. Both are
+defensible choices.
+
+**Proposed hybrid:** Builtins first (non-overridable, fast `_` prefix
+check), then user script functions, then C functions, then default
+handler. This matches the current design but keeps the user-override
+capability for C functions:
+
+```
+1. Builtins (_set, _if, _goto, etc.)  -- fast _ check, not overridable
+2. User script functions/variables     -- can shadow C functions
+3. C function table
+4. Default handler
+```
+
+#### E. Bracket evaluation (PARTIALLY DESIGNED)
+
+The old notes had a parser state machine extension for bracket
+evaluation (`[` and `]`), including bracket counting (`bkt_cnt`),
+nested bracket support, and recursive `XelpParse` calls when brackets
+close. The return value goes on a "result stack."
+
+The current design (section 17.1) proposes `(` and `)` instead of
+`[` and `]`. Either delimiter works. Parens feel more natural for
+expressions; square brackets are more Tcl-like.
+
+The old state machine approach is concrete and implementable:
+
+```
+[ → enter bracket, bkt_cnt++
+] → bkt_cnt--, if bkt_cnt == 0: evaluate bracket contents
+    via XelpParse, substitute return value
+```
+
+This is the recursive evaluation mechanism that enables both
+arithmetic expressions and inline command execution:
+
+```
+_set x (+ 3 5)            # arithmetic
+_set x (adc_read 0)        # C function call, capture return
+_set x (+ (adc_read 0) $offset)   # nested
+```
+
+#### F. "Everything is a string" model (SIMPLIFICATION)
+
+Combining insights B and the string discussion: if we adopt the Tcl
+model where all variables are byte sequences and type is determined
+by context:
+
+- `_set x 10` stores bytes "10"
+- `_set name "Alice"` stores bytes "Alice"
+- `_add` interprets its args as integers (calls `XELPStr2Int`)
+- `_echo` outputs bytes as-is
+- Calling a variable by name executes it as code
+
+Then: **no type tags needed in storage.** A variable is just
+`[name_len][name][value_len][value_bytes]`. The command that uses
+the variable decides how to interpret it. This is maximally simple
+for storage and eliminates the type-dispatch code.
+
+Trade-off: every arithmetic operation must parse its operands from
+string to int and format results back to string. On a 32-bit MCU
+this is negligible. On an MSP430 it's measurable but still small.
+
+**Alternative:** Keep the type-tagged format from `lang_design.md`
+(3-bit type in byte 0). Integers are stored as binary, avoiding
+parse/format overhead. Strings are stored as bytes. The `_set`
+command infers type from syntax. This is slightly more code but
+faster at runtime for math-heavy scripts.
+
+**Decision needed:** Pure string model (Tcl, simpler) vs type-tagged
+model (faster math, more code)?
+
+#### G. Summary of changes needed to current design
+
+| Section | Change | Reason |
+|---------|--------|--------|
+| 3 (Syntax) | Consider `@1` instead of `$1` for positional args | Avoids ambiguity with `$`-named variables |
+| 5.1 (Proc Storage) | Unify procs and string variables | `lang_design.md` insight: code is just a callable string |
+| 5.2 (Resolution) | Builtins first, then script vars, then C | Hybrid of old and new ordering |
+| 5.3 (Call Frames) | Update for `@` notation | If `@` adopted |
+| 6.3 (Arena Entries) | Reconsider entry types | May simplify to one type if "everything is a string" |
+| 11 (C API) | All CLI functions get `XELP *ths` | Breaking change, already decided in lang_design.md |
+| New | Add bracket/paren expression evaluator | Old parser state machine design exists |
+
+### 17.1 Parentheses and Expression Syntax
+
+The three-operand form (`_add result $a $b`) works but is verbose.
+Parentheses could enable grouped expressions:
+
+```
+_set result (+ $a $b)          # prefix, one operation
+_set result (+ $a (* $b $c))   # nested prefix -- Lisp-like
+_set result (+ $a $b $c)       # variadic? sum of three?
+```
+
+This requires extending the tokenizer to recognize `(` and `)` as
+delimiters. The current tokenizer splits on whitespace -- parens
+would need to be treated as token boundaries.
+
+**Key question:** what are parens *for*? Options:
+
+- **Grouping for arithmetic** -- `(op args...)` is an expression that
+  returns a value. Used only in `_set` and `_if` contexts.
+- **Grouping for commands** -- `(cmd args)` executes a command and
+  substitutes its return value (like Tcl's `[cmd args]`). More powerful
+  but means recursive evaluation.
+- **Just grouping for readability** -- no semantic meaning beyond
+  visual clarity. Tokenizer strips them.
+
+If we pick option 1 (arithmetic grouping), the syntax becomes:
+
+```
+_set x (+ 3 5)                 # x = 8
+_set x (* $x 2)                # x = x * 2
+_if (> $x 10)                  # conditional on expression
+    _echo "big"
+_endif
+```
+
+This is S-expression style. The evaluator for `(op ...)` is small:
+read op, evaluate args (recursing for nested parens), apply op, return
+integer. Maybe 200-300 lines.
+
+**Readability comparison:**
+
+```
+# Without parens (current design)
+_mul temp $b $c
+_add result $a $temp
+
+# With parens
+_set result (+ $a (* $b $c))
+```
+
+The second is clearly better. But it requires a recursive descent
+expression evaluator. Still small at the code level, but it's a
+different complexity class than "tokenize and dispatch."
+
+**Decision needed:** Are parens worth ~300 bytes of code for the
+expression evaluator?
+
+### 17.2 The String Problem
+
+Strings are the hardest part of the design. There are several tiers:
+
+**Tier 0: Static strings only (current)**
+Strings are literals in commands. No string variables.
+```
+echo "hello world"             # literal, passed as-is to echo handler
+```
+
+**Tier 1: String variables, no manipulation**
+You can store a string and recall it, but not modify it.
+```
+_sets greeting "hello world"   # store string in heap
+_echo $greeting                # expands to "hello world"
+_sets msg $greeting            # copy
+```
+Expansion: `$greeting` in the expansion buffer becomes the string
+contents. Works with the existing expansion model. Cost: a new tag
+type (`TAG_SVAR`), expansion logic to handle string vs int.
+
+**Tier 2: Basic string operations**
+Concatenation, length, substring.
+```
+_cat result $a $b              # concatenation
+_len result $greeting          # string length
+_sub result $greeting 0 5      # substring
+```
+Each string operation creates new heap entries. Heap churn increases.
+Compaction becomes more important.
+
+**Tier 3: String substitution in function arguments**
+This is where it gets truly hard. When a proc receives a string
+argument, `$1` must expand to the string, which may contain spaces.
+The expansion buffer must handle quoting correctly.
+```
+_proc greet "_echo Hello $1"
+greet "world"                  # $1 = "world", output: Hello world
+greet "Dr. Smith"              # $1 = "Dr. Smith" -- contains space!
+```
+The space in `"Dr. Smith"` means the expanded line `Hello Dr. Smith`
+could be re-tokenized incorrectly. Need quoting preservation in
+expansion.
+
+**Tier 4: Full string manipulation**
+Find, replace, format, split, join. At this point you're writing a
+real language runtime. Way too heavy for xelp's scope.
+
+**Recommendation:** Start with Tier 0 (current), implement Tier 1
+early because it's cheap (just a new tag type + expansion logic).
+Tier 2 if users ask for it. Tier 3 needs careful quoting design.
+Tier 4 is out of scope.
+
+**Previous experience:** In earlier xelp versions, strings were
+compile-time only. You could manipulate numbers and emit text using
+character codes, but constructing strings at runtime was impractical.
+This was workable but "even Forth was better at strings and Forth is
+terrible at strings."
+
+**Revised thinking (see 17.0F):** If we adopt "everything is a string"
+then there are no tiers -- all variables hold bytes. `_set x 42` stores
+the bytes "42". `_set name "Alice"` stores the bytes "Alice". The
+`_add` command parses its operands as integers; `_echo` outputs raw
+bytes. No `TAG_SVAR` vs `TAG_VAR` distinction. The string problem
+largely dissolves because strings aren't a special case -- they're the
+only case.
+
+The remaining hard problem is **Tier 3: multi-word expansion in
+function arguments.** When `$name` expands to `Dr Smith` (with a
+space), the re-tokenizer splits it into two tokens. Proposed solution:
+the expansion pass auto-wraps multi-word values in quotes:
+
+```
+_set name "Dr Smith"
+greet $name             # expander produces: greet "Dr Smith"
+```
+
+Rule: if a variable's value contains whitespace, the expansion wraps
+it in `"..."`. This preserves it as a single token through
+re-tokenization. Cost: ~10 lines in the expander. The value itself
+does NOT contain quotes in storage -- quotes are added only during
+expansion when needed.
+
+### 17.3 Single-Key Command Batching
+
+In earlier xelp versions there was a mechanism to run a string of
+single-key commands from a script:
+
+```
+_sk "fpwbx"        # run single-key commands f, p, w, b, x in sequence
+```
+
+This is high-compression for repetitive tasks -- each character is a
+complete command. Useful for test sequences, initialization macros,
+and automated key-press simulation.
+
+**Implementation:** Iterate over the string, call `XELPParseKey()`
+for each character, staying in KEY mode for the duration. Small
+(~20 lines) and useful. Should be a script builtin (`_sk`) or a
+C-level API (`XELPRunKeySequence`).
+
+**Use cases:**
+- Automated test scripts that simulate user key presses
+- Compact macros for mode-switching sequences
+- Initialization sequences for peripherals controlled via KEY mode
+
+### 17.4 Register Type Interpretation
+
+From the VM design: the 4 registers (`mR[0..3]`) are `XELPREG`-sized
+(platform int). Depending on the opcode, a register value can be
+interpreted as:
+
+- **s32** -- signed 32-bit integer (default for script `_add` etc.)
+- **u32** -- unsigned (for bitwise ops, addresses)
+- **f32** -- IEEE 754 float (if `XELP_USE_FR_MATH` or native float)
+
+The register *storage* is the same 32 bits. The *interpretation* is
+per-opcode. This is how every CPU works.
+
+**For the script engine:** the `_` commands could offer type suffixes:
+
+```
+_addf result $a $b     # float add (interpret as f32)
+_adds result $a $b     # signed add (default, maybe omit suffix)
+_addu result $a $b     # unsigned add
+```
+
+Or a mode command:
+
+```
+_mode float            # subsequent math treats regs as f32
+_add result $a $b      # float add
+_mode int              # back to integer
+```
+
+**Recommendation:** Start with integer only. Float support behind
+`XELP_ENABLE_FLOAT` or `XELP_USE_FR_MATH`. The register aliasing
+between VM and script layers means the VM's typed opcodes are
+available anyway if both modules are compiled in.
+
+### 17.5 Proc Storage: Inline vs Reference
+
+Current design copies proc body into heap always. Alternative for
+ROM-resident scripts:
+
+```c
+typedef struct {
+    uint8_t  tag;          /* TAG_PROC */
+    uint8_t  name_len;
+    /* name bytes... */
+    uint8_t  is_ref;       /* 0 = inline body, 1 = external ref */
+    union {
+        struct { uint16_t body_len; /* followed by body bytes */ } inline_;
+        struct { const char *ptr; uint16_t len; } ref;
+    } body;
+} ProcEntry;
+```
+
+Trade-off:
+- Saves heap space for ROM procs
+- Loses memcpy relocatability for ref procs
+- Adds 1 byte + branch per proc lookup
+- Only useful if many procs are defined from ROM scripts
+
+**Decision:** Start with inline-only (simpler). Add ref mode later
+if heap pressure is a real problem. The arena model doesn't need to
+change -- it's just a different payload format for TAG_PROC.
+
+### 17.6 Worked Examples
+
+Concrete scripts to validate the syntax before implementation.
+
+**Syntax conventions used in these examples (reflecting 17.0 reconciliation):**
+
+- `$name` -- named variable lookup
+- `@1 @2` -- positional arguments inside a function
+- `@#` -- argument count
+- `$?` -- last return value (alias for r0)
+- `(op args)` -- expression evaluation (returns a value)
+- `_set name value` -- assign (type inferred: quoted = string, unquoted = integer)
+- Functions are callable strings: `_set fn "body"` then call `fn`
+- Semicolons separate statements on one line
+- `#` for comments (to end of line)
+
+---
+
+#### Example 1: LED Blink with Configurable Rate
+
+Basic variables, callable string function, loop.
+
+```
+# Define a blink-once function
+_set blink "led 1; delay @1; led 0; delay @1"
+
+# Blink 5 times at 200ms
+_set count 5
+_while $count
+    blink 200
+    _dec count
+_endwhile
+
+# Blink 3 times at 500ms (reuse same function)
+_set count 3
+_while $count
+    blink 500
+    _dec count
+_endwhile
+```
+
+**Exercises:** `_set` (integer + string/code), `_while`/`_endwhile`,
+`_dec`, `@1` positional arg, callable string dispatch, user C
+functions (`led`, `delay`).
+
+---
+
+#### Example 2: Sensor Calibration
+
+Read ADC via C function, compute offset with script math, store
+result, apply via C function. Shows C↔script data flow.
+
+```
+# C side registered: adc_read <channel>, motor_set <power> <dir>
+
+# Read current sensor value (C function sets r0)
+adc_read 0
+_set raw $?
+
+# Target is 512 (midpoint of 10-bit ADC)
+_set target 512
+_set offset (- $target $raw)
+
+# Apply offset to a reading and drive motor
+_set adjusted (+ $raw $offset)
+motor_set $adjusted 1
+
+_echo "raw=$raw offset=$offset adjusted=$adjusted"
+```
+
+With paren expressions:
+```
+_set adjusted (+ (adc_read 0) $offset)
+```
+
+Without paren expressions (three-operand form):
+```
+adc_read 0
+_set raw $?
+_add adjusted $raw $offset
+```
+
+**Exercises:** C function return values via `$?`, `(op ...)` expression
+evaluation, `_echo` with variable expansion.
+
+---
+
+#### Example 3: Menu System
+
+Proc per menu item, dispatch from CLI, mode switching.
+
+```
+# Define menu actions as callable strings
+_set do_status "echo WiFi: connected; echo IP: 192.168.1.42"
+_set do_reboot "echo Rebooting...; sys_reboot"
+_set do_cal    "echo Calibrating...; adc_read 0; _set offset $?"
+
+# Menu display function
+_set show_menu "echo --- Menu ---; echo 1: Status; echo 2: Reboot; echo 3: Calibrate; echo ----------"
+
+# Dispatch (called by user typing: menu 2)
+_set menu "_if (== @1 1); do_status; _endif; _if (== @1 2); do_reboot; _endif; _if (== @1 3); do_cal; _endif"
+
+# Usage from CLI:
+#   show_menu
+#   menu 1        --> runs do_status
+#   menu 3        --> runs do_cal
+```
+
+**Note:** This works but the multi-`_if` dispatch is verbose. A
+`_case`/`_switch` construct would help here but is not in the MVP.
+An alternative using `_goto`:
+
+```
+_set menu "  \
+    _if (== @1 1); _goto m_status; _endif; \
+    _if (== @1 2); _goto m_reboot; _endif; \
+    _echo unknown option @1; _ret; \
+    m_status:; do_status; _ret; \
+    m_reboot:; do_reboot; _ret"
+```
+
+**Exercises:** Multiple callable strings, `_if` with expression,
+`_goto`/labels, `_ret`, `@1` dispatch.
+
+---
+
+#### Example 4: WiFi Setup (String Handling)
+
+Tests the "everything is a string" model with multi-word values.
+
+```
+# Set WiFi credentials (strings with spaces)
+_set ssid "My Home Network"
+_set pass "hunter2 with spaces"
+
+# Connect -- C function receives the string as-is
+wifi_connect $ssid $pass
+# Expander auto-wraps: wifi_connect "My Home Network" "hunter2 with spaces"
+
+# Check status
+wifi_status
+_if $?
+    _echo "Connected to $ssid"
+_else
+    _echo "Connection failed"
+_endif
+
+# Build a greeting message
+_set name "Alice"
+_set greeting "Hello $name, welcome to $ssid"
+_echo $greeting
+# Output: Hello Alice, welcome to My Home Network
+```
+
+**Exercises:** String variables, multi-word expansion with auto-quoting,
+`$` expansion inside quoted strings, string variables passed to C
+functions.
+
+**Design question surfaced:** Does `_set greeting "Hello $name"` expand
+`$name` at define-time or use-time? If at define-time (like bash
+double-quotes), `$greeting` stores `"Hello Alice"`. If at use-time
+(like Tcl braces), `$greeting` stores the literal `"Hello $name"` and
+expansion happens when echoed. Bash-style (define-time) is simpler to
+implement and easier to reason about.
+
+---
+
+#### Example 5: Automated Test Sequence
+
+Single-key batching + script flow control.
+
+```
+# Single-key mode commands registered:
+#   'r' = reset device
+#   's' = read sensor
+#   'p' = print status
+#   'h' = help
+
+# Run a test sequence via single-key batching
+_sk "rsp"          # reset, sensor, print -- 3 commands, 3 chars
+
+# Full test with validation
+_sk "r"            # reset
+delay 100          # wait for reset
+_sk "s"            # read sensor
+_set reading $?
+
+_if (< $reading 100)
+    _echo "FAIL: reading too low ($reading)"
+_else
+    _if (> $reading 900)
+        _echo "FAIL: reading too high ($reading)"
+    _else
+        _echo "PASS: reading=$reading"
+    _endif
+_endif
+```
+
+**Exercises:** `_sk` single-key batching, nested `_if`/`_endif`,
+`(< ...)` and `(> ...)` comparison expressions, `$?` from C function.
+
+---
+
+#### Example 6: Multi-Step Initialization (3 Levels Deep)
+
+Proc calling proc, demonstrating call frames and positional args.
+
+```
+# Level 3: configure a single GPIO pin
+_set gpio_cfg "gpio_mode @1 @2; gpio_write @1 0; _echo pin @1 mode @2"
+
+# Level 2: configure a peripheral's pins
+_set uart_init "gpio_cfg @1 1; gpio_cfg @2 1; uart_baud @3; _echo UART on @1/@2 at @3"
+_set spi_init  "gpio_cfg @1 1; gpio_cfg @2 1; gpio_cfg @3 1; spi_speed @4"
+
+# Level 1: full board init
+_set board_init " \
+    _echo === Board Init ===; \
+    uart_init 0 1 115200; \
+    spi_init 10 11 12 1000000; \
+    _set board_ready 1; \
+    _echo === Done ==="
+
+# Run it
+board_init
+
+# Call chain: board_init -> uart_init -> gpio_cfg (3 levels)
+# Each level has its own @1, @2, @3 -- frame stack preserves them
+```
+
+**Exercises:** 3-level call depth, `@1`/`@2`/`@3` at each level
+(verifying frame isolation), callable strings calling callable strings,
+global variable set from within a function (`$board_ready`).
+
+---
+
+#### Example 7: Interactive Tuning
+
+User sets gain/offset at CLI, script applies to hardware in real time.
+Shows the interactive workflow -- not a batch script.
+
+```
+# Pre-loaded calibration function
+_set apply "adc_read 0; _set raw $?; _set out (+ (* $raw $gain) $offset); dac_write $out"
+
+# Pre-loaded continuous run function
+_set run "  \
+    _set running 1; \
+    _while $running; \
+        apply; \
+        delay 50; \
+    _endwhile"
+
+# User session at the CLI prompt:
+#
+#   > _set gain 2
+#   > _set offset -100
+#   > apply              <-- single shot, see the result
+#   raw=512 out=924
+#   > _set gain 3
+#   > apply              <-- try different gain
+#   raw=512 out=1436
+#   > run                <-- continuous loop (ctrl-C to stop)
+#   > _set gain 1        <-- can still set vars while running?
+```
+
+**Design question surfaced:** Can the user type commands while a
+`_while` loop is running? In the current architecture, `XELPParse`
+is blocking -- it runs the entire script to completion. The user can
+only interact between script invocations. For real-time tuning, the
+script would need to yield between iterations, or the loop would
+need to be driven by the C `loop()` function calling `apply` on a
+timer. This is more realistic:
+
+```
+# C side: loop() calls XELPParse(ths, "apply", 5) every 50ms
+# User just sets variables at the CLI prompt between applies:
+#
+#   > _set gain 2
+#   > _set offset -100
+#   (hardware starts responding immediately -- C loop calls apply)
+#   > _set gain 3
+#   (hardware responds to new gain on next cycle)
+```
+
+This "C drives the loop, script defines the body" pattern is probably
+the right model for real-time tuning. The script defines *what* to do;
+C controls *when* to do it.
+
+**Exercises:** C↔script data flow, `(+ (* ...) ...)` nested
+expressions, interactive variable modification, discussion of
+blocking vs cooperative execution model.
+
+---
+
+#### Syntax coverage matrix
+
+| Syntax element         | Ex.1 | Ex.2 | Ex.3 | Ex.4 | Ex.5 | Ex.6 | Ex.7 | Ex.8 | Ex.9 | Ex.10|
+|------------------------|------|------|------|------|------|------|------|------|------|------|
+| `_set` integer         |  X   |  X   |      |      |  X   |  X   |  X   |  X   |      |      |
+| `_set` string/code     |  X   |      |  X   |  X   |      |  X   |  X   |      |  X   |  X   |
+| `$name` expansion      |  X   |  X   |      |  X   |  X   |      |  X   |  X   |  X   |  X   |
+| `@1 @2` positional     |  X   |      |  X   |      |      |  X   |      |      |      |      |
+| `$?` return value      |      |  X   |      |  X   |  X   |      |  X   |  X   |      |      |
+| `(op ...)` expression  |      |  X   |  X   |      |  X   |      |  X   |  X   |  X   |      |
+| `_if`/`_else`/`_endif` |      |      |      |  X   |  X   |      |      |  X   |  X   |      |
+| `_while`/`_endwhile`   |  X   |      |      |      |      |      |  X   |      |      |      |
+| `_goto`/labels         |      |      |  X   |      |      |      |      |      |      |      |
+| `_dec`/`_inc`          |  X   |      |      |      |      |      |      |      |      |      |
+| `_echo`                |      |  X   |  X   |  X   |  X   |  X   |      |  X   |  X   |  X   |
+| `_ret`                 |      |      |  X   |      |      |      |      |  X   |      |      |
+| `_sk` (key batching)   |      |      |      |      |  X   |      |      |      |      |      |
+| `_readln`              |      |      |      |      |      |      |      |  X   |  X   |  X   |
+| callable string        |  X   |      |  X   |      |      |  X   |  X   |      |  X   |  X   |
+| C function call        |      |  X   |      |  X   |      |  X   |  X   |  X   |  X   |  X   |
+| nested call (2+ deep)  |      |      |      |      |      |  X   |      |      |      |      |
+| string w/ spaces       |      |      |      |  X   |      |      |      |      |      |      |
+| nested `_if`           |      |      |      |      |  X   |      |      |      |      |      |
+| `$` in strings         |      |      |      |  X   |      |      |  X   |  X   |  X   |  X   |
+| string comparison      |      |      |      |      |      |      |      |      |  X   |      |
+
+### 17.7 FR_math Integration Points
+
+If `XELP_USE_FR_MATH` is defined:
+
+- Script gets `_fsin`, `_fcos`, `_fsqrt`, `_fmul` etc. commands
+  that call FR_math functions on register values
+- Registers interpreted as Q16.16 fixed-point for these operations
+- `_set x 1.5` would need to parse a decimal and convert to Q16.16
+  (or require `_setf x 0x00018000` in hex -- ugly)
+- Better: `_setf x 1.5` that parses float-like syntax into Q16.16
+
+**This is future work.** The script engine should not depend on
+FR_math. But the architecture should not preclude it either. The
+arena and register model already accommodate this.
+
+### 17.8 User Input: `_readln` and Blocking
+
+Scripts often need user input -- "enter a value", "confirm (y/n)",
+"type your name." This is fundamentally different from batch script
+execution because it requires *waiting for the user to type something.*
+
+#### The problem
+
+`XELPParse` is a blocking call -- it runs lines until the script ends.
+There's no natural "pause and wait for keyboard input" because the
+script engine doesn't own the input source. Characters come from the
+platform's main loop (`Serial.read()`, `uart_getc()`, `getch()`, etc.)
+and are fed to xelp one at a time via `XELPParseKey`.
+
+A `_readln` command in a script would need to:
+1. Pause script execution
+2. Return control to the main loop
+3. Accumulate characters until the user presses Enter
+4. Store the result in a variable
+5. Resume script execution from where it left off
+
+This is a **yield/resume** pattern -- effectively coroutine-like
+behavior.
+
+#### Option A: Blocking `_readln` (simple, limited)
+
+`_readln` takes a platform-specific input function pointer and busy-
+waits:
+
+```c
+// Platform provides this:
+typedef int (*XelpReadCharFn)(void);   // returns char or -1 if none
+
+// Script builtin:
+// _readln varname
+//   reads chars until \n, stores in $varname
+```
+
+Implementation: call the read function in a loop until `\n`. This
+blocks the entire system -- no other processing happens. Acceptable
+for simple interactive prompts on a single-UART device. Unacceptable
+for anything with real-time requirements.
+
+```
+# Simple blocking example
+_echo "Enter calibration offset: "
+_readln offset
+_echo "You entered: $offset"
+```
+
+The function pointer is set during init:
+```c
+XELP_SET_FN_READCHAR(cli, &uart_getc);   // platform read function
+```
+
+#### Option B: Yield/resume (complex, correct)
+
+`_readln` saves the script execution state and returns to the caller.
+The main loop continues feeding characters to `XELPParseKey`. When
+Enter is pressed, the accumulated line is stored in the target variable
+and script execution resumes.
+
+This requires:
+- Saving `script_pos`, `script_end`, `if_depth`, `skip_depth` when
+  yielding
+- A "script is suspended, accumulating readln input" state flag
+- When `\n` arrives during readln: store the accumulated line as a
+  string variable, clear the flag, resume `XELPParse` from saved pos
+
+The state machine is small but it's a new execution mode -- xelp goes
+from "run to completion" to "can be suspended mid-script." This
+affects the relocatability guarantee (don't `memcpy` while suspended)
+and any assumptions about script atomicity.
+
+```c
+typedef enum {
+    XELP_EXEC_IDLE,       // no script running
+    XELP_EXEC_RUNNING,    // script executing (inside XELPParse)
+    XELP_EXEC_READLN,     // script suspended, waiting for input
+} XelpExecState;
+```
+
+#### Option C: Callback model (pragmatic middle ground)
+
+Don't put `_readln` in the script engine at all. Instead, the C
+application implements the interactive flow:
+
+```c
+// C side -- the "ask user" flow is in C, not in script
+void cmdCalibrate(XELP *ths, const char *args, int len) {
+    XELPOut(ths, "Enter offset: ", 0);
+    // Set a flag so main loop captures the next line
+    gWaitingForInput = 1;
+    gInputCallback = &applyCalibration;
+}
+
+void applyCalibration(XELP *ths, const char *line, int len) {
+    int offset = XELPStr2Int(line, len);
+    XELPSetVar(ths, "offset", offset);
+    XELPParse(ths, "apply", 5);   // run the script function
+}
+```
+
+This keeps the script engine simple (no yield/resume) but pushes
+the interactive flow into C. Scripts can still be part of it -- they
+just can't be the thing that waits for input.
+
+#### Recommendation
+
+Start with **Option A** (blocking readln) behind `XELP_ENABLE_READLN`.
+It's simple, it covers the common case (single-UART interactive
+prompts), and the blocking limitation is acceptable for most embedded
+CLI use cases. The function pointer model means platforms without
+blocking input just don't set the pointer, and `_readln` returns an
+error.
+
+Option B (yield/resume) is the right long-term answer but it's a
+significant complexity jump. Defer it until there's a real use case
+that can't be solved with Option A or C.
+
+#### Worked examples with `_readln`
+
+**Example 8: Interactive Calibration Wizard**
+
+```
+# Walk the user through a calibration sequence
+
+_echo "=== Sensor Calibration ==="
+_echo ""
+
+_echo "Step 1: Apply zero load to sensor"
+_echo "Press Enter when ready..."
+_readln dummy                    # wait, discard the value
+
+adc_read 0
+_set zero_reading $?
+_echo "Zero reading: $zero_reading"
+
+_echo ""
+_echo "Step 2: Apply known load (enter weight in grams):"
+_readln weight
+
+adc_read 0
+_set load_reading $?
+_echo "Load reading: $load_reading"
+
+# Compute scale factor: counts per gram
+_set span (- $load_reading $zero_reading)
+_if (== $span 0)
+    _echo "ERROR: no change detected. Check sensor."
+    _ret
+_endif
+
+# Store calibration
+_set cal_zero $zero_reading
+_set cal_span $span
+_set cal_weight $weight
+
+_echo ""
+_echo "Calibration complete:"
+_echo "  zero=$cal_zero span=$cal_span ref=$cal_weight"
+_echo "  Use 'measure' command to read calibrated values"
+```
+
+**Example 9: Confirmation Prompt**
+
+```
+# Factory reset with confirmation
+
+_set factory_reset " \
+    _echo WARNING: This will erase all settings.; \
+    _echo Type YES to confirm:; \
+    _readln confirm; \
+    _if (== $confirm YES); \
+        _echo Erasing...; \
+        eeprom_erase; \
+        _echo Done. Restarting...; \
+        sys_reboot; \
+    _else; \
+        _echo Cancelled.; \
+    _endif"
+```
+
+**Example 10: Interactive Variable Setting**
+
+```
+# Let user set multiple parameters interactively
+
+_set setup " \
+    _echo Enter motor speed (0-255):; \
+    _readln speed; \
+    _echo Enter direction (0=fwd 1=rev):; \
+    _readln dir; \
+    _echo Enter duration (ms):; \
+    _readln duration; \
+    _echo Running motor: speed=$speed dir=$dir for $duration ms; \
+    motor_set $speed $dir; \
+    delay $duration; \
+    motor_set 0 0; \
+    _echo Done."
+```
+
+**Design questions surfaced:**
+
+1. **String comparison in `_if`:** Example 9 uses `_if (== $confirm YES)`.
+   In an "everything is a string" model, `==` needs to handle string
+   comparison, not just integer. If both operands are valid integers,
+   compare as integers. Otherwise compare as strings (`memcmp`). This
+   is Tcl's model and it works naturally.
+
+2. **`_readln` for integers vs strings:** `_readln speed` stores whatever
+   the user types. If they type `"150"`, it's the string "150". When
+   `motor_set $speed $dir` passes it to C, the C function calls
+   `XELPStr2Int` as usual. Everything-is-a-string makes this seamless.
+
+3. **Empty input / timeout:** Should `_readln` support a timeout?
+   `_readln var 5000` -- wait 5 seconds, then store empty/zero? Useful
+   for automated testing but adds complexity. Defer for now.
+
+4. **Echo during readln:** Should characters echo as the user types
+   during `_readln`? Probably yes, using the existing `XELPParseKey`
+   echo behavior. But if `_readln` is implemented as Option A (blocking
+   loop), it needs its own echo logic. Needs thought.
+
+### 17.9 Command Lookup Performance and the VM/Script Split
+
+A binary search for command dispatch was prototyped early on. The idea:
+sort the `XELPCLIFuncMapEntry` table alphabetically and use `bsearch()`
+instead of linear scan. This turns O(n) lookup into O(log n).
+
+**Why it was abandoned for text scripts:**
+
+1. **Sorted tables require discipline or tooling.** Users hand-write
+   command tables in C. Requiring alphabetical order is error-prone.
+   A build-time sort tool (or a `XELP_CMD_TABLE_SORTED` macro that
+   verifies at startup) adds complexity for marginal gain.
+
+2. **Typical table sizes don't justify it.** Most xelp deployments
+   have 5-30 commands. Linear scan of 30 short strings is < 1 us on
+   any 32-bit MCU. The bottleneck in text dispatch is tokenization
+   and string comparison, not table scan.
+
+3. **Anyone needing real dispatch performance should use C, not
+   script.** If a command runs 10,000 times per second, it shouldn't
+   be dispatched through text parsing at all. That's a C function
+   called directly, or a VM opcode.
+
+4. **The `_` prefix check for builtins is already O(1).** A single
+   byte comparison rejects non-builtin commands instantly. The
+   remaining linear scan is only over user commands.
+
+**Where it DOES matter: binary protocols.**
+
+The calculus changes completely when the input isn't text. Consider
+MIDI: a Control Change message is 3 bytes (`[status][cc#][value]`).
+The "command" is a byte, not a string. Dispatch on a byte is a
+switch/case or lookup table -- O(1). No tokenizer, no string
+comparison, no expansion buffer.
+
+This is exactly the use case that motivated the VM design (see
+`xelp_vm.md`). The VM is a byte-oriented dispatch engine:
+
+```
+Text path:   "motor 75 1"  →  tokenize → strcmp → dispatch  (slow, flexible)
+VM path:     [0x42][0x4B][0x01]  →  opcode switch → dispatch  (fast, compact)
+```
+
+The VM is actually simpler to design than the script engine -- no
+tokenizer, no expansion buffer, no string handling, no label
+resolution. It's a switch statement over a byte stream. But it adds
+different baggage:
+
+| Concern            | Script engine     | VM                    |
+|--------------------|-------------------|-----------------------|
+| Parsing complexity | High (tokenizer)  | None (byte stream)    |
+| Human readability  | Yes               | No (needs disasm)     |
+| Toolchain needed   | No (type at CLI)  | Yes (assembler/compiler) |
+| String handling    | Natural           | Awkward               |
+| Dispatch speed     | O(n) per command  | O(1) per opcode       |
+| ROM density        | ~5 bytes/command  | ~2 bytes/instruction  |
+| Interactive use    | Yes               | No                    |
+| Binary protocols   | Awkward           | Natural               |
+
+**The dual design conclusion:** Don't try to make text fast. Don't
+try to make bytecode readable. Let each path do what it's good at.
+They share the same XELP instance, the same C function table, the
+same I/O callbacks. A text script can invoke a VM program
+(`_vm run`). A VM `CFUNC` opcode can call a C function that calls
+`XELPParse`. They're peers, not layers.
+
+The binary search optimization was an attempt to make text do the
+VM's job. Abandoning it clarified the design split.
+
+---
+
+## 18. Design Synthesis
+
+After recovering old design notes and working through 10 examples,
+the script engine design converges on a surprisingly compact core.
+
+### What it takes
+
+**Storage model:** Everything is a string. One arena entry format
+holds variable names and their byte-sequence values. No type tags
+in storage. Commands interpret values by context -- `_add` parses
+integers, `_echo` outputs raw bytes, calling a name executes its
+value as code. Variables and functions are the same thing.
+
+**~15 builtin commands:**
+
+| Command           | Purpose                              |
+|-------------------|--------------------------------------|
+| `_set`            | Assign variable (int, string, code)  |
+| `_del`            | Delete variable                      |
+| `_echo`           | Output with `$` expansion            |
+| `_if` / `_else` / `_endif` | Conditional blocks          |
+| `_while` / `_endwhile` | Loop with condition             |
+| `_goto`           | Jump to label                        |
+| `_ret`            | Return from function                 |
+| `_add` `_sub` `_mul` `_div` `_mod` | Integer arithmetic  |
+| `_inc` `_dec`     | Shorthand increment/decrement        |
+| `_eq` `_lt` `_gt` | Comparison (result 0 or 1)          |
+| `_readln`         | Read user input into variable        |
+| `_sk`             | Single-key command batching          |
+
+Plus `_and`/`_or`/`_xor`/`_not`/`_shl`/`_shr` behind a feature flag.
+
+**4 special characters:**
+
+| Char  | Meaning                                   |
+|-------|-------------------------------------------|
+| `$`   | Named variable expansion (`$name`)        |
+| `@`   | Positional argument (`@1`, `@2`, `@#`)    |
+| `()`  | Expression evaluation (`(+ $a $b)`)       |
+| `""`  | String quoting (preserves spaces, expands `$`) |
+
+That's it. No brackets, no braces, no backslash escapes beyond `\`$`
+for literal dollar sign. The syntax is learnable in minutes.
+
+### Why it works on small targets
+
+- **One heap, one knob.** All state in `script_heap[N]`. User picks N.
+- **No malloc.** Arena bump allocator + frame stack from the top.
+- **Instance-based.** Copy with `memcpy`. Run N instances independently.
+- **~6-8 KB code.** Fits alongside the existing 2 KB xelp core.
+  Hard ceiling: 8 KB. If it exceeds that, something was over-designed.
+
+### The compression argument
+
+String-becomes-code enables significant compression over equivalent C.
+A C function to blink an LED at a configurable rate:
+
+```c
+// C: ~20 lines, separate declaration + registration + implementation
+void cmdBlink(XELP *ths, const char *args, int len) {
+    XelpBuf b, tok;
+    int rate, count;
+    XELP_XB_INIT(b, args, len);
+    XELP_XB_TOP(b);
+    XELPTokN(&b, 1, &tok);
+    rate = XELPStr2Int(tok.s, tok.p - tok.s);
+    XELP_XB_TOP(b);
+    XELPTokN(&b, 2, &tok);
+    count = XELPStr2Int(tok.s, tok.p - tok.s);
+    for (int i = 0; i < count; i++) {
+        gpio_write(LED_PIN, 1);
+        delay_ms(rate);
+        gpio_write(LED_PIN, 0);
+        delay_ms(rate);
+    }
+}
+// plus: table entry, extern declaration, header include...
+```
+
+Script equivalent:
+
+```
+_set blink "led 1; delay @1; led 0; delay @1"
+_set count 5
+_while $count
+    blink 200
+    _dec count
+_endwhile
+```
+
+The script version is shorter, readable, and modifiable at runtime
+without recompiling. The C version is faster and type-safe. Both
+have their place -- and both run on the same XELP instance.
+
+### What performance ISN'T
+
+Performance is not a goal for the script engine. If you need
+performance, use C. If you need fast dispatch of binary protocols,
+use the VM. The script engine is for:
+
+- Interactive configuration and debugging
+- Prototyping command sequences before committing to C
+- Glue logic between C functions
+- Runtime-modifiable behavior without reflashing
+- User-authored automation on deployed devices
+
+In all of these, human readability and ease of authoring trump
+execution speed. The text parser runs at "human typing speed" --
+even on an 8-bit MCU, that's more than enough.

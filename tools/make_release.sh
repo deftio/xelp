@@ -103,7 +103,7 @@ do_extract_version() {
 # -----------------------------------------------------------------------
 
 do_sync_manifests() {
-    step_header "Sync version in library.json and library.properties"
+    step_header "Sync version in library.json, library.properties, idf_component.yml"
 
     # Strip leading 'v' if present (VER_STRING is e.g. "0.2.5")
     local ver="$VER_STRING"
@@ -140,6 +140,21 @@ p.write_text(json.dumps(d, indent=4) + '\n')
             rm -f library.properties.bak
             git add library.properties
             pass "library.properties updated to $ver"
+        fi
+    fi
+
+    # idf_component.yml (ESP-IDF Component Registry)
+    if [ -f idf_component.yml ]; then
+        local cur_idf
+        cur_idf=$(sed -n 's/^version: "\(.*\)"/\1/p' idf_component.yml)
+        if [ "$cur_idf" = "$ver" ]; then
+            pass "idf_component.yml already at $ver"
+        else
+            echo "  idf_component.yml: $cur_idf -> $ver"
+            sed -i.bak "s/^version: \".*\"/version: \"$ver\"/" idf_component.yml
+            rm -f idf_component.yml.bak
+            git add idf_component.yml
+            pass "idf_component.yml updated to $ver"
         fi
     fi
 }
@@ -576,10 +591,7 @@ do_pio_publish() {
     step_header "Publish to PlatformIO registry"
 
     if ! command -v pio &>/dev/null; then
-        echo "  pio CLI not found -- skipping PlatformIO publish."
-        echo "  Install: pip install platformio"
-        echo "  Then run manually: pio pkg publish ."
-        return 0
+        fail "pio CLI not found. Install: pip install platformio"
     fi
 
     # Check if already published at this version
@@ -596,7 +608,26 @@ do_pio_publish() {
 }
 
 # -----------------------------------------------------------------------
-# Step 13: Done
+# Step 13: Publish to ESP-IDF Component Registry
+# -----------------------------------------------------------------------
+
+do_idf_publish() {
+    step_header "Publish to ESP-IDF Component Registry"
+
+    if ! command -v compote &>/dev/null; then
+        fail "compote CLI not found. Install: pip install idf-component-manager"
+    fi
+
+    confirm "Publish xelp $VER_STRING to ESP-IDF Component Registry?"
+    echo "  --- Packing component ---"
+    run_cmd compote component pack --name xelp
+    echo "  --- Uploading component ---"
+    run_cmd compote component upload --name xelp
+    pass "Published to ESP-IDF Component Registry."
+}
+
+# -----------------------------------------------------------------------
+# Step 14: Done
 # -----------------------------------------------------------------------
 
 do_done() {
@@ -673,6 +704,7 @@ if $TAG_EXISTS; then
     # Re-run: tag exists but release doesn't -- just wait for it
     do_wait_release
     do_pio_publish
+    do_idf_publish
     do_done
 else
     do_push_branch
@@ -684,5 +716,6 @@ else
     do_tag
     do_wait_release
     do_pio_publish
+    do_idf_publish
     do_done
 fi

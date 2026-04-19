@@ -38,8 +38,8 @@ Version 0.2.1.</p>
 <tr><td><code>XELPRESULT</code></td><td>Return type (<code>int</code>). 0 = OK, negative = error, positive = warning.</td></tr>
 <tr><td><code>XELPREG</code></td><td>Register type (default <code>int</code>, overridable in xelpcfg.h).</td></tr>
 <tr><td><code>XelpBuf</code></td><td>Buffer wrapper with start, position, and end pointers.</td></tr>
-<tr><td><code>XELPKeyFuncMapEntry</code></td><td>Single-key command entry: function pointer, key, help string.</td></tr>
-<tr><td><code>XELPCLIFuncMapEntry</code></td><td>CLI command entry: function pointer, command name, help string.</td></tr>
+<tr><td><code>XELPKeyFuncMapEntry</code></td><td>Single-key command entry: <code>XELPRESULT fn(XELP *ths, int key)</code>, key, help string.</td></tr>
+<tr><td><code>XELPCLIFuncMapEntry</code></td><td>CLI command entry: <code>XELPRESULT fn(XELP *ths, const char *args, int len)</code>, command name, help string.</td></tr>
 </tbody>
 </table>
 
@@ -181,14 +181,14 @@ value to <code>*n</code>.</p>
 <table>
 <thead><tr><th>Macro</th><th>Purpose</th></tr></thead>
 <tbody>
-<tr><td><code>XELP_XBInit(xb, buf, len)</code></td><td>Initialize from pointer + length</td></tr>
-<tr><td><code>XELP_XBInitPtrs(xb, s, p, e)</code></td><td>Initialize from three pointers</td></tr>
-<tr><td><code>XELP_XBInitBP(xb, buf, pos, len)</code></td><td>Initialize with cursor position</td></tr>
-<tr><td><code>XELP_XBPCopy(a, b)</code></td><td>Copy XelpBuf a to b</td></tr>
-<tr><td><code>XELP_XBBufLen(xb)</code></td><td>Total buffer length</td></tr>
-<tr><td><code>XELP_XBGetPos(xb)</code></td><td>Current position as int offset</td></tr>
-<tr><td><code>XELP_XBPUTC(xb, ch)</code></td><td>Write char with bounds check</td></tr>
-<tr><td><code>XELP_XBTOP(xb)</code></td><td>Reset position to start</td></tr>
+<tr><td><code>XELP_XB_INIT(xb, buf, len)</code></td><td>Initialize from pointer + length</td></tr>
+<tr><td><code>XELP_XB_INIT_PTRS(xb, s, p, e)</code></td><td>Initialize from three pointers</td></tr>
+<tr><td><code>XELP_XB_INIT_BP(xb, buf, pos, len)</code></td><td>Initialize with cursor position</td></tr>
+<tr><td><code>XELP_XB_COPY(a, b)</code></td><td>Copy XelpBuf a to b</td></tr>
+<tr><td><code>XELP_XB_LEN(xb)</code></td><td>Total buffer length</td></tr>
+<tr><td><code>XELP_XB_POS(xb)</code></td><td>Current position as int offset</td></tr>
+<tr><td><code>XELP_XB_PUTC(xb, ch)</code></td><td>Write char with bounds check</td></tr>
+<tr><td><code>XELP_XB_TOP(xb)</code></td><td>Reset position to start</td></tr>
 </tbody>
 </table>
 

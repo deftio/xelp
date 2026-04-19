@@ -9,6 +9,97 @@ The version source of truth is `XELP_VERSION` in `src/xelp.h` (hex format).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-04-19
+
+### Overview
+
+v0.3.0 is a breaking API change that passes the `XELP *` instance pointer
+to every user-defined CLI and KEY command function. Previously, command
+handlers had no way to know which xelp instance invoked them, forcing
+multi-instance designs to use hardcoded global pointers or separate
+functions per instance. Now every command receives `ths` as its first
+parameter, giving it direct access to `XELPOut()`, registers (`mR[]`),
+and all other instance state.
+
+**Why now:** v0.2.6 just shipped and the Arduino Library Manager hasn't
+indexed it yet, making this the ideal window for a breaking change before
+the user base grows further. This change is also a prerequisite for the
+planned scripting extensions (subroutine calls, control flow) which
+require commands to interact with interpreter state.
+
+**Migration:** add `XELP *ths` as the first parameter to every CLI
+command function and every KEY handler function. Replace any hardcoded
+`&myGlobalInstance` pointers with `ths`. Functions that don't need
+instance access can simply `(void)ths;`.
+
+**Code size impact:** ~3-5% increase across all targets (48-189 bytes
+depending on architecture) due to the extra pointer argument at 4
+internal dispatch call sites. The `XELP` struct size is unchanged.
+
+**Before:**
+
+```c
+XELPRESULT cmd_hello(const char *args, int len) {
+    XELPOut(&cli, "Hello!\n", 0);        /* hardcoded global */
+    return XELP_S_OK;
+}
+
+XELPRESULT key_help(int c) {
+    return XELPHelp(&cli);               /* hardcoded global */
+}
+```
+
+**After:**
+
+```c
+XELPRESULT cmd_hello(XELP *ths, const char *args, int len) {
+    XELPOut(ths, "Hello!\n", 0);         /* works with any instance */
+    return XELP_S_OK;
+}
+
+XELPRESULT key_help(XELP *ths, int c) {
+    return XELPHelp(ths);                /* works with any instance */
+}
+```
+
+### Changed
+- **BREAKING:** CLI command function signature changed from
+  `XELPRESULT fn(const char *args, int len)` to
+  `XELPRESULT fn(XELP *ths, const char *args, int len)`.
+- **BREAKING:** KEY command function signature changed from
+  `XELPRESULT fn(int key)` to
+  `XELPRESULT fn(XELP *ths, int key)`.
+- **BREAKING:** Default handler signatures changed similarly:
+  `mpfDefCLI` now takes `(XELP *, const char *, int)`,
+  `mpfDefKey` now takes `(XELP *, int)`.
+- `XELP` struct now uses a named tag (`struct XELP_tag`) to allow
+  forward declaration in function pointer typedefs. The `XELP` typedef
+  is unchanged -- no user code changes needed for the struct itself.
+- Multi-instance example rewritten: eliminated per-instance command
+  duplicates (`cmd_help_a`/`cmd_help_b`, `cmd_status_b`). A single
+  `cmd_status()` now works correctly with any instance via `ths`.
+- Updated all 7 example files, unit tests, and documentation.
+- **BREAKING:** XelpBuf macro names normalized to SCREAMING_CASE for
+  consistency with the rest of the API:
+  `XELP_XBInit` -> `XELP_XB_INIT`,
+  `XELP_XBInitPtrs` -> `XELP_XB_INIT_PTRS`,
+  `XELP_XBInitBP` -> `XELP_XB_INIT_BP`,
+  `XELP_XBPCopy` -> `XELP_XB_COPY`,
+  `XELP_XBGetBufPtr` -> `XELP_XB_PTR`,
+  `XELP_XBBufLen` -> `XELP_XB_LEN`,
+  `XELP_XBGetPos` -> `XELP_XB_POS`,
+  `XELP_XBPUTC` -> `XELP_XB_PUTC`,
+  `XELP_XBPUTC_RAW` -> `XELP_XB_PUTC_RAW`,
+  `XELP_XBGETC` -> `XELP_XB_GETC`,
+  `XELP_XBTOP` -> `XELP_XB_TOP`,
+  `XELPOutXB` -> `XELP_XB_OUT`.
+  Removed unused `XELP_XBGetBuf` macro.
+
+### Added
+- Cross-compilation targets: m68k (Motorola 68000), RISC-V rv32,
+  Xtensa LX106 (ESP8266/Tensilica) added to Docker crossbuild tooling
+  and README size table.
+
 ## [0.2.3] - 2026-04-17
 
 ### Fixed

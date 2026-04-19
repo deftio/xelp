@@ -1,11 +1,11 @@
 
 <a href="https://www.deftio.com/xelp"><img src="./img/xelp-prompt-med.png" width="30%"></img></a>
 
-![Version](https://img.shields.io/badge/version-0.2.6-blue.svg)
+![Version](https://img.shields.io/badge/version-0.3-blue.svg)
 [![License](https://img.shields.io/badge/License-BSD%202--Clause-blue.svg)](https://opensource.org/licenses/BSD-2-Clause)
 [![CI](https://github.com/deftio/xelp/actions/workflows/ci.yml/badge.svg)](https://github.com/deftio/xelp/actions/workflows/ci.yml)
 ![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen.svg)
-![RISC-V](https://img.shields.io/badge/RISC--V-1.9KB-informational.svg)
+![RISC-V](https://img.shields.io/badge/RISC--V-2.0KB-informational.svg)
 
 # xelp
 
@@ -13,21 +13,22 @@ A command line interpreter and script engine for embedded systems, written in
 pure C. No dynamic memory. No OS required. No standard library dependencies.
 900 bytes to 4 KB compiled depending on features enabled.
 
-xelp gives bare-metal firmware a real interactive CLI, scriptable command
-dispatch, and single-key menus -- in a package small enough for an 8051 or
-ATtiny85.
+xelp gives bare-metal firmware a real interactive CLI, with scriptable commands
+ (just store command(s) as strings), and also single-key (instant response) menus -- in a package small enough for 8051 or
+ATtiny85 through the latest processors.
 
 ## Why xelp
 
-Most embedded projects end up with an ad-hoc `if (char == 'x')` debug
+Many embedded projects end up with an ad-hoc `if (char == 'x')` debug
 console. xelp replaces that with a proper CLI that:
 
-- Compiles on **8-bit to 64-bit** targets with any C89 compiler
-- Fits in **under 1 KB** in KEY-only mode, **under 4 KB** fully featured
+- Compiles on 8-bit to 64-bittargets with any C89 or later compiler
+- Fits in under 1 KB for in KEY-only mode, and still under 4 KB fully featured with script support
 - Uses **zero dynamic memory** -- no malloc, no heap, works in ISRs
-- Supports **multiple independent instances** -- one per UART, no globals
-- Scripts are **ROM-able** const strings -- the parser never modifies input
-- Function dispatch tables let you **add C functions callable from the CLI**
+- Supports ultiple independent imnstances -- one per UART, no globals.  Each can have different functions to call
+- Scripts are ROM-able const strings -- the parser never modifies input no strtok style processing
+- Function dispatch tables allow any C/C++ functions callable from the CLI
+- Live command help (optional)
 
 ## Features
 
@@ -45,7 +46,7 @@ All features are independently compilable via `#define` flags in
 
 ## Quick Start
 
-Add three files to your project: `xelp.c`, `xelp.h`, `xelpcfg.h`.
+Add these three files to your project: `xelp.c`, `xelp.h`, `xelpcfg.h`.
 
 ```c
 #include "xelp.h"
@@ -55,14 +56,14 @@ void uart_putc(char c) { UART_TX = c; }
 void uart_bksp(void)   { uart_putc('\b'); uart_putc(' '); uart_putc('\b'); }
 
 /* Commands -- any C function with this signature */
-XELPRESULT cmd_hello(const char *args, int len) {
-    XELPOut(&cli, "Hello!\n", 0);
+XELPRESULT cmd_hello(XELP *ths, const char *args, int len) {
+    XELPOut(ths, "Hello!\n", 0);
     return XELP_S_OK;
 }
 
-XELPRESULT cmd_led(const char *args, int len) {
+XELPRESULT cmd_led(XELP *ths, const char *args, int len) {
     XelpBuf b, tok;
-    XELP_XBInit(b, args, len);
+    XELP_XB_INIT(b, args, len);
     XELPTokN(&b, 1, &tok);                  /* get second token */
     int val = XELPStr2Int(tok.s, tok.p - tok.s);
     LED_PORT = val;
@@ -99,6 +100,16 @@ Hello!
 xelp> led 1
 xelp>
 ```
+
+The prompt string is settable per instance:
+
+```c
+XELP_SET_VAL_CLI_PROMPT(cli, "mydev>");
+```
+
+The prompt is stored by pointer, not copied. It must be a null-terminated
+string that remains valid for the life of the instance (string literal,
+static, or global -- not a stack buffer that goes out of scope).
 
 ## Scripting
 
@@ -146,18 +157,21 @@ Compiled sizes with `-Os` (all features enabled):
 
 | Target | Compiler | Code size (bytes) |
 |--------|----------|-------------------|
-| ARM32 Thumb | arm-none-eabi-gcc | 1488 |
-| MSP430 | msp430-gcc | 1804 |
-| RISC-V (rv64) | riscv64-linux-gnu-gcc | 1960 |
-| ARM32 | arm-none-eabi-gcc | 2372 |
-| AVR (ATtiny85) | avr-gcc | 2420 |
-| AVR (ATmega328P) | avr-gcc | 2452 |
-| x86-64 | GCC | 2775 |
-| x86-32 | GCC | 2826 |
-| x86-64 | Clang | 3003 |
-| ARM64 | aarch64-linux-gnu-gcc | 3148 |
-| PowerPC | powerpc-linux-gnu-gcc | 3778 |
-| 68HC11 | m68hc11-gcc | 4247 |
+| ARM32 Thumb | arm-none-eabi-gcc | 1556 |
+| Xtensa LX106 (ESP8266) | xtensa-lx106-elf-gcc | 1742 |
+| RISC-V (rv32) | riscv64-unknown-elf-gcc | 1786 |
+| MSP430 | msp430-gcc | 1924 |
+| m68k | m68k-linux-gnu-gcc | 1992 |
+| RISC-V (rv64) | riscv64-linux-gnu-gcc | 2008 |
+| ARM32 | arm-none-eabi-gcc | 2476 |
+| AVR (ATtiny85) | avr-gcc | 2506 |
+| AVR (ATmega328P) | avr-gcc | 2538 |
+| x86-64 | GCC | 2875 |
+| x86-32 | GCC | 2908 |
+| x86-64 | Clang | 3071 |
+| ARM64 | aarch64-linux-gnu-gcc | 3228 |
+| PowerPC | powerpc-linux-gnu-gcc | 3890 |
+| 68HC11 | m68hc11-gcc | 4436 |
 
 Sizes measured via Docker cross-compilation. KEY-only mode: 900 bytes.
 Run `bash tools/crossbuild.sh` to reproduce.
@@ -199,8 +213,11 @@ Tested with zero warnings on:
 | x86-32 | GCC, Clang, TCC | 32-bit |
 | ARM64 | aarch64-linux-gnu-gcc | 64-bit |
 | ARM32 / Thumb | arm-none-eabi-gcc | 32-bit |
-| RISC-V | riscv64-linux-gnu-gcc | 64-bit |
+| RISC-V (rv64) | riscv64-linux-gnu-gcc | 64-bit |
+| RISC-V (rv32) | riscv64-unknown-elf-gcc | 32-bit |
+| Xtensa LX106 (ESP8266) | xtensa-lx106-elf-gcc | 32-bit |
 | MSP430 | msp430-gcc | 16-bit |
+| m68k (68000) | m68k-linux-gnu-gcc | 32-bit |
 | AVR (ATmega, ATtiny) | avr-gcc | 8-bit |
 | 8051 | SDCC | 8-bit |
 | 68HC11/12 | m68hc11-gcc | 8-bit |
@@ -246,8 +263,16 @@ what we welcome, branch model, and the release process.
 - [Tools](tools/README_TOOLS.md) -- build utilities and code generators
 - [Contributing](CONTRIBUTING.md) -- how to contribute
 
+## AI / LLM Integration
+
+If you use AI coding agents (Claude Code, Cursor, Copilot, etc.), xelp
+provides machine-readable context files for accurate code generation:
+
+- [AGENTS.md](AGENTS.md) -- concise coding reference: function signatures, setup patterns, common mistakes
+- [llms.txt](llms.txt) -- project overview and documentation index ([llmstxt.org](https://llmstxt.org) format)
+
 ## License
 
 BSD 2-Clause. See [LICENSE.txt](LICENSE.txt).
 
-Copyright (c) 2011-2025, M. A. Chatterjee
+Copyright (c) 2011-2026, M. A. Chatterjee

@@ -241,9 +241,10 @@ gcc -Wall -Isrc examples/scripting/scripting-example.c src/xelp.c -o scripting-e
 All CLI commands have the same signature:
 
 ```c
-XELPRESULT my_command(const char *args, int maxlen);
+XELPRESULT my_command(XELP *ths, const char *args, int maxlen);
 ```
 
+- `ths` is a pointer to the XELP instance that dispatched the command
 - `args` points to the raw argument string (everything after the command name)
 - `maxlen` is the number of valid bytes in `args`
 - Return `XELP_S_OK` (0) for success, negative for error, positive for warning
@@ -251,24 +252,24 @@ XELPRESULT my_command(const char *args, int maxlen);
 ### Pattern: parsing arguments
 
 ```c
-XELPRESULT cmd_set(const char *args, int len) {
+XELPRESULT cmd_set(XELP *ths, const char *args, int len) {
     XelpBuf b, tok;
     int n;
 
-    XELP_XBInit(b, args, len);
+    XELP_XB_INIT(b, args, len);
     XELPNumToks(&b, &n);
 
     if (n < 3) {
-        XELPOut(&cli, "usage: set <key> <value>\n", 0);
+        XELPOut(ths, "usage: set <key> <value>\n", 0);
         return XELP_E_ERR;
     }
 
     /* Token 0 = "set", Token 1 = key, Token 2 = value */
-    XELP_XBTOP(b);
+    XELP_XB_TOP(b);
     XELPTokN(&b, 1, &tok);
     /* use tok.s .. tok.p as the key string */
 
-    XELP_XBTOP(b);
+    XELP_XB_TOP(b);
     XELPTokN(&b, 2, &tok);
     int value = XELPStr2Int(tok.s, tok.p - tok.s);
 

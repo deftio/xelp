@@ -1,0 +1,40 @@
+# xelp
+
+> xelp is a command line interpreter and script engine for embedded systems,
+> written in pure C. Zero dynamic memory. No OS required. No standard library
+> dependencies. 900 bytes to 4 KB compiled depending on features enabled.
+> Works on 8-bit (AVR, 8051) through 64-bit (ARM64, x86-64) targets.
+
+xelp gives bare-metal firmware a real interactive CLI with scriptable
+commands, single-key menus, and pass-through mode. Three source files
+(`xelp.c`, `xelp.h`, `xelpcfg.h`) are all that are needed.
+
+## Docs
+
+- [API Reference](https://github.com/deftio/xelp/blob/master/docs/api-reference.md): All public types, functions, macros, and return codes
+- [Tutorial](https://github.com/deftio/xelp/blob/master/docs/tutorial.md): Step-by-step introduction with complete code examples
+- [Configuration Guide](https://github.com/deftio/xelp/blob/master/docs/configuration.md): Compile-time feature flags, buffer sizes, key mappings
+- [Porting Guide](https://github.com/deftio/xelp/blob/master/docs/porting.md): How to bring up xelp on a new platform
+- [Examples](https://github.com/deftio/xelp/blob/master/docs/examples.md): Annotated code for POSIX, Arduino, ESP32, bare-metal, multi-instance
+- [AGENTS.md](https://github.com/deftio/xelp/blob/master/AGENTS.md): Concise coding reference for AI agents integrating xelp
+
+## Code
+
+- [xelp.h](https://github.com/deftio/xelp/blob/master/src/xelp.h): Public API header -- types, macros, function declarations
+- [xelp.c](https://github.com/deftio/xelp/blob/master/src/xelp.c): Implementation (~700 lines)
+- [xelpcfg.h](https://github.com/deftio/xelp/blob/master/src/xelpcfg.h): Compile-time configuration
+
+## Examples
+
+- [POSIX example](https://github.com/deftio/xelp/blob/master/examples/posix-simple/xelp-example.c): Full featured CLI with ncurses
+- [Bare-metal example](https://github.com/deftio/xelp/blob/master/examples/bare-metal/bare-metal-example.c): Minimal embedded template
+- [Multi-instance example](https://github.com/deftio/xelp/blob/master/examples/multi-instance/multi-instance-example.c): Two independent CLIs on different UARTs
+- [Scripting example](https://github.com/deftio/xelp/blob/master/examples/scripting/scripting-example.c): ROM-able scripts, multi-statement parsing
+- [Arduino example](https://github.com/deftio/xelp/blob/master/examples/arduino/arduino.ino): Serial CLI for Arduino boards
+- [ESP32 WiFi example](https://github.com/deftio/xelp/blob/master/examples/esp32-wifi/esp32-wifi.ino): CLI over WiFi telnet + serial
+
+## Optional
+
+- [Changelog](https://github.com/deftio/xelp/blob/master/CHANGELOG.md): Version history and migration notes
+- [Contributing](https://github.com/deftio/xelp/blob/master/CONTRIBUTING.md): Coding standards, branch model, PR guidelines
+- [Release Management](https://github.com/deftio/xelp/blob/master/release_management.md): Versioning and release workflow
