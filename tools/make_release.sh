@@ -99,7 +99,53 @@ do_extract_version() {
 }
 
 # -----------------------------------------------------------------------
-# Step 1b: Update version badges
+# Step 1b: Sync version in library manifests
+# -----------------------------------------------------------------------
+
+do_sync_manifests() {
+    step_header "Sync version in library.json and library.properties"
+
+    # Strip leading 'v' if present (VER_STRING is e.g. "0.2.5")
+    local ver="$VER_STRING"
+
+    # library.json
+    if [ -f library.json ]; then
+        local cur_lj
+        cur_lj=$(python3 -c "import json; print(json.load(open('library.json'))['version'])" 2>/dev/null || true)
+        if [ "$cur_lj" = "$ver" ]; then
+            pass "library.json already at $ver"
+        else
+            echo "  library.json: $cur_lj -> $ver"
+            python3 -c "
+import json, pathlib
+p = pathlib.Path('library.json')
+d = json.loads(p.read_text())
+d['version'] = '$ver'
+p.write_text(json.dumps(d, indent=4) + '\n')
+"
+            git add library.json
+            pass "library.json updated to $ver"
+        fi
+    fi
+
+    # library.properties
+    if [ -f library.properties ]; then
+        local cur_lp
+        cur_lp=$(sed -n 's/^version=//p' library.properties)
+        if [ "$cur_lp" = "$ver" ]; then
+            pass "library.properties already at $ver"
+        else
+            echo "  library.properties: $cur_lp -> $ver"
+            sed -i.bak "s/^version=.*/version=$ver/" library.properties
+            rm -f library.properties.bak
+            git add library.properties
+            pass "library.properties updated to $ver"
+        fi
+    fi
+}
+
+# -----------------------------------------------------------------------
+# Step 1c: Update version badges
 # -----------------------------------------------------------------------
 
 do_update_badges() {
@@ -523,7 +569,34 @@ do_wait_release() {
 }
 
 # -----------------------------------------------------------------------
-# Step 12: Done
+# Step 12: Publish to PlatformIO registry
+# -----------------------------------------------------------------------
+
+do_pio_publish() {
+    step_header "Publish to PlatformIO registry"
+
+    if ! command -v pio &>/dev/null; then
+        echo "  pio CLI not found -- skipping PlatformIO publish."
+        echo "  Install: pip install platformio"
+        echo "  Then run manually: pio pkg publish ."
+        return 0
+    fi
+
+    # Check if already published at this version
+    local pio_info
+    pio_info=$(pio pkg show deftio/xelp 2>/dev/null || true)
+    if echo "$pio_info" | grep -q "$VER_STRING"; then
+        pass "xelp $VER_STRING already on PlatformIO registry."
+        return 0
+    fi
+
+    confirm "Publish xelp $VER_STRING to PlatformIO?"
+    run_cmd pio pkg publish . --no-interactive
+    pass "Published to PlatformIO registry."
+}
+
+# -----------------------------------------------------------------------
+# Step 13: Done
 # -----------------------------------------------------------------------
 
 do_done() {
@@ -534,9 +607,13 @@ do_done() {
     local release_url
     release_url=$(gh release view "$VER_TAG" --json url --jq '.url' 2>/dev/null || true)
     if [ -n "$release_url" ]; then
-        echo "  URL: $release_url"
+        echo "  GitHub: $release_url"
     fi
     echo "============================================"
+    echo ""
+    echo "  Reminder: Arduino Library Manager indexes from GitHub tags."
+    echo "  If xelp is registered, the new version will appear automatically."
+    echo "  To register: submit a PR to https://github.com/arduino/library-registry"
 }
 
 # -----------------------------------------------------------------------
@@ -576,6 +653,7 @@ echo "============================================"
 
 # -- Always run --
 do_extract_version
+do_sync_manifests
 do_update_badges
 do_validate
 
@@ -594,6 +672,7 @@ do_check_git
 if $TAG_EXISTS; then
     # Re-run: tag exists but release doesn't -- just wait for it
     do_wait_release
+    do_pio_publish
     do_done
 else
     do_push_branch
@@ -604,5 +683,6 @@ else
     do_verify_master
     do_tag
     do_wait_release
+    do_pio_publish
     do_done
 fi
