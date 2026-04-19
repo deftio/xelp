@@ -1,0 +1,46 @@
+{
+    "name": "xelp",
+    "version": "0.2.5",
+    "description": "Tiny CLI and script interpreter for embedded systems. 2KB flash, zero malloc, multi-instance. Interactive serial command line with scriptable dispatch, single-key menus, and pass-through mode.",
+    "keywords": [
+        "cli",
+        "command-line",
+        "serial",
+        "interpreter",
+        "shell",
+        "terminal",
+        "scripting",
+        "embedded",
+        "repl",
+        "console"
+    ],
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/deftio/xelp.git"
+    },
+    "authors": [
+        {
+            "name": "M. A. Chatterjee",
+            "email": "deftio@deftio.com",
+            "url": "https://www.deftio.com",
+            "maintainer": true
+        }
+    ],
+    "license": "BSD-2-Clause",
+    "homepage": "https://github.com/deftio/xelp",
+    "frameworks": ["arduino", "*"],
+    "platforms": "*",
+    "build": {
+        "srcFilter": ["+<xelp.c>"],
+        "includeDir": "src"
+    },
+    "export": {
+        "include": [
+            "src/*",
+            "examples/*",
+            "LICENSE.txt",
+            "README.md",
+            "library.properties"
+        ]
+    }
+}

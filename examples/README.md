@@ -38,8 +38,9 @@ gcc -Wall -Isrc examples/scripting/scripting-example.c src/xelp.c -o scripting-e
 
 ## arduino
 
-ESP32/Arduino example with NeoPixel LED control via CLI commands. Uses
-Arduino `Serial` for I/O.
+Basic xelp example using the raw C API. Works on any Arduino board
+with a Serial port -- LED control, token listing, and built-in help.
+No external library dependencies.
 
 ## arduino-cpp
 
@@ -48,3 +49,11 @@ class from `src/XelpArduino.h`. Eliminates boilerplate: no manual
 `XELP_SET_FN_*` macros, no `Serial.available()` loop -- just `begin()`,
 `setCommands()`, and `poll(Serial)`. Also demonstrates `run()` for
 executing a startup script.
+
+## esp32-wifi
+
+ESP32 WiFi example using the C++ wrapper. Configure WiFi credentials
+over the serial CLI, then fetch the current time and weather from free
+APIs (worldtimeapi.org and open-meteo.com). No API keys needed.
+
+Requires an ESP32 board and the ESP32 Arduino core.

@@ -1,6 +1,7 @@
 # Arduino Example
 
-This is an example of the using the C Xelp api for arduino.
+Basic xelp example using the raw C API. Works on any Arduino board
+with a Serial port.
 
-Be sure to include xelp.h xelp.c xelp.cfg in the same dir on in a library path.
-
+Install xelp via the Arduino Library Manager, then open this sketch.
+Open the Serial Monitor at 115200 baud and type `help`.
