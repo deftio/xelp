@@ -130,7 +130,7 @@ XELPRESULT XELPInit 	 (
 		*p++=0;
 	
 	ths->mpAboutMsg = pAboutMsg;
-	XELP_XBInit(ths->mCmdXB,ths->mCmdMsgBuf,XELP_CMDBUFSZ-1);
+	XELP_XB_INIT(ths->mCmdXB,ths->mCmdMsgBuf,XELP_CMDBUFSZ-1);
 	/* comand mode mssage index 
 	ths->mCmdMsgIndex = 0;  //set to 0 by ptr loop at top
 	*/
@@ -379,7 +379,7 @@ XELPRESULT XELPTokLine(char* bs, char* be, const char **t0s, const char **t0e, c
     XelpBuf xc,tok;
     XELPRESULT r;
 
-    XELP_XBInitPtrs(xc,bs,bs,be);
+    XELP_XB_INIT_PTRS(xc,bs,bs,be);
 
     r=XELPTokLineXB(&xc,&tok,srchType);
     *t0s = tok.s;
@@ -476,7 +476,7 @@ XELPRESULT XELPParseXB (XELP* ths, XelpBuf *args) {
 XELPRESULT XELPParse 		(XELP *ths, const char *buf, int blen)
 {
     XelpBufC args;
-    XELP_XBInit(args,buf,blen);
+    XELP_XB_INIT(args,buf,blen);
     return XELPParseXB(ths,(XelpBuf *)&args);
 }
 /********************************************************
@@ -588,17 +588,17 @@ XELPRESULT XELPParseKey (XELP *ths, char key)
                     
 					if (key == XELPKEY_ENTER )	{
                         
-						/* XELP_XBPUTC_RAW(ths->mCmdXB,';'); write this explictly b/c XELPKEY_ENTER may not be a parser term */
-                        XELP_XBInitPtrs(line,ths->mCmdXB.s,ths->mCmdXB.s,ths->mCmdXB.p);
+						/* XELP_XB_PUTC_RAW(ths->mCmdXB,';'); write this explictly b/c XELPKEY_ENTER may not be a parser term */
+                        XELP_XB_INIT_PTRS(line,ths->mCmdXB.s,ths->mCmdXB.s,ths->mCmdXB.p);
                         XELPParseXB(ths,&line);
                         line.p=line.s;
-                        XELP_XBTOP(ths->mCmdXB);/* reset command buf to beginning */
+                        XELP_XB_TOP(ths->mCmdXB);/* reset command buf to beginning */
 #ifdef XELP_CLI_PROMPT
 						XELPOut(ths,XELP_CLI_PROMPT,-1);
 #endif
 					}
 					else {
-                        XELP_XBPUTC(ths->mCmdXB,key);
+                        XELP_XB_PUTC(ths->mCmdXB,key);
 					}
 				}
 #endif

@@ -88,14 +88,14 @@ tokenizer to extract individual arguments:</p>
     XelpBuf b, tok;
     int a, result;
 
-    XELP_XBInit(b, args, len);
+    XELP_XB_INIT(b, args, len);
 
     /* Token 0 = command name ("add"), 1 = first arg, 2 = second arg */
-    XELP_XBTOP(b);
+    XELP_XB_TOP(b);
     XELPTokN(&amp;b, 1, &amp;tok);
     a = XELPStr2Int(tok.s, tok.p - tok.s);
 
-    XELP_XBTOP(b);
+    XELP_XB_TOP(b);
     XELPTokN(&amp;b, 2, &amp;tok);
     result = a + XELPStr2Int(tok.s, tok.p - tok.s);
 
@@ -126,11 +126,11 @@ tokenizer to extract individual arguments:</p>
     XelpBuf b, tok;
     int n, i;
 
-    XELP_XBInit(b, args, len);
+    XELP_XB_INIT(b, args, len);
     XELPNumToks(&amp;b, &amp;n);
 
     for (i = 0; i &lt; n; i++) {
-        XELP_XBTOP(b);
+        XELP_XB_TOP(b);
         XELPTokN(&amp;b, i, &amp;tok);
         XELPOut(ths, tok.s, tok.p - tok.s);
         XELPOut(ths, "\n", 0);

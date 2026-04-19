@@ -77,15 +77,15 @@ XELPRESULT cmd_add(XELP *ths, const char *args, int len) {
     int a, result;
 
     (void)ths;
-    XELP_XBInit(b, args, len);
+    XELP_XB_INIT(b, args, len);
 
     /* Token 0 is the command name itself ("add").
        Token 1 is the first argument, token 2 the second. */
-    XELP_XBTOP(b);
+    XELP_XB_TOP(b);
     XELPTokN(&b, 1, &tok);
     a = XELPStr2Int(tok.s, tok.p - tok.s);
 
-    XELP_XBTOP(b);
+    XELP_XB_TOP(b);
     XELPTokN(&b, 2, &tok);
     result = a + XELPStr2Int(tok.s, tok.p - tok.s);
 
@@ -120,12 +120,12 @@ XELPRESULT cmd_args(XELP *ths, const char *args, int len) {
     XelpBuf b, tok;
     int n, i;
 
-    XELP_XBInit(b, args, len);
+    XELP_XB_INIT(b, args, len);
     XELPNumToks(&b, &n);
 
     /* n includes the command name itself */
     for (i = 0; i < n; i++) {
-        XELP_XBTOP(b);
+        XELP_XB_TOP(b);
         XELPTokN(&b, i, &tok);
         XELPOut(ths, tok.s, tok.p - tok.s);
         XELPOut(ths, "\n", 0);
@@ -197,7 +197,7 @@ For scripts already in an `XelpBuf`:
 
 ```c
 XelpBuf xb;
-XELP_XBInit(xb, script, XELPStrLen(script));
+XELP_XB_INIT(xb, script, XELPStrLen(script));
 XELPParseXB(&cli, &xb);
 ```
 

@@ -121,7 +121,7 @@ XELPRESULT cmdHelp(XELP *ths, const char *args, int len)
 XELPRESULT cmdSsid(XELP *ths, const char *args, int len)
 {
     XelpBuf b, tok;
-    XELP_XBInit(b, (char *)args, len);
+    XELP_XB_INIT(b, (char *)args, len);
     if (XELPTokN(&b, 1, &tok) == XELP_S_OK) {
         tokCopy(gSsid, sizeof(gSsid), tok.s, tok.p);
         XELPOut(ths, "SSID set: ", 0);
@@ -136,7 +136,7 @@ XELPRESULT cmdSsid(XELP *ths, const char *args, int len)
 XELPRESULT cmdPass(XELP *ths, const char *args, int len)
 {
     XelpBuf b, tok;
-    XELP_XBInit(b, (char *)args, len);
+    XELP_XB_INIT(b, (char *)args, len);
     if (XELPTokN(&b, 1, &tok) == XELP_S_OK) {
         tokCopy(gPass, sizeof(gPass), tok.s, tok.p);
         XELPOut(ths, "Password set\n", 0);
@@ -243,10 +243,10 @@ XELPRESULT cmdWeather(XELP *ths, const char *args, int len)
     }
 
     XelpBuf b, tok1, tok2;
-    XELP_XBInit(b, (char *)args, len);
-    XELP_XBTOP(b);
+    XELP_XB_INIT(b, (char *)args, len);
+    XELP_XB_TOP(b);
     if (XELPTokN(&b, 1, &tok1) != XELP_S_OK ||
-        (XELP_XBTOP(b), XELPTokN(&b, 2, &tok2) != XELP_S_OK)) {
+        (XELP_XB_TOP(b), XELPTokN(&b, 2, &tok2) != XELP_S_OK)) {
         XELPOut(ths, "usage: weather <lat> <lon>\n", 0);
         XELPOut(ths, "  e.g. weather 37.77 -122.42\n", 0);
         return XELP_E_ERR;
@@ -296,7 +296,7 @@ XELPRESULT cmdLed(XELP *ths, const char *args, int len)
 {
     XelpBuf b, tok;
     int val;
-    XELP_XBInit(b, (char *)args, len);
+    XELP_XB_INIT(b, (char *)args, len);
     if (XELPTokN(&b, 1, &tok) == XELP_S_OK) {
         XELPParseNum(tok.s, (int)(tok.p - tok.s), &val);
         digitalWrite(LED_BUILTIN, val ? HIGH : LOW);

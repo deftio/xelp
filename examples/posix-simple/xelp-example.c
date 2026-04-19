@@ -181,7 +181,7 @@ XELPRESULT cmdNumToks (XELP *ths, const char* args, int maxlen)
 
     int n;
     (void)ths;
-    XELP_XBInit(b,args,maxlen);
+    XELP_XB_INIT(b,args,maxlen);
     XELPNumToks(&b,&n);
 	printw(" XELPNumToks %d\n",n);
 
@@ -202,12 +202,12 @@ XELPRESULT cmdListToks (XELP *ths, const char* args, int maxlen)
     XelpBuf b,tok;
     int n,i;
     XELPRESULT r;
-    XELP_XBInit(b,args,maxlen);
+    XELP_XB_INIT(b,args,maxlen);
     XELPNumToks(&b,&n);
-    XELP_XBTOP(b);
+    XELP_XB_TOP(b);
     printw("[%d]",n);
 	for (i=0; i< n; i++) {
-        XELP_XBTOP(b);
+        XELP_XB_TOP(b);
         r = XELPTokN( &b,i,&tok);
         printw("<");
         printw("%d:",i);
@@ -236,7 +236,7 @@ XELPRESULT cmdPrintNum (XELP *ths, const char *args, int maxlen) {
     int n;
     (void)ths;
 
-    XELP_XBInit(b,args,maxlen);
+    XELP_XB_INIT(b,args,maxlen);
     XELPTokN(&b,1,&tok),
 
 	printw("[%d]\n",XELPStr2Int(tok.s,tok.p-tok.s));
@@ -248,17 +248,17 @@ XELPRESULT cmdMath (XELP *ths, const char* args, int maxlen) {
     int i,j,k;
     int op;
 
-    XELP_XBInit(b,args,maxlen);
+    XELP_XB_INIT(b,args,maxlen);
     XELPTokN(&b,0,&tok),
 
 
 	op = *b.s;
 
-    XELP_XBTOP(b);
+    XELP_XB_TOP(b);
     XELPTokN(&b,1,&tok);
     i = XELPStr2Int(tok.s,tok.p-tok.s);
 
-    XELP_XBTOP(b);
+    XELP_XB_TOP(b);
     XELPTokN(&b,2,&tok);
 	j =XELPStr2Int(tok.s,tok.p-tok.s);
 

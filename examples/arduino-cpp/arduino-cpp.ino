@@ -40,10 +40,10 @@ XELPRESULT cmdEcho(XELP *ths, const char* args, int len)
 {
     XelpBuf b, tok;
     int i, n;
-    XELP_XBInit(b, (char*)args, len);
+    XELP_XB_INIT(b, (char*)args, len);
     XELPNumToks(&b, &n);
     for (i = 1; i < n; i++) {
-        XELP_XBTOP(b);
+        XELP_XB_TOP(b);
         if (XELPTokN(&b, i, &tok) == XELP_S_OK) {
             if (i > 1) XELPOut(ths, " ", 0);
             XELPOut(ths, tok.s, (int)(tok.p - tok.s));
@@ -59,7 +59,7 @@ XELPRESULT cmdLed(XELP *ths, const char* args, int len)
 {
     XelpBuf b, tok;
     int val;
-    XELP_XBInit(b, (char*)args, len);
+    XELP_XB_INIT(b, (char*)args, len);
     if (XELPTokN(&b, 1, &tok) == XELP_S_OK) {
         XELPParseNum(tok.s, (int)(tok.p - tok.s), &val);
         digitalWrite(gLedPin, val ? HIGH : LOW);

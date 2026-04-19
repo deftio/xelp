@@ -297,7 +297,7 @@ commands at once) and <strong>interactive mode</strong> (<code>XELPParseKey</cod
     XelpBuf b, tok;
     int n;
 
-    XELP_XBInit(b, args, len);
+    XELP_XB_INIT(b, args, len);
     XELPNumToks(&amp;b, &amp;n);
 
     if (n &lt; 3) {
@@ -306,11 +306,11 @@ commands at once) and <strong>interactive mode</strong> (<code>XELPParseKey</cod
     }
 
     /* Token 0 = "set", Token 1 = key, Token 2 = value */
-    XELP_XBTOP(b);
+    XELP_XB_TOP(b);
     XELPTokN(&amp;b, 1, &amp;tok);
     /* tok.s .. tok.p is the key string */
 
-    XELP_XBTOP(b);
+    XELP_XB_TOP(b);
     XELPTokN(&amp;b, 2, &amp;tok);
     int value = XELPStr2Int(tok.s, tok.p - tok.s);
 

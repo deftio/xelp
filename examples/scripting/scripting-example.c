@@ -41,11 +41,11 @@ static XELPRESULT cmd_echo(XELP *ths, const char *args, int len)
 {
     XelpBuf b, tok;
     int i, n;
-    XELP_XBInit(b, (char *)args, len);
+    XELP_XB_INIT(b, (char *)args, len);
     XELPNumToks(&b, &n);
     /* Print tokens 1..N (skip command name at index 0) */
     for (i = 1; i < n; i++) {
-        XELP_XBTOP(b);
+        XELP_XB_TOP(b);
         if (XELPTokN(&b, i, &tok) == XELP_S_OK) {
             if (i > 1) XELPOut(ths, " ", 0);
             XELPOut(ths, tok.s, (int)(tok.p - tok.s));
@@ -61,7 +61,7 @@ static XELPRESULT cmd_led(XELP *ths, const char *args, int len)
 {
     XelpBuf b, tok;
     int val;
-    XELP_XBInit(b, (char *)args, len);
+    XELP_XB_INIT(b, (char *)args, len);
     if (XELPTokN(&b, 1, &tok) == XELP_S_OK) {
         XELPParseNum(tok.s, (int)(tok.p - tok.s), &val);
         g_led_state = val;
@@ -80,7 +80,7 @@ static XELPRESULT cmd_gain(XELP *ths, const char *args, int len)
     XelpBuf b, tok;
     int val;
     (void)ths;
-    XELP_XBInit(b, (char *)args, len);
+    XELP_XB_INIT(b, (char *)args, len);
     if (XELPTokN(&b, 1, &tok) == XELP_S_OK) {
         XELPParseNum(tok.s, (int)(tok.p - tok.s), &val);
         g_gain = val;
@@ -173,7 +173,7 @@ int main(void)
             "gain 50\n"
             "status\n";
         XelpBuf xb;
-        XELP_XBInit(xb, (char *)script, XELPStrLen(script));
+        XELP_XB_INIT(xb, (char *)script, XELPStrLen(script));
         XELPParseXB(&cli, &xb);
     }
 

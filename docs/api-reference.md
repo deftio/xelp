@@ -48,8 +48,8 @@ Initialize an XELP instance. Must be called before any other function.
 | `XELP_SET_FN_EMCHG(ths, fn)` | Set mode-change callback: `void fn(int)` |
 | `XELP_SET_FN_CLI(ths, tbl)` | Set CLI command table |
 | `XELP_SET_FN_KEY(ths, tbl)` | Set KEY command table |
-| `XELP_SET_VAL_CLI_PROMPT(ths, str)` | Set CLI prompt string |
-| `XELP_SET_ABOUT(ths, str)` | Change the about/help message |
+| `XELP_SET_VAL_CLI_PROMPT(ths, str)` | Set CLI prompt string (stored by pointer, must be null-terminated and remain valid) |
+| `XELP_SET_ABOUT(ths, str)` | Change the about/help message (stored by pointer, must be null-terminated and remain valid) |
 
 ## Core Functions
 
@@ -188,16 +188,16 @@ Compare two buffers. `cmpType` controls null-terminator handling:
 
 | Macro | Purpose |
 |-------|---------|
-| `XELP_XBInit(xb, buf, len)` | Initialize from pointer + length |
-| `XELP_XBInitPtrs(xb, s, p, e)` | Initialize from three pointers |
-| `XELP_XBInitBP(xb, buf, pos, len)` | Initialize with cursor position |
-| `XELP_XBPCopy(a, b)` | Copy XelpBuf a to b |
-| `XELP_XBBufLen(xb)` | Total buffer length |
-| `XELP_XBGetPos(xb)` | Current position as int offset |
-| `XELP_XBPUTC(xb, ch)` | Write char with bounds check |
-| `XELP_XBGETC(xb, ch)` | Read char and advance position |
-| `XELP_XBTOP(xb)` | Reset position to start |
-| `XELPOutXB(x, xb)` | Print XelpBuf contents from current position |
+| `XELP_XB_INIT(xb, buf, len)` | Initialize from pointer + length |
+| `XELP_XB_INIT_PTRS(xb, s, p, e)` | Initialize from three pointers |
+| `XELP_XB_INIT_BP(xb, buf, pos, len)` | Initialize with cursor position |
+| `XELP_XB_COPY(a, b)` | Copy XelpBuf a to b |
+| `XELP_XB_LEN(xb)` | Total buffer length |
+| `XELP_XB_POS(xb)` | Current position as int offset |
+| `XELP_XB_PUTC(xb, ch)` | Write char with bounds check |
+| `XELP_XB_GETC(xb, ch)` | Read char and advance position |
+| `XELP_XB_TOP(xb)` | Reset position to start |
+| `XELP_XB_OUT(x, xb)` | Print XelpBuf contents from current position |
 
 ## Constants
 

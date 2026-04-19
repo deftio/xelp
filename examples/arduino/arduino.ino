@@ -39,7 +39,7 @@ XELPRESULT cmdBanner(XELP *ths, const char* args_str, int maxlen) {
 XELPRESULT cmdLed(XELP *ths, const char* args_str, int maxlen) {
     XelpBuf b, tok;
     int val;
-    XELP_XBInit(b, (char*)args_str, maxlen);
+    XELP_XB_INIT(b, (char*)args_str, maxlen);
     if (XELPTokN(&b, 1, &tok) == XELP_S_OK) {
         XELPParseNum(tok.s, (int)(tok.p - tok.s), &val);
         digitalWrite(LED_BUILTIN, val ? HIGH : LOW);
@@ -51,13 +51,13 @@ XELPRESULT cmdLed(XELP *ths, const char* args_str, int maxlen) {
 XELPRESULT cmdListToks(XELP *ths, const char* args_str, int maxlen) {
     XelpBuf b, tok;
     int n, i;
-    XELP_XBInit(b, (char*)args_str, maxlen);
+    XELP_XB_INIT(b, (char*)args_str, maxlen);
     XELPNumToks(&b, &n);
     Serial.print("[");
     Serial.print(n);
     Serial.print("]");
     for (i = 0; i < n; i++) {
-        XELP_XBTOP(b);
+        XELP_XB_TOP(b);
         XELPTokN(&b, i, &tok);
         XELPOut(ths, "<", -1);
         Serial.print(i);

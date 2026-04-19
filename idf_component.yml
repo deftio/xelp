@@ -1,0 +1,88 @@
+# idf_component.yml -- ESP-IDF Component Manager manifest for xelp.
+#
+# This file allows xelp to be published to the ESP Component Registry
+# (components.espressif.com) and installed in any ESP-IDF project with:
+#
+#   idf.py add-dependency "deftio/xelp==0.3.0"
+#
+# Or by adding to your project's main/idf_component.yml:
+#
+#   dependencies:
+#     deftio/xelp:
+#       version: "~0.3.0"
+#
+# After installation, use in your C or C++ source:
+#
+#   #include "xelp.h"
+#
+# Compile-time feature selection (CLI, KEY, THR, HELP modes) is
+# controlled by editing src/xelpcfg.h -- the same mechanism used
+# on every other platform.
+#
+# See: https://docs.espressif.com/projects/idf-component-manager/en/latest/reference/manifest_file.html
+
+version: "0.3.0"
+description: >-
+  Tiny CLI and script interpreter for embedded systems.
+  2KB flash, zero malloc, multi-instance.
+  Interactive command line with scriptable dispatch,
+  single-key menus, and pass-through mode.
+
+url: https://github.com/deftio/xelp
+repository: https://github.com/deftio/xelp.git
+documentation: https://github.com/deftio/xelp/blob/master/docs/api-reference.md
+issues: https://github.com/deftio/xelp/issues
+license: BSD-2-Clause
+
+maintainers:
+  - "M. A. Chatterjee <deftio@deftio.com>"
+
+keywords:
+  - cli
+  - command-line
+  - interpreter
+  - script
+  - serial
+  - embedded
+  - no-heap
+  - bare-metal
+  - console
+
+# Only ship the files needed to build.  Everything else (tests, tools,
+# dev notes, CI, pages) is excluded to keep the published component small.
+files:
+  include:
+    - "src/**"
+    - "examples/**"
+    - "docs/**"
+    - "CMakeLists.txt"
+    - "idf_component.yml"
+    - "LICENSE.txt"
+    - "README.md"
+    - "CHANGELOG.md"
+    - "library.json"
+    - "library.properties"
+  exclude:
+    - "build/**"
+    - "tests/**"
+    - "tools/**"
+    - "dev/**"
+    - "pages/**"
+    - "scripts/**"
+    - ".github/**"
+    - ".claude/**"
+    - "img/**"
+    - "*.gcov"
+    - "*.gcda"
+    - "*.gcno"
+    - "*.o"
+    - "*.out"
+    - ".DS_Store"
+    - "makefile"
+    - "index.html"
+    - "llms.txt"
+    - "AGENTS.md"
+    - "CONTRIBUTING.md"
+    - "release_management.md"
+    - "xelp-test-log.yaml"
+    - "CLAUDE.local.md"

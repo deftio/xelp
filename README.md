@@ -13,21 +13,22 @@ A command line interpreter and script engine for embedded systems, written in
 pure C. No dynamic memory. No OS required. No standard library dependencies.
 900 bytes to 4 KB compiled depending on features enabled.
 
-xelp gives bare-metal firmware a real interactive CLI, scriptable command
-dispatch, and single-key menus -- in a package small enough for an 8051 or
-ATtiny85.
+xelp gives bare-metal firmware a real interactive CLI, with scriptable commands
+ (just store command(s) as strings), and also single-key (instant response) menus -- in a package small enough for 8051 or
+ATtiny85 through the latest processors.
 
 ## Why xelp
 
-Most embedded projects end up with an ad-hoc `if (char == 'x')` debug
+Many embedded projects end up with an ad-hoc `if (char == 'x')` debug
 console. xelp replaces that with a proper CLI that:
 
-- Compiles on **8-bit to 64-bit** targets with any C89 compiler
-- Fits in **under 1 KB** in KEY-only mode, **under 4 KB** fully featured
+- Compiles on 8-bit to 64-bittargets with any C89 or later compiler
+- Fits in under 1 KB for in KEY-only mode, and still under 4 KB fully featured with script support
 - Uses **zero dynamic memory** -- no malloc, no heap, works in ISRs
-- Supports **multiple independent instances** -- one per UART, no globals
-- Scripts are **ROM-able** const strings -- the parser never modifies input
-- Function dispatch tables let you **add C functions callable from the CLI**
+- Supports ultiple independent imnstances -- one per UART, no globals.  Each can have different functions to call
+- Scripts are ROM-able const strings -- the parser never modifies input no strtok style processing
+- Function dispatch tables allow any C/C++ functions callable from the CLI
+- Live command help (optional)
 
 ## Features
 
@@ -45,7 +46,7 @@ All features are independently compilable via `#define` flags in
 
 ## Quick Start
 
-Add three files to your project: `xelp.c`, `xelp.h`, `xelpcfg.h`.
+Add these three files to your project: `xelp.c`, `xelp.h`, `xelpcfg.h`.
 
 ```c
 #include "xelp.h"
@@ -62,7 +63,7 @@ XELPRESULT cmd_hello(XELP *ths, const char *args, int len) {
 
 XELPRESULT cmd_led(XELP *ths, const char *args, int len) {
     XelpBuf b, tok;
-    XELP_XBInit(b, args, len);
+    XELP_XB_INIT(b, args, len);
     XELPTokN(&b, 1, &tok);                  /* get second token */
     int val = XELPStr2Int(tok.s, tok.p - tok.s);
     LED_PORT = val;
@@ -99,6 +100,16 @@ Hello!
 xelp> led 1
 xelp>
 ```
+
+The prompt string is settable per instance:
+
+```c
+XELP_SET_VAL_CLI_PROMPT(cli, "mydev>");
+```
+
+The prompt is stored by pointer, not copied. It must be a null-terminated
+string that remains valid for the life of the instance (string literal,
+static, or global -- not a stack buffer that goes out of scope).
 
 ## Scripting
 
@@ -252,8 +263,16 @@ what we welcome, branch model, and the release process.
 - [Tools](tools/README_TOOLS.md) -- build utilities and code generators
 - [Contributing](CONTRIBUTING.md) -- how to contribute
 
+## AI / LLM Integration
+
+If you use AI coding agents (Claude Code, Cursor, Copilot, etc.), xelp
+provides machine-readable context files for accurate code generation:
+
+- [AGENTS.md](AGENTS.md) -- concise coding reference: function signatures, setup patterns, common mistakes
+- [llms.txt](llms.txt) -- project overview and documentation index ([llmstxt.org](https://llmstxt.org) format)
+
 ## License
 
 BSD 2-Clause. See [LICENSE.txt](LICENSE.txt).
 
-Copyright (c) 2011-2025, M. A. Chatterjee
+Copyright (c) 2011-2026, M. A. Chatterjee

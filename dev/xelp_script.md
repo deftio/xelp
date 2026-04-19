@@ -2359,11 +2359,11 @@ A C function to blink an LED at a configurable rate:
 void cmdBlink(XELP *ths, const char *args, int len) {
     XelpBuf b, tok;
     int rate, count;
-    XELP_XBInit(b, args, len);
-    XELP_XBTOP(b);
+    XELP_XB_INIT(b, args, len);
+    XELP_XB_TOP(b);
     XELPTokN(&b, 1, &tok);
     rate = XELPStr2Int(tok.s, tok.p - tok.s);
-    XELP_XBTOP(b);
+    XELP_XB_TOP(b);
     XELPTokN(&b, 2, &tok);
     count = XELPStr2Int(tok.s, tok.p - tok.s);
     for (int i = 0; i < count; i++) {

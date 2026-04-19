@@ -256,7 +256,7 @@ XELPRESULT cmd_set(XELP *ths, const char *args, int len) {
     XelpBuf b, tok;
     int n;
 
-    XELP_XBInit(b, args, len);
+    XELP_XB_INIT(b, args, len);
     XELPNumToks(&b, &n);
 
     if (n < 3) {
@@ -265,11 +265,11 @@ XELPRESULT cmd_set(XELP *ths, const char *args, int len) {
     }
 
     /* Token 0 = "set", Token 1 = key, Token 2 = value */
-    XELP_XBTOP(b);
+    XELP_XB_TOP(b);
     XELPTokN(&b, 1, &tok);
     /* use tok.s .. tok.p as the key string */
 
-    XELP_XBTOP(b);
+    XELP_XB_TOP(b);
     XELPTokN(&b, 2, &tok);
     int value = XELPStr2Int(tok.s, tok.p - tok.s);
 
