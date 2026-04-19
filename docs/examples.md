@@ -10,7 +10,10 @@ example source code is in the `examples/` directory of the repository.
 | [Bare metal](#bare-metal) | Any MCU | Minimal porting template with all three modes |
 | [Multi-instance](#multi-instance) | Any MCU | Two independent CLIs on separate UARTs |
 | [Posix simple](#posix-simple) | Linux / macOS | Full interactive demo with ncurses |
-| [Arduino](#arduino) | ESP32 / Arduino | NeoPixel LED control via CLI |
+| [Arduino](#arduino) | Any Arduino board | LED control, token listing via CLI |
+| [Arduino C++](#arduino-cpp) | Any Arduino board | C++ wrapper class for easy integration |
+| [ESP32 WiFi](#esp32-wifi) | ESP32 | WiFi config, time and weather fetch via CLI |
+| [Scripting](#scripting) | Linux / macOS | Batch scripting vs interactive mode |
 
 ## Bare metal
 
@@ -159,21 +162,20 @@ gPutChar() -> ncurses addch() -> terminal
 
 ## Arduino
 
-**File:** `examples/arduino/arduino-example.ino`
+**File:** `examples/arduino/arduino.ino`
 
-ESP32-based example controlling a NeoPixel LED via the CLI. Uses Arduino
-`Serial` for I/O.
+Basic example using the raw C API. Works on any Arduino board with a
+Serial port -- LED control, token listing, and built-in help. No
+external library dependencies.
 
 ```c
 void writeChar(char c) { Serial.write(c); }
 
 void setup() {
     Serial.begin(115200);
-
-    XELPInit(&cli, "ESP32 Xelp test. 1.0.0\n");
+    XELPInit(&cli, "xelp Arduino example v1.0\n");
     XELP_SET_FN_OUT(cli, &writeChar);
     XELP_SET_FN_CLI(cli, gMyCLICommands);
-    XELP_SET_VAL_CLI_PROMPT(cli, "myprompt>");
 }
 
 void loop() {
@@ -188,14 +190,50 @@ void loop() {
 
 - `help` -- list all commands
 - `banner` -- print xelp ASCII art
+- `led <0|1>` -- toggle LED
 - `lt <args>` -- list parsed tokens (debugging tool)
-- `LED <value>` -- set NeoPixel color (hex value)
+
+## Arduino C++
+
+**File:** `examples/arduino-cpp/arduino-cpp.ino`
+
+Same idea as the `arduino` example but uses the `XelpCLI` C++ wrapper
+class from `src/XelpArduino.h`. Eliminates boilerplate: no manual
+`XELP_SET_FN_*` macros, no `Serial.available()` loop -- just `begin()`,
+`setCommands()`, and `poll(Serial)`.
+
+## ESP32 WiFi
+
+**File:** `examples/esp32-wifi/esp32-wifi.ino`
+
+ESP32 WiFi example using the C++ wrapper. Configure WiFi credentials
+over the serial CLI, then fetch the current time and weather from free
+APIs (worldtimeapi.org and open-meteo.com). No API keys needed.
+
+### Commands
+
+- `ssid <name>` / `pass <password>` -- set WiFi credentials
+- `connect` / `disconnect` -- manage WiFi connection
+- `status` -- show WiFi status, IP, RSSI
+- `time` -- fetch current time
+- `weather <lat> <lon>` -- fetch weather for coordinates
+
+## Scripting
+
+**File:** `examples/scripting/scripting-example.c`
+
+Demonstrates the difference between **scripting mode** (`XELPParse` /
+`XELPParseXB` -- execute a buffer of commands at once) and **interactive
+mode** (`XELPParseKey` -- character-by-character terminal input).
+
+```bash
+gcc -Wall -Isrc examples/scripting/scripting-example.c src/xelp.c -o scripting-example
+./scripting-example
+```
 
 ### Notes
 
 - On Arduino, `Serial.write()` is your output function
-- The `const char*` to `char*` cast in the token functions is needed on
-  some Arduino cores due to how they handle flash strings
 - Use `XELP_SET_VAL_CLI_PROMPT` for a custom prompt
 
 ## Writing your own commands

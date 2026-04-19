@@ -61,6 +61,9 @@ xelp-test-log.yaml
 .DS_Store
 Thumbs.db
 
+# Local working notes
+dev/misc/
+
 # Claude Code local files
 .claude/
 CLAUDE.local.md
