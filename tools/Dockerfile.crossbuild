@@ -16,8 +16,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc-msp430 \
     gcc-avr \
     gcc-m68hc1x \
+    gcc-m68k-linux-gnu \
     gcc-powerpc-linux-gnu \
     gcc-riscv64-linux-gnu \
+    gcc-riscv64-unknown-elf \
+    gcc-xtensa-lx106 \
+    picolibc-xtensa-lx106-elf \
     tcc \
     binutils \
     && rm -rf /var/lib/apt/lists/*

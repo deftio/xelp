@@ -30,12 +30,13 @@ void myOutput(char c) { Serial.write(c); }
 
 XelpCLI cli;
 
-XELPRESULT cmdHelp(const char* args, int len)
+XELPRESULT cmdHelp(XELP *ths, const char* args, int len)
 {
-    return cli.help();
+    (void)args; (void)len;
+    return XELPHelp(ths);
 }
 
-XELPRESULT cmdEcho(const char* args, int len)
+XELPRESULT cmdEcho(XELP *ths, const char* args, int len)
 {
     XelpBuf b, tok;
     int i, n;
@@ -44,17 +45,17 @@ XELPRESULT cmdEcho(const char* args, int len)
     for (i = 1; i < n; i++) {
         XELP_XBTOP(b);
         if (XELPTokN(&b, i, &tok) == XELP_S_OK) {
-            if (i > 1) cli.print(" ");
-            XELPOut(cli.raw(), tok.s, (int)(tok.p - tok.s));
+            if (i > 1) XELPOut(ths, " ", 0);
+            XELPOut(ths, tok.s, (int)(tok.p - tok.s));
         }
     }
-    cli.print("\n");
+    XELPOut(ths, "\n", 0);
     return XELP_S_OK;
 }
 
 static int gLedPin = LED_BUILTIN;
 
-XELPRESULT cmdLed(const char* args, int len)
+XELPRESULT cmdLed(XELP *ths, const char* args, int len)
 {
     XelpBuf b, tok;
     int val;
@@ -62,7 +63,7 @@ XELPRESULT cmdLed(const char* args, int len)
     if (XELPTokN(&b, 1, &tok) == XELP_S_OK) {
         XELPParseNum(tok.s, (int)(tok.p - tok.s), &val);
         digitalWrite(gLedPin, val ? HIGH : LOW);
-        cli.print(val ? "LED ON\n" : "LED OFF\n");
+        XELPOut(ths, val ? "LED ON\n" : "LED OFF\n", 0);
     }
     return XELP_S_OK;
 }

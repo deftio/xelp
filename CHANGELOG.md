@@ -9,6 +9,22 @@ The version source of truth is `XELP_VERSION` in `src/xelp.h` (hex format).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-04-19
+
+### Changed
+- **BREAKING:** CLI command functions now receive the XELP instance as
+  first parameter: `XELPRESULT fn(XELP *ths, const char *args, int len)`.
+  This gives commands access to `XELPOut()`, registers, and other
+  instance state. Migration: add `XELP *ths` as first parameter to all
+  command functions.
+- **BREAKING:** KEY command functions now receive the XELP instance as
+  first parameter: `XELPRESULT fn(XELP *ths, int key)`.
+  Migration: add `XELP *ths` as first parameter to all key handler
+  functions.
+- Updated all examples, tests, and documentation.
+- Multi-instance example now uses `ths` parameter for output instead of
+  hardcoded global pointers, demonstrating the value of this change.
+
 ## [0.2.3] - 2026-04-17
 
 ### Fixed

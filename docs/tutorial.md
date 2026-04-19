@@ -20,8 +20,8 @@ void my_putc(char c) { putchar(c); }
 void my_bksp(void)   { my_putc('\b'); my_putc(' '); my_putc('\b'); }
 
 /* Your first command */
-XELPRESULT cmd_hello(const char *args, int len) {
-    XELPOut(&cli, "Hello, world!\n", 0);
+XELPRESULT cmd_hello(XELP *ths, const char *args, int len) {
+    XELPOut(ths, "Hello, world!\n", 0);
     return XELP_S_OK;
 }
 
@@ -72,10 +72,11 @@ Command functions receive the raw argument string and its length. Use the
 tokenizer to extract individual arguments:
 
 ```c
-XELPRESULT cmd_add(const char *args, int len) {
+XELPRESULT cmd_add(XELP *ths, const char *args, int len) {
     XelpBuf b, tok;
     int a, result;
 
+    (void)ths;
     XELP_XBInit(b, args, len);
 
     /* Token 0 is the command name itself ("add").
@@ -115,7 +116,7 @@ Usage: `add 10 25`
 ## 3. Counting and iterating tokens
 
 ```c
-XELPRESULT cmd_args(const char *args, int len) {
+XELPRESULT cmd_args(XELP *ths, const char *args, int len) {
     XelpBuf b, tok;
     int n, i;
 
@@ -126,8 +127,8 @@ XELPRESULT cmd_args(const char *args, int len) {
     for (i = 0; i < n; i++) {
         XELP_XBTOP(b);
         XELPTokN(&b, i, &tok);
-        XELPOut(&cli, tok.s, tok.p - tok.s);
-        XELPOut(&cli, "\n", 0);
+        XELPOut(ths, tok.s, tok.p - tok.s);
+        XELPOut(ths, "\n", 0);
     }
     return XELP_S_OK;
 }
@@ -139,13 +140,15 @@ KEY mode is for menus and quick toggles. Each keypress fires a function
 immediately (no ENTER needed):
 
 ```c
-XELPRESULT key_help(int c) {
-    return XELPHelp(&cli);
+XELPRESULT key_help(XELP *ths, int c) {
+    (void)c;
+    return XELPHelp(ths);
 }
 
-XELPRESULT key_toggle_led(int c) {
+XELPRESULT key_toggle_led(XELP *ths, int c) {
+    (void)c;
     /* toggle your LED here */
-    XELPOut(&cli, "LED toggled\n", 0);
+    XELPOut(ths, "LED toggled\n", 0);
     return XELP_S_OK;
 }
 

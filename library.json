@@ -1,6 +1,6 @@
 {
     "name": "xelp",
-    "version": "0.2.6",
+    "version": "0.3.0",
     "description": "Tiny CLI and script interpreter for embedded systems. 2KB flash, zero malloc, multi-instance. Interactive serial command line with scriptable dispatch, single-key menus, and pass-through mode.",
     "keywords": [
         "cli",

@@ -257,14 +257,14 @@ XELPRESULT XELPExecKC(XELP* ths, char key) {
     {          
         while (p->mFunPtr) {
             if (p->mKey == key)			{
-                ths->mR[0] = p->mFunPtr((int)key);
+                ths->mR[0] = p->mFunPtr(ths, (int)key);
                 return ths->mR[0];
             }
             p++;
         }
     }
     if (ths->mpfDefKey) {
-        ths->mR[0] = ths->mpfDefKey((int)key);
+        ths->mR[0] = ths->mpfDefKey(ths, (int)key);
     } else {
         ths->mR[0] = XELP_S_NOTFOUND;
     }
@@ -460,14 +460,14 @@ XELPRESULT XELPParseXB (XELP* ths, XelpBuf *args) {
             while(f->mpCmd) {    
                 if (XELP_S_OK == XELPStrEq(line.s,(int)(line.p-line.s),f->mpCmd)){
                     
-                    ths->mR[0] = (f->mFunPtr)(line.s,(int)(line.e-line.s));	
+                    ths->mR[0] = (f->mFunPtr)(ths, line.s,(int)(line.e-line.s));
                     break;
                 }
                 f++;
             }
             if (ths->mR[0] == XELP_E_CMDNOTFOUND) {
             	if (ths->mpfDefCLI)
-            		ths->mR[0] = ths->mpfDefCLI(line.s,(int)(line.e-line.s));
+            		ths->mR[0] = ths->mpfDefCLI(ths, line.s,(int)(line.e-line.s));
             }
         }
 	}

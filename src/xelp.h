@@ -44,7 +44,7 @@ extern "C"
 {
 #endif
 
-#define XELP_VERSION      (0x00000206UL) /* 32-bit version: 0x00MMmmpp (major.minor.patch) */
+#define XELP_VERSION      (0x00000300UL) /* 32-bit version: 0x00MMmmpp (major.minor.patch) */
 #define XELP_VER_MAJOR(v) (((v) >> 16) & 0xFF)
 #define XELP_VER_MINOR(v) (((v) >>  8) & 0xFF)
 #define XELP_VER_PATCH(v) ( (v)        & 0xFF)
@@ -168,12 +168,17 @@ typedef struct {
 
 
 /*****************************************************************************
+ Forward declaration -- allows function pointers to reference the XELP instance
+ */
+struct XELP_tag;
+
+/*****************************************************************************
  KeyFuncMap declares single key launched functions
  all functions must take a single integer as the parameter
  */
 typedef struct
 {
-	XELPRESULT (*mFunPtr)(int) REENTRANT_SDCC;	/* function pointer to user-supplied fnc(int) */
+	XELPRESULT (*mFunPtr)(struct XELP_tag *, int) REENTRANT_SDCC;	/* function pointer to user-supplied fnc(ths, int) */
 	char  mKey;								    /* key press code                             */
 	char* mpHelpString;						    /* use NULL or 0 if no help string is to be provided */
 }XELPKeyFuncMapEntry;
@@ -189,7 +194,7 @@ typedef struct
  */
 typedef struct
 {
-	XELPRESULT (*mFunPtr)(const char *pArgString, int maxbuflen) REENTRANT_SDCC ;	/* fn ptr to command */
+	XELPRESULT (*mFunPtr)(struct XELP_tag *, const char *pArgString, int maxbuflen) REENTRANT_SDCC ;	/* fn ptr to command */
 	char* mpCmd;                               /* name of cmd at run-time / in script                    */
 	char* mpHelpString;                        /* optional help string                                   */
 }XELPCLIFuncMapEntry; 
@@ -239,7 +244,7 @@ typedef struct
  see xelpcfg.h for configuration options.
 */
 
-typedef struct
+typedef struct XELP_tag
 {
 	/* commandline state managemment [CLI | KEY | THR] */
 	int						mCurMode;	     /* current mode of Xelp inst - skc/CLI/thru    */
@@ -251,12 +256,12 @@ typedef struct
 
 #ifdef XELP_ENABLE_KEY						 /* if single-key commands enabled              */
 	XELPKeyFuncMapEntry		*mpKeyModeFuncs; /* key mode function dispatch                  */
-	XELPRESULT (*mpfDefKey)(int) REENTRANT_SDCC; /* default handler for unmapped keys        */
+	XELPRESULT (*mpfDefKey)(struct XELP_tag *, int) REENTRANT_SDCC; /* default handler for unmapped keys        */
 #endif
 
 #ifdef XELP_ENABLE_CLI						 /* if CLI and script support enabled           */
 	XELPCLIFuncMapEntry		*mpCLIModeFuncs; /* command mode function dispatch              */
-	XELPRESULT (*mpfDefCLI)(const char *, int) REENTRANT_SDCC; /* default handler for unknown commands */
+	XELPRESULT (*mpfDefCLI)(struct XELP_tag *, const char *, int) REENTRANT_SDCC; /* default handler for unknown commands */
 	char					mCmdMsgBuf[XELP_CMDBUFSZ]; 	/* cli string buffer storage        */
     XelpBuf                 mCmdXB;          /* buffer ptrs for parsing                     */
 #endif

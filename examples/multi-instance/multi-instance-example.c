@@ -26,36 +26,24 @@ static void uart0_bksp(void) { uart0_putc('\b'); uart0_putc(' '); uart0_putc('\b
 static void uart1_bksp(void) { uart1_putc('\b'); uart1_putc(' '); uart1_putc('\b'); }
 
 /* ------------------------------------------------------------------ */
-/* Shared commands (work with any instance via ths pointer)             */
+/* Shared commands -- ths points to whichever instance called them      */
 /* ------------------------------------------------------------------ */
 
 XELP cli_a;
 XELP cli_b;
 
-static XELPRESULT cmd_help_a(const char *args, int len)
+static XELPRESULT cmd_help(XELP *ths, const char *args, int len)
 {
-    return XELPHelp(&cli_a);
+    (void)args; (void)len;
+    return XELPHelp(ths);
 }
 
-static XELPRESULT cmd_help_b(const char *args, int len)
+static XELPRESULT cmd_status(XELP *ths, const char *args, int len)
 {
-    return XELPHelp(&cli_b);
-}
-
-static XELPRESULT cmd_status(const char *args, int len)
-{
-    /* This command is registered on both instances.
-     * Each instance has its own output function, so the response
-     * goes to the correct UART automatically.
-     */
-    XELP *ths = &cli_a; /* caller determines which instance */
+    (void)args; (void)len;
+    /* ths points to whichever instance called this command,
+     * so output goes to the correct UART automatically. */
     XELPOut(ths, "System OK\n", 0);
-    return XELP_S_OK;
-}
-
-static XELPRESULT cmd_status_b(const char *args, int len)
-{
-    XELPOut(&cli_b, "System OK\n", 0);
     return XELP_S_OK;
 }
 
@@ -64,14 +52,14 @@ static XELPRESULT cmd_status_b(const char *args, int len)
 /* ------------------------------------------------------------------ */
 
 XELPCLIFuncMapEntry commands_a[] = {
-    { &cmd_help_a, "help",   "show help"       },
+    { &cmd_help,   "help",   "show help"       },
     { &cmd_status, "status", "system status"   },
     XELP_FUNC_ENTRY_LAST
 };
 
 XELPCLIFuncMapEntry commands_b[] = {
-    { &cmd_help_b,   "help",   "show help"       },
-    { &cmd_status_b, "status", "system status"   },
+    { &cmd_help,   "help",   "show help"       },
+    { &cmd_status, "status", "system status"   },
     XELP_FUNC_ENTRY_LAST
 };
 

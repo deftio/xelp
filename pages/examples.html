@@ -281,10 +281,11 @@ commands at once) and <strong>interactive mode</strong> (<code>XELPParseKey</cod
 
 <p>All CLI commands have the same signature:</p>
 
-<pre><code>XELPRESULT my_command(const char *args, int maxlen);
+<pre><code>XELPRESULT my_command(XELP *ths, const char *args, int maxlen);
 </code></pre>
 
 <ul>
+  <li><code>ths</code> &mdash; pointer to the XELP instance that dispatched the command</li>
   <li><code>args</code> &mdash; raw argument string (everything after the command name)</li>
   <li><code>maxlen</code> &mdash; number of valid bytes in <code>args</code></li>
   <li>Return <code>XELP_S_OK</code> (0) for success, negative for error</li>
@@ -292,7 +293,7 @@ commands at once) and <strong>interactive mode</strong> (<code>XELPParseKey</cod
 
 <h3>Pattern: parsing arguments</h3>
 
-<pre><code>XELPRESULT cmd_set(const char *args, int len) {
+<pre><code>XELPRESULT cmd_set(XELP *ths, const char *args, int len) {
     XelpBuf b, tok;
     int n;
 
@@ -300,7 +301,7 @@ commands at once) and <strong>interactive mode</strong> (<code>XELPParseKey</cod
     XELPNumToks(&amp;b, &amp;n);
 
     if (n &lt; 3) {
-        XELPOut(&amp;cli, "usage: set &lt;key&gt; &lt;value&gt;\n", 0);
+        XELPOut(ths, "usage: set &lt;key&gt; &lt;value&gt;\n", 0);
         return XELP_E_ERR;
     }
 

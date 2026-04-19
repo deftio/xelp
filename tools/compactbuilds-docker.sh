@@ -76,6 +76,10 @@ print_sizes "GCC AVR ATtiny85"
 m68hc11-gcc -c $SRC $INCLUDE -Os -o $OBJ 2>&1 && true
 print_sizes "GCC 68HC11"
 
+# --- 68k (Motorola 68000) ---
+m68k-linux-gnu-gcc -c $SRC $INCLUDE -Os -Wall -o $OBJ 2>&1 && true
+print_sizes "GCC m68k"
+
 # --- PowerPC ---
 powerpc-linux-gnu-gcc -c $SRC $INCLUDE -Os -Wall -o $OBJ 2>&1 && true
 print_sizes "GCC PowerPC"
@@ -83,6 +87,13 @@ print_sizes "GCC PowerPC"
 # --- RISC-V ---
 riscv64-linux-gnu-gcc -c $SRC $INCLUDE -Os -Wall -o $OBJ 2>&1 && true
 print_sizes "GCC RISC-V (rv64)"
+
+riscv64-unknown-elf-gcc -c $SRC $INCLUDE -Os -march=rv32imac -mabi=ilp32 -Wall -o $OBJ 2>&1 && true
+print_sizes "GCC RISC-V (rv32)"
+
+# --- Xtensa (ESP8266/ESP32 family) ---
+xtensa-lx106-elf-gcc -c $SRC $INCLUDE -Os -Wall -o $OBJ 2>&1 && true
+print_sizes "GCC Xtensa LX106 (ESP8266)"
 
 # --- Function size table (native GCC) ---
 echo ""

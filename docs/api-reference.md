@@ -1,6 +1,6 @@
 # API Reference
 
-All public types, functions, and macros defined in `xelp.h`. Version 0.2.1.
+All public types, functions, and macros defined in `xelp.h`. Version 0.3.0.
 
 ## Types
 
@@ -10,8 +10,8 @@ All public types, functions, and macros defined in `xelp.h`. Version 0.2.1.
 | `XELPRESULT` | Return type (`int`). 0 = OK, negative = error, positive = warning. |
 | `XELPREG` | Register type (default `int`, overridable in xelpcfg.h). |
 | `XelpBuf` | Buffer wrapper with start, position, and end pointers. |
-| `XELPKeyFuncMapEntry` | Single-key command entry: function pointer, key, help string. |
-| `XELPCLIFuncMapEntry` | CLI command entry: function pointer, command name, help string. |
+| `XELPKeyFuncMapEntry` | Single-key command entry: `XELPRESULT fn(XELP *ths, int key)`, key, help string. |
+| `XELPCLIFuncMapEntry` | CLI command entry: `XELPRESULT fn(XELP *ths, const char *args, int len)`, command name, help string. |
 
 ## Return Codes
 
@@ -203,7 +203,7 @@ Compare two buffers. `cmpType` controls null-terminator handling:
 
 | Constant | Value | Description |
 |----------|-------|-------------|
-| `XELP_VERSION` | 0x00000201 | Library version (32-bit hex: `0x00MMmmpp`) |
+| `XELP_VERSION` | 0x00000300 | Library version (32-bit hex: `0x00MMmmpp`) |
 | `XELP_VER_MAJOR(v)` | | Extract major version byte |
 | `XELP_VER_MINOR(v)` | | Extract minor version byte |
 | `XELP_VER_PATCH(v)` | | Extract patch version byte |

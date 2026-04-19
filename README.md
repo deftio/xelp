@@ -1,11 +1,11 @@
 
 <a href="https://www.deftio.com/xelp"><img src="./img/xelp-prompt-med.png" width="30%"></img></a>
 
-![Version](https://img.shields.io/badge/version-0.2.6-blue.svg)
+![Version](https://img.shields.io/badge/version-0.3.0-blue.svg)
 [![License](https://img.shields.io/badge/License-BSD%202--Clause-blue.svg)](https://opensource.org/licenses/BSD-2-Clause)
 [![CI](https://github.com/deftio/xelp/actions/workflows/ci.yml/badge.svg)](https://github.com/deftio/xelp/actions/workflows/ci.yml)
 ![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen.svg)
-![RISC-V](https://img.shields.io/badge/RISC--V-1.9KB-informational.svg)
+![RISC-V](https://img.shields.io/badge/RISC--V-2.0KB-informational.svg)
 
 # xelp
 
@@ -55,12 +55,12 @@ void uart_putc(char c) { UART_TX = c; }
 void uart_bksp(void)   { uart_putc('\b'); uart_putc(' '); uart_putc('\b'); }
 
 /* Commands -- any C function with this signature */
-XELPRESULT cmd_hello(const char *args, int len) {
-    XELPOut(&cli, "Hello!\n", 0);
+XELPRESULT cmd_hello(XELP *ths, const char *args, int len) {
+    XELPOut(ths, "Hello!\n", 0);
     return XELP_S_OK;
 }
 
-XELPRESULT cmd_led(const char *args, int len) {
+XELPRESULT cmd_led(XELP *ths, const char *args, int len) {
     XelpBuf b, tok;
     XELP_XBInit(b, args, len);
     XELPTokN(&b, 1, &tok);                  /* get second token */
@@ -146,18 +146,21 @@ Compiled sizes with `-Os` (all features enabled):
 
 | Target | Compiler | Code size (bytes) |
 |--------|----------|-------------------|
-| ARM32 Thumb | arm-none-eabi-gcc | 1488 |
-| MSP430 | msp430-gcc | 1804 |
-| RISC-V (rv64) | riscv64-linux-gnu-gcc | 1960 |
-| ARM32 | arm-none-eabi-gcc | 2372 |
-| AVR (ATtiny85) | avr-gcc | 2420 |
-| AVR (ATmega328P) | avr-gcc | 2452 |
-| x86-64 | GCC | 2775 |
-| x86-32 | GCC | 2826 |
-| x86-64 | Clang | 3003 |
-| ARM64 | aarch64-linux-gnu-gcc | 3148 |
-| PowerPC | powerpc-linux-gnu-gcc | 3778 |
-| 68HC11 | m68hc11-gcc | 4247 |
+| ARM32 Thumb | arm-none-eabi-gcc | 1556 |
+| Xtensa LX106 (ESP8266) | xtensa-lx106-elf-gcc | 1742 |
+| RISC-V (rv32) | riscv64-unknown-elf-gcc | 1786 |
+| MSP430 | msp430-gcc | 1924 |
+| m68k | m68k-linux-gnu-gcc | 1992 |
+| RISC-V (rv64) | riscv64-linux-gnu-gcc | 2008 |
+| ARM32 | arm-none-eabi-gcc | 2476 |
+| AVR (ATtiny85) | avr-gcc | 2506 |
+| AVR (ATmega328P) | avr-gcc | 2538 |
+| x86-64 | GCC | 2875 |
+| x86-32 | GCC | 2908 |
+| x86-64 | Clang | 3071 |
+| ARM64 | aarch64-linux-gnu-gcc | 3228 |
+| PowerPC | powerpc-linux-gnu-gcc | 3890 |
+| 68HC11 | m68hc11-gcc | 4436 |
 
 Sizes measured via Docker cross-compilation. KEY-only mode: 900 bytes.
 Run `bash tools/crossbuild.sh` to reproduce.
@@ -199,8 +202,11 @@ Tested with zero warnings on:
 | x86-32 | GCC, Clang, TCC | 32-bit |
 | ARM64 | aarch64-linux-gnu-gcc | 64-bit |
 | ARM32 / Thumb | arm-none-eabi-gcc | 32-bit |
-| RISC-V | riscv64-linux-gnu-gcc | 64-bit |
+| RISC-V (rv64) | riscv64-linux-gnu-gcc | 64-bit |
+| RISC-V (rv32) | riscv64-unknown-elf-gcc | 32-bit |
+| Xtensa LX106 (ESP8266) | xtensa-lx106-elf-gcc | 32-bit |
 | MSP430 | msp430-gcc | 16-bit |
+| m68k (68000) | m68k-linux-gnu-gcc | 32-bit |
 | AVR (ATmega, ATtiny) | avr-gcc | 8-bit |
 | 8051 | SDCC | 8-bit |
 | 68HC11/12 | m68hc11-gcc | 8-bit |

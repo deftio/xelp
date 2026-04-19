@@ -25,28 +25,30 @@ void writeChar(char c) {
 /* Command handlers                                                    */
 /* ------------------------------------------------------------------ */
 
-XELPRESULT cmdHelp(const char* args_str, int maxlen) {
-    return XELPHelp(&cli);
+XELPRESULT cmdHelp(XELP *ths, const char* args_str, int maxlen) {
+    (void)args_str; (void)maxlen;
+    return XELPHelp(ths);
 }
 
-XELPRESULT cmdBanner(const char* args_str, int maxlen) {
+XELPRESULT cmdBanner(XELP *ths, const char* args_str, int maxlen) {
+    (void)ths; (void)args_str; (void)maxlen;
     Serial.println(XELP_BANNER_STR);
     return XELP_S_OK;
 }
 
-XELPRESULT cmdLed(const char* args_str, int maxlen) {
+XELPRESULT cmdLed(XELP *ths, const char* args_str, int maxlen) {
     XelpBuf b, tok;
     int val;
     XELP_XBInit(b, (char*)args_str, maxlen);
     if (XELPTokN(&b, 1, &tok) == XELP_S_OK) {
         XELPParseNum(tok.s, (int)(tok.p - tok.s), &val);
         digitalWrite(LED_BUILTIN, val ? HIGH : LOW);
-        XELPOut(&cli, val ? "LED ON\n" : "LED OFF\n", 0);
+        XELPOut(ths, val ? "LED ON\n" : "LED OFF\n", 0);
     }
     return XELP_S_OK;
 }
 
-XELPRESULT cmdListToks(const char* args_str, int maxlen) {
+XELPRESULT cmdListToks(XELP *ths, const char* args_str, int maxlen) {
     XelpBuf b, tok;
     int n, i;
     XELP_XBInit(b, (char*)args_str, maxlen);
@@ -57,11 +59,11 @@ XELPRESULT cmdListToks(const char* args_str, int maxlen) {
     for (i = 0; i < n; i++) {
         XELP_XBTOP(b);
         XELPTokN(&b, i, &tok);
-        XELPOut(&cli, "<", -1);
+        XELPOut(ths, "<", -1);
         Serial.print(i);
-        XELPOut(&cli, ":", -1);
-        XELPOut(&cli, tok.s, tok.p - tok.s);
-        XELPOut(&cli, "> ", -1);
+        XELPOut(ths, ":", -1);
+        XELPOut(ths, tok.s, tok.p - tok.s);
+        XELPOut(ths, "> ", -1);
     }
     Serial.print("\n");
     return XELP_S_OK;

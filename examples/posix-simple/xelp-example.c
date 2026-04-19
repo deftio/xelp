@@ -95,30 +95,35 @@ int gExit=0;  //global flag for when to quit interpretor loop, not part of XELP,
 /****
  begin user defined functions for XELP cli  -- key mode
  */
-XELPRESULT fooExit(int c)
+XELPRESULT fooExit(XELP *ths, int c)
 {
+	(void)ths;
 	printw("fooExit(%x) invoked\n",c);
-	gExit=1;  // modify the global flag so we quite the  interpretor loop 
+	gExit=1;  // modify the global flag so we quite the  interpretor loop
 	return XELP_S_OK;
 }
 
-XELPRESULT fooBar(int c)
+XELPRESULT fooBar(XELP *ths, int c)
 {
+	(void)ths;
 	printw("fooBar(%c) invoked (single-key mode)\n",c);
 	return XELP_S_OK;
 }
-XELPRESULT fooPrint(int c)
+XELPRESULT fooPrint(XELP *ths, int c)
 {
+	(void)ths;
 	printw("fooPrint(%x) invoked (single-key mode)\n",c);
 	return XELP_S_OK;
 }
 
-XELPRESULT fooHelp(int c)
+XELPRESULT fooHelp(XELP *ths, int c)
 {
-	return XELPHelp(&example);
+	(void)c;
+	return XELPHelp(ths);
 }
-XELPRESULT printBanner( int c) {
-	XELPOut(&example,XELP_BANNER_STR,-1); // XELPOut ==> print out a null terminated string, in this case the XELP banner in ascii
+XELPRESULT printBanner(XELP *ths, int c) {
+	(void)c;
+	XELPOut(ths,XELP_BANNER_STR,-1); // XELPOut ==> print out a null terminated string, in this case the XELP banner in ascii
 	return XELP_S_OK;
 }
 void fooNormal(char c)
@@ -141,55 +146,58 @@ XELPKeyFuncMapEntry gMyKeyCommands[] =
 	//{0         , 0 , ""              }
 };
 
-XELPRESULT cmdCLS (const char* args, int maxlen)
+XELPRESULT cmdCLS (XELP *ths, const char* args, int maxlen)
 {
+	(void)ths; (void)args; (void)maxlen;
 	printw("\x1B");
 	printw("C");
 	return XELP_S_OK;
 }
 
-XELPRESULT banner (const char* args, int maxlen)
+XELPRESULT banner (XELP *ths, const char* args, int maxlen)
 {
-	printBanner('b');
+	(void)args; (void)maxlen;
+	printBanner(ths, 'b');
 	return XELP_S_OK;
 }
-XELPRESULT cmdHome (const char* args, int maxlen)
+XELPRESULT cmdHome (XELP *ths, const char* args, int maxlen)
 {
+	(void)ths; (void)args; (void)maxlen;
 	printw("\x1B");
 	printw("H");
 	return XELP_S_OK;
 }
-XELPRESULT cmdEcho (const char* args, int maxlen)
+XELPRESULT cmdEcho (XELP *ths, const char* args, int maxlen)
 {
-	int i;
-	printw("<<");
-	for(i=0; i<maxlen; i++)
-		addch(args[i]);
-	printw(">>\n");
+	XELPOut(ths, "<<", 0);
+	XELPOut(ths, args, maxlen);
+	XELPOut(ths, ">>\n", 0);
 	return XELP_S_OK;
 }
 
-XELPRESULT cmdNumToks (const char* args, int maxlen)
+XELPRESULT cmdNumToks (XELP *ths, const char* args, int maxlen)
 {
     XelpBuf b;
- 
+
     int n;
+    (void)ths;
     XELP_XBInit(b,args,maxlen);
     XELPNumToks(&b,&n);
 	printw(" XELPNumToks %d\n",n);
-	
+
     return XELP_S_OK;
 };
-XELPRESULT cmdPrintR (const char* args, int maxlen){
-	int i = example.mR[0];
+XELPRESULT cmdPrintR (XELP *ths, const char* args, int maxlen){
+	int i = ths->mR[0];
+	(void)args; (void)maxlen;
 	printw("%x\n",i);
 	return i;  // leaves mR[0] unchanged
 }
 
 
-XELPRESULT cmdListToks (const char* args, int maxlen)
+XELPRESULT cmdListToks (XELP *ths, const char* args, int maxlen)
 {
-    
+
 #ifdef XELP_ENABLE_CLI
     XelpBuf b,tok;
     int n,i;
@@ -203,36 +211,39 @@ XELPRESULT cmdListToks (const char* args, int maxlen)
         r = XELPTokN( &b,i,&tok);
         printw("<");
         printw("%d:",i);
-		XELPOut(&example,tok.s,tok.p-tok.s);
+		XELPOut(ths,tok.s,tok.p-tok.s);
 		printw(">");
 	}
 #endif
 	printw("\n");
-		
+
 	return XELP_S_OK;
 };
 
-XELPRESULT cmdHelp (const char* args, int maxlen)
+XELPRESULT cmdHelp (XELP *ths, const char* args, int maxlen)
 {
-	return XELPHelp(&example);
+	(void)args; (void)maxlen;
+	return XELPHelp(ths);
 }
 
-XELPRESULT cmdExit (const char* args, int maxlen) {
+XELPRESULT cmdExit (XELP *ths, const char* args, int maxlen) {
+	(void)ths; (void)args; (void)maxlen;
 	gExit = 1;
 	return XELP_S_OK;
 }
-XELPRESULT cmdPrintNum (const char *args, int maxlen) {
+XELPRESULT cmdPrintNum (XELP *ths, const char *args, int maxlen) {
 	XelpBuf b,tok;
     int n;
+    (void)ths;
 
     XELP_XBInit(b,args,maxlen);
     XELPTokN(&b,1,&tok),
-    
+
 	printw("[%d]\n",XELPStr2Int(tok.s,tok.p-tok.s));
 	return XELP_S_OK;
 }
 
-XELPRESULT cmdMath (const char* args, int maxlen) {
+XELPRESULT cmdMath (XELP *ths, const char* args, int maxlen) {
 	XelpBuf b,tok;
     int i,j,k;
     int op;
@@ -242,11 +253,11 @@ XELPRESULT cmdMath (const char* args, int maxlen) {
 
 
 	op = *b.s;
-	
+
     XELP_XBTOP(b);
     XELPTokN(&b,1,&tok);
     i = XELPStr2Int(tok.s,tok.p-tok.s);
-    
+
     XELP_XBTOP(b);
     XELPTokN(&b,2,&tok);
 	j =XELPStr2Int(tok.s,tok.p-tok.s);
@@ -270,7 +281,7 @@ XELPRESULT cmdMath (const char* args, int maxlen) {
 			k=i%j;  break;
 	}
 	printw("%d %c %d = %d",i,(char) op,j,k);
-	XELPOut(&example,"\n",1);
+	XELPOut(ths,"\n",1);
 	return XELP_S_OK;
 }
 //declare a command map for functions in parse mode
@@ -354,7 +365,7 @@ int main (int argc, char *argv[])
 
 
 	printw("\n============================================================\n");
-	printBanner (0);
+	printBanner (&example, 0);
 	
 	XELPHelp(&example); // print out help to start off program.  help is per-instance
 

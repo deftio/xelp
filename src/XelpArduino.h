@@ -78,7 +78,7 @@ public:
     }
 
     /** Set the default handler for unrecognized CLI commands. */
-    void setDefaultCommandHandler(XELPRESULT (*fn)(const char*, int))
+    void setDefaultCommandHandler(XELPRESULT (*fn)(XELP*, const char*, int))
     {
         XELP_SET_FN_DEF_CLI(m_x, fn);
     }
@@ -94,7 +94,7 @@ public:
 
 #ifdef XELP_ENABLE_KEY
     /** Set the default handler for unmapped single-key presses. */
-    void setDefaultKeyHandler(XELPRESULT (*fn)(int))
+    void setDefaultKeyHandler(XELPRESULT (*fn)(XELP*, int))
     {
         XELP_SET_FN_DEF_KEY(m_x, fn);
     }

@@ -49,15 +49,18 @@ struct {
     int c2;
 }gGlobalCallbackData;
 
-XELPRESULT k0 (int k) {
+XELPRESULT k0 (XELP *ths, int k) {
+    (void)ths;
     gGlobalCallbackData.k0 = k;
     return XELP_S_OK;
 }
-XELPRESULT k1 (int k) {
+XELPRESULT k1 (XELP *ths, int k) {
+    (void)ths;
     gGlobalCallbackData.k1 = k;
     return XELP_S_OK;
 }
-XELPRESULT k2 (int k) {
+XELPRESULT k2 (XELP *ths, int k) {
+    (void)ths;
     gGlobalCallbackData.k2 = k;
     return XELP_S_OK;
 }
@@ -71,19 +74,23 @@ XELPKeyFuncMapEntry gMyKeyCommands[] =
 	XELP_FUNC_ENTRY_LAST
 };
 
-XELPRESULT cli0 (const char *c, int max) {
+XELPRESULT cli0 (XELP *ths, const char *c, int max) {
+    (void)ths;
     gGlobalCallbackData.c0 = 0;
     return XELP_S_OK;
 }
-XELPRESULT cli1 (const char *c, int max) {
+XELPRESULT cli1 (XELP *ths, const char *c, int max) {
+    (void)ths;
     gGlobalCallbackData.c1 = 1;
     return XELP_S_OK;
 }
-XELPRESULT cli2 (const char *c, int max) {
+XELPRESULT cli2 (XELP *ths, const char *c, int max) {
+    (void)ths;
     gGlobalCallbackData.c2 = 2;
     return XELP_S_OK;
 }
-XELPRESULT cli3 (const char *c, int max) {
+XELPRESULT cli3 (XELP *ths, const char *c, int max) {
+    (void)ths;
     gGlobalCallbackData.c0 = 0;
     gGlobalCallbackData.c1 = 0;
     gGlobalCallbackData.c2 = 0;
@@ -1441,12 +1448,14 @@ static int gDefKeyVal;
 static const char *gDefCLIArgs;
 static int gDefCLILen;
 
-XELPRESULT defKeyHandler(int key) {
+XELPRESULT defKeyHandler(XELP *ths, int key) {
+    (void)ths;
     gDefKeyVal = key;
     return XELP_W_WARN;
 }
 
-XELPRESULT defCLIHandler(const char *args, int len) {
+XELPRESULT defCLIHandler(XELP *ths, const char *args, int len) {
+    (void)ths;
     gDefCLIArgs = args;
     gDefCLILen = len;
     return XELP_W_WARN;
@@ -1625,7 +1634,8 @@ static const char *gBndArgs;
 static int gBndLen;
 static int gBndCallCount;
 
-XELPRESULT bndHandler(const char *args, int len) {
+XELPRESULT bndHandler(XELP *ths, const char *args, int len) {
+    (void)ths;
     gBndArgs = args;
     gBndLen = len;
     gBndCallCount++;

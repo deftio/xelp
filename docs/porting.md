@@ -131,8 +131,8 @@ void my_putc(char c) { /* ... */ }
 void my_bksp(void)   { /* ... */ }
 
 /* Commands */
-XELPRESULT cmd_hello(const char *args, int len) {
-    XELPOut(&x, "Hello!\n", 0);
+XELPRESULT cmd_hello(XELP *ths, const char *args, int len) {
+    XELPOut(ths, "Hello!\n", 0);
     return XELP_S_OK;
 }
 

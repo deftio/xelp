@@ -37,7 +37,7 @@ static void out_putc(char c) { putchar(c); }
 
 static XELP cli;
 
-static XELPRESULT cmd_echo(const char *args, int len)
+static XELPRESULT cmd_echo(XELP *ths, const char *args, int len)
 {
     XelpBuf b, tok;
     int i, n;
@@ -47,17 +47,17 @@ static XELPRESULT cmd_echo(const char *args, int len)
     for (i = 1; i < n; i++) {
         XELP_XBTOP(b);
         if (XELPTokN(&b, i, &tok) == XELP_S_OK) {
-            if (i > 1) XELPOut(&cli, " ", 0);
-            XELPOut(&cli, tok.s, (int)(tok.p - tok.s));
+            if (i > 1) XELPOut(ths, " ", 0);
+            XELPOut(ths, tok.s, (int)(tok.p - tok.s));
         }
     }
-    XELPOut(&cli, "\n", 0);
+    XELPOut(ths, "\n", 0);
     return XELP_S_OK;
 }
 
 static int g_led_state = 0;
 
-static XELPRESULT cmd_led(const char *args, int len)
+static XELPRESULT cmd_led(XELP *ths, const char *args, int len)
 {
     XelpBuf b, tok;
     int val;
@@ -65,20 +65,21 @@ static XELPRESULT cmd_led(const char *args, int len)
     if (XELPTokN(&b, 1, &tok) == XELP_S_OK) {
         XELPParseNum(tok.s, (int)(tok.p - tok.s), &val);
         g_led_state = val;
-        XELPOut(&cli, "LED -> ", 0);
+        XELPOut(ths, "LED -> ", 0);
         /* print the value using xelp's built-in output */
-        XELPOut(&cli, (val ? "ON" : "OFF"), 0);
-        XELPOut(&cli, "\n", 0);
+        XELPOut(ths, (val ? "ON" : "OFF"), 0);
+        XELPOut(ths, "\n", 0);
     }
     return XELP_S_OK;
 }
 
 static int g_gain = 50;
 
-static XELPRESULT cmd_gain(const char *args, int len)
+static XELPRESULT cmd_gain(XELP *ths, const char *args, int len)
 {
     XelpBuf b, tok;
     int val;
+    (void)ths;
     XELP_XBInit(b, (char *)args, len);
     if (XELPTokN(&b, 1, &tok) == XELP_S_OK) {
         XELPParseNum(tok.s, (int)(tok.p - tok.s), &val);
@@ -88,15 +89,17 @@ static XELPRESULT cmd_gain(const char *args, int len)
     return XELP_S_OK;
 }
 
-static XELPRESULT cmd_status(const char *args, int len)
+static XELPRESULT cmd_status(XELP *ths, const char *args, int len)
 {
+    (void)ths; (void)args; (void)len;
     printf("LED: %s, gain: %d\n", g_led_state ? "ON" : "OFF", g_gain);
     return XELP_S_OK;
 }
 
-static XELPRESULT cmd_help(const char *args, int len)
+static XELPRESULT cmd_help(XELP *ths, const char *args, int len)
 {
-    return XELPHelp(&cli);
+    (void)args; (void)len;
+    return XELPHelp(ths);
 }
 
 /* ------------------------------------------------------------------ */
