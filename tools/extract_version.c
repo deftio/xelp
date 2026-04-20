@@ -38,15 +38,8 @@ int main(int argc, char *argv[])
     fprintf(fp, "minor: %d\n", minor);
     fprintf(fp, "patch: %d\n", patch);
 
-    if (patch == 0)
-        fprintf(fp, "version: \"%d.%d\"\n", major, minor);
-    else
-        fprintf(fp, "version: \"%d.%d.%d\"\n", major, minor, patch);
-
-    if (patch == 0)
-        fprintf(fp, "tag: \"v%d.%d\"\n", major, minor);
-    else
-        fprintf(fp, "tag: \"v%d.%d.%d\"\n", major, minor, patch);
+    fprintf(fp, "version: \"%d.%d.%d\"\n", major, minor, patch);
+    fprintf(fp, "tag: \"v%d.%d.%d\"\n", major, minor, patch);
 
     if (fp != stdout)
         fclose(fp);

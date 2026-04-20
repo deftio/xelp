@@ -199,6 +199,41 @@ Compare two buffers. `cmpType` controls null-terminator handling:
 | `XELP_XB_TOP(xb)` | Reset position to start |
 | `XELP_XB_OUT(x, xb)` | Print XelpBuf contents from current position |
 
+## Registers
+
+Each XELP instance contains an array of `XELPREG` (default `int`) registers
+used to pass return values between the engine and command handlers.
+
+- **`XELP_REGS_SZ`** -- register count (default 4, minimum 4).
+- **`XELPREG`** -- register type (default `int`, overridable in xelpcfg.h).
+- **Convention: callee-clobbers-all** -- any command call may overwrite all
+  registers. Do not rely on values persisting across calls.
+
+| Macro | Description |
+|-------|-------------|
+| `XELP_R0(ths)` | Command status (written by engine after dispatch). Read-only by convention. |
+| `XELP_R1(ths)` | Command-specific return value 1 (engine never touches). |
+| `XELP_R2(ths)` | Command-specific return value 2 (engine never touches). |
+| `XELP_R3(ths)` | Command-specific return value 3 (engine never touches). |
+
+`ths` is a struct (not a pointer). For pointer access inside command
+handlers, use `ths->mR[1]` directly.
+
+### Example: command returning multiple values
+
+```c
+XELPRESULT cmd_divmod(XELP *ths, const char *args, int len) {
+    int a = 17, b = 5;
+    ths->mR[1] = a / b;  /* quotient  -> R1 */
+    ths->mR[2] = a % b;  /* remainder -> R2 */
+    return XELP_S_OK;    /* engine writes R0 */
+}
+
+/* caller reads results via macros */
+XELP_R1(cli)  /* 3 */
+XELP_R2(cli)  /* 2 */
+```
+
 ## Constants
 
 | Constant | Value | Description |

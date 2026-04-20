@@ -95,13 +95,13 @@
 #define XELP_CLI_PROMPT		"xelp>"					
 
 
-/**************************************************************************************************** 
-  XELP_REGS_SZ is the number of integer registers to use for scripting and return vars.
-  It must be atleast 1 for Xelp to work as it is where all return values from function calls are deposited.
-  Some Xelp library functions (see stack ops) require atleast 2 registers.
-  size of register is set by XELPREG (default is machine int)
+/****************************************************************************************************
+  XELP_REGS_SZ is the number of callee-clobbers-all return registers per instance.
+  R0: command status (written by engine after dispatch).
+  R1-R3: command-specific return values (engine never touches these).
+  Minimum is 4. Size of each register is set by XELPREG (default is machine int).
  */
-#define XELP_REGS_SZ    2
+#define XELP_REGS_SZ    4
 
 #define XELPREG int    /* can change this to a valid C type for your plaform. eg. short, long, _int64 */
 

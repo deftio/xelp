@@ -93,6 +93,11 @@ do_extract_version() {
 
     [ -n "$VER_STRING" ] || fail "No version string produced"
 
+    # Enforce three-component semver (e.g. 0.3.0, never 0.3)
+    if ! echo "$VER_STRING" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+        fail "Version '$VER_STRING' is not three-component semver (expected X.Y.Z)"
+    fi
+
     echo "  Version: $VER_STRING ($VER_HEX)"
     echo "  Tag:     $VER_TAG"
     cat build/xelp_version.yaml
@@ -200,6 +205,11 @@ do_validate() {
     cov_line=$(gcov src/xelp.c 2>/dev/null | grep "Lines executed" | head -1)
     pct=$(echo "$cov_line" | grep -o '[0-9]*\.[0-9]*%' | head -1)
     pass "Coverage: $pct"
+
+    echo ""
+    echo "  --- Cleaning build artifacts ---"
+    run_cmd make clean >/dev/null 2>&1
+    pass "Build artifacts cleaned."
 }
 
 # -----------------------------------------------------------------------
@@ -684,8 +694,6 @@ echo "============================================"
 
 # -- Always run --
 do_extract_version
-do_sync_manifests
-do_update_badges
 do_validate
 
 if [ "$MODE" = "validate" ]; then
@@ -699,6 +707,15 @@ fi
 
 # -- Full release flow --
 do_check_git
+do_sync_manifests
+do_update_badges
+
+# Auto-commit manifest and badge updates (if any files were staged)
+if [ -n "$(git diff --cached --name-only)" ]; then
+    step_header "Commit manifest and badge updates"
+    run_cmd git commit -m "Sync manifests and badges for $VER_STRING"
+    pass "Committed version sync changes."
+fi
 
 if $TAG_EXISTS; then
     # Re-run: tag exists but release doesn't -- just wait for it

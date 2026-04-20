@@ -1,7 +1,7 @@
 
 <a href="https://www.deftio.com/xelp"><img src="./img/xelp-prompt-med.png" width="30%"></img></a>
 
-![Version](https://img.shields.io/badge/version-0.3-blue.svg)
+![Version](https://img.shields.io/badge/version-0.3.0-blue.svg)
 [![License](https://img.shields.io/badge/License-BSD%202--Clause-blue.svg)](https://opensource.org/licenses/BSD-2-Clause)
 [![CI](https://github.com/deftio/xelp/actions/workflows/ci.yml/badge.svg)](https://github.com/deftio/xelp/actions/workflows/ci.yml)
 ![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen.svg)
@@ -16,6 +16,8 @@ pure C. No dynamic memory. No OS required. No standard library dependencies.
 xelp gives bare-metal firmware a real interactive CLI, with scriptable commands
  (just store command(s) as strings), and also single-key (instant response) menus -- in a package small enough for 8051 or
 ATtiny85 through the latest processors.
+
+<img src="./img/xelp-cli-demo.png" width="70%" alt="xelp CLI demo session">
 
 ## Why xelp
 

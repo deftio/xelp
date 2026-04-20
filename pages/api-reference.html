@@ -27,7 +27,7 @@
 <h1>API Reference</h1>
 
 <p>All public types, functions, and macros defined in <code>xelp.h</code>.
-Version 0.2.1.</p>
+Version 0.3.0.</p>
 
 <h2>Types</h2>
 
@@ -192,12 +192,32 @@ value to <code>*n</code>.</p>
 </tbody>
 </table>
 
+<h2>Registers</h2>
+
+<p>Each XELP instance contains an array of <code>XELPREG</code> (default
+<code>int</code>) registers used to pass return values between the engine
+and command handlers. Convention: <strong>callee-clobbers-all</strong> &mdash;
+any command call may overwrite all registers.</p>
+
+<table>
+<thead><tr><th>Macro</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>XELP_R0(ths)</code></td><td>Command status (written by engine after dispatch). Read-only by convention.</td></tr>
+<tr><td><code>XELP_R1(ths)</code></td><td>Command-specific return value 1 (engine never touches).</td></tr>
+<tr><td><code>XELP_R2(ths)</code></td><td>Command-specific return value 2 (engine never touches).</td></tr>
+<tr><td><code>XELP_R3(ths)</code></td><td>Command-specific return value 3 (engine never touches).</td></tr>
+</tbody>
+</table>
+
+<p><code>ths</code> is a struct (not a pointer). For pointer access inside
+command handlers, use <code>ths-&gt;mR[1]</code> directly.</p>
+
 <h2>Constants</h2>
 
 <table>
 <thead><tr><th>Constant</th><th>Value</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td><code>XELP_VERSION</code></td><td>0x00000201</td><td>Library version (32-bit hex: <code>0x00MMmmpp</code>)</td></tr>
+<tr><td><code>XELP_VERSION</code></td><td>0x00000300</td><td>Library version (32-bit hex: <code>0x00MMmmpp</code>)</td></tr>
 <tr><td><code>XELP_VER_MAJOR(v)</code></td><td></td><td>Extract major version byte</td></tr>
 <tr><td><code>XELP_VER_MINOR(v)</code></td><td></td><td>Extract minor version byte</td></tr>
 <tr><td><code>XELP_VER_PATCH(v)</code></td><td></td><td>Extract patch version byte</td></tr>

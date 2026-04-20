@@ -63,13 +63,13 @@ extern "C"
 #endif
 
 #ifndef XELP_REGS_SZ
-#define XELP_REGS_SZ 			(1) /* there is always atleast 1 XELP_REG.  R0 is used for fn return vals */
+#define XELP_REGS_SZ 			(4) /* 4 callee-clobbers-all return registers per instance */
 #endif
 
-#if (XELP_REGS_SZ<=1)
+#if (XELP_REGS_SZ < 4)
 #undef XELP_REGS_SZ
-#define XELP_REGS_SZ (1)
-#endif 
+#define XELP_REGS_SZ (4)
+#endif
 
 /*****************************************************************************
  XELP_BANNER_STR stores the following logo as a string:
@@ -251,7 +251,7 @@ typedef struct XELP_tag
 
 	const char* 			mpAboutMsg;      /* Used as beginning of help message           */
 
-	XELPREG					mR[XELP_REGS_SZ];/* mR is the reg(s) used for func retn, ifOK etc (see docs) */
+	XELPREG					mR[XELP_REGS_SZ]; /* return registers (callee-clobbers-all, see docs) */
 
 #ifdef XELP_ENABLE_KEY						 /* if single-key commands enabled              */
 	XELPKeyFuncMapEntry		*mpKeyModeFuncs; /* key mode function dispatch                  */
@@ -309,6 +309,15 @@ XELPRESULT XELPInit (XELP *ths, const char *pAboutMsg);			    /* initialize inst
 #define XELP_SET_FN_BKSP(ths,pfBKSP)   (ths.mpfBksp=pfBKSP)	        /* Handle Backspace                */
 
 #define XELP_SET_VAL_CLI_PROMPT(ths,prompt)	(ths.mpPrompt=prompt)   /* stored by ptr: must be \0 terminated, must outlive instance */
+
+/* Register access macros -- callee-clobbers-all convention.
+   R0: command status (written by engine after dispatch).
+   R1-R3: command-specific return values (engine never touches these).
+   All registers may be overwritten by any command call. */
+#define XELP_R0(ths) ((ths).mR[0])
+#define XELP_R1(ths) ((ths).mR[1])
+#define XELP_R2(ths) ((ths).mR[2])
+#define XELP_R3(ths) ((ths).mR[3])
 
 #ifdef XELP_ENABLE_HELP
 XELPRESULT XELPHelp	        (XELP *ths);                             /* print online help (if avail)    */

@@ -48,7 +48,8 @@ Same idea as the `arduino` example but uses the `XelpCLI` C++ wrapper
 class from `src/XelpArduino.h`. Eliminates boilerplate: no manual
 `XELP_SET_FN_*` macros, no `Serial.available()` loop -- just `begin()`,
 `setCommands()`, and `poll(Serial)`. Also demonstrates `run()` for
-executing a startup script.
+executing a startup script, and the `r0()`-`r3()` register accessors
+for reading command return values (divmod example).
 
 ## esp32-wifi
 

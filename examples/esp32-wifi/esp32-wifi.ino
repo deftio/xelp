@@ -305,6 +305,50 @@ XELPRESULT cmdLed(XELP *ths, const char *args, int len)
     return XELP_S_OK;
 }
 
+/* Integer division: quotient -> R1, remainder -> R2 */
+XELPRESULT cmdDivmod(XELP *ths, const char *args, int len)
+{
+    XelpBuf b, tok;
+    int a, d;
+    char buf[48];
+    XELP_XB_INIT(b, (char *)args, len);
+
+    XELP_XB_TOP(b);
+    if (XELPTokN(&b, 1, &tok) != XELP_S_OK) goto usage;
+    a = XELPStr2Int(tok.s, (int)(tok.p - tok.s));
+
+    XELP_XB_TOP(b);
+    if (XELPTokN(&b, 2, &tok) != XELP_S_OK) goto usage;
+    d = XELPStr2Int(tok.s, (int)(tok.p - tok.s));
+
+    if (d == 0) {
+        XELPOut(ths, "division by zero\n", 0);
+        return XELP_E_ERR;
+    }
+
+    ths->mR[1] = a / d;
+    ths->mR[2] = a % d;
+    snprintf(buf, sizeof(buf), "%d / %d = %d remainder %d\n",
+             a, d, ths->mR[1], ths->mR[2]);
+    XELPOut(ths, buf, 0);
+    return XELP_S_OK;
+
+usage:
+    XELPOut(ths, "usage: divmod <a> <b>\n", 0);
+    return XELP_E_ERR;
+}
+
+/* Print all 4 registers */
+XELPRESULT cmdPrintR(XELP *ths, const char *args, int len)
+{
+    char buf[64];
+    (void)args; (void)len;
+    snprintf(buf, sizeof(buf), "R0=%d R1=%d R2=%d R3=%d\n",
+             XELP_R0(*ths), XELP_R1(*ths), XELP_R2(*ths), XELP_R3(*ths));
+    XELPOut(ths, buf, 0);
+    return XELP_S_OK;
+}
+
 /* ------------------------------------------------------------------ */
 /* Command table                                                       */
 /* ------------------------------------------------------------------ */
@@ -319,6 +363,8 @@ XELPCLIFuncMapEntry commands[] = {
     { &cmdTime,       "time",       "fetch current time"           },
     { &cmdWeather,    "weather",    "weather <lat> <lon> -- fetch weather" },
     { &cmdLed,        "led",        "led <0|1> -- set LED"         },
+    { &cmdDivmod,     "divmod",     "divmod <a> <b> -- R1=a/b R2=a%b" },
+    { &cmdPrintR,     "pr",         "print all registers"          },
     XELP_FUNC_ENTRY_LAST
 };
 
@@ -338,6 +384,14 @@ void setup()
     cli.setPrompt("esp32>");
 
     cli.run("echo Type help for commands");
+
+    /* Demonstrate registers: run divmod and read results via C++ accessors */
+    cli.run("divmod 100 7");
+    Serial.print("100/7 = ");
+    Serial.print(cli.r1());       /* quotient  -> 14 */
+    Serial.print(" remainder ");
+    Serial.println(cli.r2());     /* remainder -> 2  */
+
     Serial.println();
 }
 

@@ -188,10 +188,33 @@ XELPRESULT cmdNumToks (XELP *ths, const char* args, int maxlen)
     return XELP_S_OK;
 };
 XELPRESULT cmdPrintR (XELP *ths, const char* args, int maxlen){
-	int i = ths->mR[0];
 	(void)args; (void)maxlen;
-	printw("%x\n",i);
-	return i;  // leaves mR[0] unchanged
+	printw("R0=%d R1=%d R2=%d R3=%d\n",
+	       XELP_R0(*ths), XELP_R1(*ths), XELP_R2(*ths), XELP_R3(*ths));
+	return XELP_R0(*ths);
+}
+
+XELPRESULT cmdDivmod (XELP *ths, const char* args, int maxlen){
+	XelpBuf b, tok;
+	int dividend, divisor;
+	XELP_XB_INIT(b, (char*)args, maxlen);
+
+	XELP_XB_TOP(b);
+	XELPTokN(&b, 1, &tok);
+	dividend = XELPStr2Int(tok.s, tok.p - tok.s);
+
+	XELP_XB_TOP(b);
+	XELPTokN(&b, 2, &tok);
+	divisor = XELPStr2Int(tok.s, tok.p - tok.s);
+
+	if (divisor == 0) {
+		printw("divmod: division by zero\n");
+		return XELP_E_ERR;
+	}
+	ths->mR[1] = dividend / divisor;
+	ths->mR[2] = dividend % divisor;
+	printw("%d / %d = %d remainder %d\n", dividend, divisor, ths->mR[1], ths->mR[2]);
+	return XELP_S_OK;
 }
 
 
@@ -299,7 +322,8 @@ XELPCLIFuncMapEntry gMyCLICommands[] =
 	{&cmdMath           , "-"       ,  "sub two numbers"            },
 	{&cmdMath           , "*"       ,  "mul two numbers"            },
 	{&cmdMath           , "/"       ,  "div two numbers"            },
-	{&cmdPrintR			, "pr"      ,  "print Xelp regs"            },
+	{&cmdPrintR			, "pr"      ,  "print all registers"        },
+	{&cmdDivmod			, "divmod"  ,  "divmod <a> <b>: R1=a/b R2=a%b"},
 	{&cmdExit           , "exit"    ,  "quit demo program"          },
 	XELP_FUNC_ENTRY_LAST
 };
