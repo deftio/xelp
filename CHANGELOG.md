@@ -6,8 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
 The version source of truth is `XELP_VERSION` in `src/xelp.h` (hex format).
+Versions always use three-component semver (e.g. `0.3.0`, never `0.3`).
 
 ## [Unreleased]
+
+### Changed
+- Default `XELP_REGS_SZ` changed from 1 to 4 (4 callee-clobbers-all
+  return registers per instance). Minimum clamped to 4.
+
+### Added
+- `XELP_R0`-`XELP_R3` accessor macros for register access
+- `r0()`-`r3()` methods on C++ `XelpCLI` wrapper (`XelpArduino.h`)
+- `divmod` example command demonstrating multi-register returns
+- Register tests (9 cases covering init, dispatch, macros, survival)
 
 ## [0.3.0] - 2026-04-19
 

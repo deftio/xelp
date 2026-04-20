@@ -29,7 +29,7 @@
   <img src="../img/xelp-prompt-med.png" alt="xelp" class="logo">
   <p class="tagline">A command line interpreter and script engine for embedded systems.</p>
   <div class="badges">
-    <img src="https://img.shields.io/badge/version-0.3-blue.svg" alt="Version">
+    <img src="https://img.shields.io/badge/version-0.3.0-blue.svg" alt="Version">
     <a href="https://opensource.org/licenses/BSD-2-Clause"><img src="https://img.shields.io/badge/License-BSD%202--Clause-blue.svg" alt="License"></a>
     <a href="https://github.com/deftio/xelp/actions/workflows/ci.yml"><img src="https://github.com/deftio/xelp/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
     <img src="https://img.shields.io/badge/coverage-100%25-brightgreen.svg" alt="Coverage">
@@ -82,18 +82,20 @@ CLI functions
  help     show help
  echo     echo args back
  led      led &lt;0|1&gt;
- status   system status
- config   config &lt;key&gt; &lt;value&gt;</span>
+ divmod   divmod &lt;a&gt; &lt;b&gt; R1=a/b R2=a%b
+ pr       print all registers</span>
 
 <span class="prompt">xelp&gt;</span> <span class="cmd">echo "hello world"</span>
 <span class="output">hello world</span>
 
 <span class="prompt">xelp&gt;</span> <span class="cmd">led 1</span>
-<span class="output">LED on</span>
+<span class="output">LED ON</span>
 
-<span class="prompt">xelp&gt;</span> <span class="cmd">config gain 50; config mode 2  # inline script</span>
-<span class="output">gain = 50
-mode = 2</span>
+<span class="prompt">xelp&gt;</span> <span class="cmd">divmod 17 5</span>
+<span class="output">17 / 5 = 3 remainder 2</span>
+
+<span class="prompt">xelp&gt;</span> <span class="cmd">pr</span>
+<span class="output">R0=0 R1=3 R2=2 R3=0</span>
 
 <span class="prompt">xelp&gt;</span> <span class="cmd">_</span></div>
 </div>
@@ -102,9 +104,9 @@ mode = 2</span>
 entry:</p>
 
 <pre><code>XELPCLIFuncMapEntry commands[] = {
-    { &amp;cmd_echo,   "echo",   "echo args back"          },
-    { &amp;cmd_led,    "led",    "led &lt;0|1&gt;"               },
-    { &amp;cmd_config, "config", "config &lt;key&gt; &lt;value&gt;"    },
+    { &amp;cmd_echo,   "echo",   "echo args back"              },
+    { &amp;cmd_led,    "led",    "led &lt;0|1&gt;"                   },
+    { &amp;cmd_divmod, "divmod", "divmod &lt;a&gt; &lt;b&gt; R1=a/b R2=a%b" },
     XELP_FUNC_ENTRY_LAST
 };
 </code></pre>
@@ -129,8 +131,8 @@ entry:</p>
 
 void uart_putc(char c) { UART_TX = c; }
 
-XELPRESULT cmd_hello(const char *args, int len) {
-    XELPOut(&amp;cli, "Hello!\n", 0);
+XELPRESULT cmd_hello(XELP *ths, const char *args, int len) {
+    XELPOut(ths, "Hello!\n", 0);
     return XELP_S_OK;
 }
 

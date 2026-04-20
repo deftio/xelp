@@ -291,6 +291,43 @@ void on_mode_change(int mode) {
 XELP_SET_FN_EMCHG(cli, &on_mode_change);
 ```
 
+## 11. Registers -- returning values from commands
+
+Every XELP instance has 4 integer registers (`mR[0]`..`mR[3]`).
+The engine writes R0 with the command's return code after every dispatch.
+R1-R3 are available for commands to return extra values to the caller.
+
+**Convention: callee-clobbers-all** -- any command call may overwrite all
+registers, so read them immediately after dispatch.
+
+### Reading R0 after a command
+
+```c
+XELPParse(&cli, "hello", 5);
+if (XELP_R0(cli) == XELP_S_OK) {
+    /* command succeeded */
+}
+```
+
+### Writing R1-R3 in a command handler
+
+```c
+XELPRESULT cmd_divmod(XELP *ths, const char *args, int len) {
+    int a = 17, b = 5;
+    ths->mR[1] = a / b;  /* quotient  -> R1 */
+    ths->mR[2] = a % b;  /* remainder -> R2 */
+    return XELP_S_OK;    /* engine writes R0 */
+}
+```
+
+### Reading results
+
+```c
+XELPParse(&cli, "divmod 17 5", 11);
+int quot = XELP_R1(cli);   /* 3 */
+int rem  = XELP_R2(cli);   /* 2 */
+```
+
 ## Next steps
 
 - [API Reference](api-reference.md) -- complete function and macro documentation

@@ -17,6 +17,8 @@ xelp gives bare-metal firmware a real interactive CLI, with scriptable commands
  (just store command(s) as strings), and also single-key (instant response) menus -- in a package small enough for 8051 or
 ATtiny85 through the latest processors.
 
+<img src="./img/xelp-cli-demo.png" width="70%" alt="xelp CLI demo session">
+
 ## Why xelp
 
 Many embedded projects end up with an ad-hoc `if (char == 'x')` debug

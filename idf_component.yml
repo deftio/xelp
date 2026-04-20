@@ -21,7 +21,7 @@
 #
 # See: https://docs.espressif.com/projects/idf-component-manager/en/latest/reference/manifest_file.html
 
-version: "0.3"
+version: "0.3.0"
 description: >-
   Tiny CLI and script interpreter for embedded systems.
   2KB flash, zero malloc, multi-instance.
@@ -32,12 +32,10 @@ url: https://github.com/deftio/xelp
 repository: https://github.com/deftio/xelp.git
 documentation: https://github.com/deftio/xelp/blob/master/docs/api-reference.md
 issues: https://github.com/deftio/xelp/issues
-license: BSD-2-Clause
-
 maintainers:
   - "M. A. Chatterjee <deftio@deftio.com>"
 
-keywords:
+tags:
   - cli
   - command-line
   - interpreter
@@ -51,33 +49,24 @@ keywords:
 # Only ship the files needed to build.  Everything else (tests, tools,
 # dev notes, CI, pages) is excluded to keep the published component small.
 files:
-  include:
-    - "src/**"
-    - "examples/**"
-    - "docs/**"
-    - "CMakeLists.txt"
-    - "idf_component.yml"
-    - "LICENSE.txt"
-    - "README.md"
-    - "CHANGELOG.md"
-    - "library.json"
-    - "library.properties"
   exclude:
-    - "build/**"
-    - "tests/**"
-    - "tools/**"
-    - "dev/**"
-    - "pages/**"
-    - "scripts/**"
-    - ".github/**"
-    - ".claude/**"
-    - "img/**"
-    - "*.gcov"
-    - "*.gcda"
-    - "*.gcno"
-    - "*.o"
-    - "*.out"
-    - ".DS_Store"
+    - "build/**/*"
+    - "tests/**/*"
+    - "tools/**/*"
+    - "dev/**/*"
+    - "pages/**/*"
+    - "scripts/**/*"
+    - "img/**/*"
+    - "dist/**/*"
+    - ".github/**/*"
+    - ".claude/**/*"
+    - "**/*.gcov"
+    - "**/*.gcda"
+    - "**/*.gcno"
+    - "**/*.o"
+    - "**/*.out"
+    - "**/.DS_Store"
+    - ".gitignore"
     - "makefile"
     - "index.html"
     - "llms.txt"

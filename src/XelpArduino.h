@@ -161,6 +161,19 @@ public:
     }
 #endif
 
+    /* ---- Registers ------------------------------------------------ */
+
+    /** Read command status (engine-owned, read-only). */
+    XELPREG  r0() const { return m_x.mR[0]; }
+
+    /** Read/write command-specific return registers. */
+    XELPREG  r1() const { return m_x.mR[1]; }
+    XELPREG  r2() const { return m_x.mR[2]; }
+    XELPREG  r3() const { return m_x.mR[3]; }
+    XELPREG& r1()       { return m_x.mR[1]; }
+    XELPREG& r2()       { return m_x.mR[2]; }
+    XELPREG& r3()       { return m_x.mR[3]; }
+
     /* ---- Escape hatch --------------------------------------------- */
 
     /** Access the underlying C struct for anything the wrapper doesn't expose. */

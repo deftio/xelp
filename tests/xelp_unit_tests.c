@@ -832,7 +832,7 @@ XELPRESULT test_XELPExecKC() {
     }
 
     /* verify return value stored in mR[0] */
-    if (JB_ASSERT(x.mR[0] != XELP_S_NOTFOUND, "ExecKC mR[0] stores result"))
+    if (JB_ASSERT(XELP_R0(x) != XELP_S_NOTFOUND, "ExecKC mR[0] stores result"))
         return XELP_E_ERR;
 
     /* test key '0' */
@@ -1215,7 +1215,7 @@ XELPRESULT test_XELPParseXB() {
     s = "nonexistent\n";
     XELP_XB_INIT(script,s,XELPStrLen(s));
     r = XELPParseXB(&x,&script);
-    if (JB_ASSERT((r != XELP_S_OK) || (x.mR[0] != XELP_E_CMDNOTFOUND), "XELPParseXB cmd not found"))
+    if (JB_ASSERT((r != XELP_S_OK) || (XELP_R0(x) != XELP_E_CMDNOTFOUND), "XELPParseXB cmd not found"))
         return XELP_E_ERR;
 
     /* empty input */
@@ -1279,7 +1279,7 @@ XELPRESULT test_XELPParse() {
     /* test command not found */
     s = "doesnotexist\n";
     r = XELPParse(&x,s,XELPStrLen(s));
-    if (JB_ASSERT((r!=XELP_S_OK) || (x.mR[0] != XELP_E_CMDNOTFOUND), "XELPParse not found"))
+    if (JB_ASSERT((r!=XELP_S_OK) || (XELP_R0(x) != XELP_E_CMDNOTFOUND), "XELPParse not found"))
         return XELP_E_ERR;
 
     return XELP_S_OK;
@@ -1477,7 +1477,7 @@ XELPRESULT test_default_handlers() {
     r = XELPExecKC(&x,'z');
     if (JB_ASSERT(r != XELP_S_NOTFOUND, "DefKey null handler returns NOTFOUND"))
         return XELP_E_ERR;
-    if (JB_ASSERT(x.mR[0] != XELP_S_NOTFOUND, "DefKey null handler mR[0]"))
+    if (JB_ASSERT(XELP_R0(x) != XELP_S_NOTFOUND, "DefKey null handler mR[0]"))
         return XELP_E_ERR;
 
     /* set default KEY handler -- unmapped key should call it */
@@ -1488,7 +1488,7 @@ XELPRESULT test_default_handlers() {
         return XELP_E_ERR;
     if (JB_ASSERT(gDefKeyVal != 'z', "DefKey handler received key"))
         return XELP_E_ERR;
-    if (JB_ASSERT(x.mR[0] != XELP_W_WARN, "DefKey handler mR[0] stores result"))
+    if (JB_ASSERT(XELP_R0(x) != XELP_W_WARN, "DefKey handler mR[0] stores result"))
         return XELP_E_ERR;
 
     /* mapped key should NOT call default handler */
@@ -1541,7 +1541,7 @@ XELPRESULT test_default_handlers() {
     s = "unknowncmd arg1\n";
     XELP_XB_INIT(script,s,XELPStrLen(s));
     r = XELPParseXB(&x,&script);
-    if (JB_ASSERT(x.mR[0] != XELP_E_CMDNOTFOUND, "DefCLI null handler CMDNOTFOUND"))
+    if (JB_ASSERT(XELP_R0(x) != XELP_E_CMDNOTFOUND, "DefCLI null handler CMDNOTFOUND"))
         return XELP_E_ERR;
 
     /* set default CLI handler -- unknown command should call it */
@@ -1553,7 +1553,7 @@ XELPRESULT test_default_handlers() {
     r = XELPParseXB(&x,&script);
     if (JB_ASSERT(r != XELP_S_OK, "DefCLI handler called"))
         return XELP_E_ERR;
-    if (JB_ASSERT(x.mR[0] != XELP_W_WARN, "DefCLI handler mR[0]"))
+    if (JB_ASSERT(XELP_R0(x) != XELP_W_WARN, "DefCLI handler mR[0]"))
         return XELP_E_ERR;
     if (JB_ASSERT(gDefCLIArgs == 0, "DefCLI handler received args"))
         return XELP_E_ERR;
@@ -1580,7 +1580,7 @@ XELPRESULT test_default_handlers() {
     r = XELPParseXB(&x,&script);
     if (JB_ASSERT(gGlobalCallbackData.c1 != 1, "DefCLI mixed: known ran"))
         return XELP_E_ERR;
-    if (JB_ASSERT(x.mR[0] != XELP_W_WARN, "DefCLI mixed: default handler ran"))
+    if (JB_ASSERT(XELP_R0(x) != XELP_W_WARN, "DefCLI mixed: default handler ran"))
         return XELP_E_ERR;
 
     /* default CLI handler with NULL fn table */
@@ -1612,7 +1612,7 @@ XELPRESULT test_default_handlers() {
         for (i = 0; i < XELPStrLen(cmd); i++)
             XELPParseKey(&x5,cmd[i]);
         XELPParseKey(&x5,XELPKEY_ENTER);
-        if (JB_ASSERT(x5.mR[0] != XELP_W_WARN, "DefCLI via ParseKey"))
+        if (JB_ASSERT(XELP_R0(x5) != XELP_W_WARN, "DefCLI via ParseKey"))
             return XELP_E_ERR;
     }
 
@@ -2217,6 +2217,151 @@ XELPRESULT test_stress_malformed() {
 }
 
 
+/* ====================================================================
+ test_XelpRegisters()
+
+ Tests for the mR[] register array and XELP_R0-R3 accessor macros.
+ */
+
+/* helper CLI command that writes R1-R3 from parsed args */
+XELPRESULT cmd_set_regs(XELP *ths, const char *args, int len) {
+    XelpBuf b, tok;
+    XELP_XB_INIT(b, (char*)args, len);
+
+    XELP_XB_TOP(b);
+    XELPTokN(&b, 1, &tok);
+    ths->mR[1] = XELPStr2Int(tok.s, tok.p - tok.s);
+
+    XELP_XB_TOP(b);
+    XELPTokN(&b, 2, &tok);
+    ths->mR[2] = XELPStr2Int(tok.s, tok.p - tok.s);
+
+    XELP_XB_TOP(b);
+    XELPTokN(&b, 3, &tok);
+    ths->mR[3] = XELPStr2Int(tok.s, tok.p - tok.s);
+
+    return XELP_S_OK;
+}
+
+/* helper KEY command that sets R1 */
+XELPRESULT key_set_r1(XELP *ths, int k) {
+    ths->mR[1] = k;
+    return XELP_S_OK;
+}
+
+XELPRESULT test_XelpRegisters() {
+    XELP x;
+    XELPRESULT r;
+    XelpBuf script;
+    int i;
+
+    XELPCLIFuncMapEntry regCmds[] = {
+        {&cmd_set_regs, "setr", "set R1-R3"},
+        {&cli0,         "nop",  "no-op"},
+        XELP_FUNC_ENTRY_LAST
+    };
+
+    XELPKeyFuncMapEntry regKeys[] = {
+        {&key_set_r1, 'r', "set R1"},
+        XELP_FUNC_ENTRY_LAST
+    };
+
+    /* 1. compile-time: XELP_REGS_SZ >= 4 */
+    if (JB_ASSERT(XELP_REGS_SZ < 4, "XELP_REGS_SZ >= 4"))
+        return XELP_E_ERR;
+
+    /* 2. all 4 registers zeroed after XELPInit */
+    XELPInit(&x, "RegTest");
+    XELP_SET_FN_CLI(x, regCmds);
+    XELP_SET_FN_KEY(x, regKeys);
+    XELP_SET_FN_OUT(x, dummyOut);
+
+    for (i = 0; i < 4; i++) {
+        if (JB_ASSERT(x.mR[i] != 0, "regs zeroed after init"))
+            return XELP_E_ERR;
+    }
+
+    /* 3. accessor macros read correctly */
+    if (JB_ASSERT(XELP_R0(x) != 0, "R0 macro reads 0"))
+        return XELP_E_ERR;
+    if (JB_ASSERT(XELP_R1(x) != 0, "R1 macro reads 0"))
+        return XELP_E_ERR;
+    if (JB_ASSERT(XELP_R2(x) != 0, "R2 macro reads 0"))
+        return XELP_E_ERR;
+    if (JB_ASSERT(XELP_R3(x) != 0, "R3 macro reads 0"))
+        return XELP_E_ERR;
+
+    /* 4. engine writes R0 after KEY dispatch */
+    r = XELPExecKC(&x, 'r');
+    if (JB_ASSERT(r != XELP_S_OK, "key dispatch OK"))
+        return XELP_E_ERR;
+    if (JB_ASSERT(XELP_R0(x) != XELP_S_OK, "R0 set after key dispatch"))
+        return XELP_E_ERR;
+    /* R1 was set by key_set_r1 */
+    if (JB_ASSERT(XELP_R1(x) != 'r', "R1 set by key handler"))
+        return XELP_E_ERR;
+
+    /* 5. engine writes R0 after CLI dispatch */
+    {
+        char *s = "setr 10 20 30\n";
+        XELP_XB_INIT(script, s, XELPStrLen(s));
+        r = XELPParseXB(&x, &script);
+    }
+    if (JB_ASSERT(r != XELP_S_OK, "CLI dispatch OK"))
+        return XELP_E_ERR;
+    if (JB_ASSERT(XELP_R0(x) != XELP_S_OK, "R0 set after CLI dispatch"))
+        return XELP_E_ERR;
+
+    /* 6. command wrote R1-R3, caller reads them back via macros */
+    if (JB_ASSERT(XELP_R1(x) != 10, "R1 set by setr"))
+        return XELP_E_ERR;
+    if (JB_ASSERT(XELP_R2(x) != 20, "R2 set by setr"))
+        return XELP_E_ERR;
+    if (JB_ASSERT(XELP_R3(x) != 30, "R3 set by setr"))
+        return XELP_E_ERR;
+
+    /* 7. R1-R3 survive between dispatch calls (engine doesn't touch them) */
+    {
+        char *s = "nop\n";
+        XELP_XB_INIT(script, s, XELPStrLen(s));
+        r = XELPParseXB(&x, &script);
+    }
+    if (JB_ASSERT(XELP_R1(x) != 10, "R1 survives nop"))
+        return XELP_E_ERR;
+    if (JB_ASSERT(XELP_R2(x) != 20, "R2 survives nop"))
+        return XELP_E_ERR;
+    if (JB_ASSERT(XELP_R3(x) != 30, "R3 survives nop"))
+        return XELP_E_ERR;
+
+    /* 8. callee-clobbers-all: next setr call overwrites R0 */
+    {
+        char *s = "setr 100 200 300\n";
+        XELP_XB_INIT(script, s, XELPStrLen(s));
+        r = XELPParseXB(&x, &script);
+    }
+    if (JB_ASSERT(XELP_R0(x) != XELP_S_OK, "R0 overwritten by next call"))
+        return XELP_E_ERR;
+    if (JB_ASSERT(XELP_R1(x) != 100, "R1 overwritten by setr"))
+        return XELP_E_ERR;
+    if (JB_ASSERT(XELP_R2(x) != 200, "R2 overwritten by setr"))
+        return XELP_E_ERR;
+    if (JB_ASSERT(XELP_R3(x) != 300, "R3 overwritten by setr"))
+        return XELP_E_ERR;
+
+    /* 9. not-found command sets R0 to CMDNOTFOUND, leaves R1-R3 alone */
+    {
+        char *s = "nosuchcmd\n";
+        XELP_XB_INIT(script, s, XELPStrLen(s));
+        r = XELPParseXB(&x, &script);
+    }
+    if (JB_ASSERT(XELP_R0(x) != XELP_E_CMDNOTFOUND, "R0 CMDNOTFOUND"))
+        return XELP_E_ERR;
+    if (JB_ASSERT(XELP_R1(x) != 100, "R1 untouched after not-found"))
+        return XELP_E_ERR;
+
+    return XELP_S_OK;
+}
+
 /* 	************************************************
 	Xelp Simple Unit Test suite.
 */
@@ -2258,6 +2403,7 @@ int run_tests() {
     JumpBug_RunUnit(test_default_handlers,"DefaultHandlers");
     JumpBug_RunUnit(test_buffer_boundaries,"BufferBoundaries");
     JumpBug_RunUnit(test_stress_malformed,"StressMalformed");
+    JumpBug_RunUnit(test_XelpRegisters,"XelpRegisters");
 
     JumpBug_PrintResults();
 
