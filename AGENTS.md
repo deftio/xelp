@@ -28,7 +28,7 @@ compiler.
   for the life of the instance (string literals, static buffers, or
   globals -- never stack-local buffers that go out of scope).
 
-## Function signatures (v0.3.0+)
+## Function signatures (v0.3.1+)
 
 ### CLI command functions
 
@@ -45,14 +45,20 @@ XELPRESULT my_command(XELP *ths, const char *args, int len) {
 ### KEY command functions
 
 ```c
-XELPRESULT my_key_handler(XELP *ths, int key) {
+XELPRESULT my_key_handler(XELP *ths, XELPKEYCODE key) {
     /* ths -- the invoking xelp instance
-       key -- the ASCII key that was pressed */
+       key -- XELPKEYCODE (unsigned long): single-char key or packed
+              multi-byte ANSI sequence (e.g. XELP_KEYCODE_UP) */
     (void)key;
     XELPOut(ths, "Key pressed\n", 0);
     return XELP_S_OK;
 }
 ```
+
+Multi-byte key constants: `XELP_KEYCODE_UP`, `XELP_KEYCODE_DOWN`,
+`XELP_KEYCODE_LEFT`, `XELP_KEYCODE_RIGHT`, `XELP_KEYCODE_HOME`,
+`XELP_KEYCODE_END`, `XELP_KEYCODE_INS`, `XELP_KEYCODE_KDEL`.
+Single-char keys are their natural value (`'?'` == 0x3F).
 
 ### Command tables
 
@@ -64,8 +70,9 @@ XELPCLIFuncMapEntry cli_commands[] = {
 };
 
 XELPKeyFuncMapEntry key_commands[] = {
-    { &my_key_handler, '?', "show help"  },
-    { &toggle_led,     'l', "toggle LED" },
+    { &my_key_handler, '?',              "show help"  },
+    { &toggle_led,     'l',              "toggle LED" },
+    { &on_arrow_up,    XELP_KEYCODE_UP,  "scroll up"  },
     XELP_FUNC_ENTRY_LAST
 };
 ```
@@ -182,11 +189,12 @@ Edit `src/xelpcfg.h` to enable/disable features:
 
 | Flag               | Purpose                          | Size impact    |
 |--------------------|----------------------------------|----------------|
-| `XELP_ENABLE_CLI`  | CLI mode + scripting             | Core (~2 KB)   |
-| `XELP_ENABLE_KEY`  | Single keypress mode             | ~200-500 bytes |
-| `XELP_ENABLE_THR`  | Pass-through mode                | ~50-125 bytes  |
-| `XELP_ENABLE_HELP` | Built-in help command            | ~180-350 bytes |
-| `XELP_ENABLE_FULL` | All of the above                 | All combined   |
+| `XELP_ENABLE_CLI`       | CLI mode + scripting             | Core (~2 KB)      |
+| `XELP_ENABLE_LINE_EDIT` | Cursor movement, insert, delete  | ~800-1000 bytes   |
+| `XELP_ENABLE_KEY`       | Single keypress mode             | ~200-500 bytes    |
+| `XELP_ENABLE_THR`       | Pass-through mode                | ~50-125 bytes     |
+| `XELP_ENABLE_HELP`      | Built-in help command            | ~180-350 bytes    |
+| `XELP_ENABLE_FULL`      | All of the above                 | All combined      |
 
 Buffer size: `XELP_CMDBUFSZ` (default 64 bytes).
 

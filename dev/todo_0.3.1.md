@@ -18,20 +18,26 @@ Decision deferred until implementation is complete.
       explain the 4-byte design rationale clearly for less experienced
       users. Estimated +1 KB compiled (ARM Thumb). Needs thorough testing
       of all insert/delete/cursor combinations.
-- [ ] **Badges** -- Remove RISC-V badge from README, add Arduino,
+- [x] **Badges** -- Remove RISC-V badge from README, add Arduino,
       PlatformIO, and Espressif library badges on a second line.
-- [ ] **PlatformIO ghost fix** -- Delete `v0.3` tag/release from GitHub
+- [x] **PlatformIO ghost fix** -- Delete `v0.3` tag/release from GitHub
       so PlatformIO re-indexes `0.3.0` as latest.
-- [ ] **crossbuild.sh multi-config** -- Build each target three times
+- [x] **crossbuild.sh multi-config** -- Build each target three times
       (KEY-only, CLI, FULL). Add PIC16/PIC18 via SDCC. Group output by
       word size (8/16/32/64-bit). Add `sdcc` to Dockerfile.
-- [ ] **README rewrite** -- Rewrite opening paragraph for clarity.
+      Also fixed missing `#ifdef XELP_ENABLE_CLI` guard on mCmdXB init
+      in XELPInit (KEY-only config would not compile without it).
+- [x] **README rewrite** -- Rewrite opening paragraph for clarity.
       Replace size table with 3-column (KEY/CLI/FULL) version grouped
       by word size. Remove jargon that assumes reader knows KEY mode.
-- [ ] **Fuzz testing** -- Create AFL/libFuzzer harness for `XELPParseKey`
+      Updated test counts (35 units, 442 cases). Fixed typos. Added
+      line editing to feature table. Removed stale XELP_ENABLE_LCORE.
+- [x] **Fuzz testing** -- Create AFL/libFuzzer harness for `XELPParseKey`
       and `XELPParse`. Run, fix any findings. Add harness to repo
       (e.g. `tests/fuzz/`).
-- [ ] **Multi-instance stress test** -- Add unit test that runs two XELP
+      Found and fixed SEGV in XELPTokLineXB: uninitialised tok->s when
+      buffer exhausted in _PS_ESCA state (CLI escape char at end of input).
+- [x] **Multi-instance stress test** -- Add unit test that runs two XELP
       instances interleaved (alternating char feeds, shared command table)
       to verify no shared state leaks.
 - [ ] **ESP32-C6 dual-CLI example** -- `examples/esp32c6-wifi/`. Serial +
@@ -39,16 +45,24 @@ Decision deferred until implementation is complete.
       either transport. NVS persistence. Small HTTP server or client after
       connect. Starter for an article demonstrating xelp in a real product
       pattern.
-- [ ] **PlatformIO CI** -- Add PlatformIO build check to GitHub Actions
+- [x] **PlatformIO CI** -- Add PlatformIO build check to GitHub Actions
       CI workflow. Install PlatformIO via pip, run `pio ci` against a
       few boards (e.g. uno, esp32dev). Validates `library.json` on every
       push. ~30 lines of YAML.
-- [ ] **Documentation sweep** -- Update all docs, pages, and metadata to
+- [x] **Documentation sweep** -- Update all docs, pages, and metadata to
       reflect the release: `docs/` markdown (api-reference, tutorial),
       `pages/` HTML (api-reference.html, index.html), `README.md`,
       `AGENTS.md`, `LLMTEXT.md`, `CHANGELOG.md`. Ensure new features
       (multi-byte keys, single-line editing, register macros, key macros)
       are documented everywhere consistently. Final review pass.
+      Updated: CHANGELOG.md (full [Unreleased] section with all 0.3.1
+      changes), AGENTS.md (XELPKEYCODE signatures, XELP_ENABLE_LINE_EDIT),
+      docs/configuration.md (removed LCORE/STACK_DEPTH, fixed REGS_SZ=4,
+      added LINE_EDIT), docs/api-reference.md (XELPKEYCODE type, key code
+      table, v0.3.1), docs/tutorial.md (XELPKEYCODE sigs, line editing
+      section), llms.txt (size range), docs/porting.md (Docker crossbuild),
+      pages/ HTML (api-reference, configuration, tutorial, index -- all
+      synced with markdown counterparts), README.md badge 0.3.1.
 
 ## Order of operations
 

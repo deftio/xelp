@@ -1,6 +1,6 @@
 # API Reference
 
-All public types, functions, and macros defined in `xelp.h`. Version 0.3.0.
+All public types, functions, and macros defined in `xelp.h`. Version 0.3.1.
 
 ## Types
 
@@ -9,8 +9,9 @@ All public types, functions, and macros defined in `xelp.h`. Version 0.3.0.
 | `XELP` | Runtime instance of the interpreter. Holds all state. |
 | `XELPRESULT` | Return type (`int`). 0 = OK, negative = error, positive = warning. |
 | `XELPREG` | Register type (default `int`, overridable in xelpcfg.h). |
+| `XELPKEYCODE` | Key code type (`unsigned long`). Single-char keys are their natural value; multi-byte ANSI sequences are packed little-endian. |
 | `XelpBuf` | Buffer wrapper with start, position, and end pointers. |
-| `XELPKeyFuncMapEntry` | Single-key command entry: `XELPRESULT fn(XELP *ths, int key)`, key, help string. |
+| `XELPKeyFuncMapEntry` | Single-key command entry: `XELPRESULT fn(XELP *ths, XELPKEYCODE key)`, key code, help string. |
 | `XELPCLIFuncMapEntry` | CLI command entry: `XELPRESULT fn(XELP *ths, const char *args, int len)`, command name, help string. |
 
 ## Return Codes
@@ -48,6 +49,8 @@ Initialize an XELP instance. Must be called before any other function.
 | `XELP_SET_FN_EMCHG(ths, fn)` | Set mode-change callback: `void fn(int)` |
 | `XELP_SET_FN_CLI(ths, tbl)` | Set CLI command table |
 | `XELP_SET_FN_KEY(ths, tbl)` | Set KEY command table |
+| `XELP_SET_FN_DEF_CLI(ths, fn)` | Set default CLI handler: called when no command matches |
+| `XELP_SET_FN_DEF_KEY(ths, fn)` | Set default KEY handler: called when no key matches |
 | `XELP_SET_VAL_CLI_PROMPT(ths, str)` | Set CLI prompt string (stored by pointer, must be null-terminated and remain valid) |
 | `XELP_SET_ABOUT(ths, str)` | Change the about/help message (stored by pointer, must be null-terminated and remain valid) |
 
@@ -234,11 +237,40 @@ XELP_R1(cli)  /* 3 */
 XELP_R2(cli)  /* 2 */
 ```
 
+## Multi-byte Key Codes
+
+`XELPKEYCODE` constants for ANSI escape sequences. Packed little-endian:
+byte[0] in bits 0-7, byte[1] in 8-15, etc. Single-char keys are their
+natural value (e.g. `'a'` == 0x61). Multi-byte keys are >= 0x100.
+
+| Constant | Value | Sequence |
+|----------|-------|----------|
+| `XELP_KEYCODE_UP` | `0x00415B1BUL` | ESC [ A |
+| `XELP_KEYCODE_DOWN` | `0x00425B1BUL` | ESC [ B |
+| `XELP_KEYCODE_RIGHT` | `0x00435B1BUL` | ESC [ C |
+| `XELP_KEYCODE_LEFT` | `0x00445B1BUL` | ESC [ D |
+| `XELP_KEYCODE_HOME` | `0x00485B1BUL` | ESC [ H |
+| `XELP_KEYCODE_END` | `0x00465B1BUL` | ESC [ F |
+| `XELP_KEYCODE_INS` | `0x7E325B1BUL` | ESC [ 2 ~ |
+| `XELP_KEYCODE_KDEL` | `0x7E335B1BUL` | ESC [ 3 ~ |
+| `XELP_KEYCODE_PGUP` | `0x7E355B1BUL` | ESC [ 5 ~ |
+| `XELP_KEYCODE_PGDN` | `0x7E365B1BUL` | ESC [ 6 ~ |
+
+### Key code accessor macros
+
+| Macro | Description |
+|-------|-------------|
+| `XELP_KC_B0(k)` | Extract byte 0 (bits 0-7) |
+| `XELP_KC_B1(k)` | Extract byte 1 (bits 8-15) |
+| `XELP_KC_B2(k)` | Extract byte 2 (bits 16-23) |
+| `XELP_KC_B3(k)` | Extract byte 3 (bits 24-31) |
+| `XELP_KC_IS_MULTI(k)` | True if key code is multi-byte (>= 0x100) |
+
 ## Constants
 
 | Constant | Value | Description |
 |----------|-------|-------------|
-| `XELP_VERSION` | 0x00000300 | Library version (32-bit hex: `0x00MMmmpp`) |
+| `XELP_VERSION` | 0x00000301 | Library version (32-bit hex: `0x00MMmmpp`) |
 | `XELP_VER_MAJOR(v)` | | Extract major version byte |
 | `XELP_VER_MINOR(v)` | | Extract minor version byte |
 | `XELP_VER_PATCH(v)` | | Extract patch version byte |

@@ -30,16 +30,60 @@
 Comment in or out <code>#define</code> lines to enable or disable features.
 Each feature that is compiled out saves code space.</p>
 
+<h2>Build Profiles</h2>
+
+<p>xelp is modular &mdash; enable only what you need. Three profiles cover
+most use cases:</p>
+
+<h3>KEY only (~1 KB)</h3>
+
+<p>Single-keypress dispatch: each key triggers a function immediately, no
+ENTER needed. Ideal for debug menus and hardware test jigs.</p>
+
+<pre><code>#define XELP_ENABLE_KEY  1
+</code></pre>
+
+<p>Representative size: <strong>~550 bytes</strong> on ARM Thumb,
+<strong>~900 bytes</strong> on AVR.</p>
+
+<h3>CLI (~3&ndash;5 KB)</h3>
+
+<p>Line-buffered command prompt with cursor movement, line editing,
+multi-byte ANSI key recognition, tokenizer, scripting, and help. This is
+the typical interactive configuration.</p>
+
+<pre><code>#define XELP_ENABLE_CLI        1
+#define XELP_ENABLE_LINE_EDIT  1
+#define XELP_ENABLE_KEY        1
+#define XELP_ENABLE_HELP       1
+</code></pre>
+
+<p>Representative size: <strong>~2600 bytes</strong> on ARM Thumb,
+<strong>~4200 bytes</strong> on AVR.</p>
+
+<h3>Full (~3&ndash;5 KB)</h3>
+
+<p>Everything in CLI plus THR (pass-through) mode, which forwards all
+keystrokes to another peripheral &mdash; a modem, radio module, or debug
+port. Adds ~50&ndash;125 bytes over CLI.</p>
+
+<pre><code>#define XELP_ENABLE_FULL  1
+</code></pre>
+
+<p>Every flag is independent &mdash; mix and match. See the
+<a href="https://github.com/deftio/xelp/blob/master/docs/build-profiles.md">Build
+Profiles &amp; Configuration Guide</a> for full details.</p>
+
 <h2>Feature flags</h2>
 
 <table>
 <thead><tr><th>Flag</th><th>Purpose</th><th>Size impact</th></tr></thead>
 <tbody>
 <tr><td><code>XELP_ENABLE_CLI</code></td><td>Command line mode with prompt, backspace, and command dispatch</td><td>Required for CLI and scripting</td></tr>
+<tr><td><code>XELP_ENABLE_LINE_EDIT</code></td><td>Cursor movement (left/right, Home/End), insert-at-cursor, Delete. Requires <code>XELP_ENABLE_CLI</code>.</td><td>~800&ndash;1000 bytes</td></tr>
 <tr><td><code>XELP_ENABLE_KEY</code></td><td>Single key press mode (menus, immediate actions)</td><td>~200&ndash;500 bytes</td></tr>
 <tr><td><code>XELP_ENABLE_THR</code></td><td>Pass-through mode (redirect keys to another peripheral)</td><td>~50&ndash;125 bytes</td></tr>
 <tr><td><code>XELP_ENABLE_HELP</code></td><td>Built-in help function listing all commands</td><td>~180&ndash;350 bytes</td></tr>
-<tr><td><code>XELP_ENABLE_LCORE</code></td><td>Language core features: peek, poke, go</td><td>Variable</td></tr>
 <tr><td><code>XELP_ENABLE_FULL</code></td><td>Enable all of the above</td><td>All combined</td></tr>
 </tbody>
 </table>
@@ -76,9 +120,8 @@ Each feature that is compiled out saves code space.</p>
 <thead><tr><th>Define</th><th>Default</th><th>Purpose</th></tr></thead>
 <tbody>
 <tr><td><code>XELP_CMDBUFSZ</code></td><td>64</td><td>Command line buffer size in bytes</td></tr>
-<tr><td><code>XELP_REGS_SZ</code></td><td>2</td><td>Number of integer registers (min 1, R0 is return value)</td></tr>
+<tr><td><code>XELP_REGS_SZ</code></td><td>4</td><td>Number of callee-clobbers-all return registers (minimum 4). R0 is command status, R1&ndash;R3 are command-specific.</td></tr>
 <tr><td><code>XELPREG</code></td><td><code>int</code></td><td>Register type (change for platforms where <code>int</code> is not ideal)</td></tr>
-<tr><td><code>XELP_STACK_DEPTH</code></td><td>16</td><td>Stack depth for stack machine operations</td></tr>
 </tbody>
 </table>
 
@@ -119,7 +162,7 @@ filesystems.</p>
 <h3>Minimal (KEY mode only)</h3>
 <pre><code>/* xelpcfg.h */
 #define XELP_ENABLE_KEY   1
-/* Leave CLI, THR, HELP, LCORE undefined */
+/* Leave CLI, LINE_EDIT, THR, HELP undefined */
 </code></pre>
 <p>Estimated size: ~900 bytes</p>
 

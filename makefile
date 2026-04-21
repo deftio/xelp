@@ -13,7 +13,7 @@ BUILD_DIR=build
 INCLUDES=\
     -I$(LIB_DIR)\
 
-.PHONY: tests clean example coverage version
+.PHONY: tests clean example coverage version fuzz fuzz-parsekey fuzz-parse
 
 # all object files go in build/
 $(BUILD_DIR):
@@ -71,6 +71,28 @@ $(BUILD_DIR)/xelp-example.o: $(EXAMPLE_POSIX_DIR)/xelp-example.c | $(BUILD_DIR)
 example: $(OBJ_EXAMPLE1)
 	$(CC) $(C_FLAGS) $(INCLUDES) $(OBJ_EXAMPLE1) -o $(BUILD_DIR)/xelp-example.out -lm -lncurses -Os
 	@$(BUILD_DIR)/xelp-example.out
+
+#=======================================================================
+# Fuzz testing (requires clang with libFuzzer + ASan + UBSan)
+# Override FUZZ_CC for your system, e.g.: make fuzz FUZZ_CC=clang
+FUZZ_CC ?= /usr/local/opt/llvm/bin/clang
+FUZZ_FLAGS = -fsanitize=fuzzer,address,undefined -g -O1 -I$(LIB_DIR)
+FUZZ_DIR = tests/fuzz
+FUZZ_TIME ?= 60
+
+fuzz-parsekey: | $(BUILD_DIR)
+	$(FUZZ_CC) $(FUZZ_FLAGS) $(LIB_DIR)/xelp.c $(FUZZ_DIR)/fuzz_parsekey.c \
+		-o $(BUILD_DIR)/fuzz_parsekey
+	@mkdir -p $(FUZZ_DIR)/corpus_parsekey
+	$(BUILD_DIR)/fuzz_parsekey $(FUZZ_DIR)/corpus_parsekey -max_total_time=$(FUZZ_TIME)
+
+fuzz-parse: | $(BUILD_DIR)
+	$(FUZZ_CC) $(FUZZ_FLAGS) $(LIB_DIR)/xelp.c $(FUZZ_DIR)/fuzz_parse.c \
+		-o $(BUILD_DIR)/fuzz_parse
+	@mkdir -p $(FUZZ_DIR)/corpus_parse
+	$(BUILD_DIR)/fuzz_parse $(FUZZ_DIR)/corpus_parse -max_total_time=$(FUZZ_TIME)
+
+fuzz: fuzz-parsekey fuzz-parse
 
 #=======================================================================
 # clean -- wipe all build artifacts (src/ stays clean)

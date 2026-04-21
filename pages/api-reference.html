@@ -27,7 +27,7 @@
 <h1>API Reference</h1>
 
 <p>All public types, functions, and macros defined in <code>xelp.h</code>.
-Version 0.3.0.</p>
+Version 0.3.1.</p>
 
 <h2>Types</h2>
 
@@ -37,8 +37,9 @@ Version 0.3.0.</p>
 <tr><td><code>XELP</code></td><td>Runtime instance of the interpreter. Holds all state.</td></tr>
 <tr><td><code>XELPRESULT</code></td><td>Return type (<code>int</code>). 0 = OK, negative = error, positive = warning.</td></tr>
 <tr><td><code>XELPREG</code></td><td>Register type (default <code>int</code>, overridable in xelpcfg.h).</td></tr>
+<tr><td><code>XELPKEYCODE</code></td><td>Key code type (<code>unsigned long</code>). Single-char keys are their natural value; multi-byte ANSI sequences are packed little-endian.</td></tr>
 <tr><td><code>XelpBuf</code></td><td>Buffer wrapper with start, position, and end pointers.</td></tr>
-<tr><td><code>XELPKeyFuncMapEntry</code></td><td>Single-key command entry: <code>XELPRESULT fn(XELP *ths, int key)</code>, key, help string.</td></tr>
+<tr><td><code>XELPKeyFuncMapEntry</code></td><td>Single-key command entry: <code>XELPRESULT fn(XELP *ths, XELPKEYCODE key)</code>, key code, help string.</td></tr>
 <tr><td><code>XELPCLIFuncMapEntry</code></td><td>CLI command entry: <code>XELPRESULT fn(XELP *ths, const char *args, int len)</code>, command name, help string.</td></tr>
 </tbody>
 </table>

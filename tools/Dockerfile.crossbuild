@@ -23,6 +23,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc-xtensa-lx106 \
     picolibc-xtensa-lx106-elf \
     tcc \
+    sdcc \
     binutils \
     && rm -rf /var/lib/apt/lists/*
 

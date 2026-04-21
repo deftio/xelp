@@ -276,7 +276,13 @@ XELPRESULT XELPInit 	 (
 		*p++=0;
 	
 	ths->mpAboutMsg = pAboutMsg;
+#ifdef XELP_ENABLE_CLI
+	/* Guard needed: mCmdXB and mCmdMsgBuf only exist in the struct when
+	   XELP_ENABLE_CLI is defined (see xelp.h).  Without this guard,
+	   KEY-only builds (XELP_CONFIG_OVERRIDE with only XELP_ENABLE_KEY)
+	   fail to compile. */
 	XELP_XB_INIT(ths->mCmdXB,ths->mCmdMsgBuf,XELP_CMDBUFSZ-1);
+#endif
 #if defined(XELP_ENABLE_CLI) && defined(XELP_ENABLE_LINE_EDIT)
 	ths->mCur = ths->mCmdXB.s;
 #endif
@@ -582,8 +588,16 @@ XELPRESULT XELPTokLineXB (XelpBuf *buf, XelpBuf *tok, int srchType) {
 
 		(buf->p)++; /* advance char ptr */
 	}
-    /* buffer exhausted: if still seeking (no token started) or in a comment, nothing was found */
-    if (tm && (cs == _PS_SEEK || cs == _PS_CMNT))
+    /* Buffer exhausted before a token was completed.  If tok->s was never
+       assigned (_EF_TS never fired) we must return NOTFOUND — otherwise the
+       caller would use the uninitialised tok->s pointer, causing a SEGV in
+       XELPStrEq during command dispatch.  States where _EF_TS has not fired:
+         _PS_SEEK  – still looking for a token
+         _PS_CMNT  – inside a comment (no token started)
+         _PS_ESCA  – consumed a CLI escape char at end-of-buffer
+       Bug found by libFuzzer: input " ` \n" (backtick = XELP_CLI_ESC) left
+       the tokeniser in _PS_ESCA at EOB, returning OK with garbage tok->s. */
+    if (tm && (cs == _PS_SEEK || cs == _PS_CMNT || cs == _PS_ESCA))
         return XELP_S_NOTFOUND;
     if (tm)
         tok->p  = buf->p;

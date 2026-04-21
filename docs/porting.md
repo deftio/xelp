@@ -113,12 +113,14 @@ Extremely constrained. Use KEY-only mode to minimize footprint.
 
 ## Cross-Compilation Test
 
-The `tools/compactbuilds.sh` script compiles xelp with various
-cross-toolchains and reports code sizes. Run it to verify your toolchain
-produces a clean build:
+The `tools/compactbuilds-docker.sh` script compiles xelp with various
+cross-toolchains inside Docker and reports code sizes in three
+configurations (KEY-only, CLI, FULL) grouped by word size. Run via
+Docker:
 
-```
-bash tools/compactbuilds.sh
+```bash
+docker build -f tools/Dockerfile.crossbuild -t xelp-crossbuild .
+docker run --rm xelp-crossbuild
 ```
 
 ## Minimal Example

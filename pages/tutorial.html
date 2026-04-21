@@ -144,7 +144,7 @@ tokenizer to extract individual arguments:</p>
 <p>KEY mode fires a function on every keypress, no ENTER needed. Great for
 menus and quick toggles:</p>
 
-<pre><code>XELPRESULT key_toggle_led(XELP *ths, int c) {
+<pre><code>XELPRESULT key_toggle_led(XELP *ths, XELPKEYCODE c) {
     (void)c;
     /* toggle your LED here */
     XELPOut(ths, "LED toggled\n", 0);

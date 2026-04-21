@@ -2865,6 +2865,160 @@ XELPRESULT test_CLIMalformedKeys() {
     return XELP_S_OK;
 }
 
+/* ====================================================================
+ test_MultiInstance()
+
+ Runs two XELP instances sharing the same command tables, alternating
+ char feeds to verify no shared state leaks between instances.
+ Tests:
+   1. Interleaved CLI commands dispatch to the correct instance
+   2. Interleaved ParseKey char feeds keep independent buffers
+   3. Mode changes on one instance don't affect the other
+   4. mR[] registers are per-instance
+*/
+XELPRESULT test_MultiInstance() {
+    XELP a, b;
+    XELPRESULT r;
+    int i;
+
+    XELPInit(&a, "InstanceA");
+    XELPInit(&b, "InstanceB");
+
+    XELP_SET_FN_CLI(a, gMyCLICommands);
+    XELP_SET_FN_CLI(b, gMyCLICommands);
+    XELP_SET_FN_KEY(a, gMyKeyCommands);
+    XELP_SET_FN_KEY(b, gMyKeyCommands);
+    XELP_SET_FN_OUT(a, dummyOut);
+    XELP_SET_FN_OUT(b, dummyOut);
+    XELP_SET_FN_BKSP(a, dummyVoid0);
+    XELP_SET_FN_BKSP(b, dummyVoid0);
+    XELP_SET_FN_THR(a, dummyOut);
+    XELP_SET_FN_THR(b, dummyOut);
+
+    /* 1. Interleaved XELPParse: different commands, independent results */
+    gGlobalCallbackData.c0 = -1;
+    gGlobalCallbackData.c1 = -1;
+    gGlobalCallbackData.c2 = -1;
+
+    r = XELPParse(&a, "foo\n", 4);
+    if (JB_ASSERT((r != XELP_S_OK) || (gGlobalCallbackData.c1 != 1), "MultiInst Parse A foo"))
+        return XELP_E_ERR;
+
+    r = XELPParse(&b, "bar\n", 4);
+    if (JB_ASSERT((r != XELP_S_OK) || (gGlobalCallbackData.c2 != 2), "MultiInst Parse B bar"))
+        return XELP_E_ERR;
+
+    /* mR[0] should reflect each instance's last dispatch independently */
+    if (JB_ASSERT(XELP_R0(a) != XELP_S_OK, "MultiInst mR[0] A"))
+        return XELP_E_ERR;
+    if (JB_ASSERT(XELP_R0(b) != XELP_S_OK, "MultiInst mR[0] B"))
+        return XELP_E_ERR;
+
+    /* Run command-not-found on A, verify B's mR[0] unaffected */
+    r = XELPParse(&a, "nonexistent\n", 12);
+    if (JB_ASSERT(XELP_R0(a) != XELP_E_CMDNOTFOUND, "MultiInst A cmdnotfound"))
+        return XELP_E_ERR;
+    if (JB_ASSERT(XELP_R0(b) != XELP_S_OK, "MultiInst B mR[0] still OK"))
+        return XELP_E_ERR;
+
+    /* 2. Interleaved ParseKey: type into both instances alternately */
+    {
+        char *cmdA = "cli0";
+        char *cmdB = "foo";
+        int lenA = XELPStrLen(cmdA);
+        int lenB = XELPStrLen(cmdB);
+
+        /* Reset callback state */
+        gGlobalCallbackData.c0 = -1;
+        gGlobalCallbackData.c1 = -1;
+
+        /* Feed characters alternating: A gets "cli0", B gets "foo" */
+        for (i = 0; i < lenA || i < lenB; i++) {
+            if (i < lenA) XELPParseKey(&a, cmdA[i]);
+            if (i < lenB) XELPParseKey(&b, cmdB[i]);
+        }
+        XELPParseKey(&a, XELPKEY_ENTER);
+        XELPParseKey(&b, XELPKEY_ENTER);
+
+        if (JB_ASSERT(gGlobalCallbackData.c0 != 0, "MultiInst ParseKey A cli0"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(gGlobalCallbackData.c1 != 1, "MultiInst ParseKey B foo"))
+            return XELP_E_ERR;
+    }
+
+    /* 3. Mode changes on one instance don't affect the other */
+    {
+        /* A switches to KEY mode, B stays in CLI */
+        XELPParseKey(&a, XELPKEY_KEY); /* ESC: stashed */
+        XELPParseKey(&a, '\0');        /* flush ESC -> KEY mode */
+        if (JB_ASSERT(a.mCurMode != XELP_MODE_KEY, "MultiInst A to KEY"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(b.mCurMode != XELP_MODE_CLI, "MultiInst B still CLI"))
+            return XELP_E_ERR;
+
+        /* B switches to THR, A still in KEY */
+        XELPParseKey(&b, XELPKEY_THR);
+        if (JB_ASSERT(b.mCurMode != XELP_MODE_THR, "MultiInst B to THR"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(a.mCurMode != XELP_MODE_KEY, "MultiInst A still KEY"))
+            return XELP_E_ERR;
+
+        /* Return both to CLI */
+        XELPParseKey(&a, XELPKEY_CLI);
+        XELPParseKey(&b, XELPKEY_CLI);
+        if (JB_ASSERT(a.mCurMode != XELP_MODE_CLI, "MultiInst A back CLI"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(b.mCurMode != XELP_MODE_CLI, "MultiInst B back CLI"))
+            return XELP_E_ERR;
+    }
+
+    /* 4. Stress: many interleaved commands */
+    {
+        int round;
+        for (round = 0; round < 50; round++) {
+            gGlobalCallbackData.c0 = -1;
+            gGlobalCallbackData.c1 = -1;
+            r = XELPParse(&a, "cli0\n", 5);
+            r = XELPParse(&b, "foo\n", 4);
+            if (JB_ASSERT(gGlobalCallbackData.c0 != 0, "MultiInst stress A"))
+                return XELP_E_ERR;
+            if (JB_ASSERT(gGlobalCallbackData.c1 != 1, "MultiInst stress B"))
+                return XELP_E_ERR;
+        }
+    }
+
+    /* 5. Both instances do ParseKey with backspace — independent buffers */
+    {
+        gGlobalCallbackData.c2 = -1;
+        /* A types "baz" then backspace 3 times (empty), then "foo" + enter */
+        XELPParseKey(&a, 'b');
+        XELPParseKey(&a, 'a');
+        XELPParseKey(&a, 'z');
+        XELPParseKey(&a, XELPKEY_BKSP);
+        XELPParseKey(&a, XELPKEY_BKSP);
+        XELPParseKey(&a, XELPKEY_BKSP);
+
+        /* B types "bar" + enter while A's buffer is being edited */
+        XELPParseKey(&b, 'b');
+        XELPParseKey(&b, 'a');
+        XELPParseKey(&b, 'r');
+        XELPParseKey(&b, XELPKEY_ENTER);
+        if (JB_ASSERT(gGlobalCallbackData.c2 != 2, "MultiInst bksp B bar"))
+            return XELP_E_ERR;
+
+        /* A now types "foo" + enter */
+        gGlobalCallbackData.c1 = -1;
+        XELPParseKey(&a, 'f');
+        XELPParseKey(&a, 'o');
+        XELPParseKey(&a, 'o');
+        XELPParseKey(&a, XELPKEY_ENTER);
+        if (JB_ASSERT(gGlobalCallbackData.c1 != 1, "MultiInst bksp A foo"))
+            return XELP_E_ERR;
+    }
+
+    return XELP_S_OK;
+}
+
 /* 	************************************************
 	Xelp Simple Unit Test suite.
 */
@@ -2921,6 +3075,7 @@ int run_tests() {
     JumpBug_RunUnit(test_HelpMultiByteKeys,"HelpMultiByteKeys");
     JumpBug_RunUnit(test_AccumOverflow,"AccumOverflow");
     JumpBug_RunUnit(test_CLIMalformedKeys,"CLIMalformedKeys");
+    JumpBug_RunUnit(test_MultiInstance,"MultiInstance");
 
     JumpBug_PrintResults();
 

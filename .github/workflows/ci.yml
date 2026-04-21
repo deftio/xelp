@@ -46,9 +46,9 @@ jobs:
       - name: Coverage report (GCC on Ubuntu only)
         if: matrix.os == 'ubuntu-latest' && matrix.compiler == 'gcc'
         run: |
-          gcov src/xelp.c
+          gcov -o build/ src/xelp.c
           echo "--- Coverage Summary ---"
-          gcov src/xelp.c 2>/dev/null | grep -A 1 "File.*xelp.c"
+          gcov -o build/ src/xelp.c 2>/dev/null | grep -A 1 "File.*xelp.c"
 
   test-32bit:
     runs-on: ubuntu-latest
@@ -62,3 +62,39 @@ jobs:
 
       - name: Build and run tests (32-bit)
         run: make tests C_FLAGS="-I. -Wall -g -fprofile-arcs -ftest-coverage -m32"
+
+  fuzz:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install clang
+        run: sudo apt-get update && sudo apt-get install -y clang
+
+      - name: Fuzz XELPParseKey (60s)
+        run: make fuzz-parsekey FUZZ_CC=clang
+
+      - name: Fuzz XELPParse (60s)
+        run: make fuzz-parse FUZZ_CC=clang
+
+  platformio:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install PlatformIO
+        run: pip install platformio
+
+      - name: Build Arduino Uno
+        run: pio ci examples/arduino/arduino.ino --lib=src --board=uno
+
+      - name: Build Arduino Mega
+        run: pio ci examples/arduino/arduino.ino --lib=src --board=megaatmega2560
+
+      - name: Build ESP32
+        run: pio ci examples/arduino/arduino.ino --lib=src --board=esp32dev

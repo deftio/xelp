@@ -140,12 +140,12 @@ KEY mode is for menus and quick toggles. Each keypress fires a function
 immediately (no ENTER needed):
 
 ```c
-XELPRESULT key_help(XELP *ths, int c) {
+XELPRESULT key_help(XELP *ths, XELPKEYCODE c) {
     (void)c;
     return XELPHelp(ths);
 }
 
-XELPRESULT key_toggle_led(XELP *ths, int c) {
+XELPRESULT key_toggle_led(XELP *ths, XELPKEYCODE c) {
     (void)c;
     /* toggle your LED here */
     XELPOut(ths, "LED toggled\n", 0);
@@ -274,7 +274,24 @@ When the user presses CTRL-T, all subsequent keystrokes go to
 `modem_send()` instead of the xelp parser. Press CTRL-P to return to
 CLI mode.
 
-## 10. Mode change callback
+## 10. Line editing
+
+When `XELP_ENABLE_LINE_EDIT` is defined in `xelpcfg.h`, the CLI prompt
+supports cursor movement and mid-line editing:
+
+- **Left/Right arrow** -- move cursor within the line
+- **Home/End** -- jump to beginning/end of line
+- **Delete** -- delete character at cursor
+- **Insert** -- insert characters at cursor position (shift model)
+
+Multi-byte key sequences (arrow keys, Home/End, Delete) are automatically
+recognized by xelp's key accumulator. No terminal configuration needed
+beyond standard VT100/ANSI support.
+
+Without `XELP_ENABLE_LINE_EDIT`, CLI uses append-only input with
+backspace via the `mpfBksp` callback.
+
+## 11. Mode change callback
 
 Get notified when the user switches modes:
 
@@ -291,7 +308,7 @@ void on_mode_change(int mode) {
 XELP_SET_FN_EMCHG(cli, &on_mode_change);
 ```
 
-## 11. Registers -- returning values from commands
+## 12. Registers -- returning values from commands
 
 Every XELP instance has 4 integer registers (`mR[0]`..`mR[3]`).
 The engine writes R0 with the command's return code after every dispatch.
