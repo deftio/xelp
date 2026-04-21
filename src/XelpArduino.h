@@ -94,7 +94,7 @@ public:
 
 #ifdef XELP_ENABLE_KEY
     /** Set the default handler for unmapped single-key presses. */
-    void setDefaultKeyHandler(XELPRESULT (*fn)(XELP*, int))
+    void setDefaultKeyHandler(XELPRESULT (*fn)(XELP*, XELPKEYCODE))
     {
         XELP_SET_FN_DEF_KEY(m_x, fn);
     }

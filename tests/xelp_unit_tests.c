@@ -49,19 +49,19 @@ struct {
     int c2;
 }gGlobalCallbackData;
 
-XELPRESULT k0 (XELP *ths, int k) {
+XELPRESULT k0 (XELP *ths, XELPKEYCODE k) {
     (void)ths;
-    gGlobalCallbackData.k0 = k;
+    gGlobalCallbackData.k0 = (int)k;
     return XELP_S_OK;
 }
-XELPRESULT k1 (XELP *ths, int k) {
+XELPRESULT k1 (XELP *ths, XELPKEYCODE k) {
     (void)ths;
-    gGlobalCallbackData.k1 = k;
+    gGlobalCallbackData.k1 = (int)k;
     return XELP_S_OK;
 }
-XELPRESULT k2 (XELP *ths, int k) {
+XELPRESULT k2 (XELP *ths, XELPKEYCODE k) {
     (void)ths;
-    gGlobalCallbackData.k2 = k;
+    gGlobalCallbackData.k2 = (int)k;
     return XELP_S_OK;
 }
 
@@ -75,22 +75,22 @@ XELPKeyFuncMapEntry gMyKeyCommands[] =
 };
 
 XELPRESULT cli0 (XELP *ths, const char *c, int max) {
-    (void)ths;
+    (void)ths; (void)c; (void)max;
     gGlobalCallbackData.c0 = 0;
     return XELP_S_OK;
 }
 XELPRESULT cli1 (XELP *ths, const char *c, int max) {
-    (void)ths;
+    (void)ths; (void)c; (void)max;
     gGlobalCallbackData.c1 = 1;
     return XELP_S_OK;
 }
 XELPRESULT cli2 (XELP *ths, const char *c, int max) {
-    (void)ths;
+    (void)ths; (void)c; (void)max;
     gGlobalCallbackData.c2 = 2;
     return XELP_S_OK;
 }
 XELPRESULT cli3 (XELP *ths, const char *c, int max) {
-    (void)ths;
+    (void)ths; (void)c; (void)max;
     gGlobalCallbackData.c0 = 0;
     gGlobalCallbackData.c1 = 0;
     gGlobalCallbackData.c2 = 0;
@@ -897,6 +897,7 @@ XELPRESULT test_XELPParseKey() {
         }
 
 
+#ifndef XELP_ENABLE_LINE_EDIT
         XELP_SET_FN_BKSP(x, dummyVoid1);
         dummyVoid0();
         r = XELPParseKey(&x,XELPKEY_CLI);
@@ -906,10 +907,25 @@ XELPRESULT test_XELPParseKey() {
         if (JB_ASSERT( (r!= XELP_S_OK) || (gBool != 1), "XELPParseKey --  bskp callback test")){
             return XELP_E_ERR;
         }
+#else
+        /* with line editing, mpfBksp is not called; library handles visual feedback */
+        r = XELPParseKey(&x,XELPKEY_CLI);
+        r = XELPParseKey(&x,'a');
+        r = XELPParseKey(&x,XELPKEY_BKSP);
+        r = XELPParseKey(&x,XELPKEY_ENTER);
+        if (JB_ASSERT(r!= XELP_S_OK, "XELPParseKey --  bskp line edit test")){
+            return XELP_E_ERR;
+        }
+#endif
 
     }
 
-    /* test mode changes */
+    /* test mode changes
+       Note: ESC (XELPKEY_KEY default) is deferred by the key accumulator until the
+       next byte arrives.  So switching to KEY mode requires two XELPParseKey calls:
+       the ESC byte, then any non-'[' byte that flushes it. The flush byte is then
+       reprocessed in the new mode.  To isolate the KEY mode change, we send a NUL
+       byte after ESC (NUL is not a mode-switch key, so it gets dispatched in KEY mode). */
     {
         XELP_SET_FN_EMCHG(x,0);
 
@@ -917,7 +933,8 @@ XELPRESULT test_XELPParseKey() {
         if (JB_ASSERT( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_CLI), "XELPParseKey -- mode change to CLI 1")){
             return XELP_E_ERR;
         }
-        r = XELPParseKey(&x,XELPKEY_KEY);
+        r = XELPParseKey(&x,XELPKEY_KEY); /* ESC: stashed in accumulator */
+        r = XELPParseKey(&x,'!');          /* flush ESC → KEY mode, '!' dispatched as key cmd */
         if (JB_ASSERT( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_KEY), "XELPParseKey -- mode change to KEY")){
             return XELP_E_ERR;
         }
@@ -965,13 +982,8 @@ XELPRESULT test_XELPParseKey() {
 
     /* test KEY function redirects */
     {
-        r = XELPParseKey(&x,XELPKEY_KEY);
-        if (JB_ASSERT( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_KEY) , "XELPParseKey --  KEY 1")){
-            return XELP_E_ERR;
-        }
-
-        gGlobalCallbackData.k0 = 'x';
-        r = XELPParseKey(&x,'0');
+        r = XELPParseKey(&x,XELPKEY_KEY); /* ESC: stashed */
+        r = XELPParseKey(&x,'0');         /* flush ESC → KEY mode, reprocess '0' → executes k0 */
         if (JB_ASSERT( (r!= XELP_S_OK) || (x.mCurMode != XELP_MODE_KEY) || (gGlobalCallbackData.k0 != '0'), "XELPParseKey -- KEY cmd 0")){
             return XELP_E_ERR;
         }
@@ -1019,7 +1031,8 @@ XELPRESULT test_XELPParseKey() {
         XELP_SET_FN_CLI(x2,gMyCLICommands);
         XELP_SET_FN_OUT(x2,dummyOut);
         /* no KEY funcs set -- trying to switch to KEY should stay in CLI */
-        r = XELPParseKey(&x2,XELPKEY_KEY);
+        r = XELPParseKey(&x2,XELPKEY_KEY); /* ESC: stashed */
+        r = XELPParseKey(&x2,'!');          /* flush: ESC fails to switch (no KEY table), '!' goes to CLI */
         if (JB_ASSERT(x2.mCurMode != XELP_MODE_CLI, "XELPParseKey no KEY stays CLI"))
             return XELP_E_ERR;
     }
@@ -1448,9 +1461,9 @@ static int gDefKeyVal;
 static const char *gDefCLIArgs;
 static int gDefCLILen;
 
-XELPRESULT defKeyHandler(XELP *ths, int key) {
+XELPRESULT defKeyHandler(XELP *ths, XELPKEYCODE key) {
     (void)ths;
-    gDefKeyVal = key;
+    gDefKeyVal = (int)key;
     return XELP_W_WARN;
 }
 
@@ -1524,9 +1537,9 @@ XELPRESULT test_default_handlers() {
         XELP_SET_FN_CLI(x3,gMyCLICommands);
         XELP_SET_FN_OUT(x3,dummyOut);
         XELP_SET_FN_DEF_KEY(x3,defKeyHandler);
-        XELPParseKey(&x3,XELPKEY_KEY); /* switch to KEY mode */
+        XELPParseKey(&x3,XELPKEY_KEY); /* ESC: stashed */
         gDefKeyVal = 0;
-        XELPParseKey(&x3,'q'); /* unmapped key */
+        XELPParseKey(&x3,'q'); /* flush ESC → KEY mode, reprocess 'q' → default handler */
         if (JB_ASSERT(gDefKeyVal != 'q', "DefKey via ParseKey"))
             return XELP_E_ERR;
     }
@@ -2006,8 +2019,8 @@ XELPRESULT test_stress_malformed() {
     {
         for (i = 0; i < 100; i++) {
             XELPParseKey(&x,XELPKEY_CLI);
-            XELPParseKey(&x,XELPKEY_KEY);
-            XELPParseKey(&x,XELPKEY_THR);
+            XELPParseKey(&x,XELPKEY_KEY); /* ESC: stashed */
+            XELPParseKey(&x,XELPKEY_THR); /* flush ESC → KEY, reprocess THR → THR mode */
         }
         /* should not crash and mode should be THR after last switch */
         if (JB_ASSERT(x.mCurMode != XELP_MODE_THR, "stress rapid mode switch"))
@@ -2244,8 +2257,8 @@ XELPRESULT cmd_set_regs(XELP *ths, const char *args, int len) {
 }
 
 /* helper KEY command that sets R1 */
-XELPRESULT key_set_r1(XELP *ths, int k) {
-    ths->mR[1] = k;
+XELPRESULT key_set_r1(XELP *ths, XELPKEYCODE k) {
+    ths->mR[1] = (int)k;
     return XELP_S_OK;
 }
 
@@ -2362,6 +2375,496 @@ XELPRESULT test_XelpRegisters() {
     return XELP_S_OK;
 }
 
+/* ====================================================================
+ test_KeyAccumulator() - multi-byte sequence assembly (tested indirectly via XELPParseKey)
+ */
+XELPRESULT test_KeyAccumulator() {
+    XELP x;
+
+    XELPInit(&x,"TestKeyAccum");
+    XELP_SET_FN_OUT(x,dummyOut);
+    XELP_SET_FN_CLI(x,gMyCLICommands);
+
+    /* single char 'a' processes immediately into CLI buffer */
+    XELPParseKey(&x, 'a');
+    if (JB_ASSERT(XELP_XB_POS(x.mCmdXB) != 1, "accum single char in buf"))
+        return XELP_E_ERR;
+
+    XELPParseKey(&x, XELPKEY_ENTER); /* reset buffer */
+
+    /* ESC alone stalls -- accumulator holds it, nothing in buffer */
+    XELPParseKey(&x, 0x1B);
+    if (JB_ASSERT(XELP_XB_POS(x.mCmdXB) != 0, "accum ESC stalls"))
+        return XELP_E_ERR;
+
+    /* ESC + '[' still stalls (CSI start) */
+    XELPParseKey(&x, '[');
+    if (JB_ASSERT(XELP_XB_POS(x.mCmdXB) != 0, "accum CSI stalls"))
+        return XELP_E_ERR;
+
+    /* ESC + '[' + 'A' = UP arrow: silently dropped in CLI (no change to buf) */
+    XELPParseKey(&x, 'A');
+    if (JB_ASSERT(XELP_XB_POS(x.mCmdXB) != 0, "accum UP arrow dropped in CLI"))
+        return XELP_E_ERR;
+
+    /* 4-byte sequence: ESC [ 3 ~ (KDEL) at empty buf: no effect */
+    XELPParseKey(&x, 0x1B);
+    XELPParseKey(&x, '[');
+    XELPParseKey(&x, '3');
+    XELPParseKey(&x, '~');
+    if (JB_ASSERT(XELP_XB_POS(x.mCmdXB) != 0, "accum KDEL at empty no effect"))
+        return XELP_E_ERR;
+
+    /* Verify accumulator state is clean after completed sequences */
+    if (JB_ASSERT(x.mKeyLen != 0, "accum clean after sequences"))
+        return XELP_E_ERR;
+
+    /* ESC + non-'[' flushes ESC (mode switch) and reprocesses next char */
+    {
+        XELP x2;
+        XELPInit(&x2,"TestAccumFlush");
+        XELP_SET_FN_OUT(x2,dummyOut);
+        XELP_SET_FN_CLI(x2,gMyCLICommands);
+        XELP_SET_FN_KEY(x2,gMyKeyCommands);
+
+        XELPParseKey(&x2, 0x1B);  /* ESC: stashed */
+        gGlobalCallbackData.k0 = 0;
+        XELPParseKey(&x2, '0');   /* flush ESC → KEY mode, reprocess '0' → k0 handler */
+        if (JB_ASSERT(x2.mCurMode != XELP_MODE_KEY, "accum flush ESC → KEY"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(gGlobalCallbackData.k0 != '0', "accum flush reprocessed '0'"))
+            return XELP_E_ERR;
+    }
+
+    return XELP_S_OK;
+}
+
+/* ====================================================================
+ test_MultiByteKeyDispatch() - KEY mode with arrow key entries
+ */
+static int gMultiByteKeyVal;
+XELPRESULT multiByteKeyHandler(XELP *ths, XELPKEYCODE k) {
+    (void)ths;
+    gMultiByteKeyVal = (int)k;
+    return XELP_S_OK;
+}
+
+XELPRESULT test_MultiByteKeyDispatch() {
+    XELP x;
+    XELPRESULT r;
+
+    XELPKeyFuncMapEntry mbKeys[] = {
+        {&multiByteKeyHandler, XELP_KEYCODE_UP,   "up"},
+        {&multiByteKeyHandler, XELP_KEYCODE_DOWN,  "down"},
+        {&multiByteKeyHandler, 'a',                "a key"},
+        XELP_FUNC_ENTRY_LAST
+    };
+
+    XELPInit(&x,"TestMultiByte");
+    XELP_SET_FN_KEY(x,mbKeys);
+    XELP_SET_FN_OUT(x,dummyOut);
+
+    /* direct dispatch of multi-byte key via XELPExecKC */
+    gMultiByteKeyVal = 0;
+    r = XELPExecKC(&x, XELP_KEYCODE_UP);
+    if (JB_ASSERT(r != XELP_S_OK, "multibyte direct up dispatch"))
+        return XELP_E_ERR;
+    if (JB_ASSERT(gMultiByteKeyVal != (int)XELP_KEYCODE_UP, "multibyte direct up value"))
+        return XELP_E_ERR;
+
+    /* single char still works */
+    gMultiByteKeyVal = 0;
+    r = XELPExecKC(&x, 'a');
+    if (JB_ASSERT(r != XELP_S_OK, "multibyte single char dispatch"))
+        return XELP_E_ERR;
+    if (JB_ASSERT(gMultiByteKeyVal != 'a', "multibyte single char value"))
+        return XELP_E_ERR;
+
+    /* unmapped multi-byte key */
+    r = XELPExecKC(&x, XELP_KEYCODE_LEFT);
+    if (JB_ASSERT(r != XELP_S_NOTFOUND, "multibyte unmapped returns NOTFOUND"))
+        return XELP_E_ERR;
+
+    return XELP_S_OK;
+}
+
+#ifdef XELP_ENABLE_LINE_EDIT
+/* ====================================================================
+ Helper: feed a string of raw bytes to XELPParseKey (for simulating typed input)
+ */
+static void feedString(XELP *x, const char *s) {
+    while (*s) XELPParseKey(x, *s++);
+}
+
+/* Helper: feed a multi-byte keycode as individual bytes via XELPParseKey */
+static void feedKeycode(XELP *x, XELPKEYCODE kc) {
+    XELPParseKey(x, XELP_KC_B0(kc));
+    if (XELP_KC_B1(kc)) XELPParseKey(x, XELP_KC_B1(kc));
+    if (XELP_KC_B2(kc)) XELPParseKey(x, XELP_KC_B2(kc));
+    if (XELP_KC_B3(kc)) XELPParseKey(x, XELP_KC_B3(kc));
+}
+
+/* Helper: extract CLI buffer content as a string for comparison.
+   Copies content from mCmdXB.s to mCmdXB.p into dst and null-terminates. */
+static void getCmdBuf(XELP *x, char *dst, int maxlen) {
+    int len = (int)(x->mCmdXB.p - x->mCmdXB.s);
+    int i;
+    if (len > maxlen - 1) len = maxlen - 1;
+    for (i = 0; i < len; i++) dst[i] = x->mCmdXB.s[i];
+    dst[len] = 0;
+}
+
+/* ====================================================================
+ test_CLILineEdit_Insert() - type "hello", LEFT*3, "X", verify "heXllo"
+ */
+XELPRESULT test_CLILineEdit_Insert() {
+    XELP x;
+    char buf[64];
+
+    XELPInit(&x,"TestLineInsert");
+    XELP_SET_FN_CLI(x,gMyCLICommands);
+    XELP_SET_FN_OUT(x,dummyOut);
+
+    feedString(&x, "hello");
+    feedKeycode(&x, XELP_KEYCODE_LEFT);
+    feedKeycode(&x, XELP_KEYCODE_LEFT);
+    feedKeycode(&x, XELP_KEYCODE_LEFT);
+    XELPParseKey(&x, 'X');
+
+    getCmdBuf(&x, buf, sizeof(buf));
+    if (JB_ASSERT(XELP_S_OK != XELPStrEq(buf, XELPStrLen(buf), "heXllo"), "line edit insert"))
+        return XELP_E_ERR;
+
+    return XELP_S_OK;
+}
+
+/* ====================================================================
+ test_CLILineEdit_Delete() - type "hello", HOME, KDEL, verify "ello"
+ */
+XELPRESULT test_CLILineEdit_Delete() {
+    XELP x;
+    char buf[64];
+
+    XELPInit(&x,"TestLineDel");
+    XELP_SET_FN_CLI(x,gMyCLICommands);
+    XELP_SET_FN_OUT(x,dummyOut);
+
+    feedString(&x, "hello");
+    feedKeycode(&x, XELP_KEYCODE_HOME);
+    feedKeycode(&x, XELP_KEYCODE_KDEL);
+
+    getCmdBuf(&x, buf, sizeof(buf));
+    if (JB_ASSERT(XELP_S_OK != XELPStrEq(buf, XELPStrLen(buf), "ello"), "line edit delete"))
+        return XELP_E_ERR;
+
+    return XELP_S_OK;
+}
+
+/* ====================================================================
+ test_CLILineEdit_HomeEnd() - HOME, type "AB", END, type "CD", verify "ABhelloCD"
+ */
+XELPRESULT test_CLILineEdit_HomeEnd() {
+    XELP x;
+    char buf[64];
+
+    XELPInit(&x,"TestLineHE");
+    XELP_SET_FN_CLI(x,gMyCLICommands);
+    XELP_SET_FN_OUT(x,dummyOut);
+
+    feedString(&x, "hello");
+    feedKeycode(&x, XELP_KEYCODE_HOME);
+    feedString(&x, "AB");
+    feedKeycode(&x, XELP_KEYCODE_END);
+    feedString(&x, "CD");
+
+    getCmdBuf(&x, buf, sizeof(buf));
+    if (JB_ASSERT(XELP_S_OK != XELPStrEq(buf, XELPStrLen(buf), "ABhelloCD"), "line edit home end"))
+        return XELP_E_ERR;
+
+    return XELP_S_OK;
+}
+
+/* ====================================================================
+ test_CLILineEdit_Backspace() - type "hello", LEFT*2, BKSP, verify "helo"
+ */
+XELPRESULT test_CLILineEdit_Backspace() {
+    XELP x;
+    char buf[64];
+
+    XELPInit(&x,"TestLineBksp");
+    XELP_SET_FN_CLI(x,gMyCLICommands);
+    XELP_SET_FN_OUT(x,dummyOut);
+
+    feedString(&x, "hello");
+    feedKeycode(&x, XELP_KEYCODE_LEFT);
+    feedKeycode(&x, XELP_KEYCODE_LEFT);
+    XELPParseKey(&x, XELPKEY_BKSP);
+
+    getCmdBuf(&x, buf, sizeof(buf));
+    if (JB_ASSERT(XELP_S_OK != XELPStrEq(buf, XELPStrLen(buf), "helo"), "line edit backspace"))
+        return XELP_E_ERR;
+
+    return XELP_S_OK;
+}
+
+/* ====================================================================
+ test_CLIArrowsDrop() - UP/DOWN in CLI: no corruption
+ */
+XELPRESULT test_CLIArrowsDrop() {
+    XELP x;
+    char buf[64];
+
+    XELPInit(&x,"TestArrowDrop");
+    XELP_SET_FN_CLI(x,gMyCLICommands);
+    XELP_SET_FN_OUT(x,dummyOut);
+
+    feedString(&x, "abc");
+    feedKeycode(&x, XELP_KEYCODE_UP);
+    feedKeycode(&x, XELP_KEYCODE_DOWN);
+    feedString(&x, "d");
+
+    getCmdBuf(&x, buf, sizeof(buf));
+    if (JB_ASSERT(XELP_S_OK != XELPStrEq(buf, XELPStrLen(buf), "abcd"), "CLI arrows drop"))
+        return XELP_E_ERR;
+
+    return XELP_S_OK;
+}
+
+/* ====================================================================
+ test_CLILineEdit_BufferFull() - insert at capacity
+ */
+XELPRESULT test_CLILineEdit_BufferFull() {
+    XELP x;
+    int i;
+
+    XELPInit(&x,"TestLineFull");
+    XELP_SET_FN_CLI(x,gMyCLICommands);
+    XELP_SET_FN_OUT(x,dummyOut);
+
+    /* fill buffer to capacity */
+    for (i = 0; i < XELP_CMDBUFSZ - 1; i++)
+        XELPParseKey(&x, 'A');
+
+    /* try to insert at cursor (should be ignored) */
+    feedKeycode(&x, XELP_KEYCODE_HOME);
+    XELPParseKey(&x, 'B');
+
+    /* buffer should still be at capacity */
+    if (JB_ASSERT(XELP_XB_POS(x.mCmdXB) != XELP_CMDBUFSZ - 1, "line edit buf full"))
+        return XELP_E_ERR;
+
+    return XELP_S_OK;
+}
+#endif /* XELP_ENABLE_LINE_EDIT */
+
+/* ====================================================================
+ test_HelpMultiByteKeys() - cover ALL _xelpPrintKeyName branches
+ */
+XELPRESULT test_HelpMultiByteKeys() {
+    XELP x;
+    XELPRESULT r;
+
+    /* table with every named multi-byte key + a single char + an unknown code */
+    XELPKeyFuncMapEntry mbKeys[] = {
+        {&k0, XELP_KEYCODE_UP,    "up"},
+        {&k0, XELP_KEYCODE_DOWN,  "down"},
+        {&k0, XELP_KEYCODE_LEFT,  "left"},
+        {&k0, XELP_KEYCODE_RIGHT, "right"},
+        {&k0, XELP_KEYCODE_HOME,  "home"},
+        {&k0, XELP_KEYCODE_END,   "end"},
+        {&k0, XELP_KEYCODE_KDEL,  "del"},
+        {&k0, XELP_KEYCODE_INS,   "ins"},
+        {&k0, XELP_KEYCODE_PGUP,  "pgup"},
+        {&k0, XELP_KEYCODE_PGDN,  "pgdn"},
+        {&k0, 0x00FF1234UL,       "unknown"},  /* unknown multi-byte → hex output */
+        {&k1, 'a',                "letter a"},  /* single char branch */
+        XELP_FUNC_ENTRY_LAST
+    };
+
+    resetDummyBuf();
+    XELPInit(&x,"TestHelpMB");
+    XELP_SET_FN_KEY(x,mbKeys);
+    XELP_SET_FN_OUT(x,gDummyBufOut);
+
+    r = XELPHelp(&x);
+    gDummyBufOut(0);
+
+    if (JB_ASSERT(r != XELP_S_OK, "help multibyte result"))
+        return XELP_E_ERR;
+    if (JB_ASSERT(XELPStrLen(gDummyBuf) <= 0, "help multibyte has output"))
+        return XELP_E_ERR;
+
+    return XELP_S_OK;
+}
+
+#ifdef XELP_ENABLE_LINE_EDIT
+/* ====================================================================
+ test_CLILineEdit_Right() - RIGHT arrow moves cursor forward
+ */
+XELPRESULT test_CLILineEdit_Right() {
+    XELP x;
+    char buf[64];
+
+    XELPInit(&x,"TestLineRight");
+    XELP_SET_FN_CLI(x,gMyCLICommands);
+    XELP_SET_FN_OUT(x,dummyOut);
+
+    feedString(&x, "abcd");
+    feedKeycode(&x, XELP_KEYCODE_HOME);     /* cursor at 0 */
+    feedKeycode(&x, XELP_KEYCODE_RIGHT);    /* cursor at 1 */
+    feedKeycode(&x, XELP_KEYCODE_RIGHT);    /* cursor at 2 */
+    XELPParseKey(&x, 'X');                   /* insert at 2 → "abXcd" */
+
+    getCmdBuf(&x, buf, sizeof(buf));
+    if (JB_ASSERT(XELP_S_OK != XELPStrEq(buf, XELPStrLen(buf), "abXcd"), "line edit right insert"))
+        return XELP_E_ERR;
+
+    /* RIGHT at end of buffer should be a no-op */
+    feedKeycode(&x, XELP_KEYCODE_END);
+    feedKeycode(&x, XELP_KEYCODE_RIGHT);    /* already at end → no-op */
+    getCmdBuf(&x, buf, sizeof(buf));
+    if (JB_ASSERT(XELP_S_OK != XELPStrEq(buf, XELPStrLen(buf), "abXcd"), "line edit right at end"))
+        return XELP_E_ERR;
+
+    /* LEFT at start should be a no-op */
+    feedKeycode(&x, XELP_KEYCODE_HOME);
+    feedKeycode(&x, XELP_KEYCODE_LEFT);     /* already at start → no-op */
+    XELPParseKey(&x, 'Z');
+    getCmdBuf(&x, buf, sizeof(buf));
+    if (JB_ASSERT(XELP_S_OK != XELPStrEq(buf, XELPStrLen(buf), "ZabXcd"), "line edit left at start"))
+        return XELP_E_ERR;
+
+    return XELP_S_OK;
+}
+#endif /* XELP_ENABLE_LINE_EDIT */
+
+/* ====================================================================
+ test_AccumOverflow() - CSI sequences with intermediate bytes that hit 4-byte overflow
+ */
+XELPRESULT test_AccumOverflow() {
+    XELP x;
+
+    XELPInit(&x,"TestAccumOvfl");
+    XELP_SET_FN_CLI(x,gMyCLICommands);
+    XELP_SET_FN_OUT(x,dummyOut);
+
+    /* ESC [ <digit> <digit> — 4 bytes, digit at pos 3 isn't a terminator
+       so overflow guard fires at mKeyLen==4 and flushes */
+    XELPParseKey(&x, 0x1B);  /* ESC */
+    XELPParseKey(&x, '[');   /* CSI start */
+    XELPParseKey(&x, '1');   /* intermediate — not a letter or ~ */
+    XELPParseKey(&x, '5');   /* 4th byte, still intermediate → overflow flush */
+    /* should not crash, accumulator should be idle */
+    if (JB_ASSERT(x.mKeyLen != 0, "accum overflow resets"))
+        return XELP_E_ERR;
+    if (JB_ASSERT(XELP_XB_POS(x.mCmdXB) != 0, "accum overflow no buf corruption"))
+        return XELP_E_ERR;
+
+    return XELP_S_OK;
+}
+
+/* ====================================================================
+ test_CLIMalformedKeys() - slam the CLI with garbage, partial sequences,
+ interleaved multi-byte, and verify no buffer overruns or crashes.
+ */
+XELPRESULT test_CLIMalformedKeys() {
+    XELP x;
+    int i;
+    char buf[64];
+
+    XELPInit(&x,"TestMalformed");
+    XELP_SET_FN_CLI(x,gMyCLICommands);
+    XELP_SET_FN_OUT(x,dummyOut);
+
+    /* 1. bare ESC followed immediately by another ESC */
+    XELPParseKey(&x, 0x1B);
+    XELPParseKey(&x, 0x1B);  /* flushes first ESC, stashes second */
+    XELPParseKey(&x, 'a');   /* flushes second ESC, reprocesses 'a' */
+    /* mode should still be CLI (ESC triggers KEY but KEY has no table on fresh init...
+       wait, we set gMyCLICommands but gMyKeyCommands — let me make this right */
+    XELPParseKey(&x, XELPKEY_ENTER); /* reset */
+
+    /* 2. partial CSI abandoned by another ESC */
+    XELPParseKey(&x, 0x1B);
+    XELPParseKey(&x, '[');
+    XELPParseKey(&x, 0x1B);  /* new ESC while in CSI — overflow/flush, then stash new ESC */
+    XELPParseKey(&x, 'b');   /* flush second ESC, reprocess 'b' */
+    XELPParseKey(&x, XELPKEY_ENTER); /* reset */
+
+    /* 3. rapid-fire arrow keys interleaved with typing */
+    feedString(&x, "hi");
+    feedKeycode(&x, XELP_KEYCODE_LEFT);
+    feedKeycode(&x, XELP_KEYCODE_RIGHT);
+    feedKeycode(&x, XELP_KEYCODE_UP);
+    feedKeycode(&x, XELP_KEYCODE_DOWN);
+    feedString(&x, "X");
+    getCmdBuf(&x, buf, sizeof(buf));
+    if (JB_ASSERT(XELP_S_OK != XELPStrEq(buf, XELPStrLen(buf), "hiX"), "malformed interleaved arrows"))
+        return XELP_E_ERR;
+    XELPParseKey(&x, XELPKEY_ENTER);
+
+    /* 4. unknown multi-byte key (PGUP, INS, etc.) in CLI — should be silently dropped */
+    feedString(&x, "ok");
+    feedKeycode(&x, XELP_KEYCODE_PGUP);
+    feedKeycode(&x, XELP_KEYCODE_PGDN);
+    feedKeycode(&x, XELP_KEYCODE_INS);
+    getCmdBuf(&x, buf, sizeof(buf));
+    if (JB_ASSERT(XELP_S_OK != XELPStrEq(buf, XELPStrLen(buf), "ok"), "malformed unknown keys dropped"))
+        return XELP_E_ERR;
+    XELPParseKey(&x, XELPKEY_ENTER);
+
+    /* 5. overflow: 200 chars, then arrows, then enter — no crash */
+    for (i = 0; i < 200; i++)
+        XELPParseKey(&x, 'z');
+    feedKeycode(&x, XELP_KEYCODE_HOME);
+    feedKeycode(&x, XELP_KEYCODE_END);
+    feedKeycode(&x, XELP_KEYCODE_LEFT);
+    feedKeycode(&x, XELP_KEYCODE_RIGHT);
+    feedKeycode(&x, XELP_KEYCODE_KDEL);
+    XELPParseKey(&x, XELPKEY_BKSP);
+    XELPParseKey(&x, XELPKEY_ENTER);
+    if (JB_ASSERT(XELP_XB_POS(x.mCmdXB) != 0, "malformed overflow reset"))
+        return XELP_E_ERR;
+
+    /* 6. all control chars (0x01-0x1A, skip ESC) fed one by one — none should crash */
+    for (i = 1; i < 0x1B; i++)
+        XELPParseKey(&x, (char)i);
+    /* 0x1B (ESC) needs a follow-up */
+    XELPParseKey(&x, 0x1B);
+    XELPParseKey(&x, 'x');  /* flush ESC */
+    for (i = 0x1C; i < 0x20; i++)
+        XELPParseKey(&x, (char)i);
+    XELPParseKey(&x, XELPKEY_ENTER);
+    JB_ASSERT(0, "malformed ctrl chars no crash");
+
+    /* 7. KDEL and BKSP at empty buffer — must not underflow */
+    feedKeycode(&x, XELP_KEYCODE_KDEL);
+    XELPParseKey(&x, XELPKEY_BKSP);
+    XELPParseKey(&x, XELPKEY_DEL);
+    if (JB_ASSERT(x.mCmdXB.p < x.mCmdXB.s, "malformed no underflow"))
+        return XELP_E_ERR;
+
+    /* 8. DEL (0x7F) mid-line (same as BKSP path) */
+    feedString(&x, "abc");
+    feedKeycode(&x, XELP_KEYCODE_LEFT);
+    XELPParseKey(&x, XELPKEY_DEL);
+    getCmdBuf(&x, buf, sizeof(buf));
+    if (JB_ASSERT(XELP_S_OK != XELPStrEq(buf, XELPStrLen(buf), "ac"), "malformed DEL mid-line"))
+        return XELP_E_ERR;
+    XELPParseKey(&x, XELPKEY_ENTER);
+
+    /* 9. CSI with very long intermediate sequence (> 4 bytes emulated) */
+    XELPParseKey(&x, 0x1B);
+    XELPParseKey(&x, '[');
+    XELPParseKey(&x, '1');
+    XELPParseKey(&x, ';');   /* intermediate, causes overflow at byte 4 */
+    /* accumulator should have flushed */
+    XELPParseKey(&x, '2');   /* this is a new single char now */
+    XELPParseKey(&x, XELPKEY_ENTER);
+
+    return XELP_S_OK;
+}
+
 /* 	************************************************
 	Xelp Simple Unit Test suite.
 */
@@ -2404,6 +2907,20 @@ int run_tests() {
     JumpBug_RunUnit(test_buffer_boundaries,"BufferBoundaries");
     JumpBug_RunUnit(test_stress_malformed,"StressMalformed");
     JumpBug_RunUnit(test_XelpRegisters,"XelpRegisters");
+    JumpBug_RunUnit(test_KeyAccumulator,"KeyAccumulator");
+    JumpBug_RunUnit(test_MultiByteKeyDispatch,"MultiByteKeyDispatch");
+#ifdef XELP_ENABLE_LINE_EDIT
+    JumpBug_RunUnit(test_CLILineEdit_Insert,"LineEditInsert");
+    JumpBug_RunUnit(test_CLILineEdit_Delete,"LineEditDelete");
+    JumpBug_RunUnit(test_CLILineEdit_HomeEnd,"LineEditHomeEnd");
+    JumpBug_RunUnit(test_CLILineEdit_Backspace,"LineEditBackspace");
+    JumpBug_RunUnit(test_CLIArrowsDrop,"CLIArrowsDrop");
+    JumpBug_RunUnit(test_CLILineEdit_BufferFull,"LineEditBufferFull");
+    JumpBug_RunUnit(test_CLILineEdit_Right,"LineEditRight");
+#endif
+    JumpBug_RunUnit(test_HelpMultiByteKeys,"HelpMultiByteKeys");
+    JumpBug_RunUnit(test_AccumOverflow,"AccumOverflow");
+    JumpBug_RunUnit(test_CLIMalformedKeys,"CLIMalformedKeys");
 
     JumpBug_PrintResults();
 

@@ -95,33 +95,33 @@ int gExit=0;  //global flag for when to quit interpretor loop, not part of XELP,
 /****
  begin user defined functions for XELP cli  -- key mode
  */
-XELPRESULT fooExit(XELP *ths, int c)
+XELPRESULT fooExit(XELP *ths, XELPKEYCODE c)
 {
 	(void)ths;
-	printw("fooExit(%x) invoked\n",c);
+	printw("fooExit(%lx) invoked\n",c);
 	gExit=1;  // modify the global flag so we quite the  interpretor loop
 	return XELP_S_OK;
 }
 
-XELPRESULT fooBar(XELP *ths, int c)
+XELPRESULT fooBar(XELP *ths, XELPKEYCODE c)
 {
 	(void)ths;
-	printw("fooBar(%c) invoked (single-key mode)\n",c);
+	printw("fooBar(%c) invoked (single-key mode)\n",(char)c);
 	return XELP_S_OK;
 }
-XELPRESULT fooPrint(XELP *ths, int c)
+XELPRESULT fooPrint(XELP *ths, XELPKEYCODE c)
 {
 	(void)ths;
-	printw("fooPrint(%x) invoked (single-key mode)\n",c);
+	printw("fooPrint(%lx) invoked (single-key mode)\n",c);
 	return XELP_S_OK;
 }
 
-XELPRESULT fooHelp(XELP *ths, int c)
+XELPRESULT fooHelp(XELP *ths, XELPKEYCODE c)
 {
 	(void)c;
 	return XELPHelp(ths);
 }
-XELPRESULT printBanner(XELP *ths, int c) {
+XELPRESULT printBanner(XELP *ths, XELPKEYCODE c) {
 	(void)c;
 	XELPOut(ths,XELP_BANNER_STR,-1); // XELPOut ==> print out a null terminated string, in this case the XELP banner in ascii
 	return XELP_S_OK;

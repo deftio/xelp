@@ -44,13 +44,13 @@ static char uart_getc(void)
 /* KEY mode commands (single keypress, no ENTER)                       */
 /* ------------------------------------------------------------------ */
 
-static XELPRESULT key_help(XELP *ths, int c)
+static XELPRESULT key_help(XELP *ths, XELPKEYCODE c)
 {
     (void)c;
     return XELPHelp(ths);
 }
 
-static XELPRESULT key_banner(XELP *ths, int c)
+static XELPRESULT key_banner(XELP *ths, XELPKEYCODE c)
 {
     (void)c;
     XELPOut(ths, XELP_BANNER_STR, 0);

@@ -4,70 +4,77 @@
 CC=gcc   	# C compiler to use
 CPP=g++		# C++ compiler to use
 
-#C_FLAGS=-I. -Wall -g
-C_FLAGS=-I. -Wall -g -fprofile-arcs -ftest-coverage 
+C_FLAGS=-I. -Wall -Wextra -Werror -g -fprofile-arcs -ftest-coverage
 CPP_FLAGS=-std=c++11 -Wall
 
 LIB_DIR=src
+BUILD_DIR=build
 
 INCLUDES=\
     -I$(LIB_DIR)\
 
 .PHONY: tests clean example coverage version
 
-%.o: %.c
-	$(CC) $(C_FLAGS)  $(INCLUDES) -c $< -o $@
+# all object files go in build/
+$(BUILD_DIR):
+	@mkdir -p $(BUILD_DIR)
 
 #=======================================================================
-#build unit tests in /tests folder 
+#build unit tests in /tests folder
 TEST_DIR=tests
-TEST_FLAGS=-fprofile-arcs -ftest-coverage -g # coverage and profiling data
-SRC_TESTS=\
-    $(LIB_DIR)/xelp.c\
-	$(TEST_DIR)/jumpbug_unit_test_fw.c\
-	$(TEST_DIR)/xelp_unit_tests.c
 
-#pandoc README.md -f markdown -t html -o index.html
+OBJ_TESTS=\
+    $(BUILD_DIR)/xelp.o\
+    $(BUILD_DIR)/jumpbug_unit_test_fw.o\
+    $(BUILD_DIR)/xelp_unit_tests.o
 
-OBJC_TESTS=$(SRC_TESTS:.c=.o)  # object files for C language (not CPP) for tests
+$(BUILD_DIR)/xelp.o: $(LIB_DIR)/xelp.c $(LIB_DIR)/xelp.h $(LIB_DIR)/xelpcfg.h | $(BUILD_DIR)
+	$(CC) $(C_FLAGS) $(INCLUDES) -c $< -o $@
 
-tests: $(OBJC_TESTS)
-	$(CC) $(C_FLAGS) $(INCLUDES) $(TEST_FLAGS) $(OBJC_TESTS) -o $(TEST_DIR)/xelp_unit_tests.out
-	@$(TEST_DIR)/xelp_unit_tests.out
-	@gcov $(LIB_DIR)/xelp.c
-	@mv -f xelp.c.gcov $(TEST_DIR)/ 2>/dev/null || true
+$(BUILD_DIR)/jumpbug_unit_test_fw.o: $(TEST_DIR)/jumpbug_unit_test_fw.c | $(BUILD_DIR)
+	$(CC) $(C_FLAGS) $(INCLUDES) -c $< -o $@
+
+$(BUILD_DIR)/xelp_unit_tests.o: $(TEST_DIR)/xelp_unit_tests.c $(LIB_DIR)/xelp.h $(LIB_DIR)/xelpcfg.h | $(BUILD_DIR)
+	$(CC) $(C_FLAGS) $(INCLUDES) -c $< -o $@
+
+tests: $(OBJ_TESTS)
+	$(CC) $(C_FLAGS) $(INCLUDES) $(OBJ_TESTS) -o $(BUILD_DIR)/xelp_unit_tests.out
+	@$(BUILD_DIR)/xelp_unit_tests.out
+	@gcov -o $(BUILD_DIR) $(LIB_DIR)/xelp.c
+	@mv -f xelp.c.gcov $(BUILD_DIR)/ 2>/dev/null || true
 
 coverage: tests
 	@echo "--- Coverage Summary ---"
-	@gcov $(LIB_DIR)/xelp.c 2>/dev/null | grep -A 1 "File.*xelp.c"
-	@echo "See $(TEST_DIR)/xelp.c.gcov for line-by-line details"
+	@gcov -o $(BUILD_DIR) $(LIB_DIR)/xelp.c 2>/dev/null | grep -A 1 "File.*xelp.c"
+	@echo "See $(BUILD_DIR)/xelp.c.gcov for line-by-line details"
 
 version:
-	@mkdir -p build
-	@$(CC) tools/extract_version.c -I$(LIB_DIR) -o build/extract_version
-	@build/extract_version build/xelp_version.yaml
-	@cat build/xelp_version.yaml
+	@mkdir -p $(BUILD_DIR)
+	@$(CC) tools/extract_version.c -I$(LIB_DIR) -o $(BUILD_DIR)/extract_version
+	@$(BUILD_DIR)/extract_version $(BUILD_DIR)/xelp_version.yaml
+	@cat $(BUILD_DIR)/xelp_version.yaml
 
 #=======================================================================
 #build simple example in /example/posix-simple folder
 EXAMPLE_POSIX_DIR=examples/posix-simple
-SRC_EXAMPLE1=\
-	$(LIB_DIR)/xelp.c\
-	$(EXAMPLE_POSIX_DIR)/xelp-example.c	
 
-OBJC_EXAMPLE1=$(SRC_EXAMPLE1:.c=.o)  # object files for C language (not CPP) for tests
+OBJ_EXAMPLE1=\
+    $(BUILD_DIR)/xelp_ex.o\
+    $(BUILD_DIR)/xelp-example.o
 
-example: $(OBJC_EXAMPLE1)
-	$(CC) $(C_FLAGS) $(INCLUDES) $(OBJC_EXAMPLE1) -o $(EXAMPLE_POSIX_DIR)/xelp-example.out -lm -lncurses -Os 
-	@$(EXAMPLE_POSIX_DIR)/xelp-example.out
+$(BUILD_DIR)/xelp_ex.o: $(LIB_DIR)/xelp.c $(LIB_DIR)/xelp.h $(LIB_DIR)/xelpcfg.h | $(BUILD_DIR)
+	$(CC) $(C_FLAGS) $(INCLUDES) -c $< -o $@
+
+$(BUILD_DIR)/xelp-example.o: $(EXAMPLE_POSIX_DIR)/xelp-example.c | $(BUILD_DIR)
+	$(CC) $(C_FLAGS) $(INCLUDES) -c $< -o $@
+
+example: $(OBJ_EXAMPLE1)
+	$(CC) $(C_FLAGS) $(INCLUDES) $(OBJ_EXAMPLE1) -o $(BUILD_DIR)/xelp-example.out -lm -lncurses -Os
+	@$(BUILD_DIR)/xelp-example.out
 
 #=======================================================================
-# clean deletes all compiled object files and debugging / profiling / listing files
+# clean -- wipe all build artifacts (src/ stays clean)
 clean:
-	-rm -f $(OBJC_TESTS) $(OBJC_EXAMPLE1)
-	-rm -f $(TEST_DIR)/*.gcda $(TEST_DIR)/*.gcno $(TEST_DIR)/*.gcov $(TEST_DIR)/*.out
-	-rm -f $(EXAMPLE_POSIX_DIR)/*.gcda $(EXAMPLE_POSIX_DIR)/*.gcno $(EXAMPLE_POSIX_DIR)/*.gcov $(EXAMPLE_POSIX_DIR)/*.out
-	-rm -f $(LIB_DIR)/*.gcda $(LIB_DIR)/*.gcno $(LIB_DIR)/*.gcov $(LIB_DIR)/*.out $(LIB_DIR)/*.asm $(LIB_DIR)/*.rel $(LIB_DIR)/*.s
+	-rm -rf $(BUILD_DIR)
 	-rm -f *.gcov *.gcda *.gcno
-
 

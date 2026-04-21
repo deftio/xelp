@@ -44,7 +44,7 @@ extern "C"
 {
 #endif
 
-#define XELP_VERSION      (0x00000300UL) /* 32-bit version: 0x00MMmmpp (major.minor.patch) */
+#define XELP_VERSION      (0x00000301UL) /* 32-bit version: 0x00MMmmpp (major.minor.patch) */
 #define XELP_VER_MAJOR(v) (((v) >> 16) & 0xFF)
 #define XELP_VER_MINOR(v) (((v) >>  8) & 0xFF)
 #define XELP_VER_PATCH(v) ( (v)        & 0xFF)
@@ -105,6 +105,29 @@ typedef int XELPRESULT;
 #ifndef XELPREG
 typedef int XELPREG;
 #endif
+
+typedef unsigned long XELPKEYCODE;
+
+/* XELPKEYCODE constants for multi-byte keys.
+   Packed little-endian: byte[0] in bits 0-7, byte[1] in 8-15, etc.
+   Single-char keys are their natural value (e.g. 'a' == 0x61).
+   Multi-byte keys are always >= 0x100 (byte[1] != 0). */
+#define XELP_KEYCODE_UP    (0x00415B1BUL)  /* ESC [ A */
+#define XELP_KEYCODE_DOWN  (0x00425B1BUL)  /* ESC [ B */
+#define XELP_KEYCODE_RIGHT (0x00435B1BUL)  /* ESC [ C */
+#define XELP_KEYCODE_LEFT  (0x00445B1BUL)  /* ESC [ D */
+#define XELP_KEYCODE_HOME  (0x00485B1BUL)  /* ESC [ H */
+#define XELP_KEYCODE_END   (0x00465B1BUL)  /* ESC [ F */
+#define XELP_KEYCODE_INS   (0x7E325B1BUL)  /* ESC [ 2 ~ */
+#define XELP_KEYCODE_KDEL  (0x7E335B1BUL)  /* ESC [ 3 ~ */
+#define XELP_KEYCODE_PGUP  (0x7E355B1BUL)  /* ESC [ 5 ~ */
+#define XELP_KEYCODE_PGDN  (0x7E365B1BUL)  /* ESC [ 6 ~ */
+
+#define XELP_KC_B0(k)  ((char)( (k)        & 0xFF))
+#define XELP_KC_B1(k)  ((char)(((k) >>  8) & 0xFF))
+#define XELP_KC_B2(k)  ((char)(((k) >> 16) & 0xFF))
+#define XELP_KC_B3(k)  ((char)(((k) >> 24) & 0xFF))
+#define XELP_KC_IS_MULTI(k) ((k) >= 0x100UL)
 
 #define XELP_S_NOTFOUND	    (2)
 #define XELP_W_WARN   		(1)
@@ -177,9 +200,9 @@ struct XELP_tag;
  */
 typedef struct
 {
-	XELPRESULT (*mFunPtr)(struct XELP_tag *, int) REENTRANT_SDCC;	/* function pointer to user-supplied fnc(ths, int) */
-	char  mKey;								    /* key press code                             */
-	char* mpHelpString;						    /* use NULL or 0 if no help string is to be provided */
+	XELPRESULT (*mFunPtr)(struct XELP_tag *, XELPKEYCODE) REENTRANT_SDCC;	/* function pointer to user-supplied fnc(ths, keycode) */
+	XELPKEYCODE mKey;						    /* key press code (single char or packed multi-byte)  */
+	char* mpHelpString;						    /* use NULL or 0 if no help string is to be provided  */
 }XELPKeyFuncMapEntry;
 /* #define XELP_KEYFUNCENTRY_LAST {0,0,""}          function list terminator */
 
@@ -255,7 +278,7 @@ typedef struct XELP_tag
 
 #ifdef XELP_ENABLE_KEY						 /* if single-key commands enabled              */
 	XELPKeyFuncMapEntry		*mpKeyModeFuncs; /* key mode function dispatch                  */
-	XELPRESULT (*mpfDefKey)(struct XELP_tag *, int) REENTRANT_SDCC; /* default handler for unmapped keys        */
+	XELPRESULT (*mpfDefKey)(struct XELP_tag *, XELPKEYCODE) REENTRANT_SDCC; /* default handler for unmapped keys */
 #endif
 
 #ifdef XELP_ENABLE_CLI						 /* if CLI and script support enabled           */
@@ -269,6 +292,14 @@ typedef struct XELP_tag
 #ifdef XELP_CLI_PROMPT 						 /* prompt for CLI enabled                      */
 	const char*				mpPrompt;		 /* prompt at beginning of CLI e.g. xelp>		*/
 #endif	
+
+	/* Key accumulator for multi-byte sequences (e.g. arrow keys) */
+	XELPKEYCODE				mKeyAccum;		 /* packed key being assembled                  */
+	char					mKeyLen;		 /* bytes accumulated (0 = idle)                */
+
+#if defined(XELP_ENABLE_CLI) && defined(XELP_ENABLE_LINE_EDIT)
+	char*					mCur;			 /* cursor position in [mCmdXB.s .. mCmdXB.p]  */
+#endif
 
 	/****
 	platform dependant dispatch functions  (light-weight hardware abstraction layer)
@@ -326,7 +357,7 @@ XELPRESULT XELPHelp	        (XELP *ths);                             /* print on
 /* Xelp API functions */
 XELPRESULT XELPOut 		    (XELP *ths, const char* msg, int maxlen);/* print function                  */
 #define XELP_XB_OUT(x,xb)   (XELPOut(x,xb.p,(int)(xb.e-xb.p)))       /* print a XelpBuf from cur pos    */
-XELPRESULT XELPExecKC		(XELP *ths, char key);				     /* execute key command             */
+XELPRESULT XELPExecKC		(XELP *ths, XELPKEYCODE key);		     /* execute key command             */
 XELPRESULT XELPParse 		(XELP *ths, const char *buf, int blen);  /* execute CLI or script commands  */
 XELPRESULT XELPParseXB      (XELP *ths, XelpBuf *script);            /* execute CLI or script commands  */
 XELPRESULT XELPParseKey 	(XELP *ths, char key);				     /* handle keypress at CLI          */

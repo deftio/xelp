@@ -208,6 +208,31 @@ Default mode switch keys: ESC (KEY), CTRL-P (CLI), CTRL-T (THR).
 6. Hardcoding `&global_instance` instead of using `ths` in commands.
 7. Calling `malloc` or stdlib functions in embedded contexts.
 
+## Registers (v0.3.1+)
+
+Each XELP instance has 4 return registers (`mR[0..3]`), accessed via
+macros. Convention: **callee-clobbers-all** -- any command call may
+overwrite all registers. These are a return-value mailbox, NOT
+computational registers (the VM has its own register file).
+
+```c
+/* Read after a command call */
+XELPREG status = XELP_R0(cli);   /* engine writes: XELP_S_OK, etc. */
+XELPREG val1   = XELP_R1(cli);   /* command-specific return value 1 */
+XELPREG val2   = XELP_R2(cli);   /* command-specific return value 2 */
+XELPREG val3   = XELP_R3(cli);   /* command-specific return value 3 */
+
+/* Inside a command handler (pointer access) */
+XELPRESULT cmd_divmod(XELP *ths, const char *args, int len) {
+    /* ... parse a and b ... */
+    ths->mR[1] = a / b;  /* quotient  */
+    ths->mR[2] = a % b;  /* remainder */
+    return XELP_S_OK;
+}
+```
+
+C++ wrapper: `cli.r0()` (read-only), `cli.r1()`-`cli.r3()` (read/write).
+
 ## File structure
 
 ```

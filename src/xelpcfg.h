@@ -44,6 +44,15 @@
  */
 #define XELP_ENABLE_CLI       1
 
+/****************************************************************************************************
+ Enable Line Editing in CLI Mode.
+ When defined, provides cursor movement (left/right, Home/End), mid-line insert,
+ and delete-at-cursor using only \b for terminal repositioning.
+ Requires XELP_ENABLE_CLI. Adds ~800-1000 bytes on ARM Thumb.
+ When not defined, CLI uses append-only input with mpfBksp callback.
+ */
+#define XELP_ENABLE_LINE_EDIT 1
+
 
 /****************************************************************************************************
  Enable KEY Mode.
