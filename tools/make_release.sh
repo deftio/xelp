@@ -175,6 +175,24 @@ do_update_badges() {
 }
 
 # -----------------------------------------------------------------------
+# Step 1d: Update compiled-size tables (if CSV available)
+# -----------------------------------------------------------------------
+
+do_update_sizes() {
+    step_header "Update compiled-size tables"
+
+    if [ -f build/sizes.csv ]; then
+        echo "  Found build/sizes.csv -- updating size tables..."
+        run_cmd bash tools/update_sizes.sh
+        git add README.md pages/index.html
+        pass "Size tables updated from build/sizes.csv."
+    else
+        echo "  build/sizes.csv not found (run 'bash tools/crossbuild.sh' to generate)."
+        echo "  Skipping size table update -- existing tables will be used."
+    fi
+}
+
+# -----------------------------------------------------------------------
 # Step 2: Local validation
 # -----------------------------------------------------------------------
 
@@ -709,8 +727,9 @@ fi
 do_check_git
 do_sync_manifests
 do_update_badges
+do_update_sizes
 
-# Auto-commit manifest and badge updates (if any files were staged)
+# Auto-commit manifest, badge, and size-table updates (if any files were staged)
 if [ -n "$(git diff --cached --name-only)" ]; then
     step_header "Commit manifest and badge updates"
     run_cmd git commit -m "Sync manifests and badges for $VER_STRING"

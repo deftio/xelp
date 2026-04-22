@@ -168,47 +168,62 @@ Mode switch keys are configurable in `xelpcfg.h`.
 
 ## Building and Testing
 
+### Local development (fast, no Docker)
+
 ```bash
-make tests          # build + run unit tests + coverage report
+make validate       # build + run tests + build all examples (the everyday check)
+make tests          # unit tests + coverage only
+make examples       # build all examples (no interactive launch)
+make example        # build and run the posix ncurses demo (interactive)
 make coverage       # tests + coverage summary
 make fuzz           # fuzz testing with libFuzzer (requires clang)
-make example        # build + run the posix ncurses example
-make clean          # remove all build artifacts
+make clean          # remove test build artifacts
+make clean-all      # clean tests + all examples
 ```
 
-35 test units, 442 test cases, 100% line coverage of `xelp.c`.
+35 test units, 458 test cases, 100% line coverage of `xelp.c`.
+
+### Full release (includes Docker cross-compilation)
+
+```bash
+bash tools/crossbuild.sh           # Docker cross-compile for all targets -> build/sizes.csv
+bash tools/make_release.sh         # guided release pipeline (uses sizes.csv if present)
+bash tools/make_release.sh --validate  # local validation only (no git, no push)
+```
+
+The cross-build step is expensive (~minutes, requires Docker) and only needed
+when updating the compiled-size tables. Day-to-day development uses
+`make validate` which takes seconds.
 
 ## Compiled Sizes
 
-Compiled `.text` section sizes in bytes with `-Os`. Three configurations:
-KEY (single-key dispatch only), CLI (typical interactive use), FULL (all
-features including pass-through).
+Compiled `.text` section sizes with `-Os`. Three configurations: KEY
+(single-key dispatch only), CLI (typical interactive use), FULL (all
+features). Even the largest full build is under 7 KB.
 
-| Target | Compiler | KEY | CLI | FULL |
-|--------|----------|----:|----:|-----:|
-| **8-bit** | | | | |
-| AVR (ATmega328P) | avr-gcc | ~900 | ~4200 | ~4250 |
-| AVR (ATtiny85) | avr-gcc | ~850 | ~4100 | ~4150 |
-| **16-bit** | | | | |
-| MSP430 | msp430-gcc | ~700 | ~3200 | ~3250 |
-| 68HC11 | m68hc11-gcc | ~1500 | ~6500 | ~6600 |
-| **32-bit** | | | | |
-| ARM32 Thumb | arm-none-eabi-gcc | ~550 | ~2600 | ~2650 |
-| ARM32 | arm-none-eabi-gcc | ~850 | ~3800 | ~3850 |
-| RISC-V (rv32) | riscv64-unknown-elf-gcc | ~700 | ~3000 | ~3050 |
-| Xtensa LX106 (ESP8266) | xtensa-lx106-elf-gcc | ~650 | ~2900 | ~2950 |
-| x86-32 | GCC | ~1000 | ~4600 | ~4650 |
-| m68k | m68k-linux-gnu-gcc | ~750 | ~3300 | ~3350 |
-| PowerPC | powerpc-linux-gnu-gcc | ~1300 | ~5800 | ~5850 |
-| **64-bit** | | | | |
-| x86-64 | GCC | 1008 | 4667 | 4711 |
-| x86-64 | Clang | ~1100 | ~4800 | ~4850 |
-| AArch64 (ARM64) | aarch64-linux-gnu-gcc | ~900 | ~4200 | ~4250 |
-| RISC-V (rv64) | riscv64-linux-gnu-gcc | ~900 | ~4100 | ~4150 |
+<!-- BEGIN SIZE TABLE -->
+| CPU | Width | Compiler | KEY (bytes) | CLI (bytes) | FULL (bytes) |
+|-----|------:|----------|------------:|------------:|-------------:|
+| AVR (ATtiny85) | 8 | avr-gcc | 850 | 4100 | 4150 |
+| AVR (ATmega328P) | 8 | avr-gcc | 900 | 4200 | 4250 |
+| MSP430 | 16 | msp430-gcc | 700 | 3200 | 3250 |
+| 68HC11 | 16 | m68hc11-gcc | 1500 | 6500 | 6600 |
+| ARM Thumb | 32 | arm-none-eabi-gcc | 550 | 2600 | 2650 |
+| Xtensa LX106 (ESP8266) | 32 | xtensa-lx106-elf-gcc | 650 | 2900 | 2950 |
+| Xtensa LX7 (ESP32-S3) | 32 | xtensa-esp-elf-gcc | 650 | 2900 | 2950 |
+| RISC-V (rv32) | 32 | riscv64-unknown-elf-gcc | 700 | 3000 | 3050 |
+| m68k | 32 | m68k-linux-gnu-gcc | 750 | 3300 | 3350 |
+| ARM32 | 32 | arm-none-eabi-gcc | 850 | 3800 | 3850 |
+| x86-32 | 32 | GCC | 1000 | 4600 | 4650 |
+| PowerPC | 32 | powerpc-linux-gnu-gcc | 1300 | 5800 | 5850 |
+| AArch64 (ARM64) | 64 | aarch64-linux-gnu-gcc | 900 | 4200 | 4250 |
+| RISC-V (rv64) | 64 | riscv64-linux-gnu-gcc | 900 | 4100 | 4150 |
+| x86-64 | 64 | GCC | 1008 | 4667 | 4711 |
+| x86-64 | 64 | Clang | 1100 | 4800 | 4850 |
+<!-- END SIZE TABLE -->
 
-x86-64 GCC sizes measured directly; others estimated from cross-compilation
-ratios. Run `docker build` / `docker run` with `tools/Dockerfile.crossbuild`
-for exact numbers.
+x86-64 GCC row is measured directly; others from cross-compilation via
+`tools/Dockerfile.crossbuild`.
 
 ## Configuration
 
@@ -242,6 +257,7 @@ Docker cross-compilation (`tools/Dockerfile.crossbuild`):
 | RISC-V (rv64) | riscv64-linux-gnu-gcc | 64-bit |
 | RISC-V (rv32) | riscv64-unknown-elf-gcc | 32-bit |
 | Xtensa LX106 (ESP8266) | xtensa-lx106-elf-gcc | 32-bit |
+| Xtensa LX7 (ESP32-S3) | xtensa-esp-elf-gcc | 32-bit |
 | MSP430 | msp430-gcc | 16-bit |
 | m68k (68000) | m68k-linux-gnu-gcc | 32-bit |
 | AVR (ATmega, ATtiny) | avr-gcc | 8-bit |

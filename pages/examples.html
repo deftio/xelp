@@ -158,7 +158,8 @@ for (;;) {
 
 <p>Full interactive demo for Linux and macOS using ncurses for terminal handling.</p>
 
-<pre><code>make example    # from repo root
+<pre><code>cd examples/posix-simple
+make
 </code></pre>
 
 <p>Requires ncurses: <code>sudo apt-get install libncurses5-dev</code> (Debian/Ubuntu).</p>
@@ -273,8 +274,8 @@ the serial CLI, then fetch the current time and weather from free APIs
 commands at once) and <strong>interactive mode</strong> (<code>XELPParseKey</code>
 &mdash; character-by-character terminal input).</p>
 
-<pre><code>gcc -Wall -Isrc examples/scripting/scripting-example.c src/xelp.c -o scripting-example
-./scripting-example
+<pre><code>cd examples/scripting
+make
 </code></pre>
 
 <!-- ============================================================ -->

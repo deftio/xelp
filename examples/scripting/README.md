@@ -5,11 +5,11 @@ mode** -- the two ways to drive xelp.
 
 ## Building and Running
 
-From the repo root:
-
 ```bash
-gcc -Wall -Isrc examples/scripting/scripting-example.c src/xelp.c -o scripting-example
-./scripting-example
+cd examples/scripting
+make          # build and run
+make build    # build only
+make clean    # remove build artifacts
 ```
 
 ## Two Modes of Operation

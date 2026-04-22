@@ -160,50 +160,50 @@ void main(void) {
 
 <h2>Compiled sizes</h2>
 
-<p>Compiled <code>.text</code> section sizes in bytes with <code>-Os</code>.
+<p>Compiled <code>.text</code> section sizes with <code>-Os</code>.
 Three configurations: KEY (single-key dispatch only), CLI (typical
-interactive use), FULL (all features including pass-through).</p>
+interactive use), FULL (all features). Even the largest full build is
+under 7 KB.</p>
 
+<!-- BEGIN SIZE TABLE -->
 <table>
-<thead><tr><th>Target</th><th>Compiler</th><th style="text-align:right">KEY</th><th style="text-align:right">CLI</th><th style="text-align:right">FULL</th></tr></thead>
+<thead><tr><th>CPU</th><th style="text-align:right">Width</th><th>Compiler</th><th style="text-align:right">KEY (bytes)</th><th style="text-align:right">CLI (bytes)</th><th style="text-align:right">FULL (bytes)</th></tr></thead>
 <tbody>
-<tr><td colspan="5"><strong>8-bit</strong></td></tr>
-<tr><td>AVR (ATmega328P)</td><td>avr-gcc</td><td style="text-align:right">~900</td><td style="text-align:right">~4200</td><td style="text-align:right">~4250</td></tr>
-<tr><td>AVR (ATtiny85)</td><td>avr-gcc</td><td style="text-align:right">~850</td><td style="text-align:right">~4100</td><td style="text-align:right">~4150</td></tr>
-<tr><td colspan="5"><strong>16-bit</strong></td></tr>
-<tr><td>MSP430</td><td>msp430-gcc</td><td style="text-align:right">~700</td><td style="text-align:right">~3200</td><td style="text-align:right">~3250</td></tr>
-<tr><td>68HC11</td><td>m68hc11-gcc</td><td style="text-align:right">~1500</td><td style="text-align:right">~6500</td><td style="text-align:right">~6600</td></tr>
-<tr><td colspan="5"><strong>32-bit</strong></td></tr>
-<tr><td>ARM32 Thumb</td><td>arm-none-eabi-gcc</td><td style="text-align:right">~550</td><td style="text-align:right">~2600</td><td style="text-align:right">~2650</td></tr>
-<tr><td>ARM32</td><td>arm-none-eabi-gcc</td><td style="text-align:right">~850</td><td style="text-align:right">~3800</td><td style="text-align:right">~3850</td></tr>
-<tr><td>RISC-V (rv32)</td><td>riscv64-unknown-elf-gcc</td><td style="text-align:right">~700</td><td style="text-align:right">~3000</td><td style="text-align:right">~3050</td></tr>
-<tr><td>Xtensa LX106 (ESP8266)</td><td>xtensa-lx106-elf-gcc</td><td style="text-align:right">~650</td><td style="text-align:right">~2900</td><td style="text-align:right">~2950</td></tr>
-<tr><td>x86-32</td><td>GCC</td><td style="text-align:right">~1000</td><td style="text-align:right">~4600</td><td style="text-align:right">~4650</td></tr>
-<tr><td>m68k</td><td>m68k-linux-gnu-gcc</td><td style="text-align:right">~750</td><td style="text-align:right">~3300</td><td style="text-align:right">~3350</td></tr>
-<tr><td>PowerPC</td><td>powerpc-linux-gnu-gcc</td><td style="text-align:right">~1300</td><td style="text-align:right">~5800</td><td style="text-align:right">~5850</td></tr>
-<tr><td colspan="5"><strong>64-bit</strong></td></tr>
-<tr><td>x86-64</td><td>GCC</td><td style="text-align:right">1008</td><td style="text-align:right">4667</td><td style="text-align:right">4711</td></tr>
-<tr><td>x86-64</td><td>Clang</td><td style="text-align:right">~1100</td><td style="text-align:right">~4800</td><td style="text-align:right">~4850</td></tr>
-<tr><td>AArch64 (ARM64)</td><td>aarch64-linux-gnu-gcc</td><td style="text-align:right">~900</td><td style="text-align:right">~4200</td><td style="text-align:right">~4250</td></tr>
-<tr><td>RISC-V (rv64)</td><td>riscv64-linux-gnu-gcc</td><td style="text-align:right">~900</td><td style="text-align:right">~4100</td><td style="text-align:right">~4150</td></tr>
+<tr><td>AVR (ATtiny85)</td><td style="text-align:right">8</td><td>avr-gcc</td><td style="text-align:right">850</td><td style="text-align:right">4100</td><td style="text-align:right">4150</td></tr>
+<tr><td>AVR (ATmega328P)</td><td style="text-align:right">8</td><td>avr-gcc</td><td style="text-align:right">900</td><td style="text-align:right">4200</td><td style="text-align:right">4250</td></tr>
+<tr><td>MSP430</td><td style="text-align:right">16</td><td>msp430-gcc</td><td style="text-align:right">700</td><td style="text-align:right">3200</td><td style="text-align:right">3250</td></tr>
+<tr><td>68HC11</td><td style="text-align:right">16</td><td>m68hc11-gcc</td><td style="text-align:right">1500</td><td style="text-align:right">6500</td><td style="text-align:right">6600</td></tr>
+<tr><td>ARM Thumb</td><td style="text-align:right">32</td><td>arm-none-eabi-gcc</td><td style="text-align:right">550</td><td style="text-align:right">2600</td><td style="text-align:right">2650</td></tr>
+<tr><td>Xtensa LX106 (ESP8266)</td><td style="text-align:right">32</td><td>xtensa-lx106-elf-gcc</td><td style="text-align:right">650</td><td style="text-align:right">2900</td><td style="text-align:right">2950</td></tr>
+<tr><td>Xtensa LX7 (ESP32-S3)</td><td style="text-align:right">32</td><td>xtensa-esp-elf-gcc</td><td style="text-align:right">650</td><td style="text-align:right">2900</td><td style="text-align:right">2950</td></tr>
+<tr><td>RISC-V (rv32)</td><td style="text-align:right">32</td><td>riscv64-unknown-elf-gcc</td><td style="text-align:right">700</td><td style="text-align:right">3000</td><td style="text-align:right">3050</td></tr>
+<tr><td>m68k</td><td style="text-align:right">32</td><td>m68k-linux-gnu-gcc</td><td style="text-align:right">750</td><td style="text-align:right">3300</td><td style="text-align:right">3350</td></tr>
+<tr><td>ARM32</td><td style="text-align:right">32</td><td>arm-none-eabi-gcc</td><td style="text-align:right">850</td><td style="text-align:right">3800</td><td style="text-align:right">3850</td></tr>
+<tr><td>x86-32</td><td style="text-align:right">32</td><td>GCC</td><td style="text-align:right">1000</td><td style="text-align:right">4600</td><td style="text-align:right">4650</td></tr>
+<tr><td>PowerPC</td><td style="text-align:right">32</td><td>powerpc-linux-gnu-gcc</td><td style="text-align:right">1300</td><td style="text-align:right">5800</td><td style="text-align:right">5850</td></tr>
+<tr><td>AArch64 (ARM64)</td><td style="text-align:right">64</td><td>aarch64-linux-gnu-gcc</td><td style="text-align:right">900</td><td style="text-align:right">4200</td><td style="text-align:right">4250</td></tr>
+<tr><td>RISC-V (rv64)</td><td style="text-align:right">64</td><td>riscv64-linux-gnu-gcc</td><td style="text-align:right">900</td><td style="text-align:right">4100</td><td style="text-align:right">4150</td></tr>
+<tr><td>x86-64</td><td style="text-align:right">64</td><td>GCC</td><td style="text-align:right">1008</td><td style="text-align:right">4667</td><td style="text-align:right">4711</td></tr>
+<tr><td>x86-64</td><td style="text-align:right">64</td><td>Clang</td><td style="text-align:right">1100</td><td style="text-align:right">4800</td><td style="text-align:right">4850</td></tr>
 </tbody>
 </table>
+<!-- END SIZE TABLE -->
 
-<p>x86-64 GCC sizes measured directly; others estimated from
-cross-compilation ratios. Run <code>docker build</code> / <code>docker
-run</code> with <code>tools/Dockerfile.crossbuild</code> for exact
-numbers.</p>
+<p>x86-64 GCC row is measured directly; others from cross-compilation via
+<code>tools/Dockerfile.crossbuild</code>.</p>
 
 <h2>Building and testing</h2>
 
-<pre><code>make tests        # build and run unit tests + coverage
+<pre><code>make validate     # tests + build all examples (the everyday check)
+make tests        # unit tests + coverage only
+make examples     # build all examples (no interactive launch)
+make example      # build and run the posix ncurses demo (interactive)
 make coverage     # tests + coverage summary
-make fuzz          # fuzz testing with libFuzzer (requires clang)
-make example      # build and run the posix ncurses example
-make clean        # remove build artifacts
+make fuzz         # fuzz testing with libFuzzer (requires clang)
+make clean-all    # remove all build artifacts
 </code></pre>
 
-<p>35 test units, 442 test cases, 100% line coverage of <code>xelp.c</code>.</p>
+<p>35 test units, 458 test cases, 100% line coverage of <code>xelp.c</code>.</p>
 
 <h2>Documentation</h2>
 

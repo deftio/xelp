@@ -13,7 +13,7 @@ BUILD_DIR=build
 INCLUDES=\
     -I$(LIB_DIR)\
 
-.PHONY: tests clean example coverage version fuzz fuzz-parsekey fuzz-parse
+.PHONY: tests clean coverage version fuzz fuzz-parsekey fuzz-parse examples example validate
 
 # all object files go in build/
 $(BUILD_DIR):
@@ -55,22 +55,29 @@ version:
 	@cat $(BUILD_DIR)/xelp_version.yaml
 
 #=======================================================================
-#build simple example in /example/posix-simple folder
-EXAMPLE_POSIX_DIR=examples/posix-simple
+# Build examples (build-only, no interactive launch)
+# posix-simple and posix-simple-cpp require ncurses
 
-OBJ_EXAMPLE1=\
-    $(BUILD_DIR)/xelp_ex.o\
-    $(BUILD_DIR)/xelp-example.o
+examples:
+	@echo "--- Building posix-simple ---"
+	$(MAKE) -C examples/posix-simple build
+	@echo "--- Building posix-simple-cpp ---"
+	$(MAKE) -C examples/posix-simple-cpp build
+	@echo "--- Building scripting ---"
+	$(MAKE) -C examples/scripting build
+	@echo "--- All examples built ---"
 
-$(BUILD_DIR)/xelp_ex.o: $(LIB_DIR)/xelp.c $(LIB_DIR)/xelp.h $(LIB_DIR)/xelpcfg.h | $(BUILD_DIR)
-	$(CC) $(C_FLAGS) $(INCLUDES) -c $< -o $@
+# Build and run the posix ncurses demo (interactive)
+example:
+	$(MAKE) -C examples/posix-simple
 
-$(BUILD_DIR)/xelp-example.o: $(EXAMPLE_POSIX_DIR)/xelp-example.c | $(BUILD_DIR)
-	$(CC) $(C_FLAGS) $(INCLUDES) -c $< -o $@
+#=======================================================================
+# Local validation: tests + examples build (no Docker, no release)
+# Use this for day-to-day development before pushing.
 
-example: $(OBJ_EXAMPLE1)
-	$(CC) $(C_FLAGS) $(INCLUDES) $(OBJ_EXAMPLE1) -o $(BUILD_DIR)/xelp-example.out -lm -lncurses -Os
-	@$(BUILD_DIR)/xelp-example.out
+validate: tests examples
+	@echo ""
+	@echo "=== Validation passed: tests + examples build clean ==="
 
 #=======================================================================
 # Fuzz testing (requires clang with libFuzzer + ASan + UBSan)
@@ -99,4 +106,10 @@ fuzz: fuzz-parsekey fuzz-parse
 clean:
 	-rm -rf $(BUILD_DIR)
 	-rm -f *.gcov *.gcda *.gcno
+
+# clean-all -- clean tests + all examples
+clean-all: clean
+	-$(MAKE) -C examples/posix-simple clean
+	-$(MAKE) -C examples/posix-simple-cpp clean
+	-$(MAKE) -C examples/scripting clean
 

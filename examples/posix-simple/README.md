@@ -19,17 +19,11 @@ sudo apt-get install libncurses5-dev
 
 ## Building and Running
 
-From the repo root:
-
 ```bash
-make example
-```
-
-Or compile directly:
-
-```bash
-gcc -Wall -Isrc examples/posix-simple/xelp-example.c src/xelp.c -lncurses -o xelp-example
-./xelp-example
+cd examples/posix-simple
+make          # build and run
+make build    # build only
+make clean    # remove build artifacts
 ```
 
 ## Commands

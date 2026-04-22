@@ -29,44 +29,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
  */
 
-//these includes are only for demo purposes.
 #include <stdio.h>
-#include <string.h>
-#include <ctype.h>
-#include <curses.h>
-#include <termios.h>
-#include <time.h>
 #include <ncurses.h>
 
-#define XELPGLOBAL_DEFAULTS
-
 #include "../../src/xelp.h"
-
-// setup keypress handling for unix
-int getkey() /* unix non-blocking key get */
-{
-    int character=0;
-    struct termios orig_term_attr;
-    struct termios new_term_attr;
-
-    /* set the terminal to raw mode */
-    tcgetattr(fileno(stdin), &orig_term_attr);
-    memcpy(&new_term_attr, &orig_term_attr, sizeof(struct termios));
-    new_term_attr.c_lflag &= ~(ECHO|ICANON);
-    new_term_attr.c_cc[VTIME] = 0;
-    new_term_attr.c_cc[VMIN] = 0;
-    tcsetattr(fileno(stdin), TCSANOW, &new_term_attr);
-
-    /* read a character from the stdin stream without blocking */
-    /*   returns EOF (-1) if no character is available */
-    character = fgetc(stdin);
-
-    /* restore the original terminal attributes */
-    tcsetattr(fileno(stdin), TCSANOW, &orig_term_attr);
-    fflush(stdin);
-
-    return character;
-}
 
 void gPutChar(char c) {
 	addch(c);
@@ -82,13 +48,7 @@ void handleBackspace() {
 	delch();
 	refresh();
 }
-// end key press handling (curses, unix)
-//This is the only include for xelp
-
-#define XELPGLOBAL_DEFAULTS
-#include "xelp.h"
-
-XELP example; //global declarator for an interperter.  Note this can be instance based.
+XELP example; /* xelp instance -- one per UART/console you want to control */
 int gExit=0;  //global flag for when to quit interpretor loop, not part of XELP, just the demo
 
 
@@ -149,8 +109,8 @@ XELPKeyFuncMapEntry gMyKeyCommands[] =
 XELPRESULT cmdCLS (XELP *ths, const char* args, int maxlen)
 {
 	(void)ths; (void)args; (void)maxlen;
-	printw("\x1B");
-	printw("C");
+	clear();
+	refresh();
 	return XELP_S_OK;
 }
 
@@ -163,8 +123,8 @@ XELPRESULT banner (XELP *ths, const char* args, int maxlen)
 XELPRESULT cmdHome (XELP *ths, const char* args, int maxlen)
 {
 	(void)ths; (void)args; (void)maxlen;
-	printw("\x1B");
-	printw("H");
+	move(0, 0);
+	refresh();
 	return XELP_S_OK;
 }
 XELPRESULT cmdEcho (XELP *ths, const char* args, int maxlen)
@@ -181,7 +141,7 @@ XELPRESULT cmdNumToks (XELP *ths, const char* args, int maxlen)
 
     int n;
     (void)ths;
-    XELP_XB_INIT(b,args,maxlen);
+    XELP_XB_INIT(b,(char*)args,maxlen);
     XELPNumToks(&b,&n);
 	printw(" XELPNumToks %d\n",n);
 
@@ -195,17 +155,12 @@ XELPRESULT cmdPrintR (XELP *ths, const char* args, int maxlen){
 }
 
 XELPRESULT cmdDivmod (XELP *ths, const char* args, int maxlen){
-	XelpBuf b, tok;
+	XelpArgs a;
 	int dividend, divisor;
-	XELP_XB_INIT(b, (char*)args, maxlen);
-
-	XELP_XB_TOP(b);
-	XELPTokN(&b, 1, &tok);
-	dividend = XELPStr2Int(tok.s, tok.p - tok.s);
-
-	XELP_XB_TOP(b);
-	XELPTokN(&b, 2, &tok);
-	divisor = XELPStr2Int(tok.s, tok.p - tok.s);
+	XelpArgsInit(&a, (char*)args, maxlen);
+	XelpNextTok(&a, 0, 0);           /* skip command name */
+	XelpNextInt(&a, &dividend);
+	XelpNextInt(&a, &divisor);
 
 	if (divisor == 0) {
 		printw("divmod: division by zero\n");
@@ -224,14 +179,13 @@ XELPRESULT cmdListToks (XELP *ths, const char* args, int maxlen)
 #ifdef XELP_ENABLE_CLI
     XelpBuf b,tok;
     int n,i;
-    XELPRESULT r;
-    XELP_XB_INIT(b,args,maxlen);
+    XELP_XB_INIT(b,(char*)args,maxlen);
     XELPNumToks(&b,&n);
     XELP_XB_TOP(b);
     printw("[%d]",n);
 	for (i=0; i< n; i++) {
         XELP_XB_TOP(b);
-        r = XELPTokN( &b,i,&tok);
+        XELPTokN( &b,i,&tok);
         printw("<");
         printw("%d:",i);
 		XELPOut(ths,tok.s,tok.p-tok.s);
@@ -256,10 +210,9 @@ XELPRESULT cmdExit (XELP *ths, const char* args, int maxlen) {
 }
 XELPRESULT cmdPrintNum (XELP *ths, const char *args, int maxlen) {
 	XelpBuf b,tok;
-    int n;
     (void)ths;
 
-    XELP_XB_INIT(b,args,maxlen);
+    XELP_XB_INIT(b,(char*)args,maxlen);
     XELPTokN(&b,1,&tok),
 
 	printw("[%d]\n",XELPStr2Int(tok.s,tok.p-tok.s));
@@ -271,7 +224,7 @@ XELPRESULT cmdMath (XELP *ths, const char* args, int maxlen) {
     int i,j,k;
     int op;
 
-    XELP_XB_INIT(b,args,maxlen);
+    XELP_XB_INIT(b,(char*)args,maxlen);
     XELPTokN(&b,0,&tok),
 
 
@@ -315,9 +268,9 @@ XELPCLIFuncMapEntry gMyCLICommands[] =
 	{&cmdNumToks 		, "numtoks" ,  "print number of arguments"  },
 	{&cmdListToks		, "lt"      ,  "list parsed tokens"         },
 	{&cmdHelp	 		, "help"    ,  "help"						},
-	{&cmdPrintNum       , "num"     ,  "print num to console"       },
-	{&cmdCLS			, "cls"		,  "clear screen (uses ASCII ESC seq"},
-	{&cmdHome			, "home"	,  "Set cursor to home"			},
+	{&cmdPrintNum       , "num"     ,  "print integer to console"    },
+	{&cmdCLS			, "cls"		,  "clear screen"                },
+	{&cmdHome			, "home"	,  "cursor to top-left"          },
 	{&cmdMath           , "+"       ,  "add two numbers"            },
 	{&cmdMath           , "-"       ,  "sub two numbers"            },
 	{&cmdMath           , "*"       ,  "mul two numbers"            },
@@ -349,70 +302,90 @@ void modeChangeMsg(int mode) {
 
 
 
-//===============================================
-//main program for testing the functions
+/*
+ * ===================================================================
+ * main -- ncurses terminal setup + xelp main loop
+ *
+ * ncurses is used here only as a portable terminal abstraction for
+ * this POSIX demo.  On a real embedded target you would read bytes
+ * from a UART and call XELPParseKey() directly -- ncurses is not
+ * involved at all.
+ * ===================================================================
+ */
 int main (int argc, char *argv[])
 {
+	int i = 0;
+	(void)argc; (void)argv;
 
-	/* ncurses setup (nothing to do with xelp) */
+	/* --- ncurses terminal setup --------------------------------- */
 	initscr();
-	cbreak();
-	noecho();
-    nodelay( stdscr, TRUE ); //setup non blocking io in ncurses.  ncurses is just used for terminal debugging in linux
-    keypad( stdscr, TRUE);   //allow capture of special keys eg delete etc
-    scrollok(stdscr, TRUE);
-    /* end of curses setup*/
+	cbreak();    /* disable line buffering, pass each char to us     */
+	noecho();    /* don't echo typed chars -- xelp handles its own   */
+	nodelay(stdscr, TRUE);  /* non-blocking getch()                  */
+	scrollok(stdscr, TRUE); /* allow the window to scroll            */
 
-    
-    int ret_val = 0;
-	int i=0;
-	
-	//begin XELP setup
-	char *pAboutStr = "\nExample Ver XELP Intrpreter \n By deftio\n\nEsc: single-key fns. \n(x) to exit\n  \nCTRL-P: CLI (Command line interpeter) mode\nCTRL-T: thru mode\n\n";
-	XELPInit(&example,	pAboutStr); // set the about string for the interpreter and initialize internal state  
+	/*
+	 * IMPORTANT: keypad is OFF.
+	 *
+	 * When keypad(stdscr, TRUE) is set, ncurses intercepts multi-byte
+	 * escape sequences (e.g. ESC [ D for left-arrow) and returns a
+	 * single cooked constant like KEY_LEFT (260).  xelp has its own
+	 * escape-sequence accumulator (_xelpKeyAccum) that expects to
+	 * receive the raw bytes one at a time: 0x1B, '[', 'D'.
+	 *
+	 * With keypad OFF, ncurses passes the raw bytes through.  xelp
+	 * reassembles them into XELP_KEYCODE_LEFT etc. and the built-in
+	 * line editor handles cursor movement, Home/End, Delete, etc.
+	 *
+	 * This matches how xelp works on a real microcontroller: the UART
+	 * delivers one byte at a time and xelp sorts it out.
+	 */
+	keypad(stdscr, FALSE);
+	/* --- end ncurses setup -------------------------------------- */
 
-	//example.mKeyBKSP = 0x7; //ncurses on linux
-#ifdef XELP_ENABLE_CLI	
-	XELP_SET_FN_BKSP(example,&handleBackspace);
-	//example.mpfBksp = &handleBackspace; // this is the other way to set up backspace handling (applies to CLI parse mode only)
-#endif
-	XELP_SET_FN_EMCHG(example,&modeChangeMsg);  // optional call back when mode changed (if enabled see xelpcfg.h)
-	//example.mpfEditModeChg = &modeChangeMsg;  //emit message when key entry mode changes see xelpcfg.h for more details
-	
-	XELP_SET_FN_OUT(example,&gPutChar);  
-	XELP_SET_FN_ERR(example,&gPutChar);        // optional - send error message to stream
-	XELP_SET_FN_KEY(example,gMyKeyCommands);   // map the single key commands
-	XELP_SET_FN_CLI(example,gMyCLICommands);   // map the cli commands
-	XELP_SET_VAL_CLI_PROMPT(example,"xelp>");  // if using per-instance prompt...
-	
-	// end of setup
+
+	/* --- xelp instance setup ------------------------------------ */
+	const char *pAboutStr =
+		"\nxelp posix demo\n"
+		"\n"
+		"ESC     : single-key mode  (x = exit, h = help)\n"
+		"CTRL-P  : CLI mode         (type command + ENTER)\n"
+		"CTRL-T  : pass-through mode\n"
+		"\n";
+
+	XELPInit(&example, pAboutStr);
+
+	XELP_SET_FN_OUT(example,  &gPutChar);        /* character output   */
+	XELP_SET_FN_ERR(example,  &gPutChar);        /* error output       */
+	XELP_SET_FN_BKSP(example, &handleBackspace); /* destructive bksp   */
+	XELP_SET_FN_EMCHG(example,&modeChangeMsg);   /* mode change notify */
+	XELP_SET_FN_KEY(example,   gMyKeyCommands);   /* single-key table   */
+	XELP_SET_FN_CLI(example,   gMyCLICommands);   /* CLI command table   */
+	XELP_SET_VAL_CLI_PROMPT(example, "xelp>");    /* per-instance prompt */
+	/* --- end xelp setup ----------------------------------------- */
 
 
 	printw("\n============================================================\n");
-	printBanner (&example, 0);
-	
-	XELPHelp(&example); // print out help to start off program.  help is per-instance
+	printBanner(&example, 0);
+	XELPHelp(&example);
 
-	printw("\n............\n");
-	
-	printw("\n==================\n");
-	printw("\nEntering Main Loop\n");
-	printw("\nXELP size: %d\n",(int)sizeof(XELP));
-	XELPParseKey(&example,'\n'); //hack to do first prompt;
-	
-	do
-	{
+	printw("\nXELP struct size: %d bytes\n", (int)sizeof(XELP));
+	XELPParseKey(&example, '\n'); /* emit first prompt */
+
+	/*
+	 * Main loop: read one byte at a time from ncurses and feed it to
+	 * xelp.  Because keypad is OFF, arrow keys arrive as raw escape
+	 * sequences (ESC [ A/B/C/D) and xelp's key accumulator reassembles
+	 * them.  getch() returns ERR (-1) when no input is available.
+	 */
+	do {
 		i = getch();
+		if (i != ERR)
+			XELPParseKey(&example, (char)i);
+	} while (!gExit);
 
-		if (i!=-1)
-			XELPParseKey(&example,i);
-
-		i=-1;
-	}while (!gExit); // gExit is a global variable that is called if the exit command is called ("exit" in CLI mode or "x" in KEY mode)
-
-	endwin(); // clean up curses
-
+	endwin();
 	printf("\n");
-	return ret_val;
+	return 0;
 }
 

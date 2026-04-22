@@ -23,9 +23,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc-xtensa-lx106 \
     picolibc-xtensa-lx106-elf \
     tcc \
+    curl \
+    xz-utils \
     sdcc \
     binutils \
     && rm -rf /var/lib/apt/lists/*
+
+# Espressif unified Xtensa toolchain (ESP32, ESP32-S2, ESP32-S3)
+# Not in Ubuntu repos; download prebuilt from Espressif's crosstool-NG releases.
+RUN curl -sL https://github.com/espressif/crosstool-NG/releases/download/esp-15.2.0_20251204/xtensa-esp-elf-15.2.0_20251204-x86_64-linux-gnu.tar.xz \
+    | tar -xJ -C /opt \
+    && ln -s /opt/xtensa-esp-elf/bin/xtensa-esp-elf-* /usr/local/bin/
 
 WORKDIR /xelp
 

@@ -23,9 +23,16 @@ do_build() {
 
 do_run() {
     echo "Running cross-compilation report..."
+    mkdir -p "$REPO_ROOT/build"
     docker run --rm --platform linux/amd64 \
         -v "$SCRIPT_DIR/compactbuilds-docker.sh:/xelp/tools/compactbuilds-docker.sh:ro" \
+        -v "$REPO_ROOT/build:/xelp/build" \
         "$IMAGE_NAME"
+    if [ -f "$REPO_ROOT/build/sizes.csv" ]; then
+        echo ""
+        echo "Size data written to build/sizes.csv"
+        echo "Run 'bash tools/update_sizes.sh' to update docs."
+    fi
 }
 
 case "${1:-}" in

@@ -1,27 +1,101 @@
-# CMakeLists.txt -- ESP-IDF component build definition for xelp.
+# =============================================================================
+# xelp -- Embedded CLI / Script Interpreter Library
+# =============================================================================
 #
-# This file is used by the ESP-IDF build system (CMake-based) when xelp
-# is installed as a component via the ESP Component Registry or placed
-# in a project's components/ directory.
+# This file serves two roles:
 #
-# The idf_component_register() call is specific to ESP-IDF and is
-# silently ignored by plain CMake, so this file does not interfere
-# with other build systems (make, PlatformIO, etc.).
+#   1. ESP-IDF component  -- when built inside the ESP-IDF framework, the
+#      idf_component_register() call below is all that's needed.
 #
-# Usage in an ESP-IDF project:
+#   2. Plain CMake library -- for any other CMake-based project:
 #
-#   1. Install:  idf.py add-dependency "deftio/xelp==0.3.0"
-#      -- or --  copy this repo into your project's components/xelp/
+#        add_subdirectory(path/to/xelp)
+#        target_link_libraries(my_app PRIVATE xelp)
 #
-#   2. In your source:
-#        #include "xelp.h"
+#      That gives you the include path (src/) and the compiled library.
 #
-#   3. Build:    idf.py build
+# ---- Build-time configuration ----
 #
-# No REQUIRES or PRIV_REQUIRES -- xelp depends only on standard C
-# (C89 or later) and has no ESP-IDF component dependencies.
+# xelp is configured entirely through C preprocessor defines in
+# src/xelpcfg.h.  Features (CLI mode, KEY mode, THR mode, line editing,
+# built-in help, etc.) are toggled by commenting / uncommenting #defines
+# in that file.  There are NO CMake options that mirror those flags --
+# edit xelpcfg.h directly.
+#
+# If you need a project-specific configuration WITHOUT modifying xelpcfg.h,
+# define XELP_CONFIG_OVERRIDE before xelp.h is included.  This causes
+# xelpcfg.h to #include "xelp_ovr.h" instead of using its built-in
+# defaults.  Place your xelp_ovr.h on the include path and set all the
+# XELP_ENABLE_* / XELPKEY_* defines there.
+#
+# Example with an override file:
+#
+#   target_compile_definitions(xelp PUBLIC XELP_CONFIG_OVERRIDE)
+#   target_include_directories(xelp PUBLIC ${CMAKE_SOURCE_DIR}/my_config)
+#   # ^ my_config/ contains your custom xelp_ovr.h
+#
+# ---- Register type ----
+#
+# xelp's internal registers (mR[]) default to plain `int`.  To change
+# the type (e.g. int32_t on a specific target), edit XELPREG in
+# xelpcfg.h (or your xelp_ovr.h).
+#
+# ---- Further reading ----
+#
+#   src/xelpcfg.h   -- all compile-time knobs with inline documentation
+#   src/xelp.h      -- public API, version macro, struct layout
+#   README.md       -- usage overview and examples
+# =============================================================================
 
-idf_component_register(
-    SRCS "src/xelp.c"
-    INCLUDE_DIRS "src"
+# ---- ESP-IDF component path ----
+# ESP-IDF sets ESP_PLATFORM when it drives the build.  Register the
+# component and return early -- none of the plain-CMake logic below
+# applies inside ESP-IDF.
+if(ESP_PLATFORM)
+    idf_component_register(
+        SRCS "src/xelp.c"
+        INCLUDE_DIRS "src"
+    )
+    return()
+endif()
+
+# ---- Plain CMake library ----
+cmake_minimum_required(VERSION 3.10)
+project(xelp
+    VERSION 0.3.1
+    LANGUAGES C
+    DESCRIPTION "Embedded CLI/script interpreter -- no malloc, multi-instance"
 )
+
+# xelp is a single-file C library.  Build as STATIC so parent projects
+# can link it with target_link_libraries().
+add_library(xelp STATIC
+    src/xelp.c
+)
+
+# Public include directory -- consumers get src/ on their include path
+# so #include "xelp.h" works (xelp.h pulls in xelpcfg.h automatically).
+target_include_directories(xelp PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<INSTALL_INTERFACE:include>
+)
+
+# xelp is pure C (C99 sufficient) with no external dependencies.
+target_compile_features(xelp PUBLIC c_std_99)
+
+# ---------------------------------------------------------------------------
+# Optional: unit tests (host builds only -- requires POSIX)
+# ---------------------------------------------------------------------------
+option(XELP_BUILD_TESTS "Build and register xelp unit tests" OFF)
+
+if(XELP_BUILD_TESTS)
+    enable_testing()
+
+    add_executable(xelp_unit_tests
+        tests/xelp_unit_tests.c
+        tests/jumpbug_unit_test_fw.c
+        src/xelp.c
+    )
+    target_include_directories(xelp_unit_tests PRIVATE src tests)
+    add_test(NAME xelp_unit_tests COMMAND xelp_unit_tests)
+endif()

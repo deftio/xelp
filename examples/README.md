@@ -7,10 +7,20 @@ Demonstrates CLI commands, KEY mode, THR mode, math operations, and
 token parsing.
 
 ```bash
-make example    # from repo root
+cd posix-simple && make
 ```
 
 Requires ncurses: `sudo apt-get install libncurses5-dev` (Linux).
+
+## posix-simple-cpp
+
+Same functionality as `posix-simple` but written in C++ using the `XelpCLI`
+wrapper and **Easy API** (`commands({...})` with inline lambdas). No static
+function tables, no raw `XELP*` pointers. Requires C++17.
+
+```bash
+cd posix-simple-cpp && make
+```
 
 ## bare-metal
 
@@ -32,8 +42,7 @@ mode** (`XELPParseKey` -- character-by-character terminal input). Shows
 startup scripts, one-liner macros with semicolons, and the `XelpBuf` API.
 
 ```bash
-gcc -Wall -Isrc examples/scripting/scripting-example.c src/xelp.c -o scripting-example
-./scripting-example
+cd scripting && make
 ```
 
 ## arduino

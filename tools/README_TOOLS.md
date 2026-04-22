@@ -76,8 +76,13 @@ Targets compiled:
 | MSP430 | msp430-gcc |
 | AVR5 (ATmega328P) | avr-gcc |
 | AVR ATtiny85 | avr-gcc |
+| Xtensa LX106 (ESP8266) | xtensa-lx106-elf-gcc |
+| Xtensa LX7 (ESP32-S3) | xtensa-esp-elf-gcc |
 | 68HC11 | m68hc11-gcc |
 | PowerPC | powerpc-linux-gnu-gcc |
+
+The report also writes `build/sizes.csv` (CSV with columns:
+`cpu,width,compiler,key,cli,full`).
 
 Supporting files:
 
@@ -85,6 +90,28 @@ Supporting files:
 - **`compactbuilds-docker.sh`** -- The script that runs inside the container.
 - **`compactbuilds.sh`** -- Original host-native version (requires all
   toolchains installed locally).
+
+---
+
+## Size Table Updater
+
+**`update_sizes.sh`** -- Read `build/sizes.csv` and patch the compiled-size
+tables in `README.md` and `pages/index.html`.
+
+Tables are delimited by `<!-- BEGIN SIZE TABLE -->` / `<!-- END SIZE TABLE -->`
+markers.  Rows are sorted by CPU width ascending (8 → 16 → 32 → 64), then
+KEY size ascending within each group.
+
+```
+# After running crossbuild.sh:
+bash tools/update_sizes.sh
+
+# Preview without writing:
+bash tools/update_sizes.sh --dry-run
+
+# Explicit CSV path:
+bash tools/update_sizes.sh path/to/sizes.csv
+```
 
 ---
 

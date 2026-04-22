@@ -15,11 +15,16 @@ SRC=/xelp/src/xelp.c
 INCLUDE="-I/xelp/src"
 OBJ=/tmp/xelp.o
 CFG_DIR=/tmp/xelp_cfg
+CSV_FILE=/xelp/build/sizes.csv
 
 SEP="============================================================"
 
 # Accumulate summary rows: "group|target|key_size|cli_size|full_size"
 SUMMARY=""
+
+# CSV accumulator (written to CSV_FILE at end)
+mkdir -p "$(dirname "$CSV_FILE")"
+CSV_ROWS=""
 
 # --- Create config override headers ----------------------------------------
 # XELP_CONFIG_OVERRIDE causes xelpcfg.h to #include "xelp_ovr.h" instead of
@@ -95,12 +100,21 @@ get_text_size() {
 }
 
 # --- Helper: build one target in all three configs -------------------------
-# Prints a row and accumulates summary data.
+# Prints a row, accumulates summary data, and appends a CSV row.
+#
+# Usage: build_target <width> <cpu> <compiler> <cc_base>
+#   width    -- CPU word size (8, 16, 32, 64)
+#   cpu      -- CPU name for docs (e.g. "ARM Thumb", "x86-64")
+#   compiler -- Compiler name for docs (e.g. "arm-none-eabi-gcc", "GCC")
+#   cc_base  -- Compiler command without config flags
 
 build_target() {
-    local group="$1"    # word-size group for summary table
-    local label="$2"    # human-readable target name
-    local cc_base="$3"  # compiler command without config flags
+    local width="$1"
+    local cpu="$2"
+    local compiler="$3"
+    local cc_base="$4"
+    local label="${cpu} (${compiler})"
+    local group="${width}-bit"
 
     local key_sz cli_sz full_sz
 
@@ -108,8 +122,9 @@ build_target() {
     cli_sz=$(get_text_size  "$cc_base -DXELP_CONFIG_OVERRIDE -I$CFG_DIR/cli")
     full_sz=$(get_text_size "$cc_base -DXELP_CONFIG_OVERRIDE -I$CFG_DIR/full")
 
-    printf "  %-26s %8s  %8s  %8s\n" "$label" "$key_sz" "$cli_sz" "$full_sz"
+    printf "  %-34s %8s  %8s  %8s\n" "$label" "$key_sz" "$cli_sz" "$full_sz"
     SUMMARY="${SUMMARY}${group}|${label}|${key_sz}|${cli_sz}|${full_sz}\n"
+    CSV_ROWS="${CSV_ROWS}${cpu},${width},${compiler},${key_sz},${cli_sz},${full_sz}\n"
 }
 
 # --- Report header ---------------------------------------------------------
@@ -132,78 +147,81 @@ print_header() {
     echo "$SEP"
     echo "$1"
     echo "$SEP"
-    printf "  %-26s %8s  %8s  %8s\n" "Target" "KEY" "CLI" "FULL"
-    printf "  %-26s %8s  %8s  %8s\n" "--------------------------" "--------" "--------" "--------"
+    printf "  %-34s %8s  %8s  %8s\n" "Target" "KEY" "CLI" "FULL"
+    printf "  %-34s %8s  %8s  %8s\n" "----------------------------------" "--------" "--------" "--------"
 }
 
 # --- 64-bit targets --------------------------------------------------------
 
 print_header "64-bit targets"
 
-build_target "64-bit" "GCC x86-64" \
+build_target 64 "x86-64" "GCC" \
     "gcc -c $SRC $INCLUDE -Os -Wall -o $OBJ"
 
-build_target "64-bit" "Clang x86-64" \
+build_target 64 "x86-64" "Clang" \
     "clang -c $SRC $INCLUDE -Os -Wall -o $OBJ"
 
-build_target "64-bit" "GCC AArch64 (ARM64)" \
+build_target 64 "AArch64 (ARM64)" "aarch64-linux-gnu-gcc" \
     "aarch64-linux-gnu-gcc -c $SRC $INCLUDE -Os -Wall -o $OBJ"
 
-build_target "64-bit" "GCC RISC-V (rv64)" \
+build_target 64 "RISC-V (rv64)" "riscv64-linux-gnu-gcc" \
     "riscv64-linux-gnu-gcc -c $SRC $INCLUDE -Os -Wall -o $OBJ"
 
 # --- 32-bit targets --------------------------------------------------------
 
 print_header "32-bit targets"
 
-build_target "32-bit" "GCC x86-32" \
+build_target 32 "x86-32" "GCC" \
     "gcc -c $SRC $INCLUDE -Os -m32 -Wall -o $OBJ"
 
-build_target "32-bit" "TCC x86" \
+build_target 32 "x86-32" "TCC" \
     "tcc -c $SRC $INCLUDE -o $OBJ"
 
-build_target "32-bit" "GCC ARM32" \
+build_target 32 "ARM32" "arm-none-eabi-gcc" \
     "arm-none-eabi-gcc -c $SRC $INCLUDE -Os -Wall -o $OBJ"
 
-build_target "32-bit" "GCC ARM32 Thumb" \
+build_target 32 "ARM Thumb" "arm-none-eabi-gcc" \
     "arm-none-eabi-gcc -c $SRC $INCLUDE -Os -mthumb -Wall -o $OBJ"
 
-build_target "32-bit" "GCC m68k" \
+build_target 32 "m68k" "m68k-linux-gnu-gcc" \
     "m68k-linux-gnu-gcc -c $SRC $INCLUDE -Os -Wall -o $OBJ"
 
-build_target "32-bit" "GCC PowerPC" \
+build_target 32 "PowerPC" "powerpc-linux-gnu-gcc" \
     "powerpc-linux-gnu-gcc -c $SRC $INCLUDE -Os -Wall -o $OBJ"
 
-build_target "32-bit" "GCC RISC-V (rv32)" \
+build_target 32 "RISC-V (rv32)" "riscv64-unknown-elf-gcc" \
     "riscv64-unknown-elf-gcc -c $SRC $INCLUDE -Os -march=rv32imac -mabi=ilp32 -Wall -o $OBJ"
 
-build_target "32-bit" "GCC Xtensa LX106 (ESP8266)" \
+build_target 32 "Xtensa LX106 (ESP8266)" "xtensa-lx106-elf-gcc" \
     "xtensa-lx106-elf-gcc -c $SRC $INCLUDE -Os -Wall -o $OBJ"
+
+build_target 32 "Xtensa LX7 (ESP32-S3)" "xtensa-esp-elf-gcc" \
+    "xtensa-esp-elf-gcc -mcpu=esp32s3 -c $SRC $INCLUDE -Os -Wall -o $OBJ"
 
 # --- 16-bit targets --------------------------------------------------------
 
 print_header "16-bit targets"
 
-build_target "16-bit" "GCC MSP430" \
+build_target 16 "MSP430" "msp430-gcc" \
     "msp430-gcc -c $SRC $INCLUDE -Os -Wall -o $OBJ"
 
-build_target "16-bit" "GCC 68HC11" \
+build_target 16 "68HC11" "m68hc11-gcc" \
     "m68hc11-gcc -c $SRC $INCLUDE -Os -o $OBJ"
 
-build_target "16-bit" "SDCC PIC18F2620" \
+build_target 16 "PIC18F2620" "SDCC" \
     "sdcc -mpic16 -p18f2620 --opt-code-size -c $SRC $INCLUDE -o $OBJ"
 
 # --- 8-bit targets ---------------------------------------------------------
 
 print_header "8-bit targets"
 
-build_target "8-bit" "GCC AVR5 (ATmega328P)" \
+build_target 8 "AVR (ATmega328P)" "avr-gcc" \
     "avr-gcc -c $SRC $INCLUDE -Os -mmcu=avr5 -Wall -o $OBJ"
 
-build_target "8-bit" "GCC AVR ATtiny85" \
+build_target 8 "AVR (ATtiny85)" "avr-gcc" \
     "avr-gcc -c $SRC $INCLUDE -Os -mmcu=attiny85 -Wall -o $OBJ"
 
-build_target "8-bit" "SDCC MCS-51 (8051)" \
+build_target 8 "MCS-51 (8051)" "SDCC" \
     "sdcc -mmcs51 --model-small --opt-code-size -c $SRC $INCLUDE -o $OBJ"
 
 # --- Function size table (native GCC, FULL config) -------------------------
@@ -225,14 +243,24 @@ echo "$SEP"
 
 for grp in "64-bit" "32-bit" "16-bit" "8-bit"; do
     echo ""
-    printf "  %-26s %8s  %8s  %8s\n" "$grp" "KEY" "CLI" "FULL"
-    printf "  %-26s %8s  %8s  %8s\n" "--------------------------" "--------" "--------" "--------"
+    printf "  %-34s %8s  %8s  %8s\n" "$grp" "KEY" "CLI" "FULL"
+    printf "  %-34s %8s  %8s  %8s\n" "----------------------------------" "--------" "--------" "--------"
     echo -e "$SUMMARY" | while IFS='|' read -r g label ks cs fs; do
         [ -z "$g" ] && continue
         [ "$g" != "$grp" ] && continue
-        printf "  %-26s %8s  %8s  %8s\n" "$label" "$ks" "$cs" "$fs"
+        printf "  %-34s %8s  %8s  %8s\n" "$label" "$ks" "$cs" "$fs"
     done
 done
+
+# --- Write CSV file --------------------------------------------------------
+
+echo ""
+echo "Writing CSV to $CSV_FILE ..."
+{
+    echo "cpu,width,compiler,key,cli,full"
+    echo -e "$CSV_ROWS" | sed '/^$/d'
+} > "$CSV_FILE"
+echo "CSV written: $(wc -l < "$CSV_FILE") rows (including header)."
 
 echo ""
 echo "Done."

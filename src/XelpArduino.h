@@ -330,7 +330,7 @@ private:
     bool _addCmd(const char* name, const char* help, XelpEasyCliFn fn)
     {
         if (m_nCli >= XELP_MAX_CLI_CMDS) return false;
-        m_cliTable[m_nCli] = { &_easyCliDispatch, (char*)name, (char*)help };
+        m_cliTable[m_nCli] = { &_easyCliDispatch, name, help };
         m_easyCliFns[m_nCli] = fn;
         m_nCli++;
         _rebuildCliSentinel();
@@ -362,7 +362,7 @@ private:
         /* Find which table entry matches. */
         for (int i = 0; i < cli.m_nCli; i++) {
             if (cli.m_cliTable[i].mFunPtr == &_easyCliDispatch &&
-                XELPStrEq((char*)tok.s, cmdLen, cli.m_cliTable[i].mpCmd) == XELP_S_OK) {
+                XELPStrEq(tok.s, cmdLen, cli.m_cliTable[i].mpCmd) == XELP_S_OK) {
                 /* Parse argv and null-terminate each token. */
                 const char* argv[XELP_MAX_EASY_ARGV];
                 int argc = 0;
@@ -403,7 +403,7 @@ private:
     bool _addKey(XELPKEYCODE key, const char* help, XelpEasyKeyFn fn)
     {
         if (m_nKey >= XELP_MAX_KEY_CMDS) return false;
-        m_keyTable[m_nKey] = { &_easyKeyDispatch, key, (char*)help };
+        m_keyTable[m_nKey] = { &_easyKeyDispatch, key, help };
         m_easyKeyFns[m_nKey] = fn;
         m_nKey++;
         _rebuildKeySentinel();

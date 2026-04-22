@@ -27,24 +27,39 @@ make version   # compile + run, writes build/xelp_version.yaml
 
 ## Quick Reference
 
+### Local development (fast, no Docker)
+
 | Command | Purpose |
 | --- | --- |
-| `make tests` | Build + run unit tests + gcov |
+| `make validate` | Tests + build all examples -- the everyday pre-push check |
+| `make tests` | Unit tests + gcov only |
+| `make examples` | Build all examples (no interactive launch) |
+| `make example` | Build + run posix ncurses example (interactive) |
 | `make coverage` | Tests + coverage summary |
+| `make fuzz` | Fuzz testing with libFuzzer (requires clang) |
 | `make version` | Extract version to build/xelp_version.yaml |
-| `make example` | Build + run posix ncurses example |
-| `make clean` | Remove all build artifacts |
-| `bash tools/make_release.sh` | Validate build for release (dry run) |
-| `bash tools/make_release.sh --tag` | Validate + tag + push (CI creates release) |
-| `bash tools/make_release.sh --release` | Validate + tag + push + local release (fallback) |
-| `bash tools/crossbuild.sh` | Docker cross-compilation size report |
+| `make clean` | Remove test build artifacts |
+| `make clean-all` | Clean tests + all examples |
+
+### Full release (includes Docker cross-compilation)
+
+| Command | Purpose |
+| --- | --- |
+| `bash tools/crossbuild.sh` | Docker cross-compile all targets, writes `build/sizes.csv` |
+| `bash tools/make_release.sh` | Full guided release pipeline |
+| `bash tools/make_release.sh --validate` | Local validation only (no git, no push) |
+| `bash tools/make_release.sh --release-local` | Full flow, creates GH release locally (fallback) |
+
+The cross-build step is expensive (~minutes, requires Docker) and only
+needed when updating the compiled-size tables for a release. Day-to-day
+development uses `make validate` which takes seconds.
 
 ## Development Workflow
 
 ```bash
 git checkout -b dev-my-feature master
 # ... make changes ...
-make clean && make tests        # must pass with zero warnings
+make validate                   # tests + examples, zero warnings
 make coverage                   # check coverage didn't drop
 ```
 
@@ -53,16 +68,23 @@ make coverage                   # check coverage didn't drop
 1. Bump `XELP_VERSION` in `src/xelp.h`
 2. Update `CHANGELOG.md` with release notes
 3. Commit on your working branch
+4. (Optional) Run Docker cross-build to update size tables:
+   ```bash
+   bash tools/crossbuild.sh      # writes build/sizes.csv
+   ```
+5. Run the guided release script:
+   ```bash
+   bash tools/make_release.sh
+   ```
 
-Then run the guided release script:
+The script walks through every step: extract version, validate build,
+sync manifests, update badges, update size tables (if `build/sizes.csv`
+exists), push branch, open PR, wait for CI, merge, tag, and wait for
+the GitHub Release. It pauses for confirmation before anything that
+affects the remote.
 
-```bash
-bash tools/make_release.sh
-```
-
-The script walks through every step: local validation, push, PR, CI,
-merge, tag, and waits for the GitHub Release to appear. It pauses for
-confirmation before anything that affects the remote.
+If `build/sizes.csv` is not present the script skips the size-table
+update and uses whatever tables are already in the docs.
 
 For local validation only (no git, no PR):
 

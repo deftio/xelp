@@ -202,7 +202,7 @@ typedef struct
 {
 	XELPRESULT (*mFunPtr)(struct XELP_tag *, XELPKEYCODE) REENTRANT_SDCC;	/* function pointer to user-supplied fnc(ths, keycode) */
 	XELPKEYCODE mKey;						    /* key press code (single char or packed multi-byte)  */
-	char* mpHelpString;						    /* use NULL or 0 if no help string is to be provided  */
+	const char* mpHelpString;				    /* use NULL or 0 if no help string is to be provided  */
 }XELPKeyFuncMapEntry;
 /* #define XELP_KEYFUNCENTRY_LAST {0,0,""}          function list terminator */
 
@@ -217,8 +217,8 @@ typedef struct
 typedef struct
 {
 	XELPRESULT (*mFunPtr)(struct XELP_tag *, const char *pArgString, int maxbuflen) REENTRANT_SDCC ;	/* fn ptr to command */
-	char* mpCmd;                               /* name of cmd at run-time / in script                    */
-	char* mpHelpString;                        /* optional help string                                   */
+	const char* mpCmd;                         /* name of cmd at run-time / in script                    */
+	const char* mpHelpString;                  /* optional help string                                   */
 }XELPCLIFuncMapEntry; 
 /*#define XELP_CLIFUNCENTRY_LAST {0,"",""}			 function list terminator */
 
@@ -344,11 +344,18 @@ XELPRESULT XELPInit (XELP *ths, const char *pAboutMsg);			    /* initialize inst
 /* Register access macros -- callee-clobbers-all convention.
    R0: command status (written by engine after dispatch).
    R1-R3: command-specific return values (engine never touches these).
-   All registers may be overwritten by any command call. */
+   All registers may be overwritten by any command call. 
+   */
 #define XELP_R0(ths) ((ths).mR[0])
 #define XELP_R1(ths) ((ths).mR[1])
 #define XELP_R2(ths) ((ths).mR[2])
 #define XELP_R3(ths) ((ths).mR[3])
+
+#define XELP_SET_R0(ths,val) ((ths).mR[0]=(val))
+#define XELP_SET_R1(ths,val) ((ths).mR[1]=(val))
+#define XELP_SET_R2(ths,val) ((ths).mR[2]=(val))
+#define XELP_SET_R3(ths,val) ((ths).mR[3]=(val))
+
 
 #ifdef XELP_ENABLE_HELP
 XELPRESULT XELPHelp	        (XELP *ths);                             /* print online help (if avail)    */
@@ -368,6 +375,24 @@ XELPRESULT XELPParseKey 	(XELP *ths, char key);				     /* handle keypress at CL
 XELPRESULT XELPTokLineXB (XelpBuf *buf, XelpBuf *tok, int srchType);
 XELPRESULT XELPTokN (XelpBuf *buf, int n, XelpBuf *tok);
 XELPRESULT XELPNumToks (XelpBuf *buf, int *n);
+
+/*****************************************************************************
+ XelpArgs -- sequential argument iterator for CLI command handlers.
+
+ Provides O(1)-per-token left-to-right iteration.  argv[0] is the command
+ name (no auto-skip).  Tokens are returned as pointer + length (NOT
+ null-terminated) to avoid corrupting the buffer for subsequent tokens.
+ Use XELPStrEq() for string comparison, or XelpNextInt() which handles
+ the length internally.  Token pointers are valid only during the callback.
+ */
+typedef struct {
+    XelpBuf buf;    /* tokenizer state (cursor advances as tokens are consumed) */
+} XelpArgs;
+
+XELPRESULT XelpArgsInit  (XelpArgs *a, char *args, int len);
+XELPRESULT XelpNextTok   (XelpArgs *a, const char **tok, int *toklen);
+XELPRESULT XelpNextInt   (XelpArgs *a, int *val);
+XELPRESULT XelpArgCount  (XelpArgs *a, int *n);
 
 /* XELPNEXTTOK get next token in a string buffer.  This is just a macro call to XELPTokLine             */
 /* #define    XELPNEXTTOK(buf,blen,tok_s,tok_e)    (XELPTokLine(buf, buf+blen, tok_s, tok_e, 0, XELP_TOK_ONLY)) */

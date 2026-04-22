@@ -299,18 +299,16 @@ XELPRESULT XELPInit 	 (
 	
 	return XELP_S_OK;
 }
-/****************************
- XELPStrEq() : test if 2 strings are equal.  used for parsing commands at CLI, scripts
- cmd is assumed to be 0 terminated e.g. "mycommand" === mycommand0 
-*/
+/********************************************************
+ XELPStrEq2 (pbuf, pend, cmd)
+  Compare a pointer-pair buffer [pbuf..pend) to a null-terminated string cmd.
+  This is the primary comparison function; XELPStrEq is a thin wrapper.
+ */
 #ifdef XELP_ENABLE_CLI
-XELPRESULT XELPStrEq (const char* pbuf, int blen, const char *cmd)
+XELPRESULT XELPStrEq2 (const char* pbuf, const char* pend, const char *cmd)
 {
-	if (0 == blen) {
-        return (*cmd == 0) ? XELP_S_OK : XELP_S_NOTFOUND;
-    }
-	while(blen--){
-		if (*cmd == 0) 
+	while(pbuf<pend){
+		if (*cmd == 0)
 			return XELP_S_NOTFOUND;
 		if (*pbuf++ != *cmd++)
 			return XELP_S_NOTFOUND;
@@ -319,22 +317,13 @@ XELPRESULT XELPStrEq (const char* pbuf, int blen, const char *cmd)
 		return XELP_S_NOTFOUND;
 	return XELP_S_OK;
 }
-/********************************************************
- XELPStrEq2 (pbuf, pend, cmd)
-  takes a string specified by start and stop ptrs pbuf ... penf and compares if equal
-  to null termintaed string cmd.
- */
-XELPRESULT XELPStrEq2 (const char* pbuf, const char* pend, const char *cmd)
+/****************************
+ XELPStrEq() : length-based wrapper around XELPStrEq2.
+ cmd is assumed to be 0 terminated e.g. "mycommand" === mycommand\0
+*/
+XELPRESULT XELPStrEq (const char* pbuf, int blen, const char *cmd)
 {
-	while(pbuf<pend){
-		if (*cmd == 0) 
-			return XELP_S_NOTFOUND;
-		if (*pbuf++ != *cmd++)
-			return XELP_S_NOTFOUND;
-	}
-	if (*cmd != 0)
-		return XELP_S_NOTFOUND;
-	return XELP_S_OK;
+	return XELPStrEq2(pbuf, pbuf + blen, cmd);
 }
 /********************************************************
  XELPBufCmp() : test if 2 buffers have byte for byte equality.  Used for finding if tokens match commands or labels
@@ -621,7 +610,7 @@ XELPRESULT XELPParseXB (XELP* ths, XelpBuf *args) {
         if (f) { /* make sure fn dispatch table exists */
         	ths->mR[0] = XELP_E_CMDNOTFOUND;
             while(f->mpCmd) {    
-                if (XELP_S_OK == XELPStrEq(line.s,(int)(line.p-line.s),f->mpCmd)){
+                if (XELP_S_OK == XELPStrEq2(line.s,line.p,f->mpCmd)){
                     
                     ths->mR[0] = (f->mFunPtr)(ths, line.s,(int)(line.e-line.s));
                     break;
@@ -638,9 +627,9 @@ XELPRESULT XELPParseXB (XELP* ths, XelpBuf *args) {
 }
 XELPRESULT XELPParse 		(XELP *ths, const char *buf, int blen)
 {
-    XelpBufC args;
-    XELP_XB_INIT(args,buf,blen);
-    return XELPParseXB(ths,(XelpBuf *)&args);
+    XelpBuf args;
+    XELP_XB_INIT(args,(char*)buf,blen); /* const discard is safe: tokenizer only reads */
+    return XELPParseXB(ths,&args);
 }
 /********************************************************
  XELPTokN() find the nth token (if it exists) - useful for parsing arguments
@@ -677,9 +666,53 @@ XELPRESULT XELPNumToks (XelpBuf *b, int *n)
     *n=0;
     while (XELP_S_OK == XELPTokLineXB(b,&t,XELP_TOK_ONLY))
         (*n)++;
-        
+
     return XELP_S_OK;
 };
+
+/********************************************************
+ XelpArgs -- sequential argument iterator.
+ See xelp.h for API documentation.
+ */
+
+XELPRESULT XelpArgsInit (XelpArgs *a, char *args, int len)
+{
+    XELP_XB_INIT(a->buf, args, len);
+    return XELP_S_OK;
+}
+
+XELPRESULT XelpNextTok (XelpArgs *a, const char **tok, int *toklen)
+{
+    XelpBuf t;
+    XELPRESULT r = XELPTokLineXB(&a->buf, &t, XELP_TOK_ONLY);
+    if (r != XELP_S_OK) {
+        if (tok)    *tok = 0;
+        if (toklen) *toklen = 0;
+        return r;
+    }
+    if (tok)    *tok = t.s;
+    if (toklen) *toklen = (int)(t.p - t.s);
+    return XELP_S_OK;
+}
+
+XELPRESULT XelpNextInt (XelpArgs *a, int *val)
+{
+    const char *tok;
+    int len;
+    XELPRESULT r = XelpNextTok(a, &tok, &len);
+    if (r != XELP_S_OK) return r;
+    return XELPParseNum(tok, len, val);
+}
+
+XELPRESULT XelpArgCount (XelpArgs *a, int *n)
+{
+    XelpBuf save;
+    XELP_XB_COPY(a->buf, save);
+    XELP_XB_TOP(a->buf);
+    XELPNumToks(&a->buf, n);
+    XELP_XB_COPY(save, a->buf);
+    return XELP_S_OK;
+}
 #endif /* XELP_ENABLE_CLI */
 
 /********************************************************
@@ -887,89 +920,67 @@ XELPRESULT XELPParseKey (XELP *ths, char key)
 
 	return XELP_S_OK;
 }
-/********************************************************
-  XELPSStr2Int()
-  parse a string return an integer
-  345  --> read as decimal
-  345h --> read as hex
- */
 #define FR_SMUL10(x)	(((x)<<3)+(((x)<<1)))  /* many old micros don't have multiply in core inst set */
-
-int XELPStr2Int (const char* s,int  maxlen) {
-	const char *p = s+maxlen-1;
-	int r=0,x=0,d;
-
-	if ('h' == *p)
-    { /* hexadecimal */
-		while (s<p) {
-			d = (*s >= 'a') ? (*s-'a'+0xa) : (*s >= 'A') ? (*s-'A'+0xa) : (*s-'0');
-			r = (r<<4)|d;
-			s++;
-		}
-	}
-	else { /* base 10 */
-		if (*s == '-') {
-			x = -1;
-			s++;
-		} else {
-			if (*s == '+') {
-				s++;
-			}
-		}
-		while (s<=p) {
-			d = *s - '0';
-			r = FR_SMUL10(r) + d;
-			s++;
-		}
-		r = x ? -r : r;
-	}
-	return r;
-}
+#define XELP_INT_MAX    ((int)(((unsigned)-1) >> 1))  /* portable INT_MAX without <limits.h> */
 /********************************************************
   XELPParseNum()
-  parse a string return an integer
-  345  	--> read as decimal
-  345h 	--> read as hex
-  0x345 --> read as hex
+  parse a string, return an integer via *n.
+  Returns XELP_S_OK on success, XELP_E_ERR on invalid input.
+  345   --> decimal
+  345h  --> hex (suffix)
+  0x345 --> hex (prefix)
  */
 XELPRESULT XELPParseNum (const char* s, int maxlen, int* n) {
-	const char *p = s+maxlen-1;
-	int r=0,x=0,d, isHex=0;
+	const char *end = s + maxlen; /* one past last byte -- never dereferenced */
+	int r=0, neg=0, d, isHex=0;
 
-	if ('h' == *p)
-		isHex = 1;
+	if (maxlen <= 0) return XELP_E_ERR;
 
-	if (('0' == *s) && ('x' == *(s+1))) {
+	/* detect hex: 0x prefix takes priority over h suffix */
+	if (maxlen >= 3 && s[0] == '0' && s[1] == 'x') {
 		isHex = 1;
-		s+=2;
-		p++;
+		s += 2;                    /* skip "0x", end stays */
+	} else if (s[maxlen-1] == 'h') {
+		isHex = 1;
+		end--;                     /* exclude trailing 'h' */
 	}
 
-	if (isHex)
-    { /* hexadecimal */
-		while (s<p) {
-			d = (*s >= 'a') ? (*s-'a'+0xa) : (*s >= 'A') ? (*s-'A'+0xa) : (*s-'0');
-			r = (r<<4)|d;
+	if (isHex) {
+		if (s >= end) return XELP_E_ERR; /* no hex digits */
+		while (s < end) {
+			if      (*s >= 'a' && *s <= 'f') d = *s - 'a' + 0xa;
+			else if (*s >= 'A' && *s <= 'F') d = *s - 'A' + 0xa;
+			else if (*s >= '0' && *s <= '9') d = *s - '0';
+			else return XELP_E_ERR;
+			if ((unsigned)r > ((unsigned)XELP_INT_MAX >> 4)) return XELP_E_ERR;
+			r = (r << 4) | d;
 			s++;
 		}
 	}
 	else { /* base 10 */
-		if (*s == '-') {
-			x = -1;
-			s++;
-		} else {
-			if (*s == '+') {
-				s++;
-			}
-		}
-		while (s<=p) {
+		if      (*s == '-') { neg = 1; s++; }
+		else if (*s == '+') {          s++; }
+		if (s >= end) return XELP_E_ERR; /* sign only, no digits */
+		while (s < end) {
 			d = *s - '0';
+			if (d < 0 || d > 9) return XELP_E_ERR;
+			if (r > (XELP_INT_MAX - d) / 10) return XELP_E_ERR;
 			r = FR_SMUL10(r) + d;
 			s++;
 		}
-		r = x ? -r : r;
+		if (neg) r = -r;
 	}
 	*n = r;
 
-    return XELP_S_OK;
+	return XELP_S_OK;
+}
+/********************************************************
+  XELPStr2Int()
+  Convenience wrapper: parse a string, return an integer directly.
+  Calls XELPParseNum internally.  Returns 0 on invalid input.
+ */
+int XELPStr2Int (const char* s, int maxlen) {
+	int n = 0;
+	XELPParseNum(s, maxlen, &n);
+	return n;
 }

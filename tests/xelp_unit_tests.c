@@ -2119,29 +2119,130 @@ XELPRESULT test_stress_malformed() {
             return XELP_E_ERR;
     }
 
-    /* --- XELPStr2Int with garbage (not real hex/dec but should not crash) --- */
+    /* --- XELPStr2Int with garbage: returns 0 on invalid input --- */
     {
         int v;
-        v = XELPStr2Int("zzz",3); /* decimal parse of garbage - won't be correct but must not crash */
-        (void)v; /* suppress unused warning */
-        JB_ASSERT(0, "stress Str2Int garbage no crash");
+        v = XELPStr2Int("zzz",3);
+        if (JB_ASSERT(v != 0, "Str2Int garbage returns 0"))
+            return XELP_E_ERR;
 
-        v = XELPStr2Int("   h",4); /* spaces then h */
-        (void)v;
-        JB_ASSERT(0, "stress Str2Int spaces-h no crash");
+        v = XELPStr2Int("   h",4);
+        if (JB_ASSERT(v != 0, "Str2Int spaces-h returns 0"))
+            return XELP_E_ERR;
+
+        v = XELPStr2Int("343.3",5);
+        if (JB_ASSERT(v != 0, "Str2Int decimal point returns 0"))
+            return XELP_E_ERR;
     }
 
-    /* --- XELPParseNum with garbage --- */
+    /* --- XELPParseNum validation: must return XELP_E_ERR on bad input --- */
     {
-        int n;
+        int n = 99;
+
+        /* garbage decimal */
         r = XELPParseNum("xyz",3,&n);
-        JB_ASSERT(0, "stress ParseNum garbage no crash");
+        if (JB_ASSERT(r != XELP_E_ERR, "ParseNum garbage decimal"))
+            return XELP_E_ERR;
 
+        /* decimal with embedded dot */
+        n = 99;
+        r = XELPParseNum("3.14",4,&n);
+        if (JB_ASSERT(r != XELP_E_ERR, "ParseNum decimal point"))
+            return XELP_E_ERR;
+
+        /* bare "0x" -- no hex digits */
+        n = 99;
         r = XELPParseNum("0x",2,&n);
-        JB_ASSERT(0, "stress ParseNum bare 0x no crash");
+        if (JB_ASSERT(r != XELP_E_ERR, "ParseNum bare 0x"))
+            return XELP_E_ERR;
 
+        /* bare "h" -- no hex digits */
+        n = 99;
         r = XELPParseNum("h",1,&n);
-        JB_ASSERT(0, "stress ParseNum bare h no crash");
+        if (JB_ASSERT(r != XELP_E_ERR, "ParseNum bare h"))
+            return XELP_E_ERR;
+
+        /* empty string */
+        n = 99;
+        r = XELPParseNum("",0,&n);
+        if (JB_ASSERT(r != XELP_E_ERR, "ParseNum empty"))
+            return XELP_E_ERR;
+
+        /* sign only, no digits */
+        n = 99;
+        r = XELPParseNum("-",1,&n);
+        if (JB_ASSERT(r != XELP_E_ERR, "ParseNum minus only"))
+            return XELP_E_ERR;
+
+        n = 99;
+        r = XELPParseNum("+",1,&n);
+        if (JB_ASSERT(r != XELP_E_ERR, "ParseNum plus only"))
+            return XELP_E_ERR;
+
+        /* hex with non-hex char: "0xGG" */
+        n = 99;
+        r = XELPParseNum("0xGG",4,&n);
+        if (JB_ASSERT(r != XELP_E_ERR, "ParseNum 0xGG"))
+            return XELP_E_ERR;
+
+        /* hex suffix with non-hex body: "zzh" */
+        n = 99;
+        r = XELPParseNum("zzh",3,&n);
+        if (JB_ASSERT(r != XELP_E_ERR, "ParseNum zzh"))
+            return XELP_E_ERR;
+
+        /* spaces in decimal: "1 2" */
+        n = 99;
+        r = XELPParseNum("1 2",3,&n);
+        if (JB_ASSERT(r != XELP_E_ERR, "ParseNum space in decimal"))
+            return XELP_E_ERR;
+
+        /* valid inputs still work after exercising error paths */
+        n = 0;
+        r = XELPParseNum("42",2,&n);
+        if (JB_ASSERT((r != XELP_S_OK) || (n != 42), "ParseNum 42 after errors"))
+            return XELP_E_ERR;
+
+        n = 0;
+        r = XELPParseNum("0xFF",4,&n);
+        if (JB_ASSERT((r != XELP_S_OK) || (n != 0xFF), "ParseNum 0xFF after errors"))
+            return XELP_E_ERR;
+
+        n = 0;
+        r = XELPParseNum("ABh",3,&n);
+        if (JB_ASSERT((r != XELP_S_OK) || (n != 0xAB), "ParseNum ABh after errors"))
+            return XELP_E_ERR;
+
+        n = 0;
+        r = XELPParseNum("-99",3,&n);
+        if (JB_ASSERT((r != XELP_S_OK) || (n != -99), "ParseNum -99 after errors"))
+            return XELP_E_ERR;
+
+        /* --- integer overflow: must return XELP_E_ERR, not wrap --- */
+
+        /* decimal overflow: 20 digits always overflows any int */
+        n = 0;
+        r = XELPParseNum("99999999999999999999",20,&n);
+        if (JB_ASSERT(r != XELP_E_ERR, "ParseNum decimal overflow"))
+            return XELP_E_ERR;
+
+        /* hex overflow: 0x + 16 F's overflows any int */
+        n = 0;
+        r = XELPParseNum("0xFFFFFFFFFF",12,&n);
+        if (JB_ASSERT(r != XELP_E_ERR, "ParseNum hex overflow"))
+            return XELP_E_ERR;
+
+        /* hex suffix overflow */
+        n = 0;
+        r = XELPParseNum("FFFFFFFFFFh",11,&n);
+        if (JB_ASSERT(r != XELP_E_ERR, "ParseNum hex suffix overflow"))
+            return XELP_E_ERR;
+
+        /* boundary: largest valid positive (via Str2Int which wraps ParseNum) */
+        n = 0;
+        r = XELPParseNum("32767",5,&n);  /* valid on 16-bit and 32-bit */
+        if (JB_ASSERT(r != XELP_S_OK, "ParseNum 32767 ok"))
+            return XELP_E_ERR;
     }
 
     /* --- XELPExecKC with all possible char values --- */
@@ -3019,6 +3120,135 @@ XELPRESULT test_MultiInstance() {
     return XELP_S_OK;
 }
 
+/* ====================================================================
+ test_XelpArgs() - sequential argument iterator
+ */
+XELPRESULT test_XelpArgs() {
+    const char *tok;
+    int toklen, val, n;
+    XelpArgs a;
+    XELPRESULT r;
+
+    /* --- basic iteration: "divmod 17 5" --- */
+    {
+        char buf[] = "divmod 17 5";
+        XelpArgsInit(&a, buf, XELPStrLen(buf));
+
+        r = XelpNextTok(&a, &tok, &toklen);
+        if (JB_ASSERT(r != XELP_S_OK, "Args tok0 ok"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(toklen != 6, "Args tok0 len"))
+            return XELP_E_ERR;
+
+        r = XelpNextInt(&a, &val);
+        if (JB_ASSERT(r != XELP_S_OK || val != 17, "Args int 17"))
+            return XELP_E_ERR;
+
+        r = XelpNextInt(&a, &val);
+        if (JB_ASSERT(r != XELP_S_OK || val != 5, "Args int 5"))
+            return XELP_E_ERR;
+
+        /* past end */
+        r = XelpNextTok(&a, &tok, &toklen);
+        if (JB_ASSERT(r == XELP_S_OK, "Args past end"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(tok != 0, "Args past end tok null"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(toklen != 0, "Args past end len 0"))
+            return XELP_E_ERR;
+    }
+
+    /* --- XelpArgCount --- */
+    {
+        char buf2[] = "echo hello world";
+        XelpArgsInit(&a, buf2, XELPStrLen(buf2));
+        r = XelpArgCount(&a, &n);
+        if (JB_ASSERT(r != XELP_S_OK || n != 3, "ArgCount 3"))
+            return XELP_E_ERR;
+
+        /* count should not disturb iteration position */
+        r = XelpNextTok(&a, &tok, &toklen);
+        if (JB_ASSERT(r != XELP_S_OK || toklen != 4, "ArgCount preserves pos"))
+            return XELP_E_ERR;
+    }
+
+    /* --- empty buffer --- */
+    {
+        char buf3[] = "";
+        XelpArgsInit(&a, buf3, 0);
+        r = XelpNextTok(&a, &tok, &toklen);
+        if (JB_ASSERT(r == XELP_S_OK, "Args empty"))
+            return XELP_E_ERR;
+
+        r = XelpArgCount(&a, &n);
+        if (JB_ASSERT(n != 0, "ArgCount empty"))
+            return XELP_E_ERR;
+    }
+
+    /* --- single token --- */
+    {
+        char buf4[] = "help";
+        XelpArgsInit(&a, buf4, XELPStrLen(buf4));
+        r = XelpNextTok(&a, &tok, &toklen);
+        if (JB_ASSERT(r != XELP_S_OK || toklen != 4, "Args single tok"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(tok[0] != 'h' || tok[3] != 'p', "Args single content"))
+            return XELP_E_ERR;
+    }
+
+    /* --- XelpNextInt with hex --- */
+    {
+        char buf5[] = "cmd 0xFF ABh";
+        XelpArgsInit(&a, buf5, XELPStrLen(buf5));
+        XelpNextTok(&a, 0, 0); /* skip "cmd" */
+
+        r = XelpNextInt(&a, &val);
+        if (JB_ASSERT(r != XELP_S_OK || val != 0xFF, "Args hex 0xFF"))
+            return XELP_E_ERR;
+
+        r = XelpNextInt(&a, &val);
+        if (JB_ASSERT(r != XELP_S_OK || val != 0xAB, "Args hex ABh"))
+            return XELP_E_ERR;
+    }
+
+    /* --- XelpNextInt on non-numeric token --- */
+    {
+        char buf6[] = "cmd abc";
+        XelpArgsInit(&a, buf6, XELPStrLen(buf6));
+        XelpNextTok(&a, 0, 0); /* skip "cmd" */
+        r = XelpNextInt(&a, &val);
+        if (JB_ASSERT(r != XELP_E_ERR, "Args non-numeric"))
+            return XELP_E_ERR;
+    }
+
+    /* --- NULL tok/toklen pointers (skip pattern) --- */
+    {
+        char buf7[] = "skip me keep";
+        XelpArgsInit(&a, buf7, XELPStrLen(buf7));
+        r = XelpNextTok(&a, 0, 0); /* skip with NULLs */
+        if (JB_ASSERT(r != XELP_S_OK, "Args skip NULL ptrs"))
+            return XELP_E_ERR;
+        r = XelpNextTok(&a, 0, 0);
+        if (JB_ASSERT(r != XELP_S_OK, "Args skip NULL ptrs 2"))
+            return XELP_E_ERR;
+        r = XelpNextTok(&a, &tok, &toklen);
+        if (JB_ASSERT(r != XELP_S_OK || toklen != 4, "Args after skips"))
+            return XELP_E_ERR;
+    }
+
+    /* --- negative integer --- */
+    {
+        char buf8[] = "cmd -42";
+        XelpArgsInit(&a, buf8, XELPStrLen(buf8));
+        XelpNextTok(&a, 0, 0);
+        r = XelpNextInt(&a, &val);
+        if (JB_ASSERT(r != XELP_S_OK || val != -42, "Args negative int"))
+            return XELP_E_ERR;
+    }
+
+    return XELP_S_OK;
+}
+
 /* 	************************************************
 	Xelp Simple Unit Test suite.
 */
@@ -3076,6 +3306,7 @@ int run_tests() {
     JumpBug_RunUnit(test_AccumOverflow,"AccumOverflow");
     JumpBug_RunUnit(test_CLIMalformedKeys,"CLIMalformedKeys");
     JumpBug_RunUnit(test_MultiInstance,"MultiInstance");
+    JumpBug_RunUnit(test_XelpArgs,"XelpArgs");
 
     JumpBug_PrintResults();
 

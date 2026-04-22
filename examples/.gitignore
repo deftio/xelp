@@ -1,0 +1,11 @@
+# Ignore everything in example subdirectories
+*/*
+
+# Except source files and build scripts
+!*/*.c
+!*/*.cpp
+!*/*.h
+!*/*.ino
+!*/Makefile
+!*/CMakeLists.txt
+!*/README.md
