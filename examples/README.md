@@ -58,3 +58,17 @@ over the serial CLI, then fetch the current time and weather from free
 APIs (worldtimeapi.org and open-meteo.com). No API keys needed.
 
 Requires an ESP32 board and the ESP32 Arduino core.
+
+## pico-cli
+
+Pure C example for Raspberry Pi Pico / Pico W / Pico 2 using the
+Pico SDK. Controls GPIO, ADC, and PWM over USB CDC serial. Automatically
+handles Pico W LED (CYW43 driver). See `pico-cli/README.md` for build
+instructions.
+
+## pico-cli-arduino
+
+Raspberry Pi Pico example using the **C++ Easy API**. Commands are
+registered with `commands({...})` using inline lambdas -- no static
+tables, no raw `XELP*` pointers. Uses the Arduino-Pico core by Earle
+Philhower. See `pico-cli-arduino/README.md` for details.
