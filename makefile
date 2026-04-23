@@ -13,7 +13,23 @@ BUILD_DIR=build
 INCLUDES=\
     -I$(LIB_DIR)\
 
-.PHONY: tests clean coverage version fuzz fuzz-parsekey fuzz-parse examples example validate
+.PHONY: help tests clean clean-all coverage version fuzz fuzz-parsekey fuzz-parse examples example validate
+
+#=======================================================================
+# Default target: print available targets
+help:
+	@echo "xelp build targets:"
+	@echo ""
+	@echo "  make validate     Build + run tests + build examples (pre-push check)"
+	@echo "  make tests        Build + run unit tests with coverage"
+	@echo "  make examples     Build all examples (no interactive launch)"
+	@echo "  make example      Build + run the posix ncurses demo (interactive)"
+	@echo "  make coverage     Tests + coverage summary"
+	@echo "  make version      Extract and print library version"
+	@echo "  make fuzz         Run fuzz tests (requires clang + libFuzzer)"
+	@echo "  make clean        Remove test build artifacts"
+	@echo "  make clean-all    Remove all build artifacts including examples"
+	@echo ""
 
 # all object files go in build/
 $(BUILD_DIR):

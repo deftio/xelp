@@ -620,7 +620,10 @@ XELPRESULT test_XelpInit() {
     if (JB_ASSERT(x->mCurMode != XELP_MODE_CLI, "XelpInit mode is CLI"))
         return XELP_E_ERR;
 
-    if (JB_ASSERT(x->mEchoState != 0, "XelpInit echo state"))
+    if (JB_ASSERT(x->mOutEnable != 1, "XelpInit mOutEnable is 1"))
+        return XELP_E_ERR;
+
+    if (JB_ASSERT(x->mEchoChar != XELP_ECHO_NORMAL, "XelpInit mEchoChar normal"))
         return XELP_E_ERR;
 
     if (JB_ASSERT(x->mpfOut != 0, "XelpInit mpfOut null"))
@@ -3247,6 +3250,598 @@ XELPRESULT test_XelpArgs() {
     return XELP_S_OK;
 }
 
+/* ====================================================================
+ test_CursorWithEcho()
+ Verify arrow keys, HOME/END, insert, delete, backspace with echo
+ masking and output control. Tests both buffer correctness and output.
+ */
+XELPRESULT test_CursorWithEcho() {
+    XELP x;
+    char buf[64];
+    int i;
+
+    /* --- 1. Insert with echo mask '*': buffer has real chars, output has stars --- */
+    {
+        XELPInit(&x,"CurEcho1");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,gDummyBufOut);
+        XELP_SET_ECHO(x, '*');
+
+        resetDummyBuf();
+        feedString(&x, "abc");
+        gDummyBufOut(0);
+
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XELP_S_OK != XELPStrEq(buf, XELPStrLen(buf), "abc"),
+                      "Mask insert buffer correct"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(gDummyBuf[0] != '*' || gDummyBuf[1] != '*' || gDummyBuf[2] != '*',
+                      "Mask insert output stars"))
+            return XELP_E_ERR;
+    }
+
+    /* --- 2. LEFT/RIGHT with mask: cursor movement works, output uses mask chars --- */
+    {
+        XELPInit(&x,"CurEcho2");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,gDummyBufOut);
+        XELP_SET_ECHO(x, '*');
+
+        feedString(&x, "abcde");
+        feedKeycode(&x, XELP_KEYCODE_LEFT);
+        feedKeycode(&x, XELP_KEYCODE_LEFT);
+        XELPParseKey(&x, 'X');
+
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XELP_S_OK != XELPStrEq(buf, XELPStrLen(buf), "abcXde"),
+                      "Mask LEFT insert buffer"))
+            return XELP_E_ERR;
+    }
+
+    /* --- 3. HOME + insert with mask --- */
+    {
+        XELPInit(&x,"CurEcho3");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,gDummyBufOut);
+        XELP_SET_ECHO(x, '*');
+
+        feedString(&x, "hello");
+        feedKeycode(&x, XELP_KEYCODE_HOME);
+        feedString(&x, "AB");
+
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XELP_S_OK != XELPStrEq(buf, XELPStrLen(buf), "ABhello"),
+                      "Mask HOME insert buffer"))
+            return XELP_E_ERR;
+    }
+
+    /* --- 4. END + append with mask --- */
+    {
+        XELPInit(&x,"CurEcho4");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,gDummyBufOut);
+        XELP_SET_ECHO(x, '*');
+
+        feedString(&x, "hello");
+        feedKeycode(&x, XELP_KEYCODE_HOME);
+        feedKeycode(&x, XELP_KEYCODE_END);
+        feedString(&x, "CD");
+
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XELP_S_OK != XELPStrEq(buf, XELPStrLen(buf), "helloCD"),
+                      "Mask END append buffer"))
+            return XELP_E_ERR;
+    }
+
+    /* --- 5. Backspace with mask: buffer correct --- */
+    {
+        XELPInit(&x,"CurEcho5");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,gDummyBufOut);
+        XELP_SET_ECHO(x, '*');
+
+        feedString(&x, "hello");
+        feedKeycode(&x, XELP_KEYCODE_LEFT);
+        feedKeycode(&x, XELP_KEYCODE_LEFT);
+        XELPParseKey(&x, XELPKEY_BKSP);
+
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XELP_S_OK != XELPStrEq(buf, XELPStrLen(buf), "helo"),
+                      "Mask backspace buffer"))
+            return XELP_E_ERR;
+    }
+
+    /* --- 6. Delete key with mask --- */
+    {
+        XELPInit(&x,"CurEcho6");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,gDummyBufOut);
+        XELP_SET_ECHO(x, '*');
+
+        feedString(&x, "hello");
+        feedKeycode(&x, XELP_KEYCODE_HOME);
+        feedKeycode(&x, XELP_KEYCODE_KDEL);
+
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XELP_S_OK != XELPStrEq(buf, XELPStrLen(buf), "ello"),
+                      "Mask delete buffer"))
+            return XELP_E_ERR;
+    }
+
+    /* --- 7. Echo OFF with cursor ops: buffer correct, no echo output --- */
+    {
+        XELPInit(&x,"CurEcho7");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,gDummyBufOut);
+        XELP_SET_ECHO(x, XELP_ECHO_OFF);
+
+        resetDummyBuf();
+        feedString(&x, "secret");
+        feedKeycode(&x, XELP_KEYCODE_LEFT);
+        feedKeycode(&x, XELP_KEYCODE_LEFT);
+        XELPParseKey(&x, 'X');
+        gDummyBufOut(0);
+
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XELP_S_OK != XELPStrEq(buf, XELPStrLen(buf), "secrXet"),
+                      "EchoOff cursor insert buffer"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(XELPStrLen(gDummyBuf) != 0,
+                      "EchoOff cursor no output"))
+            return XELP_E_ERR;
+    }
+
+    /* --- 8. Output disabled with cursor ops: buffer correct, zero output --- */
+    {
+        XELPInit(&x,"CurEcho8");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,gDummyBufOut);
+        XELP_SET_OUT_ENABLE(x, 0);
+
+        resetDummyBuf();
+        feedString(&x, "test");
+        feedKeycode(&x, XELP_KEYCODE_HOME);
+        feedString(&x, "AB");
+        feedKeycode(&x, XELP_KEYCODE_END);
+        feedString(&x, "CD");
+        gDummyBufOut(0);
+
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XELP_S_OK != XELPStrEq(buf, XELPStrLen(buf), "ABtestCD"),
+                      "OutDisabled cursor buffer"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(XELPStrLen(gDummyBuf) != 0,
+                      "OutDisabled cursor no output"))
+            return XELP_E_ERR;
+    }
+
+    /* --- 9. UP/DOWN arrows with mask: no buffer corruption --- */
+    {
+        XELPInit(&x,"CurEcho9");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,gDummyBufOut);
+        XELP_SET_ECHO(x, '*');
+
+        feedString(&x, "xyz");
+        feedKeycode(&x, XELP_KEYCODE_UP);
+        feedKeycode(&x, XELP_KEYCODE_DOWN);
+        feedString(&x, "w");
+
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XELP_S_OK != XELPStrEq(buf, XELPStrLen(buf), "xyzw"),
+                      "Mask UP/DOWN no corrupt"))
+            return XELP_E_ERR;
+    }
+
+    /* --- 10. Complex sequence: mask, navigate, delete, insert, verify --- */
+    {
+        XELPInit(&x,"CurEcho10");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,gDummyBufOut);
+        XELP_SET_ECHO(x, '#');
+
+        resetDummyBuf();
+        feedString(&x, "abcdef");
+        feedKeycode(&x, XELP_KEYCODE_HOME);
+        feedKeycode(&x, XELP_KEYCODE_RIGHT);
+        feedKeycode(&x, XELP_KEYCODE_RIGHT);
+        feedKeycode(&x, XELP_KEYCODE_KDEL);   /* delete 'c' → "abdef" */
+        feedKeycode(&x, XELP_KEYCODE_KDEL);   /* delete 'd' → "abef"  */
+        feedString(&x, "XY");                  /* insert → "abXYef"    */
+        feedKeycode(&x, XELP_KEYCODE_END);
+        XELPParseKey(&x, 'Z');                 /* append → "abXYefZ"   */
+
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XELP_S_OK != XELPStrEq(buf, XELPStrLen(buf), "abXYefZ"),
+                      "Complex mask nav buffer"))
+            return XELP_E_ERR;
+    }
+
+    /* --- 11. Switch echo mid-stream: normal→mask→normal --- */
+    {
+        XELPInit(&x,"CurEcho11");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,gDummyBufOut);
+
+        resetDummyBuf();
+        feedString(&x, "AB");                 /* normal echo: "AB" */
+        XELP_SET_ECHO(x, '*');
+        feedString(&x, "CD");                 /* masked echo: "**" */
+        XELP_SET_ECHO(x, XELP_ECHO_NORMAL);
+        feedString(&x, "EF");                 /* normal echo: "EF" */
+        gDummyBufOut(0);
+
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XELP_S_OK != XELPStrEq(buf, XELPStrLen(buf), "ABCDEF"),
+                      "Mid-stream echo switch buffer"))
+            return XELP_E_ERR;
+        /* output should be "AB**EF" */
+        if (JB_ASSERT(gDummyBuf[0] != 'A' || gDummyBuf[1] != 'B',
+                      "Mid-stream normal part"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(gDummyBuf[2] != '*' || gDummyBuf[3] != '*',
+                      "Mid-stream masked part"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(gDummyBuf[4] != 'E' || gDummyBuf[5] != 'F',
+                      "Mid-stream restored part"))
+            return XELP_E_ERR;
+    }
+
+    /* --- 12. LEFT past buffer start (no-op) with mask --- */
+    {
+        XELPInit(&x,"CurEcho12");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,gDummyBufOut);
+        XELP_SET_ECHO(x, '*');
+
+        feedString(&x, "ab");
+        feedKeycode(&x, XELP_KEYCODE_HOME);
+        feedKeycode(&x, XELP_KEYCODE_LEFT);  /* should be no-op */
+        feedString(&x, "Z");
+
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XELP_S_OK != XELPStrEq(buf, XELPStrLen(buf), "Zab"),
+                      "Mask LEFT past start"))
+            return XELP_E_ERR;
+    }
+
+    /* --- 13. RIGHT past buffer end (no-op) with mask --- */
+    {
+        XELPInit(&x,"CurEcho13");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,gDummyBufOut);
+        XELP_SET_ECHO(x, '*');
+
+        feedString(&x, "ab");
+        feedKeycode(&x, XELP_KEYCODE_RIGHT); /* already at end, no-op */
+        feedString(&x, "c");
+
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XELP_S_OK != XELPStrEq(buf, XELPStrLen(buf), "abc"),
+                      "Mask RIGHT past end"))
+            return XELP_E_ERR;
+    }
+
+    /* --- 14. Backspace at start (no-op) with mask --- */
+    {
+        XELPInit(&x,"CurEcho14");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,gDummyBufOut);
+        XELP_SET_ECHO(x, '*');
+
+        feedString(&x, "ab");
+        feedKeycode(&x, XELP_KEYCODE_HOME);
+        XELPParseKey(&x, XELPKEY_BKSP);      /* at start, no-op */
+
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XELP_S_OK != XELPStrEq(buf, XELPStrLen(buf), "ab"),
+                      "Mask bksp at start"))
+            return XELP_E_ERR;
+    }
+
+    /* --- 15. Delete at end (no-op) with mask --- */
+    {
+        XELPInit(&x,"CurEcho15");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,gDummyBufOut);
+        XELP_SET_ECHO(x, '*');
+
+        feedString(&x, "ab");
+        feedKeycode(&x, XELP_KEYCODE_KDEL);  /* at end, no-op */
+
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XELP_S_OK != XELPStrEq(buf, XELPStrLen(buf), "ab"),
+                      "Mask del at end"))
+            return XELP_E_ERR;
+    }
+
+    /* --- 16. Buffer full with mask: insert rejected --- */
+    {
+        XELPInit(&x,"CurEcho16");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,gDummyBufOut);
+        XELP_SET_ECHO(x, '*');
+
+        for (i = 0; i < XELP_CMDBUFSZ - 1; i++)
+            XELPParseKey(&x, 'A');
+        feedKeycode(&x, XELP_KEYCODE_HOME);
+        XELPParseKey(&x, 'B');  /* should be rejected */
+
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(buf[0] != 'A', "Mask full insert rejected"))
+            return XELP_E_ERR;
+    }
+
+    /* --- 17. ENTER with mask: newline echoes, command executes --- */
+    {
+        XELPInit(&x,"CurEcho17");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,gDummyBufOut);
+        XELP_SET_ECHO(x, '*');
+
+        gGlobalCallbackData.c1 = 0;
+        resetDummyBuf();
+        feedString(&x, "foo");
+        XELPParseKey(&x, XELPKEY_ENTER);
+        gDummyBufOut(0);
+
+        /* command should have executed */
+        if (JB_ASSERT(gGlobalCallbackData.c1 != 1, "Mask ENTER executes cmd"))
+            return XELP_E_ERR;
+        /* output should contain stars then newline */
+        if (JB_ASSERT(gDummyBuf[0] != '*' || gDummyBuf[1] != '*' || gDummyBuf[2] != '*',
+                      "Mask ENTER output stars"))
+            return XELP_E_ERR;
+    }
+
+    /* --- 18. Output disabled + mask: buffer works, zero output --- */
+    {
+        XELPInit(&x,"CurEcho18");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,gDummyBufOut);
+        XELP_SET_OUT_ENABLE(x, 0);
+        XELP_SET_ECHO(x, '*');
+
+        resetDummyBuf();
+        feedString(&x, "test");
+        feedKeycode(&x, XELP_KEYCODE_LEFT);
+        XELPParseKey(&x, 'X');
+        gDummyBufOut(0);
+
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XELP_S_OK != XELPStrEq(buf, XELPStrLen(buf), "tesXt"),
+                      "OutDis+Mask buffer"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(XELPStrLen(gDummyBuf) != 0,
+                      "OutDis+Mask no output"))
+            return XELP_E_ERR;
+    }
+
+    return XELP_S_OK;
+}
+
+/* ====================================================================
+ test_OutputEnable()
+ Verify mOutEnable gates all output.
+ */
+XELPRESULT test_OutputEnable() {
+    XELP x;
+
+    XELPInit(&x,"TestOutEnable");
+    XELP_SET_FN_KEY(x,gMyKeyCommands);
+    XELP_SET_FN_CLI(x,gMyCLICommands);
+    XELP_SET_FN_OUT(x,gDummyBufOut);
+
+    /* 1. default state: output enabled */
+    if (JB_ASSERT(XELP_GET_OUT_ENABLE(x) != 1, "OutEnable default 1"))
+        return XELP_E_ERR;
+
+    /* 2. XELPOut with output enabled */
+    resetDummyBuf();
+    XELPOut(&x, "hello", 0);
+    gDummyBufOut(0);
+    if (JB_ASSERT(XELPStrLen(gDummyBuf) != 5, "OutEnable XELPOut normal"))
+        return XELP_E_ERR;
+
+    /* 3. disable output */
+    XELP_SET_OUT_ENABLE(x, 0);
+    if (JB_ASSERT(XELP_GET_OUT_ENABLE(x) != 0, "OutEnable set 0"))
+        return XELP_E_ERR;
+
+    resetDummyBuf();
+    XELPOut(&x, "hello", 0);
+    gDummyBufOut(0);
+    if (JB_ASSERT(XELPStrLen(gDummyBuf) != 0, "OutEnable XELPOut muted"))
+        return XELP_E_ERR;
+
+    /* 4. re-enable output */
+    XELP_SET_OUT_ENABLE(x, 1);
+    resetDummyBuf();
+    XELPOut(&x, "hi", 0);
+    gDummyBufOut(0);
+    if (JB_ASSERT(XELPStrLen(gDummyBuf) != 2, "OutEnable XELPOut resumed"))
+        return XELP_E_ERR;
+
+    /* 5. XELPHelp suppressed when disabled */
+    XELP_SET_OUT_ENABLE(x, 0);
+    resetDummyBuf();
+    XELPHelp(&x);
+    gDummyBufOut(0);
+    if (JB_ASSERT(XELPStrLen(gDummyBuf) != 0, "OutEnable help muted"))
+        return XELP_E_ERR;
+    XELP_SET_OUT_ENABLE(x, 1);
+
+    /* 6. XELPParseKey echo suppressed when disabled */
+    XELP_SET_OUT_ENABLE(x, 0);
+    resetDummyBuf();
+    XELPParseKey(&x, 'A');
+    gDummyBufOut(0);
+    if (JB_ASSERT(XELPStrLen(gDummyBuf) != 0, "OutEnable key echo muted"))
+        return XELP_E_ERR;
+    XELP_SET_OUT_ENABLE(x, 1);
+
+    /* 7. prompt suppressed when disabled -- type a char then ENTER with output disabled */
+    {
+        XELP x2;
+        XELPInit(&x2,"TestOutPrompt");
+        XELP_SET_FN_CLI(x2,gMyCLICommands);
+        XELP_SET_FN_OUT(x2,gDummyBufOut);
+        XELP_SET_OUT_ENABLE(x2, 0);
+        resetDummyBuf();
+        XELPParseKey(&x2, 'x');
+        XELPParseKey(&x2, XELPKEY_ENTER);
+        gDummyBufOut(0);
+        if (JB_ASSERT(XELPStrLen(gDummyBuf) != 0, "OutEnable prompt muted"))
+            return XELP_E_ERR;
+    }
+
+    /* 8. re-enable, verify full behavior restored */
+    {
+        XELP x3;
+        XELPInit(&x3,"TestOutRestore");
+        XELP_SET_FN_CLI(x3,gMyCLICommands);
+        XELP_SET_FN_OUT(x3,gDummyBufOut);
+        XELP_SET_OUT_ENABLE(x3, 0);
+        XELP_SET_OUT_ENABLE(x3, 1);
+        resetDummyBuf();
+        XELPParseKey(&x3, 'A');
+        gDummyBufOut(0);
+        if (JB_ASSERT(XELPStrLen(gDummyBuf) != 1, "OutEnable restore echo"))
+            return XELP_E_ERR;
+    }
+
+    return XELP_S_OK;
+}
+
+/* ====================================================================
+ test_EchoControl()
+ Verify mEchoChar controls character echo masking.
+ */
+XELPRESULT test_EchoControl() {
+    XELP x;
+    int i;
+
+    XELPInit(&x,"TestEcho");
+    XELP_SET_FN_CLI(x,gMyCLICommands);
+    XELP_SET_FN_OUT(x,gDummyBufOut);
+
+    /* 1. default state */
+    if (JB_ASSERT(XELP_GET_ECHO(x) != XELP_ECHO_NORMAL, "Echo default normal"))
+        return XELP_E_ERR;
+
+    /* 2. normal echo: feed printable chars, verify output matches */
+    resetDummyBuf();
+    XELPParseKey(&x, 'a');
+    XELPParseKey(&x, 'b');
+    XELPParseKey(&x, 'c');
+    gDummyBufOut(0);
+    if (JB_ASSERT(gDummyBuf[0] != 'a' || gDummyBuf[1] != 'b' || gDummyBuf[2] != 'c',
+                  "Echo normal chars"))
+        return XELP_E_ERR;
+
+    /* reset buffer for next test */
+    XELPParseKey(&x, XELPKEY_ENTER); /* flush command buffer */
+
+    /* 3. mask '*': feed chars, verify all output is '*' */
+    XELP_SET_ECHO(x, '*');
+    resetDummyBuf();
+    XELPParseKey(&x, 'x');
+    XELPParseKey(&x, 'y');
+    XELPParseKey(&x, 'z');
+    gDummyBufOut(0);
+    if (JB_ASSERT(gDummyBuf[0] != '*' || gDummyBuf[1] != '*' || gDummyBuf[2] != '*',
+                  "Echo mask '*'"))
+        return XELP_E_ERR;
+    if (JB_ASSERT(XELPStrLen(gDummyBuf) != 3, "Echo mask len"))
+        return XELP_E_ERR;
+
+    XELPParseKey(&x, XELPKEY_ENTER);
+
+    /* 4. XELP_ECHO_OFF: feed chars, verify zero echo output */
+    XELP_SET_ECHO(x, XELP_ECHO_OFF);
+    resetDummyBuf();
+    XELPParseKey(&x, 'a');
+    XELPParseKey(&x, 'b');
+    gDummyBufOut(0);
+    if (JB_ASSERT(XELPStrLen(gDummyBuf) != 0, "Echo off no output"))
+        return XELP_E_ERR;
+
+    /* 5. ENTER still echoes newline even with echo off */
+    resetDummyBuf();
+    XELPParseKey(&x, XELPKEY_ENTER);
+    gDummyBufOut(0);
+    /* ENTER produces '\n' plus possibly prompt -- at minimum '\n' */
+    if (JB_ASSERT(gDummyBuf[0] != '\n', "Echo off ENTER still echoes"))
+        return XELP_E_ERR;
+
+    /* 6. prompt still prints after ENTER even with echo off */
+    /* (covered by test 5 -- if XELP_CLI_PROMPT is defined, output > 1 char) */
+
+    /* 7. restore normal, verify echo resumes */
+    XELP_SET_ECHO(x, XELP_ECHO_NORMAL);
+    resetDummyBuf();
+    XELPParseKey(&x, 'd');
+    gDummyBufOut(0);
+    if (JB_ASSERT(gDummyBuf[0] != 'd', "Echo restored normal"))
+        return XELP_E_ERR;
+
+    XELPParseKey(&x, XELPKEY_ENTER);
+
+    /* 8. backspace cursor control still works with mask active */
+    XELP_SET_ECHO(x, '*');
+    XELPParseKey(&x, 'a');
+    XELPParseKey(&x, 'b');
+    resetDummyBuf();
+    XELPParseKey(&x, XELPKEY_DEL); /* backspace */
+    /* should not crash; buffer should have 1 char now */
+    gDummyBufOut(0);
+    /* just verify no crash; cursor control chars may appear */
+
+    XELPParseKey(&x, XELPKEY_ENTER);
+    XELP_SET_ECHO(x, XELP_ECHO_NORMAL);
+
+    /* 9. password flow end-to-end */
+    {
+        XELP px;
+        XELPInit(&px,"PassTest");
+        XELP_SET_FN_CLI(px,gMyCLICommands);
+        XELP_SET_FN_OUT(px,gDummyBufOut);
+
+        XELP_SET_ECHO(px, '*');
+        resetDummyBuf();
+        XELPParseKey(&px, 's');
+        XELPParseKey(&px, 'e');
+        XELPParseKey(&px, 'c');
+        XELPParseKey(&px, 'r');
+        XELPParseKey(&px, 'e');
+        XELPParseKey(&px, 't');
+        gDummyBufOut(0);
+        if (JB_ASSERT(XELPStrLen(gDummyBuf) != 6, "Password mask len 6"))
+            return XELP_E_ERR;
+        for (i = 0; i < 6; i++) {
+            if (JB_ASSERT(gDummyBuf[i] != '*', "Password all stars"))
+                return XELP_E_ERR;
+        }
+    }
+
+    /* 10. XELPOut from commands still works while echo is masked */
+    {
+        XELP ox;
+        XELPInit(&ox,"OutWhileMasked");
+        XELP_SET_FN_OUT(ox,gDummyBufOut);
+        XELP_SET_ECHO(ox, '*');
+        resetDummyBuf();
+        XELPOut(&ox, "test", 0);
+        gDummyBufOut(0);
+        if (JB_ASSERT(XELPStrLen(gDummyBuf) != 4, "XELPOut independent of echo"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(gDummyBuf[0] != 't', "XELPOut not masked"))
+            return XELP_E_ERR;
+    }
+
+    return XELP_S_OK;
+}
+
 /* 	************************************************
 	Xelp Simple Unit Test suite.
 */
@@ -3305,6 +3900,11 @@ int run_tests() {
     JumpBug_RunUnit(test_CLIMalformedKeys,"CLIMalformedKeys");
     JumpBug_RunUnit(test_MultiInstance,"MultiInstance");
     JumpBug_RunUnit(test_XelpArgs,"XelpArgs");
+#ifdef XELP_ENABLE_LINE_EDIT
+    JumpBug_RunUnit(test_CursorWithEcho,"CursorWithEcho");
+#endif
+    JumpBug_RunUnit(test_OutputEnable,"OutputEnable");
+    JumpBug_RunUnit(test_EchoControl,"EchoControl");
 
     JumpBug_PrintResults();
 

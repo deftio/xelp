@@ -38,13 +38,20 @@
 local defines (this file only)
  */
 #ifndef _PUTC
-#define _PUTC(c)	((ths->mpfOut)((char)(c)))   /* write char to output */
+#define _PUTC(c)	do{ if(ths->mOutEnable && ths->mpfOut) ths->mpfOut((char)(c)); }while(0)
 #endif
-
 
 #ifndef _XOUTC
-#define _XOUTC(x,c)    do{if(x->mpfOut){x->mpfOut(c);}}while(0) /* write a char to output (null ptr safe) */
+#define _XOUTC(x,c)    do{if(x->mOutEnable && x->mpfOut){x->mpfOut(c);}}while(0)
 #endif
+
+#define _ECHO(c) do { \
+    if (ths->mEchoChar == XELP_ECHO_NORMAL) { _PUTC(c); } \
+    else if (ths->mEchoChar != XELP_ECHO_OFF) { _PUTC(ths->mEchoChar); } \
+} while(0)
+
+/* cursor control output: suppressed when echo is OFF */
+#define _CURSOR(c) do { if (ths->mEchoChar != XELP_ECHO_OFF) { _PUTC(c); } } while(0)
 /*****************************************
  _xelp_memmove() - overlap-safe byte copy (avoids stdlib dependency for bare-metal).
  Copies bytes from [src .. src+n) to [dst .. dst+n).  Handles the overlapping-
@@ -143,10 +150,13 @@ static int _xelpKeyAccum(XELP *ths, char byte, int *reprocess) {
 static void _xelpRedrawFromCursor(XELP *ths) {
     char *p;
     int tail;
-    if (!ths->mpfOut) return;
+    if (!ths->mOutEnable || !ths->mpfOut) return;
+    if (ths->mEchoChar == XELP_ECHO_OFF) return;
     /* print from cursor to end of content */
-    for (p = ths->mCur; p < ths->mCmdXB.p; p++)
-        ths->mpfOut(*p);
+    for (p = ths->mCur; p < ths->mCmdXB.p; p++) {
+        if (ths->mEchoChar != XELP_ECHO_NORMAL) ths->mpfOut(ths->mEchoChar);
+        else ths->mpfOut(*p);
+    }
     /* erase one trailing char (covers deletion case) */
     ths->mpfOut(' ');
     /* backspace to cursor position */
@@ -209,6 +219,7 @@ int XELPStrLen (const char* c) {
  */
 XELPRESULT XELPOut (XELP *ths, const char* msg, int maxlen)
 {
+	if (!ths->mOutEnable) return XELP_S_OK;
 	if ((0 != msg) && (0 !=ths->mpfOut)) {
 		while (*msg != 0) {
 			(ths->mpfOut)(*msg++);
@@ -275,6 +286,7 @@ XELPRESULT XELPInit 	 (
 	while (i--)
 		*p++=0;
 	
+	ths->mOutEnable = 1;
 	ths->mpAboutMsg = pAboutMsg;
 #ifdef XELP_ENABLE_CLI
 	/* Guard needed: mCmdXB and mCmdMsgBuf only exist in the struct when
@@ -793,25 +805,25 @@ XELPRESULT XELPParseKey (XELP *ths, char key)
 						case XELP_KEYCODE_LEFT:
 							if (ths->mCur > ths->mCmdXB.s) {
 								ths->mCur--;
-								if (ths->mpfOut) ths->mpfOut('\b');
+								_CURSOR('\b');
 							}
 							break;
 						case XELP_KEYCODE_RIGHT:
 							if (ths->mCur < ths->mCmdXB.p) {
-								if (ths->mpfOut) ths->mpfOut(*ths->mCur);
+								_CURSOR(*ths->mCur);
 								ths->mCur++;
 							}
 							break;
 						case XELP_KEYCODE_HOME: {
 							while (ths->mCur > ths->mCmdXB.s) {
 								ths->mCur--;
-								if (ths->mpfOut) ths->mpfOut('\b');
+								_CURSOR('\b');
 							}
 							break;
 						}
 						case XELP_KEYCODE_END: {
 							while (ths->mCur < ths->mCmdXB.p) {
-								if (ths->mpfOut) ths->mpfOut(*ths->mCur);
+								_CURSOR(*ths->mCur);
 								ths->mCur++;
 							}
 							break;
@@ -843,12 +855,12 @@ XELPRESULT XELPParseKey (XELP *ths, char key)
 							ths->mCur--;
 							_xelp_memmove(ths->mCur, ths->mCur + 1, tail);
 							ths->mCmdXB.p--;
-							if (ths->mpfOut) ths->mpfOut('\b');
+							_CURSOR('\b');
 							_xelpRedrawFromCursor(ths);
 						}
 					} else if (ch == XELPKEY_ENTER) {
 						XelpBuf line;
-						if (ths->mpfOut) ths->mpfOut(ch);
+						_PUTC(ch);
 						XELP_XB_INIT_PTRS(line,ths->mCmdXB.s,ths->mCmdXB.s,ths->mCmdXB.p);
 						XELPParseXB(ths,&line);
 						XELP_XB_TOP(ths->mCmdXB);
@@ -863,7 +875,7 @@ XELPRESULT XELPParseKey (XELP *ths, char key)
 							XELP_XB_PUTC(ths->mCmdXB, ch);
 							if (ths->mCmdXB.p > ths->mCur) {
 								ths->mCur++;
-								if (ths->mpfOut) ths->mpfOut(ch);
+								_ECHO(ch);
 							}
 						} else {
 							/* insert at cursor */
@@ -873,7 +885,7 @@ XELPRESULT XELPParseKey (XELP *ths, char key)
 								*ths->mCur = ch;
 								ths->mCmdXB.p++;
 								ths->mCur++;
-								if (ths->mpfOut) ths->mpfOut(ch);
+								_ECHO(ch);
 								_xelpRedrawFromCursor(ths);
 							}
 						}
@@ -892,20 +904,19 @@ XELPRESULT XELPParseKey (XELP *ths, char key)
 							if (ths->mpfBksp)
 								ths->mpfBksp();
 						}
-					} else {
+					} else if (ch == XELPKEY_ENTER) {
+						XelpBuf line;
 						_PUTC(ch);
-						if (ch == XELPKEY_ENTER) {
-							XelpBuf line;
-							XELP_XB_INIT_PTRS(line,ths->mCmdXB.s,ths->mCmdXB.s,ths->mCmdXB.p);
-							XELPParseXB(ths,&line);
-							line.p=line.s;
-							XELP_XB_TOP(ths->mCmdXB);
+						XELP_XB_INIT_PTRS(line,ths->mCmdXB.s,ths->mCmdXB.s,ths->mCmdXB.p);
+						XELPParseXB(ths,&line);
+						line.p=line.s;
+						XELP_XB_TOP(ths->mCmdXB);
 #ifdef XELP_CLI_PROMPT
-							XELPOut(ths,XELP_CLI_PROMPT,-1);
+						XELPOut(ths,XELP_CLI_PROMPT,-1);
 #endif
-						} else {
-							XELP_XB_PUTC(ths->mCmdXB,ch);
-						}
+					} else {
+						_ECHO(ch);
+						XELP_XB_PUTC(ths->mCmdXB,ch);
 					}
 				}
 #endif /* XELP_ENABLE_LINE_EDIT */

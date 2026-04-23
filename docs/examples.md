@@ -245,35 +245,40 @@ XELPRESULT my_command(XELP *ths, const char *args, int maxlen);
 ```
 
 - `ths` is a pointer to the XELP instance that dispatched the command
-- `args` points to the raw argument string (everything after the command name)
+- `args` points to the full command line (including the command name)
 - `maxlen` is the number of valid bytes in `args`
 - Return `XELP_S_OK` (0) for success, negative for error, positive for warning
 
-### Pattern: parsing arguments
+### Pattern: parsing arguments with XelpArgs (preferred)
+
+`XelpArgs` iterates tokens left-to-right in O(1) per token:
 
 ```c
 XELPRESULT cmd_set(XELP *ths, const char *args, int len) {
-    XelpBuf b, tok;
-    int n;
+    XelpArgs a;
+    XelpBuf key;
+    int value;
 
-    XELP_XB_INIT(b, args, len);
-    XELPNumToks(&b, &n);
-
-    if (n < 3) {
-        XELPOut(ths, "usage: set <key> <value>\n", 0);
-        return XELP_E_ERR;
-    }
-
-    /* Token 0 = "set", Token 1 = key, Token 2 = value */
-    XELP_XB_TOP(b);
-    XELPTokN(&b, 1, &tok);
-    /* use tok.s .. tok.p as the key string */
-
-    XELP_XB_TOP(b);
-    XELPTokN(&b, 2, &tok);
-    int value = XELPStr2Int(tok.s, tok.p - tok.s);
+    XelpArgsInit(&a, args, len);
+    XelpNextTok(&a, 0);              /* skip command name ("set") */
+    XelpNextTok(&a, &key);           /* key: use key.s .. key.p */
+    XelpNextInt(&a, &value);
 
     /* do something with key and value */
+    return XELP_S_OK;
+}
+```
+
+### Pattern: random-access by index (XELPTokN)
+
+For random access to any token by index:
+
+```c
+XELPRESULT cmd_get(XELP *ths, const char *args, int len) {
+    XelpBuf b, tok;
+    XELP_XB_INIT(b, (char*)args, len);  /* cast: XELP_XB_INIT takes char* */
+    XELPTokN(&b, 1, &tok);              /* 0-indexed: token 1 = first arg */
+    /* use tok.s .. tok.p */
     return XELP_S_OK;
 }
 ```

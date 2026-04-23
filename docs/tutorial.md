@@ -68,30 +68,23 @@ Type `hello` and press ENTER. You should see `Hello, world!`.
 
 ## 2. Commands with arguments
 
-Command functions receive the raw argument string and its length. Use the
-tokenizer to extract individual arguments:
+Command functions receive the raw argument string and its length. Use
+`XelpArgs` to iterate tokens left-to-right:
 
 ```c
 XELPRESULT cmd_add(XELP *ths, const char *args, int len) {
-    XelpBuf b, tok;
-    int a, result;
+    XelpArgs a;
+    int x, y;
 
     (void)ths;
-    XELP_XB_INIT(b, args, len);
-
-    /* Token 0 is the command name itself ("add").
-       Token 1 is the first argument, token 2 the second. */
-    XELP_XB_TOP(b);
-    XELPTokN(&b, 1, &tok);
-    a = XELPStr2Int(tok.s, tok.p - tok.s);
-
-    XELP_XB_TOP(b);
-    XELPTokN(&b, 2, &tok);
-    result = a + XELPStr2Int(tok.s, tok.p - tok.s);
+    XelpArgsInit(&a, args, len);
+    XelpNextTok(&a, 0);              /* skip command name ("add") */
+    XelpNextInt(&a, &x);
+    XelpNextInt(&a, &y);
 
     /* Output the result (xelp has no printf -- format manually or
        use your platform's sprintf into a buffer, then XELPOut) */
-    /* ... */
+    /* ... x + y ... */
     return XELP_S_OK;
 }
 ```
@@ -115,23 +108,31 @@ Usage: `add 10 25`
 
 ## 3. Counting and iterating tokens
 
+Using `XelpArgs` to walk all tokens sequentially:
+
 ```c
 XELPRESULT cmd_args(XELP *ths, const char *args, int len) {
-    XelpBuf b, tok;
-    int n, i;
+    XelpArgs a;
+    XelpBuf tok;
+    int n;
 
-    XELP_XB_INIT(b, args, len);
-    XELPNumToks(&b, &n);
+    XelpArgsInit(&a, args, len);
+    XelpArgCount(&a, &n);            /* n includes the command name */
 
-    /* n includes the command name itself */
-    for (i = 0; i < n; i++) {
-        XELP_XB_TOP(b);
-        XELPTokN(&b, i, &tok);
+    while (XelpNextTok(&a, &tok) == XELP_S_OK) {
         XELPOut(ths, tok.s, tok.p - tok.s);
         XELPOut(ths, "\n", 0);
     }
     return XELP_S_OK;
 }
+```
+
+For random access by index (e.g. "get the 3rd argument"), use `XELPTokN`:
+
+```c
+XelpBuf b, tok;
+XELP_XB_INIT(b, (char*)args, len);  /* cast required: XELP_XB_INIT takes char* */
+XELPTokN(&b, 2, &tok);              /* 0-indexed: token 2 = third token */
 ```
 
 ## 4. KEY mode -- single keypress actions

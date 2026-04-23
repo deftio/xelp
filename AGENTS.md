@@ -106,26 +106,23 @@ void loop(void) {
 }
 ```
 
-## Parsing arguments inside commands
+## Parsing arguments inside commands (XelpArgs -- preferred)
+
+For sequential left-to-right argument parsing, use `XelpArgs`:
 
 ```c
 XELPRESULT cmd_set(XELP *ths, const char *args, int len) {
-    XelpBuf b, tok;
-    XELP_XB_INIT(b, args, len);
-
-    /* Token 0 = command name ("set"), token 1 = first arg, etc. */
-    XELPTokN(&b, 1, &tok);
-    int value = XELPStr2Int(tok.s, tok.p - tok.s);
-
-    /* Count tokens */
-    int n;
-    XELPNumToks(&b, &n);  /* n includes the command name */
-
+    XelpArgs a;
+    int value;
+    XelpArgsInit(&a, args, len);
+    XelpNextTok(&a, 0);              /* skip command name ("set") */
+    XelpNextTok(&a, 0);              /* skip key (or read it into a XelpBuf) */
+    XelpNextInt(&a, &value);
     return XELP_S_OK;
 }
 ```
 
-## Parsing arguments with XelpArgs (preferred)
+## Parsing arguments with XelpArgs (full reference)
 
 XelpArgs is a sequential iterator that yields one token at a time in O(1).
 Preferred over `XELPTokN` when arguments are processed left-to-right:
@@ -151,6 +148,21 @@ XELPRESULT cmd_divmod(XELP *ths, const char *args, int len) {
 | `XelpArgCount(a, &n)` | Count remaining tokens (does not consume) |
 
 Tokens are NOT null-terminated. Use `tok.s`..`tok.p` or `XELP_XB_LEN(tok)`.
+
+### Random-access alternative (XELPTokN)
+
+For random-access by index, use `XELPTokN`. Note the `(char*)` cast
+required because `XELP_XB_INIT` takes `char*`:
+
+```c
+XELPRESULT cmd_get(XELP *ths, const char *args, int len) {
+    XelpBuf b, tok;
+    XELP_XB_INIT(b, (char*)args, len);
+    XELPTokN(&b, 1, &tok);
+    /* tok.s .. tok.p is the token */
+    return XELP_S_OK;
+}
+```
 
 ## Running scripts
 
@@ -267,6 +279,28 @@ XELPRESULT cmd_divmod(XELP *ths, const char *args, int len) {
 ```
 
 C++ wrapper: `cli.r0()` (read-only), `cli.r1()`-`cli.r3()` (read/write).
+
+## Output Control
+
+Two `char` fields in the XELP struct control output behavior:
+
+- **`mOutEnable`** -- gates ALL output (XELPOut, echo, prompt, help).
+  Set via `XELP_SET_OUT_ENABLE(ths, val)`. Default: 1 (enabled).
+  Set to 0 for silent scripting / batch mode.
+
+- **`mEchoChar`** -- controls how printable chars are echoed during
+  interactive input. Does NOT affect XELPOut, ENTER newline, cursor
+  movement, or prompt.
+  - `XELP_ECHO_NORMAL` (`'\0'`) -- echo as typed (default)
+  - `XELP_ECHO_OFF` (`'\1'`) -- suppress echo
+  - Any other char (e.g. `'*'`) -- mask: echo that char instead
+
+Password entry pattern:
+```c
+XELP_SET_ECHO(*ths, '*');          /* mask during input */
+/* ... user types, sees ****** ... */
+XELP_SET_ECHO(*ths, XELP_ECHO_NORMAL);  /* restore after ENTER */
+```
 
 ## File structure
 

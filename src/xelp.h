@@ -270,7 +270,8 @@ typedef struct XELP_tag
 {
 	/* commandline state managemment [CLI | KEY | THR] */
 	int						mCurMode;	     /* current mode of Xelp inst - skc/CLI/thru    */
-	int						mEchoState; 	 /* whether to echo each key to the output      */
+	char					mOutEnable;		 /* 0 = mute all output, nonzero = normal        */
+	char					mEchoChar;		 /* '\0' = normal, '\1' = suppress, else mask    */
 
 	const char* 			mpAboutMsg;      /* Used as beginning of help message           */
 
@@ -356,6 +357,16 @@ XELPRESULT XELPInit (XELP *ths, const char *pAboutMsg);			    /* initialize inst
 #define XELP_SET_R2(ths,val) ((ths).mR[2]=(val))
 #define XELP_SET_R3(ths,val) ((ths).mR[3]=(val))
 
+
+/* Echo and output control constants */
+#define XELP_ECHO_NORMAL  '\0'   /* echo typed char as-is (default) */
+#define XELP_ECHO_OFF     '\1'   /* suppress echo entirely          */
+
+/* Echo and output control macros */
+#define XELP_SET_OUT_ENABLE(ths, val)  ((ths).mOutEnable = (val))
+#define XELP_GET_OUT_ENABLE(ths)       ((ths).mOutEnable)
+#define XELP_SET_ECHO(ths, ch)         ((ths).mEchoChar = (ch))
+#define XELP_GET_ECHO(ths)             ((ths).mEchoChar)
 
 #ifdef XELP_ENABLE_HELP
 XELPRESULT XELPHelp	        (XELP *ths);                             /* print online help (if avail)    */

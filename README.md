@@ -97,10 +97,11 @@ XELPRESULT cmd_hello(XELP *ths, const char *args, int len) {
 }
 
 XELPRESULT cmd_led(XELP *ths, const char *args, int len) {
-    XelpBuf b, tok;
-    XELP_XB_INIT(b, args, len);
-    XELPTokN(&b, 1, &tok);                  /* get second token */
-    int val = XELPStr2Int(tok.s, tok.p - tok.s);
+    XelpArgs a;
+    int val;
+    XelpArgsInit(&a, args, len);
+    XelpNextTok(&a, 0);                      /* skip command name */
+    XelpNextInt(&a, &val);
     LED_PORT = val;
     return XELP_S_OK;
 }

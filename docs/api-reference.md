@@ -339,3 +339,52 @@ natural value (e.g. `'a'` == 0x61). Multi-byte keys are >= 0x100.
 | `XELP_MODE_CLI` | 0x00 | CLI mode identifier |
 | `XELP_MODE_KEY` | 0x01 | KEY mode identifier |
 | `XELP_MODE_THR` | 0x02 | THRU mode identifier |
+| `XELP_ECHO_NORMAL` | `'\0'` | Echo typed character as-is (default) |
+| `XELP_ECHO_OFF` | `'\1'` | Suppress character echo entirely |
+
+## Output Control
+
+Two independent mechanisms control what an XELP instance sends to its
+output function:
+
+### Output Enable (`mOutEnable`)
+
+Gates **all** output: `XELPOut`, help, prompt, character echo, and
+redraw. Useful for silent scripting or batch mode.
+
+| Macro | Description |
+|-------|-------------|
+| `XELP_SET_OUT_ENABLE(ths, val)` | Set output enable: 0 = mute, nonzero = normal |
+| `XELP_GET_OUT_ENABLE(ths)` | Read current output-enable state |
+
+Default after `XELPInit`: **1** (enabled).
+
+### Echo Control (`mEchoChar`)
+
+Controls how printable characters are echoed during interactive input.
+Does **not** affect `XELPOut` calls from commands, ENTER newline echo,
+cursor movement, or prompt output.
+
+| Macro | Description |
+|-------|-------------|
+| `XELP_SET_ECHO(ths, ch)` | Set echo mode: `XELP_ECHO_NORMAL`, `XELP_ECHO_OFF`, or a mask character |
+| `XELP_GET_ECHO(ths)` | Read current echo character |
+
+Values:
+- `XELP_ECHO_NORMAL` (`'\0'`) -- echo the typed character (default)
+- `XELP_ECHO_OFF` (`'\1'`) -- suppress echo entirely
+- Any other character (e.g. `'*'`) -- echo that character instead
+
+Default after `XELPInit`: `XELP_ECHO_NORMAL`.
+
+### Password Entry Example
+
+```c
+XELPRESULT cmd_pass(XELP *ths, const char *args, int len) {
+    XELP_SET_ECHO(*ths, '*');       /* mask input */
+    /* ... user types password, sees ****** ... */
+    /* on ENTER, read buffer, then: */
+    XELP_SET_ECHO(*ths, XELP_ECHO_NORMAL);  /* restore */
+    return XELP_S_OK;
+}
+```
