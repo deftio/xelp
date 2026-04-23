@@ -98,9 +98,9 @@ Supporting files:
 **`update_sizes.sh`** -- Read `build/sizes.csv` and patch the compiled-size
 tables in `README.md` and `pages/index.html`.
 
-Tables are delimited by `<!-- BEGIN SIZE TABLE -->` / `<!-- END SIZE TABLE -->`
-markers.  Rows are sorted by CPU width ascending (8 → 16 → 32 → 64), then
-KEY size ascending within each group.
+Tables are delimited by a pair of `<!-- Build Size Table -->` markers.
+Rows are sorted by CPU width ascending (8 → 16 → 32 → 64), then KEY size
+ascending within each group.
 
 ```
 # After running crossbuild.sh:

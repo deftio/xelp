@@ -3124,8 +3124,8 @@ XELPRESULT test_MultiInstance() {
  test_XelpArgs() - sequential argument iterator
  */
 XELPRESULT test_XelpArgs() {
-    const char *tok;
-    int toklen, val, n;
+    XelpBuf tok;
+    int val, n;
     XelpArgs a;
     XELPRESULT r;
 
@@ -3134,10 +3134,10 @@ XELPRESULT test_XelpArgs() {
         char buf[] = "divmod 17 5";
         XelpArgsInit(&a, buf, XELPStrLen(buf));
 
-        r = XelpNextTok(&a, &tok, &toklen);
+        r = XelpNextTok(&a, &tok);
         if (JB_ASSERT(r != XELP_S_OK, "Args tok0 ok"))
             return XELP_E_ERR;
-        if (JB_ASSERT(toklen != 6, "Args tok0 len"))
+        if (JB_ASSERT((int)(tok.p - tok.s) != 6, "Args tok0 len"))
             return XELP_E_ERR;
 
         r = XelpNextInt(&a, &val);
@@ -3149,12 +3149,10 @@ XELPRESULT test_XelpArgs() {
             return XELP_E_ERR;
 
         /* past end */
-        r = XelpNextTok(&a, &tok, &toklen);
+        r = XelpNextTok(&a, &tok);
         if (JB_ASSERT(r == XELP_S_OK, "Args past end"))
             return XELP_E_ERR;
-        if (JB_ASSERT(tok != 0, "Args past end tok null"))
-            return XELP_E_ERR;
-        if (JB_ASSERT(toklen != 0, "Args past end len 0"))
+        if (JB_ASSERT(tok.s != 0, "Args past end tok null"))
             return XELP_E_ERR;
     }
 
@@ -3167,8 +3165,8 @@ XELPRESULT test_XelpArgs() {
             return XELP_E_ERR;
 
         /* count should not disturb iteration position */
-        r = XelpNextTok(&a, &tok, &toklen);
-        if (JB_ASSERT(r != XELP_S_OK || toklen != 4, "ArgCount preserves pos"))
+        r = XelpNextTok(&a, &tok);
+        if (JB_ASSERT(r != XELP_S_OK || (int)(tok.p - tok.s) != 4, "ArgCount preserves pos"))
             return XELP_E_ERR;
     }
 
@@ -3176,7 +3174,7 @@ XELPRESULT test_XelpArgs() {
     {
         char buf3[] = "";
         XelpArgsInit(&a, buf3, 0);
-        r = XelpNextTok(&a, &tok, &toklen);
+        r = XelpNextTok(&a, &tok);
         if (JB_ASSERT(r == XELP_S_OK, "Args empty"))
             return XELP_E_ERR;
 
@@ -3189,10 +3187,10 @@ XELPRESULT test_XelpArgs() {
     {
         char buf4[] = "help";
         XelpArgsInit(&a, buf4, XELPStrLen(buf4));
-        r = XelpNextTok(&a, &tok, &toklen);
-        if (JB_ASSERT(r != XELP_S_OK || toklen != 4, "Args single tok"))
+        r = XelpNextTok(&a, &tok);
+        if (JB_ASSERT(r != XELP_S_OK || (int)(tok.p - tok.s) != 4, "Args single tok"))
             return XELP_E_ERR;
-        if (JB_ASSERT(tok[0] != 'h' || tok[3] != 'p', "Args single content"))
+        if (JB_ASSERT(tok.s[0] != 'h' || tok.s[3] != 'p', "Args single content"))
             return XELP_E_ERR;
     }
 
@@ -3200,7 +3198,7 @@ XELPRESULT test_XelpArgs() {
     {
         char buf5[] = "cmd 0xFF ABh";
         XelpArgsInit(&a, buf5, XELPStrLen(buf5));
-        XelpNextTok(&a, 0, 0); /* skip "cmd" */
+        XelpNextTok(&a, 0); /* skip "cmd" */
 
         r = XelpNextInt(&a, &val);
         if (JB_ASSERT(r != XELP_S_OK || val != 0xFF, "Args hex 0xFF"))
@@ -3215,24 +3213,24 @@ XELPRESULT test_XelpArgs() {
     {
         char buf6[] = "cmd abc";
         XelpArgsInit(&a, buf6, XELPStrLen(buf6));
-        XelpNextTok(&a, 0, 0); /* skip "cmd" */
+        XelpNextTok(&a, 0); /* skip "cmd" */
         r = XelpNextInt(&a, &val);
         if (JB_ASSERT(r != XELP_E_ERR, "Args non-numeric"))
             return XELP_E_ERR;
     }
 
-    /* --- NULL tok/toklen pointers (skip pattern) --- */
+    /* --- NULL tok pointer (skip pattern) --- */
     {
         char buf7[] = "skip me keep";
         XelpArgsInit(&a, buf7, XELPStrLen(buf7));
-        r = XelpNextTok(&a, 0, 0); /* skip with NULLs */
-        if (JB_ASSERT(r != XELP_S_OK, "Args skip NULL ptrs"))
+        r = XelpNextTok(&a, 0); /* skip with NULL */
+        if (JB_ASSERT(r != XELP_S_OK, "Args skip NULL ptr"))
             return XELP_E_ERR;
-        r = XelpNextTok(&a, 0, 0);
-        if (JB_ASSERT(r != XELP_S_OK, "Args skip NULL ptrs 2"))
+        r = XelpNextTok(&a, 0);
+        if (JB_ASSERT(r != XELP_S_OK, "Args skip NULL ptr 2"))
             return XELP_E_ERR;
-        r = XelpNextTok(&a, &tok, &toklen);
-        if (JB_ASSERT(r != XELP_S_OK || toklen != 4, "Args after skips"))
+        r = XelpNextTok(&a, &tok);
+        if (JB_ASSERT(r != XELP_S_OK || (int)(tok.p - tok.s) != 4, "Args after skips"))
             return XELP_E_ERR;
     }
 
@@ -3240,7 +3238,7 @@ XELPRESULT test_XelpArgs() {
     {
         char buf8[] = "cmd -42";
         XelpArgsInit(&a, buf8, XELPStrLen(buf8));
-        XelpNextTok(&a, 0, 0);
+        XelpNextTok(&a, 0);
         r = XelpNextInt(&a, &val);
         if (JB_ASSERT(r != XELP_S_OK || val != -42, "Args negative int"))
             return XELP_E_ERR;

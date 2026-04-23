@@ -22,7 +22,7 @@ commands, single-key menus, and pass-through mode. Three source files
 ## Code
 
 - [xelp.h](https://github.com/deftio/xelp/blob/master/src/xelp.h): Public API header -- types, macros, function declarations
-- [xelp.c](https://github.com/deftio/xelp/blob/master/src/xelp.c): Implementation (~700 lines)
+- [xelp.c](https://github.com/deftio/xelp/blob/master/src/xelp.c): Implementation (~980 lines)
 - [xelpcfg.h](https://github.com/deftio/xelp/blob/master/src/xelpcfg.h): Compile-time configuration
 
 ## Examples

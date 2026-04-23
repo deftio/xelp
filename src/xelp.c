@@ -675,33 +675,30 @@ XELPRESULT XELPNumToks (XelpBuf *b, int *n)
  See xelp.h for API documentation.
  */
 
-XELPRESULT XelpArgsInit (XelpArgs *a, char *args, int len)
+XELPRESULT XelpArgsInit (XelpArgs *a, const char *args, int len)
 {
-    XELP_XB_INIT(a->buf, args, len);
+    XELP_XB_INIT(a->buf, (char*)args, len);
     return XELP_S_OK;
 }
 
-XELPRESULT XelpNextTok (XelpArgs *a, const char **tok, int *toklen)
+XELPRESULT XelpNextTok (XelpArgs *a, XelpBuf *tok)
 {
     XelpBuf t;
     XELPRESULT r = XELPTokLineXB(&a->buf, &t, XELP_TOK_ONLY);
     if (r != XELP_S_OK) {
-        if (tok)    *tok = 0;
-        if (toklen) *toklen = 0;
+        if (tok) { tok->s = 0; tok->p = 0; }
         return r;
     }
-    if (tok)    *tok = t.s;
-    if (toklen) *toklen = (int)(t.p - t.s);
+    if (tok) *tok = t;
     return XELP_S_OK;
 }
 
 XELPRESULT XelpNextInt (XelpArgs *a, int *val)
 {
-    const char *tok;
-    int len;
-    XELPRESULT r = XelpNextTok(a, &tok, &len);
+    XelpBuf tok;
+    XELPRESULT r = XelpNextTok(a, &tok);
     if (r != XELP_S_OK) return r;
-    return XELPParseNum(tok, len, val);
+    return XELPParseNum(tok.s, (int)(tok.p - tok.s), val);
 }
 
 XELPRESULT XelpArgCount (XelpArgs *a, int *n)

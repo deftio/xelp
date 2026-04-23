@@ -86,7 +86,7 @@ Same as `XELPParse` but takes a `XelpBuf`.
 ### `XELPExecKC`
 
 ```c
-XELPRESULT XELPExecKC(XELP *ths, char key);
+XELPRESULT XELPExecKC(XELP *ths, XELPKEYCODE key);
 ```
 
 Execute a single-key command directly (bypasses mode checking).
@@ -136,6 +136,67 @@ XELPRESULT XELPNumToks(XelpBuf *buf, int *n);
 ```
 
 Count the number of tokens in a buffer.
+
+## XelpArgs -- Sequential Argument Iterator
+
+A left-to-right token iterator for CLI command handlers. Preferred over
+`XELPTokN` when arguments are processed sequentially (O(1) per token
+instead of O(n) re-scan).
+
+### `XelpArgsInit`
+
+```c
+XELPRESULT XelpArgsInit(XelpArgs *a, const char *args, int len);
+```
+
+Initialize an argument iterator. `args` and `len` come directly from
+the CLI command callback parameters.
+
+### `XelpNextTok`
+
+```c
+XELPRESULT XelpNextTok(XelpArgs *a, XelpBuf *tok);
+```
+
+Get the next token. On success, `tok->s` points to the first character
+and `tok->p` points one past the last. Pass `NULL` for `tok` to skip a
+token (useful for skipping the command name).
+
+Returns `XELP_S_OK` on success, non-OK when no more tokens remain.
+
+### `XelpNextInt`
+
+```c
+XELPRESULT XelpNextInt(XelpArgs *a, int *val);
+```
+
+Get the next token and parse it as an integer (decimal or hex).
+
+### `XelpArgCount`
+
+```c
+XELPRESULT XelpArgCount(XelpArgs *a, int *n);
+```
+
+Count the total number of tokens without consuming them. The iteration
+position is preserved.
+
+### Example
+
+```c
+XELPRESULT cmd_divmod(XELP *ths, const char *args, int len) {
+    XelpArgs a;
+    int dividend, divisor;
+    XelpArgsInit(&a, args, len);
+    XelpNextTok(&a, 0);              /* skip command name */
+    XelpNextInt(&a, &dividend);
+    XelpNextInt(&a, &divisor);
+    if (divisor == 0) return XELP_E_ERR;
+    ths->mR[1] = dividend / divisor;
+    ths->mR[2] = dividend % divisor;
+    return XELP_S_OK;
+}
+```
 
 ## String Utilities
 

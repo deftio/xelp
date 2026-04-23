@@ -4,17 +4,19 @@
 ![Version](https://img.shields.io/badge/version-0.3.1-blue.svg)
 [![License](https://img.shields.io/badge/License-BSD%202--Clause-blue.svg)](https://opensource.org/licenses/BSD-2-Clause)
 [![CI](https://github.com/deftio/xelp/actions/workflows/ci.yml/badge.svg)](https://github.com/deftio/xelp/actions/workflows/ci.yml)
-![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen.svg)
+![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen.svg)  
 [![PlatformIO](https://img.shields.io/badge/PlatformIO-library-orange.svg)](https://registry.platformio.org/libraries/deftio/xelp)
 [![Arduino](https://img.shields.io/badge/Arduino-library-teal.svg)](https://github.com/deftio/xelp)
 [![ESP Component](https://img.shields.io/badge/ESP--IDF-component-red.svg)](https://components.espressif.com/components/deftio/xelp)
 
 # xelp
 
-A tiny command interpreter for embedded systems. Add an interactive serial
-CLI, single-key menus, or scripted command sequences to any microcontroller --
+A tiny command interpreter with scripting support for embedded systems. 
+Add an interactive serial CLI, single-key menus, or scripted command sequences to any microcontroller --
 from an 8-bit ATtiny85 to a 64-bit ARM Cortex-A. Pure C, no malloc, no OS,
-under 5 KB fully featured.
+under 5 KB fully featured. 
+
+Xelp is instance based so it's possible to run distinct copies on different ports and can be run inside interrupts (pending your own functions are safe).
 
 <img src="https://deftio.github.io/xelp/img/xelp-cli-demo.png" width="70%" alt="xelp CLI demo session">
 
@@ -25,11 +27,17 @@ console. xelp replaces that with a proper CLI that:
 
 - Compiles on 8-bit to 64-bit targets with any C89 or later compiler
 - Fits in ~1 KB (key dispatch only) to ~5 KB (full CLI with line editing)
-- Uses **zero dynamic memory** -- no malloc, no heap, safe for ISRs
+- Uses zero dynamic memory -- no malloc, no heap, safe for ISRs
 - Supports multiple independent instances -- one per UART, no globals
-- Scripts are ROM-able const strings -- the parser never modifies its input
+- Scripts are ROM-able const strings -- the parser never modifies its input (e.g. no strtok style processing)
 - Function dispatch tables make any C/C++ function callable from the CLI
-- Live help listing (optional, compile-time removable)
+- Live help listing (optional, compile-time removable) 
+- CLI commands can be called from C or C functions can be called from the CLI.
+- A cpp wrapper is provided with identical functionality and some syntactic sugar for ease of use (still no memory allocation)
+
+## History
+Xelp was first built for some embedded projects in the late 90s (though under different names) and then made more uniform in the late 2000s.
+
 
 ## Build Profiles
 
@@ -61,7 +69,8 @@ interactive configuration.
 ### Full (~3-5 KB)
 
 Adds THR pass-through mode (~50-125 bytes more) for forwarding all
-keystrokes to another peripheral such as a modem or radio module.
+keystrokes to another peripheral such as a modem or radio module. This enables 
+the cli to flip in to a mode where one can send raw commands (such AT commands) to another device.  
 
 ```c
 #define XELP_ENABLE_FULL  1
@@ -181,7 +190,7 @@ make clean          # remove test build artifacts
 make clean-all      # clean tests + all examples
 ```
 
-35 test units, 458 test cases, 100% line coverage of `xelp.c`.
+36 test units, 477 test cases, 100% line coverage of `xelp.c`.
 
 ### Full release (includes Docker cross-compilation)
 
@@ -201,7 +210,7 @@ Compiled `.text` section sizes with `-Os`. Three configurations: KEY
 (single-key dispatch only), CLI (typical interactive use), FULL (all
 features). Even the largest full build is under 7 KB.
 
-<!-- BEGIN SIZE TABLE -->
+<!-- Build Size Table -->
 | CPU | Width | Compiler | KEY (bytes) | CLI (bytes) | FULL (bytes) |
 |-----|------:|----------|------------:|------------:|-------------:|
 | AVR (ATtiny85) | 8 | avr-gcc | 850 | 4100 | 4150 |
@@ -220,10 +229,10 @@ features). Even the largest full build is under 7 KB.
 | RISC-V (rv64) | 64 | riscv64-linux-gnu-gcc | 900 | 4100 | 4150 |
 | x86-64 | 64 | GCC | 1008 | 4667 | 4711 |
 | x86-64 | 64 | Clang | 1100 | 4800 | 4850 |
-<!-- END SIZE TABLE -->
+<!-- Build Size Table -->
 
 x86-64 GCC row is measured directly; others from cross-compilation via
-`tools/Dockerfile.crossbuild`.
+`tools/Dockerfile.crossbuild`.  This is for size tracking, older versions / cousins of xelp were compiled and run on several (but not all of the above platforms)
 
 ## Configuration
 
@@ -272,7 +281,7 @@ Docker cross-compilation (`tools/Dockerfile.crossbuild`):
 xelp/
   src/            xelp.c, xelp.h, xelpcfg.h (the library -- add these to your project)
   tests/          unit tests (jumpbug framework), fuzz harnesses, 100% coverage
-  examples/       Arduino, bare-metal template, multi-instance, ESP32 Wi-Fi
+  examples/       POSIX ncurses, Arduino, C++ wrapper, bare-metal, scripting, ESP32 Wi-Fi
   tools/          cross-build scripts, release script, banner generator
   docs/           API reference, configuration guide, porting guide
   pages/          GitHub Pages site
@@ -283,7 +292,8 @@ xelp/
 ## Contributing
 
 PRs welcome. `master` is protected -- all changes go through pull requests.
-CI must pass (zero warnings, all tests, coverage) before merge.
+CI must pass (zero warnings, all tests, coverage) before merge.  Please note that 
+PRs which affect multi-instance support or require dynamic memory may not be accepted.
 
 ```bash
 git checkout -b dev-my-feature master

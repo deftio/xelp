@@ -125,6 +125,33 @@ XELPRESULT cmd_set(XELP *ths, const char *args, int len) {
 }
 ```
 
+## Parsing arguments with XelpArgs (preferred)
+
+XelpArgs is a sequential iterator that yields one token at a time in O(1).
+Preferred over `XELPTokN` when arguments are processed left-to-right:
+
+```c
+XELPRESULT cmd_divmod(XELP *ths, const char *args, int len) {
+    XelpArgs a;
+    int dividend, divisor;
+    XelpArgsInit(&a, args, len);
+    XelpNextTok(&a, 0);              /* skip command name */
+    XelpNextInt(&a, &dividend);
+    XelpNextInt(&a, &divisor);
+    /* ... */
+    return XELP_S_OK;
+}
+```
+
+| Function | Purpose |
+|----------|---------|
+| `XelpArgsInit(a, args, len)` | Initialize iterator from `const char *args` |
+| `XelpNextTok(a, &tok)` | Get next token as `XelpBuf` (pass `0` to skip) |
+| `XelpNextInt(a, &val)` | Get next token and parse as int |
+| `XelpArgCount(a, &n)` | Count remaining tokens (does not consume) |
+
+Tokens are NOT null-terminated. Use `tok.s`..`tok.p` or `XELP_XB_LEN(tok)`.
+
 ## Running scripts
 
 Scripts are const strings parsed without modification (ROM-safe):
@@ -244,7 +271,7 @@ C++ wrapper: `cli.r0()` (read-only), `cli.r1()`-`cli.r3()` (read/write).
 ## File structure
 
 ```
-src/xelp.c       -- implementation (~700 lines)
+src/xelp.c       -- implementation (~980 lines)
 src/xelp.h       -- public API (types, macros, function declarations)
 src/xelpcfg.h    -- compile-time feature flags and settings
 ```

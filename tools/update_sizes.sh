@@ -6,8 +6,9 @@
 #   - README.md           (Markdown table)
 #   - pages/index.html    (HTML table)
 #
-# Tables are delimited by <!-- BEGIN SIZE TABLE --> / <!-- END SIZE TABLE -->
-# markers.  Rows are sorted by width (8→16→32→64), then KEY size ascending.
+# Tables are delimited by a pair of <!-- Build Size Table --> markers.
+# The script wipes everything between them and inserts fresh rows.
+# Rows are sorted by width (8→16→32→64), then KEY size ascending.
 #
 # Usage:
 #   bash tools/update_sizes.sh                      # default: build/sizes.csv
@@ -79,16 +80,15 @@ HTML_TABLE="${HTML_TABLE}
 patch_file() {
     local file="$1"
     local replacement="$2"
-    local begin_marker="<!-- BEGIN SIZE TABLE -->"
-    local end_marker="<!-- END SIZE TABLE -->"
+    local marker='<!-- Build Size Table -->'
 
     if [ ! -f "$file" ]; then
         echo "  SKIP $file (not found)"
         return
     fi
 
-    if ! grep -q "$begin_marker" "$file"; then
-        echo "  SKIP $file (no BEGIN marker)"
+    if ! grep -qF "$marker" "$file"; then
+        echo "  SKIP $file (no marker)"
         return
     fi
 
@@ -98,21 +98,23 @@ patch_file() {
     tmpfile=$(mktemp)
     printf '%s\n' "$replacement" > "$replfile"
 
-    awk -v begin="$begin_marker" -v end="$end_marker" -v rf="$replfile" '
-        BEGIN { inside=0 }
-        index($0, begin) {
-            print $0
-            while ((getline line < rf) > 0) print line
-            close(rf)
-            inside=1
-            next
+    awk -v m="$marker" -v rf="$replfile" '
+        BEGIN { seen=0 }
+        index($0, m) {
+            if (seen == 0) {
+                print $0
+                while ((getline line < rf) > 0) print line
+                close(rf)
+                seen=1
+                next
+            } else {
+                print $0
+                seen=2
+                next
+            }
         }
-        index($0, end) {
-            print $0
-            inside=0
-            next
-        }
-        inside==0 { print }
+        seen==1 { next }
+        { print }
     ' "$file" > "$tmpfile"
     rm -f "$replfile"
 

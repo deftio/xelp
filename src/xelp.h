@@ -380,17 +380,17 @@ XELPRESULT XELPNumToks (XelpBuf *buf, int *n);
  XelpArgs -- sequential argument iterator for CLI command handlers.
 
  Provides O(1)-per-token left-to-right iteration.  argv[0] is the command
- name (no auto-skip).  Tokens are returned as pointer + length (NOT
- null-terminated) to avoid corrupting the buffer for subsequent tokens.
- Use XELPStrEq() for string comparison, or XelpNextInt() which handles
- the length internally.  Token pointers are valid only during the callback.
+ name (no auto-skip).  XelpNextTok yields a XelpBuf (tok.s = start,
+ tok.p = end); use XELP_XB_PTR/XELP_XB_LEN or pass to XELPStrEq2.
+ Tokens are NOT null-terminated (buffer is not modified).
+ Token pointers are valid only during the callback.
  */
 typedef struct {
     XelpBuf buf;    /* tokenizer state (cursor advances as tokens are consumed) */
 } XelpArgs;
 
-XELPRESULT XelpArgsInit  (XelpArgs *a, char *args, int len);
-XELPRESULT XelpNextTok   (XelpArgs *a, const char **tok, int *toklen);
+XELPRESULT XelpArgsInit  (XelpArgs *a, const char *args, int len);
+XELPRESULT XelpNextTok   (XelpArgs *a, XelpBuf *tok);
 XELPRESULT XelpNextInt   (XelpArgs *a, int *val);
 XELPRESULT XelpArgCount  (XelpArgs *a, int *n);
 

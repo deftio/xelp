@@ -157,8 +157,8 @@ XELPRESULT cmdPrintR (XELP *ths, const char* args, int maxlen){
 XELPRESULT cmdDivmod (XELP *ths, const char* args, int maxlen){
 	XelpArgs a;
 	int dividend, divisor;
-	XelpArgsInit(&a, (char*)args, maxlen);
-	XelpNextTok(&a, 0, 0);           /* skip command name */
+	XelpArgsInit(&a, args, maxlen);
+	XelpNextTok(&a, 0);              /* skip command name */
 	XelpNextInt(&a, &dividend);
 	XelpNextInt(&a, &divisor);
 
