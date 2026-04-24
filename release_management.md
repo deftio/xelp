@@ -36,10 +36,22 @@ make version   # compile + run, writes build/xelp_version.yaml
 | `make examples` | Build all examples (no interactive launch) |
 | `make example` | Build + run posix ncurses example (interactive) |
 | `make coverage` | Tests + coverage summary |
+| `make funcsizes` | Per-function compiled sizes (x86-32, ARM32) |
+| `make sizes` | Feature profile compiled sizes (ARM + host) |
 | `make fuzz` | Fuzz testing with libFuzzer (requires clang) |
 | `make version` | Extract version to build/xelp_version.yaml |
 | `make clean` | Remove test build artifacts |
 | `make clean-all` | Clean tests + all examples |
+
+### Pre-release (validate + update size tables, requires Docker)
+
+| Command | Purpose |
+| --- | --- |
+| `make prerelease` | Validate + Docker cross-compile + update README size tables |
+
+Runs `make validate`, then `tools/crossbuild.sh` (Docker), then
+`tools/update_sizes.sh` to patch the compiled-size tables in README.md
+and pages/index.html. Does not tag, push, or publish.
 
 ### Full release (includes Docker cross-compilation)
 

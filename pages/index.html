@@ -169,22 +169,32 @@ under 7 KB.</p>
 <table>
 <thead><tr><th>CPU</th><th style="text-align:right">Width</th><th>Compiler</th><th style="text-align:right">KEY (bytes)</th><th style="text-align:right">CLI (bytes)</th><th style="text-align:right">FULL (bytes)</th></tr></thead>
 <tbody>
-<tr><td>AVR (ATtiny85)</td><td style="text-align:right">8</td><td>avr-gcc</td><td style="text-align:right">850</td><td style="text-align:right">4100</td><td style="text-align:right">4150</td></tr>
-<tr><td>AVR (ATmega328P)</td><td style="text-align:right">8</td><td>avr-gcc</td><td style="text-align:right">900</td><td style="text-align:right">4200</td><td style="text-align:right">4250</td></tr>
-<tr><td>MSP430</td><td style="text-align:right">16</td><td>msp430-gcc</td><td style="text-align:right">700</td><td style="text-align:right">3200</td><td style="text-align:right">3250</td></tr>
-<tr><td>68HC11</td><td style="text-align:right">16</td><td>m68hc11-gcc</td><td style="text-align:right">1500</td><td style="text-align:right">6500</td><td style="text-align:right">6600</td></tr>
-<tr><td>ARM Thumb</td><td style="text-align:right">32</td><td>arm-none-eabi-gcc</td><td style="text-align:right">550</td><td style="text-align:right">2600</td><td style="text-align:right">2650</td></tr>
-<tr><td>Xtensa LX106 (ESP8266)</td><td style="text-align:right">32</td><td>xtensa-lx106-elf-gcc</td><td style="text-align:right">650</td><td style="text-align:right">2900</td><td style="text-align:right">2950</td></tr>
-<tr><td>Xtensa LX7 (ESP32-S3)</td><td style="text-align:right">32</td><td>xtensa-esp-elf-gcc</td><td style="text-align:right">650</td><td style="text-align:right">2900</td><td style="text-align:right">2950</td></tr>
-<tr><td>RISC-V (rv32)</td><td style="text-align:right">32</td><td>riscv64-unknown-elf-gcc</td><td style="text-align:right">700</td><td style="text-align:right">3000</td><td style="text-align:right">3050</td></tr>
-<tr><td>m68k</td><td style="text-align:right">32</td><td>m68k-linux-gnu-gcc</td><td style="text-align:right">750</td><td style="text-align:right">3300</td><td style="text-align:right">3350</td></tr>
-<tr><td>ARM32</td><td style="text-align:right">32</td><td>arm-none-eabi-gcc</td><td style="text-align:right">850</td><td style="text-align:right">3800</td><td style="text-align:right">3850</td></tr>
-<tr><td>x86-32</td><td style="text-align:right">32</td><td>GCC</td><td style="text-align:right">1000</td><td style="text-align:right">4600</td><td style="text-align:right">4650</td></tr>
-<tr><td>PowerPC</td><td style="text-align:right">32</td><td>powerpc-linux-gnu-gcc</td><td style="text-align:right">1300</td><td style="text-align:right">5800</td><td style="text-align:right">5850</td></tr>
-<tr><td>AArch64 (ARM64)</td><td style="text-align:right">64</td><td>aarch64-linux-gnu-gcc</td><td style="text-align:right">900</td><td style="text-align:right">4200</td><td style="text-align:right">4250</td></tr>
-<tr><td>RISC-V (rv64)</td><td style="text-align:right">64</td><td>riscv64-linux-gnu-gcc</td><td style="text-align:right">900</td><td style="text-align:right">4100</td><td style="text-align:right">4150</td></tr>
-<tr><td>x86-64</td><td style="text-align:right">64</td><td>GCC</td><td style="text-align:right">1008</td><td style="text-align:right">4667</td><td style="text-align:right">4711</td></tr>
-<tr><td>x86-64</td><td style="text-align:right">64</td><td>Clang</td><td style="text-align:right">1100</td><td style="text-align:right">4800</td><td style="text-align:right">4850</td></tr>
+<tr><td>6502</td><td style="text-align:right">8</td><td>cc65</td><td style="text-align:right">unavail</td><td style="text-align:right">unavail</td><td style="text-align:right">unavail</td></tr>
+<tr><td>6800 (HC08)</td><td style="text-align:right">8</td><td>SDCC</td><td style="text-align:right">unavail</td><td style="text-align:right">unavail</td><td style="text-align:right">unavail</td></tr>
+<tr><td>MCS-51 (8051)</td><td style="text-align:right">8</td><td>SDCC</td><td style="text-align:right">0</td><td style="text-align:right">unavail</td><td style="text-align:right">unavail</td></tr>
+<tr><td>PIC16F877A</td><td style="text-align:right">8</td><td>SDCC</td><td style="text-align:right">unavail</td><td style="text-align:right">unavail</td><td style="text-align:right">unavail</td></tr>
+<tr><td>PIC18F2620</td><td style="text-align:right">8</td><td>SDCC</td><td style="text-align:right">unavail</td><td style="text-align:right">unavail</td><td style="text-align:right">unavail</td></tr>
+<tr><td>AVR (ATtiny85)</td><td style="text-align:right">8</td><td>avr-gcc</td><td style="text-align:right">1046</td><td style="text-align:right">4038</td><td style="text-align:right">4096</td></tr>
+<tr><td>AVR (ATmega328P)</td><td style="text-align:right">8</td><td>avr-gcc</td><td style="text-align:right">1054</td><td style="text-align:right">4132</td><td style="text-align:right">4190</td></tr>
+<tr><td>Z80</td><td style="text-align:right">8</td><td>SDCC</td><td style="text-align:right">2121</td><td style="text-align:right">unavail</td><td style="text-align:right">unavail</td></tr>
+<tr><td>8086</td><td style="text-align:right">16</td><td>ia16-elf-gcc</td><td style="text-align:right">unavail</td><td style="text-align:right">unavail</td><td style="text-align:right">unavail</td></tr>
+<tr><td>MSP430</td><td style="text-align:right">16</td><td>msp430-gcc</td><td style="text-align:right">770</td><td style="text-align:right">3260</td><td style="text-align:right">3306</td></tr>
+<tr><td>68HC11</td><td style="text-align:right">16</td><td>m68hc11-gcc</td><td style="text-align:right">2369</td><td style="text-align:right">6570</td><td style="text-align:right">6641</td></tr>
+<tr><td>Xtensa LX7 (ESP32-S3)</td><td style="text-align:right">32</td><td>xtensa-esp-elf-gcc</td><td style="text-align:right">unavail</td><td style="text-align:right">unavail</td><td style="text-align:right">unavail</td></tr>
+<tr><td>ARM Thumb</td><td style="text-align:right">32</td><td>arm-none-eabi-gcc</td><td style="text-align:right">580</td><td style="text-align:right">2482</td><td style="text-align:right">2526</td></tr>
+<tr><td>RISC-V (rv32)</td><td style="text-align:right">32</td><td>riscv64-unknown-elf-gcc</td><td style="text-align:right">722</td><td style="text-align:right">2970</td><td style="text-align:right">3008</td></tr>
+<tr><td>Xtensa LX106 (ESP8266)</td><td style="text-align:right">32</td><td>xtensa-lx106-elf-gcc</td><td style="text-align:right">723</td><td style="text-align:right">2831</td><td style="text-align:right">2863</td></tr>
+<tr><td>m68k</td><td style="text-align:right">32</td><td>m68k-linux-gnu-gcc</td><td style="text-align:right">728</td><td style="text-align:right">3146</td><td style="text-align:right">3194</td></tr>
+<tr><td>ARM32</td><td style="text-align:right">32</td><td>arm-none-eabi-gcc</td><td style="text-align:right">980</td><td style="text-align:right">3746</td><td style="text-align:right">3806</td></tr>
+<tr><td>x86-32</td><td style="text-align:right">32</td><td>GCC</td><td style="text-align:right">1081</td><td style="text-align:right">4604</td><td style="text-align:right">4654</td></tr>
+<tr><td>MIPS32</td><td style="text-align:right">32</td><td>mipsel-linux-gnu-gcc</td><td style="text-align:right">1296</td><td style="text-align:right">4888</td><td style="text-align:right">4936</td></tr>
+<tr><td>PowerPC</td><td style="text-align:right">32</td><td>powerpc-linux-gnu-gcc</td><td style="text-align:right">1504</td><td style="text-align:right">5674</td><td style="text-align:right">5738</td></tr>
+<tr><td>x86-32</td><td style="text-align:right">32</td><td>TCC</td><td style="text-align:right">3021</td><td style="text-align:right">8921</td><td style="text-align:right">9059</td></tr>
+<tr><td>RISC-V (rv64)</td><td style="text-align:right">64</td><td>riscv64-linux-gnu-gcc</td><td style="text-align:right">756</td><td style="text-align:right">3332</td><td style="text-align:right">3366</td></tr>
+<tr><td>x86-64</td><td style="text-align:right">64</td><td>Clang</td><td style="text-align:right">1043</td><td style="text-align:right">5013</td><td style="text-align:right">5055</td></tr>
+<tr><td>x86-64</td><td style="text-align:right">64</td><td>GCC</td><td style="text-align:right">1063</td><td style="text-align:right">4787</td><td style="text-align:right">4836</td></tr>
+<tr><td>AArch64 (ARM64)</td><td style="text-align:right">64</td><td>aarch64-linux-gnu-gcc</td><td style="text-align:right">1324</td><td style="text-align:right">5178</td><td style="text-align:right">5234</td></tr>
+<tr><td>MIPS64</td><td style="text-align:right">64</td><td>mips64el-linux-gnuabi64-gcc</td><td style="text-align:right">1360</td><td style="text-align:right">5512</td><td style="text-align:right">5560</td></tr>
 </tbody>
 </table>
 <!-- Build Size Table -->

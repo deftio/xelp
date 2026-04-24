@@ -100,12 +100,26 @@ make validate           # tests + build all examples -- the everyday check
 make tests              # unit tests + gcov only
 make examples           # build all examples (no interactive launch)
 make coverage           # tests + coverage summary
+make funcsizes          # per-function compiled sizes (x86-32, ARM32)
+make sizes              # feature profile compiled sizes (ARM + host)
+make version            # extract and print library version
+make fuzz               # fuzz testing with libFuzzer (requires clang)
 make clean-all          # remove all build artifacts including examples
 ```
 
 `make validate` is the recommended pre-push check. It runs the full test
 suite with `-Werror` and builds all examples, confirming zero warnings
 everywhere. Takes seconds on any modern machine.
+
+Before a release, run:
+
+```bash
+make prerelease         # validate + Docker cross-compile + update README size tables
+```
+
+This chains `make validate`, `tools/crossbuild.sh` (Docker), and
+`tools/update_sizes.sh` to patch the compiled-size tables in README.md
+and pages/index.html. Does not tag, push, or publish.
 
 The test suite uses the jumpbug framework. All tests must pass with
 **zero compiler warnings** and **100% line coverage** of `xelp.c`
