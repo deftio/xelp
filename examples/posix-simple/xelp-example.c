@@ -79,11 +79,11 @@ XELPRESULT fooPrint(XELP *ths, XELPKEYCODE c)
 XELPRESULT fooHelp(XELP *ths, XELPKEYCODE c)
 {
 	(void)c;
-	return XELPHelp(ths);
+	return XelpHelp(ths);
 }
 XELPRESULT printBanner(XELP *ths, XELPKEYCODE c) {
 	(void)c;
-	XELPOut(ths,XELP_BANNER_STR,-1); // XELPOut ==> print out a null terminated string, in this case the XELP banner in ascii
+	XelpOut(ths,XELP_BANNER_STR,-1); // XelpOut ==> print out a null terminated string, in this case the XELP banner in ascii
 	return XELP_S_OK;
 }
 void fooNormal(char c)
@@ -129,9 +129,9 @@ XELPRESULT cmdHome (XELP *ths, const char* args, int maxlen)
 }
 XELPRESULT cmdEcho (XELP *ths, const char* args, int maxlen)
 {
-	XELPOut(ths, "<<", 0);
-	XELPOut(ths, args, maxlen);
-	XELPOut(ths, ">>\n", 0);
+	XelpOut(ths, "<<", 0);
+	XelpOut(ths, args, maxlen);
+	XelpOut(ths, ">>\n", 0);
 	return XELP_S_OK;
 }
 
@@ -142,8 +142,8 @@ XELPRESULT cmdNumToks (XELP *ths, const char* args, int maxlen)
     int n;
     (void)ths;
     XELP_XB_INIT(b,(char*)args,maxlen);
-    XELPNumToks(&b,&n);
-	printw(" XELPNumToks %d\n",n);
+    XelpNumToks(&b,&n);
+	printw(" XelpNumToks %d\n",n);
 
     return XELP_S_OK;
 };
@@ -180,15 +180,15 @@ XELPRESULT cmdListToks (XELP *ths, const char* args, int maxlen)
     XelpBuf b,tok;
     int n,i;
     XELP_XB_INIT(b,(char*)args,maxlen);
-    XELPNumToks(&b,&n);
+    XelpNumToks(&b,&n);
     XELP_XB_TOP(b);
     printw("[%d]",n);
 	for (i=0; i< n; i++) {
         XELP_XB_TOP(b);
-        XELPTokN( &b,i,&tok);
+        XelpTokN( &b,i,&tok);
         printw("<");
         printw("%d:",i);
-		XELPOut(ths,tok.s,tok.p-tok.s);
+		XelpOut(ths,tok.s,tok.p-tok.s);
 		printw(">");
 	}
 #endif
@@ -200,7 +200,7 @@ XELPRESULT cmdListToks (XELP *ths, const char* args, int maxlen)
 XELPRESULT cmdHelp (XELP *ths, const char* args, int maxlen)
 {
 	(void)args; (void)maxlen;
-	return XELPHelp(ths);
+	return XelpHelp(ths);
 }
 
 XELPRESULT cmdExit (XELP *ths, const char* args, int maxlen) {
@@ -213,9 +213,9 @@ XELPRESULT cmdPrintNum (XELP *ths, const char *args, int maxlen) {
     (void)ths;
 
     XELP_XB_INIT(b,(char*)args,maxlen);
-    XELPTokN(&b,1,&tok),
+    XelpTokN(&b,1,&tok),
 
-	printw("[%d]\n",XELPStr2Int(tok.s,tok.p-tok.s));
+	printw("[%d]\n",XelpStr2Int(tok.s,tok.p-tok.s));
 	return XELP_S_OK;
 }
 
@@ -225,18 +225,18 @@ XELPRESULT cmdMath (XELP *ths, const char* args, int maxlen) {
     int op;
 
     XELP_XB_INIT(b,(char*)args,maxlen);
-    XELPTokN(&b,0,&tok),
+    XelpTokN(&b,0,&tok),
 
 
 	op = *b.s;
 
     XELP_XB_TOP(b);
-    XELPTokN(&b,1,&tok);
-    i = XELPStr2Int(tok.s,tok.p-tok.s);
+    XelpTokN(&b,1,&tok);
+    i = XelpStr2Int(tok.s,tok.p-tok.s);
 
     XELP_XB_TOP(b);
-    XELPTokN(&b,2,&tok);
-	j =XELPStr2Int(tok.s,tok.p-tok.s);
+    XelpTokN(&b,2,&tok);
+	j =XelpStr2Int(tok.s,tok.p-tok.s);
 
 	switch(op) {
 		case '+':
@@ -257,7 +257,7 @@ XELPRESULT cmdMath (XELP *ths, const char* args, int maxlen) {
 			k=i%j;  break;
 	}
 	printw("%d %c %d = %d",i,(char) op,j,k);
-	XELPOut(ths,"\n",1);
+	XelpOut(ths,"\n",1);
 	return XELP_S_OK;
 }
 //declare a command map for functions in parse mode
@@ -308,7 +308,7 @@ void modeChangeMsg(int mode) {
  *
  * ncurses is used here only as a portable terminal abstraction for
  * this POSIX demo.  On a real embedded target you would read bytes
- * from a UART and call XELPParseKey() directly -- ncurses is not
+ * from a UART and call XelpParseKey() directly -- ncurses is not
  * involved at all.
  * ===================================================================
  */
@@ -353,7 +353,7 @@ int main (int argc, char *argv[])
 		"CTRL-T  : pass-through mode\n"
 		"\n";
 
-	XELPInit(&example, pAboutStr);
+	XelpInit(&example, pAboutStr);
 
 	XELP_SET_FN_OUT(example,  &gPutChar);        /* character output   */
 	XELP_SET_FN_ERR(example,  &gPutChar);        /* error output       */
@@ -367,10 +367,10 @@ int main (int argc, char *argv[])
 
 	printw("\n============================================================\n");
 	printBanner(&example, 0);
-	XELPHelp(&example);
+	XelpHelp(&example);
 
 	printw("\nXELP struct size: %d bytes\n", (int)sizeof(XELP));
-	XELPParseKey(&example, '\n'); /* emit first prompt */
+	XelpParseKey(&example, '\n'); /* emit first prompt */
 
 	/*
 	 * Main loop: read one byte at a time from ncurses and feed it to
@@ -381,7 +381,7 @@ int main (int argc, char *argv[])
 	do {
 		i = getch();
 		if (i != ERR)
-			XELPParseKey(&example, (char)i);
+			XelpParseKey(&example, (char)i);
 	} while (!gExit);
 
 	endwin();

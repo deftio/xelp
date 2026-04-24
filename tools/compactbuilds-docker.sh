@@ -7,7 +7,7 @@
 #   CLI  -- XELP_ENABLE_KEY + CLI + LINE_EDIT + HELP (typical interactive)
 #   FULL -- All features (KEY + CLI + LINE_EDIT + HELP + THR)
 #
-# Output is grouped by word size (8/16/32/64-bit).
+# Output is grouped by word size (8/16/32/64-bit), ascending.
 
 set -e
 
@@ -84,19 +84,59 @@ cat > "$CFG_DIR/full/xelp_ovr.h" << 'EOF'
 EOF
 
 # --- Helper: compile and return .text size ---------------------------------
-# Returns size via stdout; prints nothing else.  Returns "FAIL" on error.
+# Returns size via stdout; prints nothing else.
+# Tries multiple strategies to extract code size from different object formats:
+#   1. GNU size  (ELF, a.out, COFF)
+#   2. SDCC .rel (ASxxxx relocatable -- _CODE area hex size)
+#   3. cc65 od65 (cc65 native object format)
+# Returns "unavail" if compilation failed or size could not be determined.
 
 get_text_size() {
     local cc_cmd="$1"
+
+    # Clean stale outputs from compilers that may ignore -o
+    rm -f xelp.rel xelp.asm xelp.lst xelp.sym xelp.o 2>/dev/null
+
     eval $cc_cmd > /dev/null 2>&1 || true
+
+    # Some compilers (SDCC, cc65) may ignore -o; check fallback locations
     if [ ! -f "$OBJ" ]; then
-        echo "FAIL"
+        for f in xelp.rel xelp.o; do
+            if [ -f "$f" ]; then
+                mv "$f" "$OBJ"
+                break
+            fi
+        done
+    fi
+
+    if [ ! -f "$OBJ" ]; then
+        echo "unavail"
         return
     fi
-    local sz
+
+    local sz=""
+
+    # Strategy 1: GNU size (ELF, a.out, COFF)
     sz=$(size "$OBJ" 2>/dev/null | awk 'FNR==2{print $1}')
-    echo "${sz:-FAIL}"
-    rm -f "$OBJ"
+
+    # Strategy 2: SDCC .rel / ASxxxx relocatable format
+    # Area definition line: "A _CODE size XXXX flags ..."  (XXXX is hex)
+    if [ -z "$sz" ]; then
+        local hex_sz
+        hex_sz=$(sed -n 's/^A _CODE size \([0-9A-Fa-f]\{1,\}\).*/\1/p' "$OBJ" 2>/dev/null | head -1)
+        if [ -n "$hex_sz" ]; then
+            sz=$((16#$hex_sz))
+        fi
+    fi
+
+    # Strategy 3: cc65 object format via od65 --dump-segments
+    if [ -z "$sz" ] && command -v od65 >/dev/null 2>&1; then
+        sz=$(od65 --dump-segments "$OBJ" 2>/dev/null \
+            | awk '/Segment "CODE"/{f=1} f && /Size:/{print $2+0; exit}')
+    fi
+
+    echo "${sz:-unavail}"
+    rm -f "$OBJ" xelp.asm xelp.lst xelp.sym xelp.rel 2>/dev/null
 }
 
 # --- Helper: build one target in all three configs -------------------------
@@ -151,21 +191,46 @@ print_header() {
     printf "  %-34s %8s  %8s  %8s\n" "----------------------------------" "--------" "--------" "--------"
 }
 
-# --- 64-bit targets --------------------------------------------------------
+# --- 8-bit targets ---------------------------------------------------------
 
-print_header "64-bit targets"
+print_header "8-bit targets"
 
-build_target 64 "x86-64" "GCC" \
-    "gcc -c $SRC $INCLUDE -Os -Wall -o $OBJ"
+build_target 8 "AVR (ATmega328P)" "avr-gcc" \
+    "avr-gcc -c $SRC $INCLUDE -Os -mmcu=avr5 -Wall -o $OBJ"
 
-build_target 64 "x86-64" "Clang" \
-    "clang -c $SRC $INCLUDE -Os -Wall -o $OBJ"
+build_target 8 "AVR (ATtiny85)" "avr-gcc" \
+    "avr-gcc -c $SRC $INCLUDE -Os -mmcu=attiny85 -Wall -o $OBJ"
 
-build_target 64 "AArch64 (ARM64)" "aarch64-linux-gnu-gcc" \
-    "aarch64-linux-gnu-gcc -c $SRC $INCLUDE -Os -Wall -o $OBJ"
+build_target 8 "MCS-51 (8051)" "SDCC" \
+    "sdcc -mmcs51 --model-small --opt-code-size -c $SRC $INCLUDE -o $OBJ"
 
-build_target 64 "RISC-V (rv64)" "riscv64-linux-gnu-gcc" \
-    "riscv64-linux-gnu-gcc -c $SRC $INCLUDE -Os -Wall -o $OBJ"
+build_target 8 "6502" "cc65" \
+    "cl65 -t none -O --cpu 6502 -c $SRC $INCLUDE -o $OBJ"
+
+build_target 8 "Z80" "SDCC" \
+    "sdcc -mz80 --opt-code-size -c $SRC $INCLUDE -o $OBJ"
+
+build_target 8 "6800 (HC08)" "SDCC" \
+    "sdcc -mhc08 --opt-code-size -c $SRC $INCLUDE -o $OBJ"
+
+build_target 8 "PIC16F877A" "SDCC" \
+    "sdcc -mpic14 -p16f877a --opt-code-size -c $SRC $INCLUDE -o $OBJ"
+
+build_target 8 "PIC18F2620" "SDCC" \
+    "sdcc -mpic16 -p18f2620 --opt-code-size -c $SRC $INCLUDE -o $OBJ"
+
+# --- 16-bit targets --------------------------------------------------------
+
+print_header "16-bit targets"
+
+build_target 16 "MSP430" "msp430-gcc" \
+    "msp430-gcc -c $SRC $INCLUDE -Os -Wall -o $OBJ"
+
+build_target 16 "68HC11" "m68hc11-gcc" \
+    "m68hc11-gcc -c $SRC $INCLUDE -Os -o $OBJ"
+
+build_target 16 "8086" "ia16-elf-gcc" \
+    "ia16-elf-gcc -c $SRC $INCLUDE -Os -Wall -o $OBJ"
 
 # --- 32-bit targets --------------------------------------------------------
 
@@ -198,31 +263,27 @@ build_target 32 "Xtensa LX106 (ESP8266)" "xtensa-lx106-elf-gcc" \
 build_target 32 "Xtensa LX7 (ESP32-S3)" "xtensa-esp-elf-gcc" \
     "xtensa-esp-elf-gcc -mcpu=esp32s3 -c $SRC $INCLUDE -Os -Wall -o $OBJ"
 
-# --- 16-bit targets --------------------------------------------------------
+build_target 32 "MIPS32" "mipsel-linux-gnu-gcc" \
+    "mipsel-linux-gnu-gcc -c $SRC $INCLUDE -Os -Wall -o $OBJ"
 
-print_header "16-bit targets"
+# --- 64-bit targets --------------------------------------------------------
 
-build_target 16 "MSP430" "msp430-gcc" \
-    "msp430-gcc -c $SRC $INCLUDE -Os -Wall -o $OBJ"
+print_header "64-bit targets"
 
-build_target 16 "68HC11" "m68hc11-gcc" \
-    "m68hc11-gcc -c $SRC $INCLUDE -Os -o $OBJ"
+build_target 64 "x86-64" "GCC" \
+    "gcc -c $SRC $INCLUDE -Os -Wall -o $OBJ"
 
-build_target 16 "PIC18F2620" "SDCC" \
-    "sdcc -mpic16 -p18f2620 --opt-code-size -c $SRC $INCLUDE -o $OBJ"
+build_target 64 "x86-64" "Clang" \
+    "clang -c $SRC $INCLUDE -Os -Wall -o $OBJ"
 
-# --- 8-bit targets ---------------------------------------------------------
+build_target 64 "AArch64 (ARM64)" "aarch64-linux-gnu-gcc" \
+    "aarch64-linux-gnu-gcc -c $SRC $INCLUDE -Os -Wall -o $OBJ"
 
-print_header "8-bit targets"
+build_target 64 "RISC-V (rv64)" "riscv64-linux-gnu-gcc" \
+    "riscv64-linux-gnu-gcc -c $SRC $INCLUDE -Os -Wall -o $OBJ"
 
-build_target 8 "AVR (ATmega328P)" "avr-gcc" \
-    "avr-gcc -c $SRC $INCLUDE -Os -mmcu=avr5 -Wall -o $OBJ"
-
-build_target 8 "AVR (ATtiny85)" "avr-gcc" \
-    "avr-gcc -c $SRC $INCLUDE -Os -mmcu=attiny85 -Wall -o $OBJ"
-
-build_target 8 "MCS-51 (8051)" "SDCC" \
-    "sdcc -mmcs51 --model-small --opt-code-size -c $SRC $INCLUDE -o $OBJ"
+build_target 64 "MIPS64" "mips64el-linux-gnuabi64-gcc" \
+    "mips64el-linux-gnuabi64-gcc -c $SRC $INCLUDE -Os -Wall -o $OBJ"
 
 # --- Function size table (native GCC, FULL config) -------------------------
 
@@ -241,7 +302,7 @@ echo "$SEP"
 echo "Summary: .text section size (bytes), compiled with -Os"
 echo "$SEP"
 
-for grp in "64-bit" "32-bit" "16-bit" "8-bit"; do
+for grp in "8-bit" "16-bit" "32-bit" "64-bit"; do
     echo ""
     printf "  %-34s %8s  %8s  %8s\n" "$grp" "KEY" "CLI" "FULL"
     printf "  %-34s %8s  %8s  %8s\n" "----------------------------------" "--------" "--------" "--------"

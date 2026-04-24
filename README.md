@@ -5,9 +5,9 @@
 [![License](https://img.shields.io/badge/License-BSD%202--Clause-blue.svg)](https://opensource.org/licenses/BSD-2-Clause)
 [![CI](https://github.com/deftio/xelp/actions/workflows/ci.yml/badge.svg)](https://github.com/deftio/xelp/actions/workflows/ci.yml)
 ![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen.svg)  
-[![PlatformIO](https://img.shields.io/badge/PlatformIO-library-orange.svg)](https://registry.platformio.org/libraries/deftio/xelp)
+[![PlatformIO](https://img.shields.io/badge/PlatformIO-library-teal.svg)](https://registry.platformio.org/libraries/deftio/xelp)
 [![Arduino](https://img.shields.io/badge/Arduino-library-teal.svg)](https://github.com/deftio/xelp)
-[![ESP Component](https://img.shields.io/badge/ESP--IDF-component-red.svg)](https://components.espressif.com/components/deftio/xelp)
+[![ESP Component](https://img.shields.io/badge/ESP--IDF-component-teal.svg)](https://components.espressif.com/components/deftio/xelp)
 
 # xelp
 

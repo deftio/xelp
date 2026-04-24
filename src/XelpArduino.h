@@ -75,7 +75,7 @@ public:
      */
     void begin(const char* aboutMsg, void (*outputFn)(char))
     {
-        XELPInit(&m_x, aboutMsg);
+        XelpInit(&m_x, aboutMsg);
         if (outputFn)
             XELP_SET_FN_OUT(m_x, outputFn);
     }
@@ -220,7 +220,7 @@ public:
     {
         while (stream.available() > 0) {
             char c = (char)stream.read();
-            XELPParseKey(&m_x, c);
+            XelpParseKey(&m_x, c);
         }
     }
 #endif
@@ -232,27 +232,27 @@ public:
      */
     XELPRESULT run(const char* script)
     {
-        return XELPParse(&m_x, script, XELPStrLen(script));
+        return XelpParse(&m_x, script, XelpStrLen(script));
     }
 #endif
 
     /** Process a single keypress through xelp's interactive parser. */
     XELPRESULT parseKey(char key)
     {
-        return XELPParseKey(&m_x, key);
+        return XelpParseKey(&m_x, key);
     }
 
     /** Print a null-terminated string through xelp's output function. */
     void print(const char* msg)
     {
-        XELPOut(&m_x, msg, XELPStrLen(msg));
+        XelpOut(&m_x, msg, XelpStrLen(msg));
     }
 
 #ifdef XELP_ENABLE_HELP
     /** Print the built-in help listing. */
     XELPRESULT help()
     {
-        return XELPHelp(&m_x);
+        return XelpHelp(&m_x);
     }
 #endif
 
@@ -355,21 +355,21 @@ private:
         /* Identify the command name (token 0). */
         XelpBuf b, tok;
         XELP_XB_INIT(b, (char*)args, len);
-        if (XELPTokN(&b, 0, &tok) != XELP_S_OK)
+        if (XelpTokN(&b, 0, &tok) != XELP_S_OK)
             return XELP_E_ERR;
         int cmdLen = (int)(tok.p - tok.s);
 
         /* Find which table entry matches. */
         for (int i = 0; i < cli.m_nCli; i++) {
             if (cli.m_cliTable[i].mFunPtr == &_easyCliDispatch &&
-                XELPStrEq(tok.s, cmdLen, cli.m_cliTable[i].mpCmd) == XELP_S_OK) {
+                XelpStrEq(tok.s, cmdLen, cli.m_cliTable[i].mpCmd) == XELP_S_OK) {
                 /* Parse argv and null-terminate each token. */
                 const char* argv[XELP_MAX_EASY_ARGV];
                 int argc = 0;
                 XELP_XB_TOP(b);
                 XelpBuf t;
                 while (argc < XELP_MAX_EASY_ARGV &&
-                       XELPTokN(&b, argc, &t) == XELP_S_OK) {
+                       XelpTokN(&b, argc, &t) == XELP_S_OK) {
                     *t.p = '\0';  /* null-terminate in the writable cmd buffer */
                     argv[argc++] = t.s;
                 }
@@ -390,7 +390,7 @@ private:
         XELP_XB_INIT(b, (char*)args, len);
         XelpBuf t;
         while (argc < XELP_MAX_EASY_ARGV &&
-               XELPTokN(&b, argc, &t) == XELP_S_OK) {
+               XelpTokN(&b, argc, &t) == XELP_S_OK) {
             *t.p = '\0';
             argv[argc++] = t.s;
         }

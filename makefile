@@ -13,7 +13,7 @@ BUILD_DIR=build
 INCLUDES=\
     -I$(LIB_DIR)\
 
-.PHONY: help tests clean clean-all coverage version fuzz fuzz-parsekey fuzz-parse examples example validate
+.PHONY: help tests clean clean-all coverage version fuzz fuzz-parsekey fuzz-parse examples example validate funcsizes
 
 #=======================================================================
 # Default target: print available targets
@@ -25,6 +25,7 @@ help:
 	@echo "  make examples     Build all examples (no interactive launch)"
 	@echo "  make example      Build + run the posix ncurses demo (interactive)"
 	@echo "  make coverage     Tests + coverage summary"
+	@echo "  make funcsizes    Per-function compiled sizes (x86-32, ARM32)"
 	@echo "  make version      Extract and print library version"
 	@echo "  make fuzz         Run fuzz tests (requires clang + libFuzzer)"
 	@echo "  make clean        Remove test build artifacts"
@@ -116,6 +117,11 @@ fuzz-parse: | $(BUILD_DIR)
 	$(BUILD_DIR)/fuzz_parse $(FUZZ_DIR)/corpus_parse -max_total_time=$(FUZZ_TIME)
 
 fuzz: fuzz-parsekey fuzz-parse
+
+#=======================================================================
+# Per-function compiled sizes (x86-32 and ARM32 if available)
+funcsizes:
+	@bash tools/funcsizes.sh
 
 #=======================================================================
 # clean -- wipe all build artifacts (src/ stays clean)

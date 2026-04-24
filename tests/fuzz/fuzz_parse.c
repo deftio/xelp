@@ -1,9 +1,9 @@
 /*
-  fuzz_parse.c — libFuzzer harness for XELPParse
+  fuzz_parse.c — libFuzzer harness for XelpParse
 
-  Feeds the entire fuzz input as a command buffer to XELPParse.
+  Feeds the entire fuzz input as a command buffer to XelpParse.
   Exercises the PSM tokenizer, command dispatch, semicolon/newline
-  splitting, argument parsing, and XELPParseNum.
+  splitting, argument parsing, and XelpParseNum.
 
   Build (requires clang with libFuzzer):
     clang -fsanitize=fuzzer,address,undefined -g -O1 -Isrc \
@@ -59,7 +59,7 @@ static XELPCLIFuncMapEntry fuzz_cli_cmds[] = {
 
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     XELP x;
-    XELPInit(&x, "fuzz");
+    XelpInit(&x, "fuzz");
 
     XELP_SET_FN_OUT(x, &fuzz_out);
     XELP_SET_FN_CLI(x, fuzz_cli_cmds);
@@ -70,7 +70,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     XELP_SET_FN_DEF_KEY(x, &fuzz_def_key);
     XELP_SET_FN_EMCHG(x, &fuzz_emchg);
 
-    XELPParse(&x, (const char *)data, (int)size);
+    XelpParse(&x, (const char *)data, (int)size);
 
     return 0;
 }

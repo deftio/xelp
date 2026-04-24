@@ -35,7 +35,7 @@ XELP cli_b;
 static XELPRESULT cmd_help(XELP *ths, const char *args, int len)
 {
     (void)args; (void)len;
-    return XELPHelp(ths);
+    return XelpHelp(ths);
 }
 
 static XELPRESULT cmd_status(XELP *ths, const char *args, int len)
@@ -43,7 +43,7 @@ static XELPRESULT cmd_status(XELP *ths, const char *args, int len)
     (void)args; (void)len;
     /* ths points to whichever instance called this command,
      * so output goes to the correct UART automatically. */
-    XELPOut(ths, "System OK\n", 0);
+    XelpOut(ths, "System OK\n", 0);
     return XELP_S_OK;
 }
 
@@ -70,8 +70,8 @@ XELPCLIFuncMapEntry commands_b[] = {
 void main(void)
 {
     /* Initialize two independent instances */
-    XELPInit(&cli_a, "Debug Console (UART0)");
-    XELPInit(&cli_b, "Service Port (UART1)");
+    XelpInit(&cli_a, "Debug Console (UART0)");
+    XelpInit(&cli_b, "Service Port (UART1)");
 
     /* Each gets its own output and backspace handler */
     XELP_SET_FN_OUT(cli_a, &uart0_putc);
@@ -87,15 +87,15 @@ void main(void)
     XELP_SET_VAL_CLI_PROMPT(cli_b, "svc>");
 
     /* Show startup on both */
-    XELPOut(&cli_a, XELP_BANNER_STR, 0);
-    XELPParseKey(&cli_a, '\n');
+    XelpOut(&cli_a, XELP_BANNER_STR, 0);
+    XelpParseKey(&cli_a, '\n');
 
-    XELPOut(&cli_b, "Service port ready.\n", 0);
-    XELPParseKey(&cli_b, '\n');
+    XelpOut(&cli_b, "Service port ready.\n", 0);
+    XelpParseKey(&cli_b, '\n');
 
     /* Main loop -- poll both UARTs */
     for (;;) {
-        /* if (uart0_rx_ready()) XELPParseKey(&cli_a, uart0_getc()); */
-        /* if (uart1_rx_ready()) XELPParseKey(&cli_b, uart1_getc()); */
+        /* if (uart0_rx_ready()) XelpParseKey(&cli_a, uart0_getc()); */
+        /* if (uart1_rx_ready()) XelpParseKey(&cli_b, uart1_getc()); */
     }
 }

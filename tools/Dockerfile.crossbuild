@@ -26,7 +26,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     xz-utils \
     sdcc \
+    cc65 \
+    gcc-mipsel-linux-gnu \
+    gcc-mips64el-linux-gnuabi64 \
     binutils \
+    software-properties-common \
+    && rm -rf /var/lib/apt/lists/*
+
+# gcc-ia16-elf for real-mode 8086/8088 (from community PPA)
+RUN (add-apt-repository -y ppa:tkchia/build-ia16 \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends gcc-ia16-elf \
+    || echo "NOTE: ia16-elf-gcc unavailable; 8086 targets will show unavail") \
     && rm -rf /var/lib/apt/lists/*
 
 # Espressif unified Xtensa toolchain (ESP32, ESP32-S2, ESP32-S3)

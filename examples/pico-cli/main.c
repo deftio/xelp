@@ -76,14 +76,14 @@ static void led_toggle(void)
 static XELPRESULT key_help(XELP *ths, XELPKEYCODE c)
 {
     (void)c;
-    return XELPHelp(ths);
+    return XelpHelp(ths);
 }
 
 static XELPRESULT key_led_toggle(XELP *ths, XELPKEYCODE c)
 {
     (void)c;
     led_toggle();
-    XELPOut(ths, g_led_state ? "LED ON\n" : "LED OFF\n", 0);
+    XelpOut(ths, g_led_state ? "LED ON\n" : "LED OFF\n", 0);
     return XELP_S_OK;
 }
 
@@ -100,19 +100,19 @@ XELPKeyFuncMapEntry key_commands[] = {
 static XELPRESULT cmd_help(XELP *ths, const char *args, int len)
 {
     (void)args; (void)len;
-    return XELPHelp(ths);
+    return XelpHelp(ths);
 }
 
 static XELPRESULT cmd_led(XELP *ths, const char *args, int len)
 {
     XelpBuf b, tok;
     XELP_XB_INIT(b, (char*)args, len);
-    if (XELPTokN(&b, 1, &tok) == XELP_S_OK) {
-        int val = XELPStr2Int(tok.s, (int)(tok.p - tok.s));
+    if (XelpTokN(&b, 1, &tok) == XELP_S_OK) {
+        int val = XelpStr2Int(tok.s, (int)(tok.p - tok.s));
         led_set(val);
-        XELPOut(ths, val ? "LED ON\n" : "LED OFF\n", 0);
+        XelpOut(ths, val ? "LED ON\n" : "LED OFF\n", 0);
     } else {
-        XELPOut(ths, "usage: led <0|1>\n", 0);
+        XelpOut(ths, "usage: led <0|1>\n", 0);
     }
     return XELP_S_OK;
 }
@@ -123,25 +123,25 @@ static XELPRESULT cmd_pin(XELP *ths, const char *args, int len)
     XELP_XB_INIT(b, (char*)args, len);
 
     XELP_XB_TOP(b);
-    if (XELPTokN(&b, 1, &tok) != XELP_S_OK) goto usage;
-    int pin = XELPStr2Int(tok.s, (int)(tok.p - tok.s));
+    if (XelpTokN(&b, 1, &tok) != XELP_S_OK) goto usage;
+    int pin = XelpStr2Int(tok.s, (int)(tok.p - tok.s));
 
     XELP_XB_TOP(b);
-    if (XELPTokN(&b, 2, &tok) != XELP_S_OK) goto usage;
+    if (XelpTokN(&b, 2, &tok) != XELP_S_OK) goto usage;
 
     gpio_init(pin);
     if (tok.s[0] == 'o') {
         gpio_set_dir(pin, GPIO_OUT);
-        XELPOut(ths, "output\n", 0);
+        XelpOut(ths, "output\n", 0);
     } else {
         gpio_set_dir(pin, GPIO_IN);
         gpio_pull_up(pin);
-        XELPOut(ths, "input (pull-up)\n", 0);
+        XelpOut(ths, "input (pull-up)\n", 0);
     }
     return XELP_S_OK;
 
 usage:
-    XELPOut(ths, "usage: pin <n> <in|out>\n", 0);
+    XelpOut(ths, "usage: pin <n> <in|out>\n", 0);
     return XELP_E_ERR;
 }
 
@@ -151,19 +151,19 @@ static XELPRESULT cmd_set(XELP *ths, const char *args, int len)
     XELP_XB_INIT(b, (char*)args, len);
 
     XELP_XB_TOP(b);
-    if (XELPTokN(&b, 1, &tok) != XELP_S_OK) goto usage;
-    int pin = XELPStr2Int(tok.s, (int)(tok.p - tok.s));
+    if (XelpTokN(&b, 1, &tok) != XELP_S_OK) goto usage;
+    int pin = XelpStr2Int(tok.s, (int)(tok.p - tok.s));
 
     XELP_XB_TOP(b);
-    if (XELPTokN(&b, 2, &tok) != XELP_S_OK) goto usage;
-    int val = XELPStr2Int(tok.s, (int)(tok.p - tok.s));
+    if (XelpTokN(&b, 2, &tok) != XELP_S_OK) goto usage;
+    int val = XelpStr2Int(tok.s, (int)(tok.p - tok.s));
 
     gpio_put(pin, val ? 1 : 0);
-    XELPOut(ths, val ? "HIGH\n" : "LOW\n", 0);
+    XelpOut(ths, val ? "HIGH\n" : "LOW\n", 0);
     return XELP_S_OK;
 
 usage:
-    XELPOut(ths, "usage: set <pin> <0|1>\n", 0);
+    XelpOut(ths, "usage: set <pin> <0|1>\n", 0);
     return XELP_E_ERR;
 }
 
@@ -172,13 +172,13 @@ static XELPRESULT cmd_get(XELP *ths, const char *args, int len)
     XelpBuf b, tok;
     XELP_XB_INIT(b, (char*)args, len);
 
-    if (XELPTokN(&b, 1, &tok) != XELP_S_OK) {
-        XELPOut(ths, "usage: get <pin>\n", 0);
+    if (XelpTokN(&b, 1, &tok) != XELP_S_OK) {
+        XelpOut(ths, "usage: get <pin>\n", 0);
         return XELP_E_ERR;
     }
-    int pin = XELPStr2Int(tok.s, (int)(tok.p - tok.s));
+    int pin = XelpStr2Int(tok.s, (int)(tok.p - tok.s));
     int val = gpio_get(pin);
-    XELPOut(ths, val ? "HIGH\n" : "LOW\n", 0);
+    XelpOut(ths, val ? "HIGH\n" : "LOW\n", 0);
     ths->mR[1] = val;
     return XELP_S_OK;
 }
@@ -188,13 +188,13 @@ static XELPRESULT cmd_adc(XELP *ths, const char *args, int len)
     XelpBuf b, tok;
     XELP_XB_INIT(b, (char*)args, len);
 
-    if (XELPTokN(&b, 1, &tok) != XELP_S_OK) {
-        XELPOut(ths, "usage: adc <0-3>\n", 0);
+    if (XelpTokN(&b, 1, &tok) != XELP_S_OK) {
+        XelpOut(ths, "usage: adc <0-3>\n", 0);
         return XELP_E_ERR;
     }
-    int ch = XELPStr2Int(tok.s, (int)(tok.p - tok.s));
+    int ch = XelpStr2Int(tok.s, (int)(tok.p - tok.s));
     if (ch < 0 || ch > 3) {
-        XELPOut(ths, "channel 0-3 only\n", 0);
+        XelpOut(ths, "channel 0-3 only\n", 0);
         return XELP_E_ERR;
     }
 
@@ -202,7 +202,7 @@ static XELPRESULT cmd_adc(XELP *ths, const char *args, int len)
     uint16_t raw = adc_read();
     char buf[32];
     snprintf(buf, sizeof(buf), "ADC%d: %u\n", ch, raw);
-    XELPOut(ths, buf, 0);
+    XelpOut(ths, buf, 0);
     ths->mR[1] = raw;
     return XELP_S_OK;
 }
@@ -213,12 +213,12 @@ static XELPRESULT cmd_pwm(XELP *ths, const char *args, int len)
     XELP_XB_INIT(b, (char*)args, len);
 
     XELP_XB_TOP(b);
-    if (XELPTokN(&b, 1, &tok) != XELP_S_OK) goto usage;
-    int pin = XELPStr2Int(tok.s, (int)(tok.p - tok.s));
+    if (XelpTokN(&b, 1, &tok) != XELP_S_OK) goto usage;
+    int pin = XelpStr2Int(tok.s, (int)(tok.p - tok.s));
 
     XELP_XB_TOP(b);
-    if (XELPTokN(&b, 2, &tok) != XELP_S_OK) goto usage;
-    int duty = XELPStr2Int(tok.s, (int)(tok.p - tok.s));
+    if (XelpTokN(&b, 2, &tok) != XELP_S_OK) goto usage;
+    int duty = XelpStr2Int(tok.s, (int)(tok.p - tok.s));
 
     {
         gpio_set_function(pin, GPIO_FUNC_PWM);
@@ -227,12 +227,12 @@ static XELPRESULT cmd_pwm(XELP *ths, const char *args, int len)
         pwm_set_wrap(slice, 255);
         pwm_set_chan_level(slice, channel, duty & 0xFF);
         pwm_set_enabled(slice, true);
-        XELPOut(ths, "OK\n", 0);
+        XelpOut(ths, "OK\n", 0);
     }
     return XELP_S_OK;
 
 usage:
-    XELPOut(ths, "usage: pwm <pin> <0-255>\n", 0);
+    XelpOut(ths, "usage: pwm <pin> <0-255>\n", 0);
     return XELP_E_ERR;
 }
 
@@ -270,21 +270,21 @@ int main(void)
     adc_gpio_init(27);
     adc_gpio_init(28);
 
-    XELPInit(&cli, "Pico CLI (xelp)\n");
+    XelpInit(&cli, "Pico CLI (xelp)\n");
 
     XELP_SET_FN_OUT(cli, &uart_putc_fn);
     XELP_SET_FN_BKSP(cli, &uart_bksp);
     XELP_SET_FN_KEY(cli, key_commands);
     XELP_SET_FN_CLI(cli, cli_commands);
 
-    XELPOut(&cli, XELP_BANNER_STR, 0);
-    XELPHelp(&cli);
-    XELPParseKey(&cli, '\n');  /* show initial prompt */
+    XelpOut(&cli, XELP_BANNER_STR, 0);
+    XelpHelp(&cli);
+    XelpParseKey(&cli, '\n');  /* show initial prompt */
 
     for (;;) {
         int c = getchar_timeout_us(0);
         if (c >= 0) {
-            XELPParseKey(&cli, (char)c);
+            XelpParseKey(&cli, (char)c);
         }
     }
 }

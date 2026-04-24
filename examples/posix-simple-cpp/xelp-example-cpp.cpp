@@ -102,8 +102,8 @@ int main()
         }},
         {"divmod", "divmod <a> <b>: R1=a/b R2=a%b", [](XelpCLI& c, int argc, const char** argv) {
             if (argc < 3) { c.print("usage: divmod <a> <b>\n"); return; }
-            int a = XELPStr2Int(argv[1], XELPStrLen(argv[1]));
-            int b = XELPStr2Int(argv[2], XELPStrLen(argv[2]));
+            int a = XelpStr2Int(argv[1], XelpStrLen(argv[1]));
+            int b = XelpStr2Int(argv[2], XelpStrLen(argv[2]));
             if (b == 0) { c.print("divmod: division by zero\n"); return; }
             c.r1() = a / b;
             c.r2() = a % b;
@@ -119,7 +119,7 @@ int main()
         }},
         {"num", "print integer to console", [](XelpCLI& c, int argc, const char** argv) {
             if (argc < 2) { c.print("usage: num <integer>\n"); return; }
-            int val = XELPStr2Int(argv[1], XELPStrLen(argv[1]));
+            int val = XelpStr2Int(argv[1], XelpStrLen(argv[1]));
             char buf[32];
             snprintf(buf, sizeof(buf), "%d\n", val);
             c.print(buf);

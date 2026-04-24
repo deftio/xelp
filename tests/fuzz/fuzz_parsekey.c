@@ -1,7 +1,7 @@
 /*
-  fuzz_parsekey.c — libFuzzer harness for XELPParseKey
+  fuzz_parsekey.c — libFuzzer harness for XelpParseKey
 
-  Feeds every byte of the fuzz input through XELPParseKey one at a time.
+  Feeds every byte of the fuzz input through XelpParseKey one at a time.
   Exercises the key accumulator, ESC-sequence handling, mode switching,
   CLI line editor (insert/delete/cursor), KEY dispatch, and THR passthrough.
 
@@ -65,7 +65,7 @@ static XELPCLIFuncMapEntry fuzz_cli_cmds[] = {
 
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     XELP x;
-    XELPInit(&x, "fuzz");
+    XelpInit(&x, "fuzz");
 
     XELP_SET_FN_OUT(x, &fuzz_out);
     XELP_SET_FN_CLI(x, fuzz_cli_cmds);
@@ -77,7 +77,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     XELP_SET_FN_EMCHG(x, &fuzz_emchg);
 
     for (size_t i = 0; i < size; i++)
-        XELPParseKey(&x, (char)data[i]);
+        XelpParseKey(&x, (char)data[i]);
 
     return 0;
 }
