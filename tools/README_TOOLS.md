@@ -93,6 +93,43 @@ Supporting files:
 
 ---
 
+## Feature Profile Size Report
+
+**`../dev/size_profiles.sh`** -- Report compiled `.text` sizes across 9
+feature profiles (from CLI-only to full). Uses Docker (`xelp-crossbuild:latest`)
+for ARM Cortex-M0 Thumb sizes, falls back to host GCC if Docker is unavailable.
+
+```
+# From the repo root:
+bash dev/size_profiles.sh
+
+# Or via make:
+make sizes
+```
+
+Output example (with Docker):
+
+```
+xelp compiled .text sizes (bytes, -Os)
+
+ARM-M0    Host  Profile
+------  ------  -------
+  1396    2664  1. CLI only
+  1496    2844  2. CLI + help
+  1500    2876  3. CLI + key
+  1874    3572  4. CLI + help + key
+  1910    3616  5. CLI + help + key + thru
+  1840    3584  6. CLI + line edit
+  1936    3764  7. CLI + line edit + help
+  2358    4452  8. CLI + LE + help + key
+  2394    4496  9. Full (all features)
+```
+
+Requires the `xelp-crossbuild:latest` Docker image (see `tools/Dockerfile.crossbuild`).
+Without Docker, shows host GCC sizes only.
+
+---
+
 ## Size Table Updater
 
 **`update_sizes.sh`** -- Read `build/sizes.csv` and patch the compiled-size

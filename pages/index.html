@@ -135,7 +135,7 @@ entry:</p>
 void uart_putc(char c) { UART_TX = c; }
 
 XELPRESULT cmd_hello(XELP *ths, const char *args, int len) {
-    XELPOut(ths, "Hello!\n", 0);
+    XelpOut(ths, "Hello!\n", 0);
     return XELP_S_OK;
 }
 
@@ -147,13 +147,13 @@ XELPCLIFuncMapEntry commands[] = {
 XELP cli;
 
 void main(void) {
-    XELPInit(&amp;cli, "My Device v1.0");
+    XelpInit(&amp;cli, "My Device v1.0");
     XELP_SET_FN_OUT(cli, &amp;uart_putc);
     XELP_SET_FN_CLI(cli, commands);
 
     for (;;) {
         if (uart_rx_ready())
-            XELPParseKey(&amp;cli, uart_getc());
+            XelpParseKey(&amp;cli, uart_getc());
     }
 }
 </code></pre>
@@ -203,7 +203,7 @@ make fuzz         # fuzz testing with libFuzzer (requires clang)
 make clean-all    # remove all build artifacts
 </code></pre>
 
-<p>36 test units, 477 test cases, 100% line coverage of <code>xelp.c</code>.</p>
+<p>39 test units, 531 test cases, 100% line coverage of <code>xelp.c</code>.</p>
 
 <h2>Documentation</h2>
 

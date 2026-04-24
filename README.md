@@ -1,4 +1,3 @@
-
 <a href="https://deftio.github.io/xelp/pages/"><img src="https://deftio.github.io/xelp/img/xelp-prompt-med.png" width="30%"></img></a>
 
 ![Version](https://img.shields.io/badge/version-0.3.1-blue.svg)
@@ -11,12 +10,12 @@
 
 # xelp
 
-A tiny command interpreter with scripting support for embedded systems. 
+A tiny extensible command interpreter with scripting support for embedded systems. 
 Add an interactive serial CLI, single-key menus, or scripted command sequences to any microcontroller --
 from an 8-bit ATtiny85 to a 64-bit ARM Cortex-A. Pure C, no malloc, no OS,
-under 5 KB fully featured. 
+under 3-5 KB fully featured depending on archicture. 
 
-Xelp is instance based so it's possible to run distinct copies on different ports and can be run inside interrupts (pending your own functions are safe).
+Xelp is instance based so it's possible to run distinct copies on different ports and it can be run inside interrupts (pending your own functions are safe).
 
 <img src="https://deftio.github.io/xelp/img/xelp-cli-demo.png" width="70%" alt="xelp CLI demo session">
 
@@ -29,9 +28,10 @@ console. xelp replaces that with a proper CLI that:
 - Fits in ~1 KB (key dispatch only) to ~5 KB (full CLI with line editing)
 - Uses zero dynamic memory -- no malloc, no heap, safe for ISRs
 - Supports multiple independent instances -- one per UART, no globals
+- Multiple commands can be saved as strings (scripts) and run from C or from the CLI.
 - Scripts are ROM-able const strings -- the parser never modifies its input (e.g. no strtok style processing)
 - Function dispatch tables make any C/C++ function callable from the CLI
-- Live help listing (optional, compile-time removable) 
+- Live help listing (optional, compile-time removable), commands can have run time assistance
 - CLI commands can be called from C or C functions can be called from the CLI.
 - A cpp wrapper is provided with identical functionality and some syntactic sugar for ease of use (still no memory allocation)
 
@@ -41,8 +41,7 @@ Xelp was first built for some embedded projects in the late 90s (though under di
 
 ## Build Profiles
 
-xelp is modular -- enable only what you need. Three profiles cover most
-use cases.
+xelp is modular -- enable only what you need. Three profiles cover most use cases.
 
 ### KEY only (~1 KB)
 
@@ -51,6 +50,16 @@ ENTER needed. Ideal for debug menus and hardware test jigs.
 
 ```c
 #define XELP_ENABLE_KEY  1
+```
+
+### CLI Lean (~1.4 KB)
+
+Append-only command line with tokenizer, scripting, and command dispatch.
+No line editing, no cursor movement, no help listing. Ideal for the
+most size-constrained targets that still need a CLI.
+
+```c
+#define XELP_ENABLE_CLI  1
 ```
 
 ### CLI (~3-5 KB)
@@ -66,7 +75,7 @@ interactive configuration.
 #define XELP_ENABLE_HELP       1
 ```
 
-### Full (~3-5 KB)
+### Full (~3-6 KB)
 
 Adds THR pass-through mode (~50-125 bytes more) for forwarding all
 keystrokes to another peripheral such as a modem or radio module. This enables 
@@ -79,20 +88,25 @@ the cli to flip in to a mode where one can send raw commands (such AT commands) 
 Every flag is independent -- mix and match. For the full reference see
 [Build Profiles & Configuration Guide](docs/build-profiles.md).
 
-## Quick Start
+## Quick Start (Pure C)
+
+See examples for simpler C++ version.
 
 Add these three files to your project: `xelp.c`, `xelp.h`, `xelpcfg.h`.
 
 ```c
+#include "xelpcfg.h"
 #include "xelp.h"
 
 /* Your output function -- write one char to UART, LCD, etc. */
 void uart_putc(char c) { UART_TX = c; }
+
+/* Your destructive backspace function - customize for your OS */
 void uart_bksp(void)   { uart_putc('\b'); uart_putc(' '); uart_putc('\b'); }
 
 /* Commands -- any C function with this signature */
 XELPRESULT cmd_hello(XELP *ths, const char *args, int len) {
-    XELPOut(ths, "Hello!\n", 0);
+    XelpOut(ths, "Hello!\n", 0);
     return XELP_S_OK;
 }
 
@@ -116,14 +130,14 @@ XELPCLIFuncMapEntry commands[] = {
 XELP cli;
 
 void main(void) {
-    XELPInit(&cli, "My Device v1.0");
+    XelpInit(&cli, "My Device v1.0");
     XELP_SET_FN_OUT(cli, &uart_putc);
     XELP_SET_FN_BKSP(cli, &uart_bksp);
     XELP_SET_FN_CLI(cli, commands);
 
     for (;;) {
         if (uart_rx_ready())
-            XELPParseKey(&cli, uart_getc());
+            XelpParseKey(&cli, uart_getc());
     }
 }
 ```
@@ -147,14 +161,16 @@ The prompt is stored by pointer, not copied. It must be a null-terminated
 string that remains valid for the life of the instance (string literal,
 static, or global -- not a stack buffer that goes out of scope).
 
+Prompts can be global (all instances share a prompt), or per-instance (each peripheral gets its own prompt)
+
 ## Scripting
 
 Anything typed at the CLI can be run as a script. Scripts are const strings
 parsed without modification -- they can live in ROM:
 
 ```c
-const char *startup_script = "hello; led 1";
-XELPParse(&cli, startup_script, XELPStrLen(startup_script));
+const char *startup_script = "hello; led 1";   /* cli functions that are available plus mode switch imperatives are allowed */
+XelpParse(&cli, startup_script, XelpStrLen(startup_script));
 ```
 
 Scripts support semicolons (`;`), newlines, `#` comments, quoted strings
@@ -174,7 +190,7 @@ CLI mode -------> KEY mode -----> THR mode
 - **KEY**: Each keypress triggers a command immediately. For menus.
 - **THR**: All keys pass through to another peripheral. For debugging modems, serial devices.
 
-Mode switch keys are configurable in `xelpcfg.h`.
+Mode switch keys are configurable in `xelpcfg.h`.  If any mode is not enabled then the mode switch skips that mode
 
 ## Building and Testing
 
@@ -187,11 +203,25 @@ make examples       # build all examples (no interactive launch)
 make example        # build and run the posix ncurses demo (interactive)
 make coverage       # tests + coverage summary
 make fuzz           # fuzz testing with libFuzzer (requires clang)
+make funcsizes      # per-function compiled sizes (x86-32, ARM32)
+make sizes          # print compiled sizes for all feature profiles
 make clean          # remove test build artifacts
 make clean-all      # clean tests + all examples
 ```
 
-36 test units, 477 test cases, 100% line coverage of `xelp.c`.
+39 test units, 531 test cases, 100% line coverage of `xelp.c`.
+
+Feature profile sizes: `dev/size_profiles.sh` (uses Docker for ARM Cortex-M0, falls back to host GCC).
+
+### Pre-release (validates + updates size tables)
+
+```bash
+make prerelease     # tests + examples + Docker cross-compile + update README size tables
+```
+
+Runs `make validate`, then `tools/crossbuild.sh` (Docker), then
+`tools/update_sizes.sh` to patch the compiled-size tables in README.md
+and pages/index.html. Does not tag, push, or publish.
 
 ### Full release (includes Docker cross-compilation)
 
@@ -221,7 +251,7 @@ features). Even the largest full build is under 7 KB.
 | ARM Thumb | 32 | arm-none-eabi-gcc | 550 | 2600 | 2650 |
 | Xtensa LX106 (ESP8266) | 32 | xtensa-lx106-elf-gcc | 650 | 2900 | 2950 |
 | Xtensa LX7 (ESP32-S3) | 32 | xtensa-esp-elf-gcc | 650 | 2900 | 2950 |
-| RISC-V (rv32) | 32 | riscv64-unknown-elf-gcc | 700 | 3000 | 3050 |
+| RISC-V (rv32) | 32 | riscv64-linux-elf-gcc | 700 | 3000 | 3050 |
 | m68k | 32 | m68k-linux-gnu-gcc | 750 | 3300 | 3350 |
 | ARM32 | 32 | arm-none-eabi-gcc | 850 | 3800 | 3850 |
 | x86-32 | 32 | GCC | 1000 | 4600 | 4650 |
@@ -248,7 +278,7 @@ xelp compiles on anything with a C89 compiler. To port:
 
 1. Add `xelp.c`, `xelp.h`, `xelpcfg.h` to your build
 2. Write a `void putc(char c)` function for your output hardware
-3. Call `XELP_SET_FN_OUT()` and `XELPParseKey()` -- that's it
+3. Call `XELP_SET_FN_OUT()` and `XelpParseKey()` -- that's it
 
 No assembly. No platform `#ifdefs` (except optional SDCC `__reentrant`).
 See [Porting Guide](docs/porting.md).
@@ -286,7 +316,7 @@ xelp/
   tools/          cross-build scripts, release script, banner generator
   docs/           API reference, configuration guide, porting guide
   pages/          GitHub Pages site
-  dev/            design notes and planning
+  dev/            design notes, planning docs, size profiling tools
   .github/        CI workflows (build, test, fuzz, PlatformIO)
 ```
 

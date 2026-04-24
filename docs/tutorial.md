@@ -21,7 +21,7 @@ void my_bksp(void)   { my_putc('\b'); my_putc(' '); my_putc('\b'); }
 
 /* Your first command */
 XELPRESULT cmd_hello(XELP *ths, const char *args, int len) {
-    XELPOut(ths, "Hello, world!\n", 0);
+    XelpOut(ths, "Hello, world!\n", 0);
     return XELP_S_OK;
 }
 
@@ -34,7 +34,7 @@ XELPCLIFuncMapEntry commands[] = {
 XELP cli;
 
 int main(void) {
-    XELPInit(&cli, "Tutorial v1.0");
+    XelpInit(&cli, "Tutorial v1.0");
     XELP_SET_FN_OUT(cli, &my_putc);
     XELP_SET_FN_BKSP(cli, &my_bksp);
     XELP_SET_FN_CLI(cli, commands);
@@ -42,7 +42,7 @@ int main(void) {
     /* Feed characters from stdin (or UART, BLE, etc.) */
     int c;
     while ((c = getchar()) != EOF)
-        XELPParseKey(&cli, (char)c);
+        XelpParseKey(&cli, (char)c);
     return 0;
 }
 ```
@@ -58,11 +58,11 @@ Type `hello` and press ENTER. You should see `Hello, world!`.
 
 ### What just happened
 
-1. `XELPInit` zeroes all internal state and stores the about message.
+1. `XelpInit` zeroes all internal state and stores the about message.
 2. `XELP_SET_FN_OUT` tells xelp how to emit characters on this platform.
 3. `XELP_SET_FN_BKSP` tells xelp how to handle destructive backspace.
 4. `XELP_SET_FN_CLI` registers your command table.
-5. `XELPParseKey` feeds one character at a time into xelp's state machine.
+5. `XelpParseKey` feeds one character at a time into xelp's state machine.
    When ENTER is received, xelp tokenizes the line and dispatches to the
    matching command function.
 
@@ -83,7 +83,7 @@ XELPRESULT cmd_add(XELP *ths, const char *args, int len) {
     XelpNextInt(&a, &y);
 
     /* Output the result (xelp has no printf -- format manually or
-       use your platform's sprintf into a buffer, then XELPOut) */
+       use your platform's sprintf into a buffer, then XelpOut) */
     /* ... x + y ... */
     return XELP_S_OK;
 }
@@ -120,19 +120,19 @@ XELPRESULT cmd_args(XELP *ths, const char *args, int len) {
     XelpArgCount(&a, &n);            /* n includes the command name */
 
     while (XelpNextTok(&a, &tok) == XELP_S_OK) {
-        XELPOut(ths, tok.s, tok.p - tok.s);
-        XELPOut(ths, "\n", 0);
+        XelpOut(ths, tok.s, tok.p - tok.s);
+        XelpOut(ths, "\n", 0);
     }
     return XELP_S_OK;
 }
 ```
 
-For random access by index (e.g. "get the 3rd argument"), use `XELPTokN`:
+For random access by index (e.g. "get the 3rd argument"), use `XelpTokN`:
 
 ```c
 XelpBuf b, tok;
 XELP_XB_INIT(b, (char*)args, len);  /* cast required: XELP_XB_INIT takes char* */
-XELPTokN(&b, 2, &tok);              /* 0-indexed: token 2 = third token */
+XelpTokN(&b, 2, &tok);              /* 0-indexed: token 2 = third token */
 ```
 
 ## 4. KEY mode -- single keypress actions
@@ -143,13 +143,13 @@ immediately (no ENTER needed):
 ```c
 XELPRESULT key_help(XELP *ths, XELPKEYCODE c) {
     (void)c;
-    return XELPHelp(ths);
+    return XelpHelp(ths);
 }
 
 XELPRESULT key_toggle_led(XELP *ths, XELPKEYCODE c) {
     (void)c;
     /* toggle your LED here */
-    XELPOut(ths, "LED toggled\n", 0);
+    XelpOut(ths, "LED toggled\n", 0);
     return XELP_S_OK;
 }
 
@@ -178,7 +178,7 @@ strings -- they can live in ROM on embedded targets:
 
 ```c
 const char *startup = "hello; add 10 20; echo done";
-XELPParse(&cli, startup, XELPStrLen(startup));
+XelpParse(&cli, startup, XELPStrLen(startup));
 ```
 
 Multi-line scripts work too:
@@ -189,7 +189,7 @@ const char *script =
     "set mode 1\n"
     "set gain 50\n"
     "echo config complete\n";
-XELPParse(&cli, script, XELPStrLen(script));
+XelpParse(&cli, script, XELPStrLen(script));
 ```
 
 ### XelpBuf variant
@@ -199,12 +199,12 @@ For scripts already in an `XelpBuf`:
 ```c
 XelpBuf xb;
 XELP_XB_INIT(xb, script, XELPStrLen(script));
-XELPParseXB(&cli, &xb);
+XelpParseXB(&cli, &xb);
 ```
 
 ## 6. Help system
 
-If `XELP_ENABLE_HELP` is defined in `xelpcfg.h`, calling `XELPHelp(&cli)`
+If `XELP_ENABLE_HELP` is defined in `xelpcfg.h`, calling `XelpHelp(&cli)`
 prints a listing of all registered KEY and CLI commands with their help
 strings. This is why the third field in every command table entry matters:
 
@@ -222,8 +222,8 @@ serial ports:
 XELP debug_cli;
 XELP field_cli;
 
-XELPInit(&debug_cli, "Debug Console");
-XELPInit(&field_cli, "Field Service");
+XelpInit(&debug_cli, "Debug Console");
+XelpInit(&field_cli, "Field Service");
 
 XELP_SET_FN_OUT(debug_cli, &uart0_putc);
 XELP_SET_FN_OUT(field_cli, &uart1_putc);
@@ -246,13 +246,13 @@ xelp supports decimal and hexadecimal:
 int val;
 
 /* Quick conversion (no error checking) */
-val = XELPStr2Int("255", 3);       /* decimal: 255 */
-val = XELPStr2Int("FFh", 3);       /* hex suffix: 255 */
-val = XELPStr2Int("0xFF", 4);      /* hex prefix: 255 */
-val = XELPStr2Int("0x1A", 4);      /* uppercase hex: 26 */
+val = XelpStr2Int("255", 3);       /* decimal: 255 */
+val = XelpStr2Int("FFh", 3);       /* hex suffix: 255 */
+val = XelpStr2Int("0xFF", 4);      /* hex prefix: 255 */
+val = XelpStr2Int("0x1A", 4);      /* uppercase hex: 26 */
 
 /* Safer -- returns XELP_S_OK on success */
-XELPRESULT r = XELPParseNum("0xFF", 4, &val);
+XELPRESULT r = XelpParseNum("0xFF", 4, &val);
 if (XELP_T_OK(r)) {
     /* val == 255 */
 }
@@ -299,11 +299,11 @@ Get notified when the user switches modes:
 ```c
 void on_mode_change(int mode) {
     if (mode == XELP_MODE_CLI)
-        XELPOut(&cli, "[CLI]\n", 0);
+        XelpOut(&cli, "[CLI]\n", 0);
     else if (mode == XELP_MODE_KEY)
-        XELPOut(&cli, "[KEY]\n", 0);
+        XelpOut(&cli, "[KEY]\n", 0);
     else if (mode == XELP_MODE_THR)
-        XELPOut(&cli, "[THR]\n", 0);
+        XelpOut(&cli, "[THR]\n", 0);
 }
 
 XELP_SET_FN_EMCHG(cli, &on_mode_change);
@@ -321,7 +321,7 @@ registers, so read them immediately after dispatch.
 ### Reading R0 after a command
 
 ```c
-XELPParse(&cli, "hello", 5);
+XelpParse(&cli, "hello", 5);
 if (XELP_R0(cli) == XELP_S_OK) {
     /* command succeeded */
 }
@@ -341,7 +341,7 @@ XELPRESULT cmd_divmod(XELP *ths, const char *args, int len) {
 ### Reading results
 
 ```c
-XELPParse(&cli, "divmod 17 5", 11);
+XelpParse(&cli, "divmod 17 5", 11);
 int quot = XELP_R1(cli);   /* 3 */
 int rem  = XELP_R2(cli);   /* 2 */
 ```

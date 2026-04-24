@@ -50,7 +50,7 @@ XELPCLIFuncMapEntry cli_commands[] = {
 XELP cli;
 
 void main(void) {
-    XELPInit(&cli, "My Device v1.0\n");
+    XelpInit(&cli, "My Device v1.0\n");
 
     XELP_SET_FN_OUT(cli, &uart_putc);
     XELP_SET_FN_BKSP(cli, &uart_bksp);
@@ -59,12 +59,12 @@ void main(void) {
     XELP_SET_FN_THR(cli, &thr_passthrough);      /* optional */
     XELP_SET_FN_EMCHG(cli, &on_mode_change);     /* optional */
 
-    XELPHelp(&cli);
-    XELPParseKey(&cli, '\n');   /* show initial prompt */
+    XelpHelp(&cli);
+    XelpParseKey(&cli, '\n');   /* show initial prompt */
 
     for (;;) {
         if (uart_rx_ready())
-            XELPParseKey(&cli, uart_getc());
+            XelpParseKey(&cli, uart_getc());
     }
 }
 ```
@@ -95,8 +95,8 @@ serial ports. Each instance has its own:
 XELP debug_cli;
 XELP field_cli;
 
-XELPInit(&debug_cli, "Debug Console (UART0)");
-XELPInit(&field_cli, "Service Port (UART1)");
+XelpInit(&debug_cli, "Debug Console (UART0)");
+XelpInit(&field_cli, "Service Port (UART1)");
 
 XELP_SET_FN_OUT(debug_cli, &uart0_putc);
 XELP_SET_FN_OUT(field_cli, &uart1_putc);
@@ -109,8 +109,8 @@ XELP_SET_VAL_CLI_PROMPT(field_cli, "svc>");
 
 /* Main loop -- poll both UARTs */
 for (;;) {
-    if (uart0_rx_ready()) XELPParseKey(&debug_cli, uart0_getc());
-    if (uart1_rx_ready()) XELPParseKey(&field_cli, uart1_getc());
+    if (uart0_rx_ready()) XelpParseKey(&debug_cli, uart0_getc());
+    if (uart1_rx_ready()) XelpParseKey(&field_cli, uart1_getc());
 }
 ```
 
@@ -150,7 +150,7 @@ Requires ncurses (`sudo apt-get install libncurses5-dev` on Debian/Ubuntu).
 stdin (ncurses getch)
   |
   v
-XELPParseKey(&example, char)
+XelpParseKey(&example, char)
   |
   +---> CLI mode: line buffer -> tokenize -> dispatch
   +---> KEY mode: immediate dispatch
@@ -173,7 +173,7 @@ void writeChar(char c) { Serial.write(c); }
 
 void setup() {
     Serial.begin(115200);
-    XELPInit(&cli, "xelp Arduino example v1.0\n");
+    XelpInit(&cli, "xelp Arduino example v1.0\n");
     XELP_SET_FN_OUT(cli, &writeChar);
     XELP_SET_FN_CLI(cli, gMyCLICommands);
 }
@@ -181,7 +181,7 @@ void setup() {
 void loop() {
     if (Serial.available() > 0) {
         char c = Serial.read();
-        XELPParseKey(&cli, c);
+        XelpParseKey(&cli, c);
     }
 }
 ```
@@ -222,9 +222,9 @@ APIs (worldtimeapi.org and open-meteo.com). No API keys needed.
 
 **File:** `examples/scripting/scripting-example.c`
 
-Demonstrates the difference between **scripting mode** (`XELPParse` /
-`XELPParseXB` -- execute a buffer of commands at once) and **interactive
-mode** (`XELPParseKey` -- character-by-character terminal input).
+Demonstrates the difference between **scripting mode** (`XelpParse` /
+`XelpParseXB` -- execute a buffer of commands at once) and **interactive
+mode** (`XelpParseKey` -- character-by-character terminal input).
 
 ```bash
 gcc -Wall -Isrc examples/scripting/scripting-example.c src/xelp.c -o scripting-example
@@ -269,7 +269,7 @@ XELPRESULT cmd_set(XELP *ths, const char *args, int len) {
 }
 ```
 
-### Pattern: random-access by index (XELPTokN)
+### Pattern: random-access by index (XelpTokN)
 
 For random access to any token by index:
 
@@ -277,7 +277,7 @@ For random access to any token by index:
 XELPRESULT cmd_get(XELP *ths, const char *args, int len) {
     XelpBuf b, tok;
     XELP_XB_INIT(b, (char*)args, len);  /* cast: XELP_XB_INIT takes char* */
-    XELPTokN(&b, 1, &tok);              /* 0-indexed: token 1 = first arg */
+    XelpTokN(&b, 1, &tok);              /* 0-indexed: token 1 = first arg */
     /* use tok.s .. tok.p */
     return XELP_S_OK;
 }
@@ -285,7 +285,7 @@ XELPRESULT cmd_get(XELP *ths, const char *args, int len) {
 
 ### Pattern: output without printf
 
-xelp has no printf. For string output, use `XELPOut`. For numbers, either
+xelp has no printf. For string output, use `XelpOut`. For numbers, either
 use your platform's `sprintf` into a local buffer, or write a simple
 int-to-string helper:
 
@@ -293,10 +293,10 @@ int-to-string helper:
 void print_int(XELP *x, int val) {
     char buf[12];
     int i = 0;
-    if (val < 0) { XELPOut(x, "-", 1); val = -val; }
-    if (val == 0) { XELPOut(x, "0", 1); return; }
+    if (val < 0) { XelpOut(x, "-", 1); val = -val; }
+    if (val == 0) { XelpOut(x, "0", 1); return; }
     while (val > 0) { buf[i++] = '0' + (val % 10); val /= 10; }
-    while (i > 0) { XELPOut(x, &buf[--i], 1); }
+    while (i > 0) { XelpOut(x, &buf[--i], 1); }
 }
 ```
 

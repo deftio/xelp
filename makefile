@@ -13,7 +13,7 @@ BUILD_DIR=build
 INCLUDES=\
     -I$(LIB_DIR)\
 
-.PHONY: help tests clean clean-all coverage version fuzz fuzz-parsekey fuzz-parse examples example validate funcsizes
+.PHONY: help tests clean clean-all coverage version fuzz fuzz-parsekey fuzz-parse examples example validate prerelease funcsizes sizes
 
 #=======================================================================
 # Default target: print available targets
@@ -21,11 +21,13 @@ help:
 	@echo "xelp build targets:"
 	@echo ""
 	@echo "  make validate     Build + run tests + build examples (pre-push check)"
+	@echo "  make prerelease   Validate + cross-build sizes + update README tables"
 	@echo "  make tests        Build + run unit tests with coverage"
 	@echo "  make examples     Build all examples (no interactive launch)"
 	@echo "  make example      Build + run the posix ncurses demo (interactive)"
 	@echo "  make coverage     Tests + coverage summary"
 	@echo "  make funcsizes    Per-function compiled sizes (x86-32, ARM32)"
+	@echo "  make sizes        Feature profile compiled sizes (ARM + host)"
 	@echo "  make version      Extract and print library version"
 	@echo "  make fuzz         Run fuzz tests (requires clang + libFuzzer)"
 	@echo "  make clean        Remove test build artifacts"
@@ -97,6 +99,20 @@ validate: tests examples
 	@echo "=== Validation passed: tests + examples build clean ==="
 
 #=======================================================================
+# Pre-release: validate + cross-compile sizes + update README tables
+# Requires Docker for the cross-build step.
+
+prerelease: validate
+	@echo ""
+	@echo "--- Cross-compiling all targets (Docker required) ---"
+	bash tools/crossbuild.sh
+	@echo ""
+	@echo "--- Updating size tables in README.md and pages/index.html ---"
+	bash tools/update_sizes.sh
+	@echo ""
+	@echo "=== Pre-release complete: tests passed, sizes updated ==="
+
+#=======================================================================
 # Fuzz testing (requires clang with libFuzzer + ASan + UBSan)
 # Override FUZZ_CC for your system, e.g.: make fuzz FUZZ_CC=clang
 FUZZ_CC ?= /usr/local/opt/llvm/bin/clang
@@ -122,6 +138,11 @@ fuzz: fuzz-parsekey fuzz-parse
 # Per-function compiled sizes (x86-32 and ARM32 if available)
 funcsizes:
 	@bash tools/funcsizes.sh
+
+#=======================================================================
+# Feature profile compiled sizes (ARM Cortex-M0 via Docker + host GCC)
+sizes:
+	@bash dev/size_profiles.sh
 
 #=======================================================================
 # clean -- wipe all build artifacts (src/ stays clean)
