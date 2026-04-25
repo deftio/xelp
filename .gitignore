@@ -58,6 +58,9 @@ xelp-test-log.yaml
 *~
 *.bak
 
+__pycache__
+__pycache__/
+
 # OS generated
 .DS_Store
 Thumbs.db

@@ -31,12 +31,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc-mips64el-linux-gnuabi64 \
     binutils \
     software-properties-common \
+    gputils \
+    python3 \
     && rm -rf /var/lib/apt/lists/*
 
 # gcc-ia16-elf for real-mode 8086/8088 (from community PPA)
-RUN (add-apt-repository -y ppa:tkchia/build-ia16 \
+RUN (apt-get update \
+    && apt-get install -y --no-install-recommends gpg gpg-agent \
+    && add-apt-repository -y ppa:tkchia/build-ia16 \
     && apt-get update \
-    && apt-get install -y --no-install-recommends gcc-ia16-elf \
+    && apt-get install -y gcc-ia16-elf \
     || echo "NOTE: ia16-elf-gcc unavailable; 8086 targets will show unavail") \
     && rm -rf /var/lib/apt/lists/*
 
@@ -44,11 +48,8 @@ RUN (add-apt-repository -y ppa:tkchia/build-ia16 \
 # Not in Ubuntu repos; download prebuilt from Espressif's crosstool-NG releases.
 RUN curl -sL https://github.com/espressif/crosstool-NG/releases/download/esp-15.2.0_20251204/xtensa-esp-elf-15.2.0_20251204-x86_64-linux-gnu.tar.xz \
     | tar -xJ -C /opt \
-    && ln -s /opt/xtensa-esp-elf/bin/xtensa-esp-elf-* /usr/local/bin/
+    && for f in /opt/xtensa-esp-elf/bin/xtensa-esp*; do ln -sf "$f" /usr/local/bin/; done
 
 WORKDIR /xelp
-
-COPY src/ src/
-COPY tools/compactbuilds-docker.sh tools/compactbuilds-docker.sh
 
 CMD ["/bin/bash", "/xelp/tools/compactbuilds-docker.sh"]

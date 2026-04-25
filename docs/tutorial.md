@@ -178,7 +178,7 @@ strings -- they can live in ROM on embedded targets:
 
 ```c
 const char *startup = "hello; add 10 20; echo done";
-XelpParse(&cli, startup, XELPStrLen(startup));
+XelpParse(&cli, startup, XelpStrLen(startup));
 ```
 
 Multi-line scripts work too:
@@ -189,7 +189,7 @@ const char *script =
     "set mode 1\n"
     "set gain 50\n"
     "echo config complete\n";
-XelpParse(&cli, script, XELPStrLen(script));
+XelpParse(&cli, script, XelpStrLen(script));
 ```
 
 ### XelpBuf variant
@@ -198,7 +198,7 @@ For scripts already in an `XelpBuf`:
 
 ```c
 XelpBuf xb;
-XELP_XB_INIT(xb, script, XELPStrLen(script));
+XELP_XB_INIT(xb, script, XelpStrLen(script));
 XelpParseXB(&cli, &xb);
 ```
 

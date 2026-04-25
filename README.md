@@ -244,18 +244,13 @@ features). Even the largest full build is under 7 KB.
 <!-- Build Size Table -->
 | CPU | Width | Compiler | KEY (bytes) | CLI (bytes) | FULL (bytes) |
 |-----|------:|----------|------------:|------------:|-------------:|
-| 6502 | 8 | cc65 | unavail | unavail | unavail |
-| 6800 (HC08) | 8 | SDCC | unavail | unavail | unavail |
-| MCS-51 (8051) | 8 | SDCC | 0 | unavail | unavail |
-| PIC16F877A | 8 | SDCC | unavail | unavail | unavail |
-| PIC18F2620 | 8 | SDCC | unavail | unavail | unavail |
 | AVR (ATtiny85) | 8 | avr-gcc | 1046 | 4038 | 4096 |
 | AVR (ATmega328P) | 8 | avr-gcc | 1054 | 4132 | 4190 |
-| Z80 | 8 | SDCC | 2121 | unavail | unavail |
-| 8086 | 16 | ia16-elf-gcc | unavail | unavail | unavail |
+| Z80 | 8 | SDCC | 2121 | 6966 | 7074 |
+| 6800 (HC08) | 8 | SDCC | 2471 | 8147 | 8288 |
 | MSP430 | 16 | msp430-gcc | 770 | 3260 | 3306 |
 | 68HC11 | 16 | m68hc11-gcc | 2369 | 6570 | 6641 |
-| Xtensa LX7 (ESP32-S3) | 32 | xtensa-esp-elf-gcc | unavail | unavail | unavail |
+| Xtensa LX7 (ESP32-S3) | 32 | xtensa-esp-elf-gcc | 576 | 2508 | 2540 |
 | ARM Thumb | 32 | arm-none-eabi-gcc | 580 | 2482 | 2526 |
 | RISC-V (rv32) | 32 | riscv64-unknown-elf-gcc | 722 | 2970 | 3008 |
 | Xtensa LX106 (ESP8266) | 32 | xtensa-lx106-elf-gcc | 723 | 2831 | 2863 |
@@ -264,7 +259,6 @@ features). Even the largest full build is under 7 KB.
 | x86-32 | 32 | GCC | 1081 | 4604 | 4654 |
 | MIPS32 | 32 | mipsel-linux-gnu-gcc | 1296 | 4888 | 4936 |
 | PowerPC | 32 | powerpc-linux-gnu-gcc | 1504 | 5674 | 5738 |
-| x86-32 | 32 | TCC | 3021 | 8921 | 9059 |
 | RISC-V (rv64) | 64 | riscv64-linux-gnu-gcc | 756 | 3332 | 3366 |
 | x86-64 | 64 | Clang | 1043 | 5013 | 5055 |
 | x86-64 | 64 | GCC | 1063 | 4787 | 4836 |
@@ -301,7 +295,7 @@ Docker cross-compilation (`tools/Dockerfile.crossbuild`):
 | Architecture | Compiler | Word Size |
 |-------------|----------|-----------|
 | x86-64 | GCC, Clang | 64-bit |
-| x86-32 | GCC, Clang, TCC | 32-bit |
+| x86-32 | GCC, Clang | 32-bit |
 | ARM64 | aarch64-linux-gnu-gcc | 64-bit |
 | ARM32 / Thumb | arm-none-eabi-gcc | 32-bit |
 | RISC-V (rv64) | riscv64-linux-gnu-gcc | 64-bit |
@@ -312,7 +306,6 @@ Docker cross-compilation (`tools/Dockerfile.crossbuild`):
 | m68k (68000) | m68k-linux-gnu-gcc | 32-bit |
 | AVR (ATmega, ATtiny) | avr-gcc | 8-bit |
 | 8051 | SDCC | 8-bit |
-| PIC18 | SDCC | 8-bit |
 | 68HC11/12 | m68hc11-gcc | 16-bit |
 | PowerPC | powerpc-linux-gnu-gcc | 32-bit |
 

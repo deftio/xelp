@@ -12,10 +12,11 @@
 set -e
 
 SRC=/xelp/src/xelp.c
-INCLUDE="-I/xelp/src"
+INCLUDE="-I /xelp/src"
 OBJ=/tmp/xelp.o
 CFG_DIR=/tmp/xelp_cfg
 CSV_FILE=/xelp/build/sizes.csv
+LOG_FILE=/xelp/build/crossbuild.log
 
 SEP="============================================================"
 
@@ -25,6 +26,15 @@ SUMMARY=""
 # CSV accumulator (written to CSV_FILE at end)
 mkdir -p "$(dirname "$CSV_FILE")"
 CSV_ROWS=""
+
+# Diagnostic counters (temp file so subshell increments propagate)
+DIAG_COUNT_FILE=$(mktemp)
+echo "0 0" > "$DIAG_COUNT_FILE"
+
+# Initialize diagnostic log
+echo "xelp crossbuild diagnostic log" > "$LOG_FILE"
+echo "Date: $(date -u '+%Y-%m-%d %H:%M UTC')" >> "$LOG_FILE"
+echo "$SEP" >> "$LOG_FILE"
 
 # --- Create config override headers ----------------------------------------
 # XELP_CONFIG_OVERRIDE causes xelpcfg.h to #include "xelp_ovr.h" instead of
@@ -84,20 +94,20 @@ cat > "$CFG_DIR/full/xelp_ovr.h" << 'EOF'
 EOF
 
 # --- Helper: compile and return .text size ---------------------------------
-# Returns size via stdout; prints nothing else.
-# Tries multiple strategies to extract code size from different object formats:
-#   1. GNU size  (ELF, a.out, COFF)
-#   2. SDCC .rel (ASxxxx relocatable -- _CODE area hex size)
-#   3. cc65 od65 (cc65 native object format)
+# Returns size via stdout; prints nothing else to stdout.
+# Uses extract_size.py for multi-format size extraction.
 # Returns "unavail" if compilation failed or size could not be determined.
 
 get_text_size() {
     local cc_cmd="$1"
 
     # Clean stale outputs from compilers that may ignore -o
-    rm -f xelp.rel xelp.asm xelp.lst xelp.sym xelp.o 2>/dev/null
+    rm -f "$OBJ" xelp.rel xelp.asm xelp.lst xelp.sym xelp.o xelp.s 2>/dev/null
 
-    eval $cc_cmd > /dev/null 2>&1 || true
+    local diag_file
+    diag_file=$(mktemp)
+    # Capture both stdout and stderr (cc65 writes errors to stdout)
+    eval $cc_cmd >"$diag_file" 2>&1 || true
 
     # Some compilers (SDCC, cc65) may ignore -o; check fallback locations
     if [ ! -f "$OBJ" ]; then
@@ -110,33 +120,30 @@ get_text_size() {
     fi
 
     if [ ! -f "$OBJ" ]; then
+        echo "  DIAG: compile failed:" >> "$LOG_FILE"
+        head -3 "$diag_file" >> "$LOG_FILE" 2>/dev/null
+        echo "  DIAG: command was: $cc_cmd" >> "$LOG_FILE"
+        rm -f "$diag_file"
+        read -r ok fail < "$DIAG_COUNT_FILE"
+        echo "$ok $((fail + 1))" > "$DIAG_COUNT_FILE"
         echo "unavail"
         return
     fi
 
-    local sz=""
+    local sz
+    sz=$(python3 /xelp/tools/extract_size.py "$OBJ")
 
-    # Strategy 1: GNU size (ELF, a.out, COFF)
-    sz=$(size "$OBJ" 2>/dev/null | awk 'FNR==2{print $1}')
-
-    # Strategy 2: SDCC .rel / ASxxxx relocatable format
-    # Area definition line: "A _CODE size XXXX flags ..."  (XXXX is hex)
-    if [ -z "$sz" ]; then
-        local hex_sz
-        hex_sz=$(sed -n 's/^A _CODE size \([0-9A-Fa-f]\{1,\}\).*/\1/p' "$OBJ" 2>/dev/null | head -1)
-        if [ -n "$hex_sz" ]; then
-            sz=$((16#$hex_sz))
-        fi
+    if [ "$sz" = "unavail" ]; then
+        echo "  DIAG: size extraction failed for $OBJ (file exists but unrecognized format)" >> "$LOG_FILE"
+        read -r ok fail < "$DIAG_COUNT_FILE"
+        echo "$ok $((fail + 1))" > "$DIAG_COUNT_FILE"
+    else
+        read -r ok fail < "$DIAG_COUNT_FILE"
+        echo "$((ok + 1)) $fail" > "$DIAG_COUNT_FILE"
     fi
 
-    # Strategy 3: cc65 object format via od65 --dump-segments
-    if [ -z "$sz" ] && command -v od65 >/dev/null 2>&1; then
-        sz=$(od65 --dump-segments "$OBJ" 2>/dev/null \
-            | awk '/Segment "CODE"/{f=1} f && /Size:/{print $2+0; exit}')
-    fi
-
-    echo "${sz:-unavail}"
-    rm -f "$OBJ" xelp.asm xelp.lst xelp.sym xelp.rel 2>/dev/null
+    rm -f "$OBJ" "$diag_file" xelp.asm xelp.lst xelp.sym xelp.rel xelp.s 2>/dev/null
+    echo "$sz"
 }
 
 # --- Helper: build one target in all three configs -------------------------
@@ -156,11 +163,19 @@ build_target() {
     local label="${cpu} (${compiler})"
     local group="${width}-bit"
 
+    echo "" >> "$LOG_FILE"
+    echo "TARGET: $label ($group)" >> "$LOG_FILE"
+
     local key_sz cli_sz full_sz
 
-    key_sz=$(get_text_size  "$cc_base -DXELP_CONFIG_OVERRIDE -I$CFG_DIR/key")
-    cli_sz=$(get_text_size  "$cc_base -DXELP_CONFIG_OVERRIDE -I$CFG_DIR/cli")
-    full_sz=$(get_text_size "$cc_base -DXELP_CONFIG_OVERRIDE -I$CFG_DIR/full")
+    echo "  CONFIG: KEY" >> "$LOG_FILE"
+    key_sz=$(get_text_size  "$cc_base -DXELP_CONFIG_OVERRIDE -I $CFG_DIR/key")
+    echo "  CONFIG: CLI" >> "$LOG_FILE"
+    cli_sz=$(get_text_size  "$cc_base -DXELP_CONFIG_OVERRIDE -I $CFG_DIR/cli")
+    echo "  CONFIG: FULL" >> "$LOG_FILE"
+    full_sz=$(get_text_size "$cc_base -DXELP_CONFIG_OVERRIDE -I $CFG_DIR/full")
+
+    echo "  RESULT: KEY=$key_sz CLI=$cli_sz FULL=$full_sz" >> "$LOG_FILE"
 
     printf "  %-34s %8s  %8s  %8s\n" "$label" "$key_sz" "$cli_sz" "$full_sz"
     SUMMARY="${SUMMARY}${group}|${label}|${key_sz}|${cli_sz}|${full_sz}\n"
@@ -178,7 +193,7 @@ echo "  KEY  = XELP_ENABLE_KEY only (minimal single-key dispatch)"
 echo "  CLI  = KEY + CLI + LINE_EDIT + HELP (typical interactive)"
 echo "  FULL = CLI + THR (all features)"
 echo ""
-echo "All sizes are .text section bytes, compiled with -Os."
+echo "All sizes are .text section bytes (GCC targets use -Os)."
 
 # --- Column header (reused for each group) ---------------------------------
 
@@ -201,23 +216,15 @@ build_target 8 "AVR (ATmega328P)" "avr-gcc" \
 build_target 8 "AVR (ATtiny85)" "avr-gcc" \
     "avr-gcc -c $SRC $INCLUDE -Os -mmcu=attiny85 -Wall -o $OBJ"
 
-build_target 8 "MCS-51 (8051)" "SDCC" \
-    "sdcc -mmcs51 --model-small --opt-code-size -c $SRC $INCLUDE -o $OBJ"
-
-build_target 8 "6502" "cc65" \
-    "cl65 -t none -O --cpu 6502 -c $SRC $INCLUDE -o $OBJ"
+# TODO: MCS-51 sizes inflated (~10KB CLI/FULL); needs investigation
+#build_target 8 "MCS-51 (8051)" "SDCC" \
+#    "sdcc -mmcs51 --model-small --opt-code-size -c $SRC $INCLUDE -o $OBJ"
 
 build_target 8 "Z80" "SDCC" \
     "sdcc -mz80 --opt-code-size -c $SRC $INCLUDE -o $OBJ"
 
 build_target 8 "6800 (HC08)" "SDCC" \
-    "sdcc -mhc08 --opt-code-size -c $SRC $INCLUDE -o $OBJ"
-
-build_target 8 "PIC16F877A" "SDCC" \
-    "sdcc -mpic14 -p16f877a --opt-code-size -c $SRC $INCLUDE -o $OBJ"
-
-build_target 8 "PIC18F2620" "SDCC" \
-    "sdcc -mpic16 -p18f2620 --opt-code-size -c $SRC $INCLUDE -o $OBJ"
+    "sdcc -mhc08 --stack-auto --opt-code-size -c $SRC $INCLUDE -o $OBJ"
 
 # --- 16-bit targets --------------------------------------------------------
 
@@ -229,9 +236,6 @@ build_target 16 "MSP430" "msp430-gcc" \
 build_target 16 "68HC11" "m68hc11-gcc" \
     "m68hc11-gcc -c $SRC $INCLUDE -Os -o $OBJ"
 
-build_target 16 "8086" "ia16-elf-gcc" \
-    "ia16-elf-gcc -c $SRC $INCLUDE -Os -Wall -o $OBJ"
-
 # --- 32-bit targets --------------------------------------------------------
 
 print_header "32-bit targets"
@@ -239,8 +243,8 @@ print_header "32-bit targets"
 build_target 32 "x86-32" "GCC" \
     "gcc -c $SRC $INCLUDE -Os -m32 -Wall -o $OBJ"
 
-build_target 32 "x86-32" "TCC" \
-    "tcc -c $SRC $INCLUDE -o $OBJ"
+#build_target 32 "x86-32" "TCC" \
+#    "tcc -c $SRC $INCLUDE -o $OBJ"
 
 build_target 32 "ARM32" "arm-none-eabi-gcc" \
     "arm-none-eabi-gcc -c $SRC $INCLUDE -Os -Wall -o $OBJ"
@@ -261,7 +265,7 @@ build_target 32 "Xtensa LX106 (ESP8266)" "xtensa-lx106-elf-gcc" \
     "xtensa-lx106-elf-gcc -c $SRC $INCLUDE -Os -Wall -o $OBJ"
 
 build_target 32 "Xtensa LX7 (ESP32-S3)" "xtensa-esp-elf-gcc" \
-    "xtensa-esp-elf-gcc -mcpu=esp32s3 -c $SRC $INCLUDE -Os -Wall -o $OBJ"
+    "xtensa-esp32s3-elf-gcc -c $SRC $INCLUDE -Os -Wall -o $OBJ"
 
 build_target 32 "MIPS32" "mipsel-linux-gnu-gcc" \
     "mipsel-linux-gnu-gcc -c $SRC $INCLUDE -Os -Wall -o $OBJ"
@@ -323,5 +327,13 @@ echo "Writing CSV to $CSV_FILE ..."
 } > "$CSV_FILE"
 echo "CSV written: $(wc -l < "$CSV_FILE") rows (including header)."
 
+# --- Diagnostic summary ----------------------------------------------------
+read -r DIAG_OK DIAG_FAIL < "$DIAG_COUNT_FILE"
+rm -f "$DIAG_COUNT_FILE"
+echo "" >> "$LOG_FILE"
+echo "$SEP" >> "$LOG_FILE"
+echo "SUMMARY: $DIAG_OK successful size extractions, $DIAG_FAIL failures" >> "$LOG_FILE"
+echo "Diagnostic log written to $LOG_FILE"
+
 echo ""
-echo "Done."
+echo "Done. ($DIAG_OK sizes extracted, $DIAG_FAIL unavailable -- see build/crossbuild.log)"

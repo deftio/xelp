@@ -21,7 +21,7 @@ ENTER, no prompt, no line buffer. Good for:
 
 - Debug menus ("press L to toggle LED")
 - Hardware test jigs
-- Minimal footprint on tiny targets (ATtiny85, PIC18, 8051)
+- Minimal footprint on tiny targets (ATtiny85, 8051)
 
 ```c
 /* xelpcfg.h */

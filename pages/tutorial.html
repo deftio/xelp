@@ -41,7 +41,7 @@ void my_bksp(void)   { my_putc('\b'); my_putc(' '); my_putc('\b'); }
 
 /* Your first command */
 XELPRESULT cmd_hello(XELP *ths, const char *args, int len) {
-    XELPOut(ths, "Hello, world!\n", 0);
+    XelpOut(ths, "Hello, world!\n", 0);
     return XELP_S_OK;
 }
 
@@ -54,14 +54,14 @@ XELPCLIFuncMapEntry commands[] = {
 XELP cli;
 
 int main(void) {
-    XELPInit(&amp;cli, "Tutorial v1.0");
+    XelpInit(&amp;cli, "Tutorial v1.0");
     XELP_SET_FN_OUT(cli, &amp;my_putc);
     XELP_SET_FN_BKSP(cli, &amp;my_bksp);
     XELP_SET_FN_CLI(cli, commands);
 
     int c;
     while ((c = getchar()) != EOF)
-        XELPParseKey(&amp;cli, (char)c);
+        XelpParseKey(&amp;cli, (char)c);
     return 0;
 }
 </code></pre>
@@ -71,11 +71,11 @@ int main(void) {
 <h3>What just happened</h3>
 
 <ol>
-  <li><code>XELPInit</code> zeroes all internal state and stores the about message.</li>
+  <li><code>XelpInit</code> zeroes all internal state and stores the about message.</li>
   <li><code>XELP_SET_FN_OUT</code> tells xelp how to emit characters on this platform.</li>
   <li><code>XELP_SET_FN_BKSP</code> tells xelp how to handle destructive backspace.</li>
   <li><code>XELP_SET_FN_CLI</code> registers your command table.</li>
-  <li><code>XELPParseKey</code> feeds one character at a time. When ENTER is received,
+  <li><code>XelpParseKey</code> feeds one character at a time. When ENTER is received,
       xelp tokenizes the line and dispatches to the matching command.</li>
 </ol>
 
@@ -92,12 +92,12 @@ tokenizer to extract individual arguments:</p>
 
     /* Token 0 = command name ("add"), 1 = first arg, 2 = second arg */
     XELP_XB_TOP(b);
-    XELPTokN(&amp;b, 1, &amp;tok);
-    a = XELPStr2Int(tok.s, tok.p - tok.s);
+    XelpTokN(&amp;b, 1, &amp;tok);
+    a = XelpStr2Int(tok.s, tok.p - tok.s);
 
     XELP_XB_TOP(b);
-    XELPTokN(&amp;b, 2, &amp;tok);
-    result = a + XELPStr2Int(tok.s, tok.p - tok.s);
+    XelpTokN(&amp;b, 2, &amp;tok);
+    result = a + XelpStr2Int(tok.s, tok.p - tok.s);
 
     /* result now holds the sum */
     return XELP_S_OK;
@@ -127,13 +127,13 @@ tokenizer to extract individual arguments:</p>
     int n, i;
 
     XELP_XB_INIT(b, args, len);
-    XELPNumToks(&amp;b, &amp;n);
+    XelpNumToks(&amp;b, &amp;n);
 
     for (i = 0; i &lt; n; i++) {
         XELP_XB_TOP(b);
-        XELPTokN(&amp;b, i, &amp;tok);
-        XELPOut(ths, tok.s, tok.p - tok.s);
-        XELPOut(ths, "\n", 0);
+        XelpTokN(&amp;b, i, &amp;tok);
+        XelpOut(ths, tok.s, tok.p - tok.s);
+        XelpOut(ths, "\n", 0);
     }
     return XELP_S_OK;
 }
@@ -147,7 +147,7 @@ menus and quick toggles:</p>
 <pre><code>XELPRESULT key_toggle_led(XELP *ths, XELPKEYCODE c) {
     (void)c;
     /* toggle your LED here */
-    XELPOut(ths, "LED toggled\n", 0);
+    XelpOut(ths, "LED toggled\n", 0);
     return XELP_S_OK;
 }
 
@@ -179,7 +179,7 @@ XELP_SET_FN_KEY(cli, key_commands);
 they can live in ROM:</p>
 
 <pre><code>const char *startup = "hello; add 10 20; echo done";
-XELPParse(&amp;cli, startup, XELPStrLen(startup));
+XelpParse(&amp;cli, startup, XelpStrLen(startup));
 </code></pre>
 
 <p>Multi-line scripts:</p>
@@ -189,12 +189,12 @@ XELPParse(&amp;cli, startup, XELPStrLen(startup));
     "set mode 1\n"
     "set gain 50\n"
     "echo config complete\n";
-XELPParse(&amp;cli, script, XELPStrLen(script));
+XelpParse(&amp;cli, script, XelpStrLen(script));
 </code></pre>
 
 <h2>6. Help system</h2>
 
-<p>With <code>XELP_ENABLE_HELP</code> defined, <code>XELPHelp(&amp;cli)</code>
+<p>With <code>XELP_ENABLE_HELP</code> defined, <code>XelpHelp(&amp;cli)</code>
 prints all registered KEY and CLI commands. The third field in every command
 table entry is the help text:</p>
 
@@ -208,8 +208,8 @@ table entry is the help text:</p>
 
 <pre><code>XELP debug_cli, field_cli;
 
-XELPInit(&amp;debug_cli, "Debug Console");
-XELPInit(&amp;field_cli, "Field Service");
+XelpInit(&amp;debug_cli, "Debug Console");
+XelpInit(&amp;field_cli, "Field Service");
 
 XELP_SET_FN_OUT(debug_cli, &amp;uart0_putc);
 XELP_SET_FN_OUT(field_cli, &amp;uart1_putc);
@@ -225,13 +225,13 @@ XELP_SET_VAL_CLI_PROMPT(field_cli, "svc&gt;");
 <p>Decimal, hex with <code>0x</code> prefix, and hex with <code>h</code> suffix:</p>
 
 <pre><code>int val;
-val = XELPStr2Int("255", 3);     /* 255 decimal       */
-val = XELPStr2Int("FFh", 3);     /* 255 hex suffix    */
-val = XELPStr2Int("0xFF", 4);    /* 255 hex prefix    */
-val = XELPStr2Int("0x1A", 4);    /* 26  uppercase hex */
+val = XelpStr2Int("255", 3);     /* 255 decimal       */
+val = XelpStr2Int("FFh", 3);     /* 255 hex suffix    */
+val = XelpStr2Int("0xFF", 4);    /* 255 hex prefix    */
+val = XelpStr2Int("0x1A", 4);    /* 26  uppercase hex */
 
 /* Safer variant with error checking */
-XELPRESULT r = XELPParseNum("0xFF", 4, &amp;val);
+XELPRESULT r = XelpParseNum("0xFF", 4, &amp;val);
 if (XELP_T_OK(r)) { /* val == 255 */ }
 </code></pre>
 
@@ -250,9 +250,9 @@ XELP_SET_FN_THR(cli, &amp;modem_send);
 <h2>10. Mode change callback</h2>
 
 <pre><code>void on_mode_change(int mode) {
-    if      (mode == XELP_MODE_CLI) XELPOut(&amp;cli, "[CLI]\n", 0);
-    else if (mode == XELP_MODE_KEY) XELPOut(&amp;cli, "[KEY]\n", 0);
-    else if (mode == XELP_MODE_THR) XELPOut(&amp;cli, "[THR]\n", 0);
+    if      (mode == XELP_MODE_CLI) XelpOut(&amp;cli, "[CLI]\n", 0);
+    else if (mode == XELP_MODE_KEY) XelpOut(&amp;cli, "[KEY]\n", 0);
+    else if (mode == XELP_MODE_THR) XelpOut(&amp;cli, "[THR]\n", 0);
 }
 
 XELP_SET_FN_EMCHG(cli, &amp;on_mode_change);

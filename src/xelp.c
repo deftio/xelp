@@ -669,7 +669,7 @@ XELPRESULT XelpNumToks (XelpBuf *b, int *n)
         (*n)++;
 
     return XELP_S_OK;
-};
+}
 
 /********************************************************
  XelpArgs -- sequential argument iterator.

@@ -62,8 +62,8 @@ Version 0.3.1.</p>
 
 <h2>Initialization</h2>
 
-<h3><code>XELPInit</code></h3>
-<pre><code>XELPRESULT XELPInit(XELP *ths, const char *pAboutMsg);
+<h3><code>XelpInit</code></h3>
+<pre><code>XELPRESULT XelpInit(XELP *ths, const char *pAboutMsg);
 </code></pre>
 <p>Initialize an XELP instance. Must be called before any other function.
 <code>pAboutMsg</code> is displayed at the start of help output.</p>
@@ -87,87 +87,87 @@ Version 0.3.1.</p>
 
 <h2>Core functions</h2>
 
-<h3><code>XELPParseKey</code></h3>
-<pre><code>XELPRESULT XELPParseKey(XELP *ths, char key);
+<h3><code>XelpParseKey</code></h3>
+<pre><code>XELPRESULT XelpParseKey(XELP *ths, char key);
 </code></pre>
 <p>Feed a single character from the input stream. This is the main entry
 point for interactive use. Call this for every character received from
 UART, keyboard, BLE, etc.</p>
 
-<h3><code>XELPParse</code></h3>
-<pre><code>XELPRESULT XELPParse(XELP *ths, const char *buf, int blen);
+<h3><code>XelpParse</code></h3>
+<pre><code>XELPRESULT XelpParse(XELP *ths, const char *buf, int blen);
 </code></pre>
 <p>Parse and execute a command string. Used for scripting &mdash; pass a
 complete command or multi-statement script.</p>
 
-<h3><code>XELPParseXB</code></h3>
-<pre><code>XELPRESULT XELPParseXB(XELP *ths, XelpBuf *script);
+<h3><code>XelpParseXB</code></h3>
+<pre><code>XELPRESULT XelpParseXB(XELP *ths, XelpBuf *script);
 </code></pre>
-<p>Same as <code>XELPParse</code> but takes a <code>XelpBuf</code>.</p>
+<p>Same as <code>XelpParse</code> but takes a <code>XelpBuf</code>.</p>
 
-<h3><code>XELPExecKC</code></h3>
-<pre><code>XELPRESULT XELPExecKC(XELP *ths, char key);
+<h3><code>XelpExecKC</code></h3>
+<pre><code>XELPRESULT XelpExecKC(XELP *ths, char key);
 </code></pre>
 <p>Execute a single-key command directly (bypasses mode checking).</p>
 
-<h3><code>XELPOut</code></h3>
-<pre><code>XELPRESULT XELPOut(XELP *ths, const char *msg, int maxlen);
+<h3><code>XelpOut</code></h3>
+<pre><code>XELPRESULT XelpOut(XELP *ths, const char *msg, int maxlen);
 </code></pre>
 <p>Output a string through the instance&rsquo;s output function. If
 <code>maxlen &gt; 0</code>, prints exactly that many characters. If
 <code>maxlen == 0</code>, prints until null terminator.</p>
 
-<h3><code>XELPHelp</code></h3>
-<pre><code>XELPRESULT XELPHelp(XELP *ths);
+<h3><code>XelpHelp</code></h3>
+<pre><code>XELPRESULT XelpHelp(XELP *ths);
 </code></pre>
 <p>Print help listing all registered KEY and CLI commands. Only available
 when <code>XELP_ENABLE_HELP</code> is defined.</p>
 
 <h2>Tokenizer</h2>
 
-<h3><code>XELPTokLineXB</code></h3>
-<pre><code>XELPRESULT XELPTokLineXB(XelpBuf *buf, XelpBuf *tok, int srchType);
+<h3><code>XelpTokLineXB</code></h3>
+<pre><code>XELPRESULT XelpTokLineXB(XelpBuf *buf, XelpBuf *tok, int srchType);
 </code></pre>
 <p>Get the next token or line from a buffer. <code>srchType</code> is
 <code>XELP_TOK_ONLY</code> (token) or <code>XELP_TOK_LINE</code> (full line).</p>
 
-<h3><code>XELPTokN</code></h3>
-<pre><code>XELPRESULT XELPTokN(XelpBuf *buf, int n, XelpBuf *tok);
+<h3><code>XelpTokN</code></h3>
+<pre><code>XELPRESULT XelpTokN(XelpBuf *buf, int n, XelpBuf *tok);
 </code></pre>
 <p>Get the Nth token (0-indexed) from a buffer.</p>
 
-<h3><code>XELPNumToks</code></h3>
-<pre><code>XELPRESULT XELPNumToks(XelpBuf *buf, int *n);
+<h3><code>XelpNumToks</code></h3>
+<pre><code>XELPRESULT XelpNumToks(XelpBuf *buf, int *n);
 </code></pre>
 <p>Count the number of tokens in a buffer.</p>
 
 <h2>String utilities</h2>
 
-<h3><code>XELPStrLen</code></h3>
-<pre><code>int XELPStrLen(const char *c);
+<h3><code>XelpStrLen</code></h3>
+<pre><code>int XelpStrLen(const char *c);
 </code></pre>
 <p>Compute length of a null-terminated string. No stdlib dependency.</p>
 
-<h3><code>XELPStrEq</code></h3>
-<pre><code>XELPRESULT XELPStrEq(const char *pbuf, int blen, const char *cmd);
+<h3><code>XelpStrEq</code></h3>
+<pre><code>XELPRESULT XelpStrEq(const char *pbuf, int blen, const char *cmd);
 </code></pre>
 <p>Compare a buffer of length <code>blen</code> against a null-terminated
 string <code>cmd</code>. Returns <code>XELP_S_OK</code> if equal.</p>
 
-<h3><code>XELPStr2Int</code></h3>
-<pre><code>int XELPStr2Int(const char *s, int maxlen);
+<h3><code>XelpStr2Int</code></h3>
+<pre><code>int XelpStr2Int(const char *s, int maxlen);
 </code></pre>
 <p>Parse a string to integer. Accepts decimal and hex (<code>FFh</code> suffix
 or <code>0xFF</code> prefix).</p>
 
-<h3><code>XELPParseNum</code></h3>
-<pre><code>XELPRESULT XELPParseNum(const char *s, int maxlen, int *n);
+<h3><code>XelpParseNum</code></h3>
+<pre><code>XELPRESULT XelpParseNum(const char *s, int maxlen, int *n);
 </code></pre>
 <p>Safer string-to-integer: returns a result code and writes the parsed
 value to <code>*n</code>.</p>
 
-<h3><code>XELPBufCmp</code></h3>
-<pre><code>XELPRESULT XELPBufCmp(const char *as, const char *ae,
+<h3><code>XelpBufCmp</code></h3>
+<pre><code>XELPRESULT XelpBufCmp(const char *as, const char *ae,
                       const char *bs, const char *be, int cmpType);
 </code></pre>
 <p>Compare two buffers. <code>cmpType</code> controls null-terminator handling:</p>

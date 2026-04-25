@@ -28,13 +28,13 @@ XELP_SET_FN_OUT(myXelp, &uart_putc);
 
 ## Required: Character Feeding
 
-Feed received characters one at a time via `XELPParseKey`:
+Feed received characters one at a time via `XelpParseKey`:
 
 ```c
 /* In your UART ISR or main loop */
 void UART_RX_ISR(void) {
     char c = UART_RX_REG;
-    XELPParseKey(&myXelp, c);
+    XelpParseKey(&myXelp, c);
 }
 ```
 
@@ -103,24 +103,16 @@ Watch `int` size (16-bit on MSP430). If you need 32-bit registers, override
 #define XELPREG long
 ```
 
-### 6502 (cc65)
-
-```
-cc65 -t none -Os xelp.c
-```
-
-Extremely constrained. Use KEY-only mode to minimize footprint.
-
 ## Cross-Compilation Test
 
 The `tools/compactbuilds-docker.sh` script compiles xelp with various
 cross-toolchains inside Docker and reports code sizes in three
 configurations (KEY-only, CLI, FULL) grouped by word size. Run via
-Docker:
+the crossbuild wrapper:
 
 ```bash
-docker build -f tools/Dockerfile.crossbuild -t xelp-crossbuild .
-docker run --rm xelp-crossbuild
+bash tools/crossbuild.sh            # builds Docker image (first time) and runs
+bash tools/crossbuild.sh --build    # force rebuild the Docker image
 ```
 
 ## Minimal Example
@@ -134,26 +126,26 @@ void my_bksp(void)   { /* ... */ }
 
 /* Commands */
 XELPRESULT cmd_hello(XELP *ths, const char *args, int len) {
-    XELPOut(ths, "Hello!\n", 0);
+    XelpOut(ths, "Hello!\n", 0);
     return XELP_S_OK;
 }
 
 XELPCLIFuncMapEntry cmds[] = {
     {&cmd_hello, "hello", "say hello"},
-    {0, 0, 0}
+    XELP_FUNC_ENTRY_LAST
 };
 
 XELP x;
 
 void main(void) {
-    XELPInit(&x, "My Device v1.0");
+    XelpInit(&x, "My Device v1.0");
     XELP_SET_FN_OUT(x, &my_putc);
     XELP_SET_FN_BKSP(x, &my_bksp);
     XELP_SET_FN_CLI(x, cmds);
 
     for (;;) {
         if (char_available())
-            XELPParseKey(&x, get_char());
+            XelpParseKey(&x, get_char());
     }
 }
 ```

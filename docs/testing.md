@@ -144,10 +144,10 @@ page renders it in a browser.
 XELPRESULT test_MyFeature() {
     /* setup */
     XELP x;
-    XELPInit(&x, "MyFeature");
+    XelpInit(&x, "MyFeature");
 
     /* test cases */
-    JB_ASSERT_EQ_RET(XELPStrLen("hi"), 2, "strlen hi", XELP_E_ERR);
+    JB_ASSERT_EQ_RET(XelpStrLen("hi"), 2, "strlen hi", XELP_E_ERR);
 
     return XELP_S_OK;
 }
