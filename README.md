@@ -223,17 +223,18 @@ Runs `make validate`, then `tools/crossbuild.sh` (Docker), then
 `tools/update_sizes.sh` to patch the compiled-size tables in README.md
 and pages/index.html. Does not tag, push, or publish.
 
-### Full release (includes Docker cross-compilation)
+### Full release
 
 ```bash
-bash tools/crossbuild.sh           # Docker cross-compile for all targets -> build/sizes.csv
-bash tools/make_release.sh         # guided release pipeline (uses sizes.csv if present)
+bash tools/make_release.sh             # full guided release (includes Docker cross-build)
 bash tools/make_release.sh --validate  # local validation only (no git, no push)
 ```
 
-The cross-build step is expensive (~minutes, requires Docker) and only needed
-when updating the compiled-size tables. Day-to-day development uses
-`make validate` which takes seconds.
+The release script handles everything end-to-end: validation (tests +
+examples), manifest sync, badge update, Docker cross-compilation, size
+table update, push, PR, CI, merge, tag, and publish. The Docker
+cross-build step is skipped if Docker is not installed. Day-to-day
+development uses `make validate` which takes seconds.
 
 ## Compiled Sizes
 

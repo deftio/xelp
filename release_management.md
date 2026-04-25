@@ -53,18 +53,18 @@ Runs `make validate`, then `tools/crossbuild.sh` (Docker), then
 `tools/update_sizes.sh` to patch the compiled-size tables in README.md
 and pages/index.html. Does not tag, push, or publish.
 
-### Full release (includes Docker cross-compilation)
+### Full release
 
 | Command | Purpose |
 | --- | --- |
-| `bash tools/crossbuild.sh` | Docker cross-compile all targets, writes `build/sizes.csv` |
-| `bash tools/make_release.sh` | Full guided release pipeline |
+| `bash tools/make_release.sh` | Full guided release pipeline (includes Docker cross-build) |
 | `bash tools/make_release.sh --validate` | Local validation only (no git, no push) |
 | `bash tools/make_release.sh --release-local` | Full flow, creates GH release locally (fallback) |
+| `bash tools/crossbuild.sh` | Docker cross-compile only (standalone, writes `build/sizes.csv`) |
 
-The cross-build step is expensive (~minutes, requires Docker) and only
-needed when updating the compiled-size tables for a release. Day-to-day
-development uses `make validate` which takes seconds.
+The cross-build step is expensive (~minutes, requires Docker). It runs
+automatically during `make_release.sh` but can be skipped if Docker is
+unavailable. Day-to-day development uses `make validate` which takes seconds.
 
 ## Development Workflow
 
@@ -80,23 +80,19 @@ make coverage                   # check coverage didn't drop
 1. Bump `XELP_VERSION` in `src/xelp.h`
 2. Update `CHANGELOG.md` with release notes
 3. Commit on your working branch
-4. (Optional) Run Docker cross-build to update size tables:
-   ```bash
-   bash tools/crossbuild.sh      # writes build/sizes.csv
-   ```
-5. Run the guided release script:
+4. Run the guided release script:
    ```bash
    bash tools/make_release.sh
    ```
 
-The script walks through every step: extract version, validate build,
-sync manifests, update badges, update size tables (if `build/sizes.csv`
-exists), push branch, open PR, wait for CI, merge, tag, and wait for
-the GitHub Release. It pauses for confirmation before anything that
-affects the remote.
+The script handles everything end-to-end: extract version, validate
+(tests + examples + warnings + coverage), sync manifests, update
+badges, Docker cross-compilation, size table update, push branch,
+open PR, wait for CI, merge, tag, and wait for the GitHub Release.
+It pauses for confirmation before anything that affects the remote.
 
-If `build/sizes.csv` is not present the script skips the size-table
-update and uses whatever tables are already in the docs.
+If Docker is not installed, the cross-build step is skipped and
+existing size tables are preserved.
 
 For local validation only (no git, no PR):
 
@@ -151,21 +147,22 @@ Runs automatically when a version tag (`v*`) is pushed:
 This means the release flow is:
 
 ```bash
-bash tools/make_release.sh --tag   # creates + pushes tag
+bash tools/make_release.sh               # full guided release (includes tag + push)
 # GitHub Actions takes over: validates, creates release
 ```
 
-Or for full local control:
+Or for full local control (if GitHub Actions is unavailable):
 
 ```bash
-bash tools/make_release.sh --release   # creates tag + release via gh CLI
+bash tools/make_release.sh --release-local   # creates tag + release via gh CLI
 ```
 
 ## Cross-Compilation
 
 ```bash
-bash tools/crossbuild.sh        # Docker-based, all targets
-bash tools/compactbuilds.sh     # host-native (requires toolchains)
+bash tools/crossbuild.sh                    # Docker-based, all targets -> build/sizes.csv
+bash tools/crossbuild.sh --build            # force rebuild the Docker image
 ```
 
+The cross-build is also run automatically as part of `make_release.sh`.
 See `tools/README_TOOLS.md` for details.

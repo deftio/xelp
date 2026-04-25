@@ -175,20 +175,30 @@ do_update_badges() {
 }
 
 # -----------------------------------------------------------------------
-# Step 1d: Update compiled-size tables (if CSV available)
+# Step 1d: Cross-compile all targets (Docker) and update size tables
 # -----------------------------------------------------------------------
 
-do_update_sizes() {
-    step_header "Update compiled-size tables"
+do_crossbuild() {
+    step_header "Cross-compile all targets (Docker)"
+
+    if ! command -v docker &>/dev/null; then
+        echo "  Docker not found -- skipping cross-compilation."
+        echo "  Size tables will use existing data."
+        return 0
+    fi
+
+    confirm "Run Docker cross-build? (takes a few minutes)"
+    run_cmd bash tools/crossbuild.sh
+    pass "Cross-compilation complete."
 
     if [ -f build/sizes.csv ]; then
-        echo "  Found build/sizes.csv -- updating size tables..."
+        echo ""
+        echo "  --- Updating size tables in README.md and pages/index.html ---"
         run_cmd bash tools/update_sizes.sh
         git add README.md pages/index.html
         pass "Size tables updated from build/sizes.csv."
     else
-        echo "  build/sizes.csv not found (run 'bash tools/crossbuild.sh' to generate)."
-        echo "  Skipping size table update -- existing tables will be used."
+        echo "  WARNING: build/sizes.csv not produced."
     fi
 }
 
@@ -197,18 +207,21 @@ do_update_sizes() {
 # -----------------------------------------------------------------------
 
 do_validate() {
-    step_header "Local validation (build, tests, warnings, coverage)"
+    step_header "Local validation (tests, examples, warnings, coverage)"
 
-    echo "  --- Clean build + tests ---"
+    echo "  --- Clean build + tests + examples ---"
+    local build_log warnings
     run_cmd make clean >/dev/null 2>&1
-    run_cmd make tests 2>&1
-    pass "All tests passed."
+    echo "  \$ make validate  (tests + examples, capturing for warning scan)"
+    build_log=$(make validate 2>&1) || {
+        echo "$build_log"
+        fail "make validate failed."
+    }
+    echo "$build_log" | tail -5
+    pass "Tests passed, all examples built."
 
     echo ""
     echo "  --- Zero-warning check ---"
-    local build_log warnings
-    echo "  \$ make clean && make tests  (capturing output for warning scan)"
-    build_log=$(make clean 2>&1 && make tests 2>&1)
     warnings=$(echo "$build_log" | grep -E "^[^:]+\.(c|h):[0-9]+:[0-9]+: warning:" || true)
     if [ -n "$warnings" ]; then
         echo "$warnings" >&2
@@ -526,8 +539,8 @@ do_verify_master() {
     step_header "Verify build on master"
 
     run_cmd make clean >/dev/null 2>&1
-    run_cmd make tests 2>&1
-    pass "All tests pass on master."
+    run_cmd make validate 2>&1
+    pass "All tests and examples pass on master."
 }
 
 # -----------------------------------------------------------------------
@@ -727,12 +740,12 @@ fi
 do_check_git
 do_sync_manifests
 do_update_badges
-do_update_sizes
+do_crossbuild
 
 # Auto-commit manifest, badge, and size-table updates (if any files were staged)
 if [ -n "$(git diff --cached --name-only)" ]; then
-    step_header "Commit manifest and badge updates"
-    run_cmd git commit -m "Sync manifests and badges for $VER_STRING"
+    step_header "Commit manifest, badge, and size-table updates"
+    run_cmd git commit -m "Sync manifests, badges, and sizes for $VER_STRING"
     pass "Committed version sync changes."
 fi
 

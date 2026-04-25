@@ -174,16 +174,15 @@ Only maintainers create releases. The process is:
 2. Move the `[Unreleased]` section in `CHANGELOG.md` to a versioned
    heading (e.g. `## [0.3.1] - 2025-07-01`)
 3. Commit on your working branch
-4. (Optional) Run Docker cross-build to update size tables:
+4. Run the guided release script:
    ```bash
-   bash tools/crossbuild.sh            # writes build/sizes.csv
-   ```
-5. Run the guided release script:
-   ```bash
-   bash tools/make_release.sh          # full guided release
+   bash tools/make_release.sh              # full guided release
    bash tools/make_release.sh --validate   # local validation only
    ```
-6. GitHub Actions picks up the tag push, validates again in CI, and
+   The script handles everything end-to-end: validation (tests +
+   examples), manifest sync, badge update, Docker cross-compilation,
+   size table update, push, PR, CI, merge, tag, and publish.
+5. GitHub Actions picks up the tag push, validates again in CI, and
    creates a GitHub Release with notes from `CHANGELOG.md`.
 
 See `release_management.md` for full details.
