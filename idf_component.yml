@@ -3,13 +3,13 @@
 # This file allows xelp to be published to the ESP Component Registry
 # (components.espressif.com) and installed in any ESP-IDF project with:
 #
-#   idf.py add-dependency "deftio/xelp==0.3.0"
+#   idf.py add-dependency "deftio/xelp==0.3.1"
 #
 # Or by adding to your project's main/idf_component.yml:
 #
 #   dependencies:
 #     deftio/xelp:
-#       version: "~0.3.0"
+#       version: "~0.3.1"
 #
 # After installation, use in your C or C++ source:
 #
@@ -21,7 +21,7 @@
 #
 # See: https://docs.espressif.com/projects/idf-component-manager/en/latest/reference/manifest_file.html
 
-version: "0.3.0"
+version: "0.3.1"
 description: >-
   Tiny CLI and script interpreter for embedded systems.
   2KB flash, zero malloc, multi-instance.

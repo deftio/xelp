@@ -65,7 +65,9 @@ Versions always use three-component semver (e.g. `0.3.0`, never `0.3`).
 - Multi-instance stress test verifying no shared state between
   interleaved XELP instances (5 test sections, 50-round stress loop).
 - PlatformIO CI job in GitHub Actions (builds for Uno, Mega, ESP32).
-- SDCC PIC18F2620 and MCS-51 added to crossbuild Docker targets.
+- Cross-build Docker tooling: added `extract_size.py` for robust
+  multi-format size extraction (ELF, SDCC .rel, SDCC .map, Intel HEX).
+  18 targets now produce real sizes across KEY/CLI/FULL configurations.
 - **Output control**: `mOutEnable` (char) gates all output; `mEchoChar`
   (char) controls echo during interactive input (normal, off, or mask
   character). Macros: `XELP_SET_OUT_ENABLE`, `XELP_GET_OUT_ENABLE`,
@@ -85,7 +87,7 @@ Versions always use three-component semver (e.g. `0.3.0`, never `0.3`).
   uninitialized `tok->s`, causing crash in `XelpStrEq` during command
   dispatch. Found by fuzz testing.
 - **KEY-only build failure**: `XELP_XB_INIT(ths->mCmdXB,...)` in
-  `XELPInit` was not guarded by `#ifdef XELP_ENABLE_CLI`, preventing
+  `XelpInit` was not guarded by `#ifdef XELP_ENABLE_CLI`, preventing
   KEY-only configurations from compiling.
 
 ## [0.3.0] - 2026-04-19

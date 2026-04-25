@@ -14,6 +14,11 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libncurses-dev
+
       - name: Extract version from xelp.h
         id: version
         run: |
@@ -35,25 +40,14 @@ jobs:
             exit 1
           fi
 
-      - name: Build and run tests
-        run: make tests
-
-      - name: Check for compiler warnings
-        run: |
-          BUILD_LOG=$(make clean 2>&1 && make tests 2>&1)
-          WARNINGS=$(echo "$BUILD_LOG" | grep -E "^[^:]+\.(c|h):[0-9]+:[0-9]+: warning:" || true)
-          if [ -n "$WARNINGS" ]; then
-            echo "ERROR: Compiler warnings detected:"
-            echo "$WARNINGS"
-            exit 1
-          fi
-          echo "Zero warnings."
+      - name: Validate (tests + examples, -Werror)
+        run: make validate
 
       - name: Coverage check
         run: |
-          gcov src/xelp.c
+          gcov -o build/ src/xelp.c
           echo "--- Coverage Summary ---"
-          gcov src/xelp.c 2>/dev/null | grep -A 1 "File.*xelp.c"
+          gcov -o build/ src/xelp.c 2>/dev/null | grep -A 1 "File.*xelp.c"
 
   release:
     needs: validate

@@ -214,8 +214,8 @@ do_validate() {
     echo ""
     echo "  --- Coverage ---"
     local cov_line pct
-    echo "  \$ gcov src/xelp.c"
-    cov_line=$(gcov src/xelp.c 2>/dev/null | grep "Lines executed" | head -1)
+    echo "  \$ gcov -o build/ src/xelp.c"
+    cov_line=$(gcov -o build/ src/xelp.c 2>/dev/null | grep "Lines executed" | head -1)
     pct=$(echo "$cov_line" | grep -o '[0-9]*\.[0-9]*%' | head -1)
     pass "Coverage: $pct"
 
@@ -235,11 +235,10 @@ do_crossbuild() {
     if ! command -v docker &>/dev/null; then
         echo "  Docker not found -- skipping cross-compilation."
         echo "  Size tables will use existing data."
-        echo "  Install Docker or use --skip-cross to suppress this message."
         return 0
     fi
 
-    confirm "Run Docker cross-build? (takes a few minutes)"
+    echo "  Running Docker cross-build (this takes a few minutes)..."
     run_cmd bash tools/crossbuild.sh
     pass "Cross-compilation complete."
 
@@ -601,7 +600,7 @@ print('yes' if any(c['state'] == 'FAILURE' for c in checks) else 'no')
 do_merge_pr() {
     if $ON_MASTER; then return 0; fi
 
-    step_header "Enable auto-merge on PR #$PR_NUM"
+    step_header "Squash-merge PR #$PR_NUM"
 
     # Check if PR is already merged (re-run scenario)
     local pr_state
@@ -611,9 +610,27 @@ do_merge_pr() {
         return 0
     fi
 
-    confirm "Enable auto-merge (squash) for PR #$PR_NUM?"
-    run_cmd gh pr merge "$PR_NUM" --auto --squash --delete-branch
-    pass "Auto-merge enabled. Will merge when all requirements are met."
+    confirm "Squash-merge PR #$PR_NUM into master?"
+
+    # Try direct merge first (CI already passed at this point).
+    if gh pr merge "$PR_NUM" --squash --delete-branch 2>/dev/null; then
+        pass "PR merged (squash)."
+        return 0
+    fi
+
+    # Direct merge failed -- likely branch protection or auto-merge required.
+    echo "  Direct merge blocked (branch protection?). Enabling auto-merge..."
+    if gh pr merge "$PR_NUM" --auto --squash --delete-branch 2>/dev/null; then
+        pass "Auto-merge enabled. Will merge when all requirements are met."
+        return 0
+    fi
+
+    # Both failed -- give actionable guidance.
+    fail "Could not merge PR #$PR_NUM.
+  Check branch protection settings, required reviews, or status checks.
+  You can merge manually:
+    gh pr merge $PR_NUM --squash --delete-branch
+  Then re-run this script to continue from where it stopped."
 }
 
 # -----------------------------------------------------------------------
