@@ -63,8 +63,9 @@ and pages/index.html. Does not tag, push, or publish.
 | `bash tools/crossbuild.sh` | Docker cross-compile only (standalone, writes `build/sizes.csv`) |
 
 The cross-build step is expensive (~minutes, requires Docker). It runs
-automatically during `make_release.sh` but can be skipped if Docker is
-unavailable. Day-to-day development uses `make validate` which takes seconds.
+automatically during `make_release.sh` and is skipped gracefully if Docker
+is unavailable. Day-to-day development uses `make validate` which takes
+seconds.
 
 ## Development Workflow
 

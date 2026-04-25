@@ -1,9 +1,11 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # make_release.sh -- Guided release pipeline for xelp.
 #
 # Walks through every step from local validation to published GitHub
-# Release, pausing for confirmation before anything visible to others.
+# Release and package registry uploads, pausing for confirmation before
+# anything visible to others.
+#
 # The XELP_VERSION macro in src/xelp.h is the single source of truth;
 # the version is read via the C preprocessor (tools/extract_version.c),
 # not regex.
@@ -13,11 +15,11 @@
 #   bash tools/make_release.sh --validate      # local validation only
 #   bash tools/make_release.sh --release-local # full flow, local GH release fallback
 #
-# See tools/make-release.md for detailed documentation.
+# Exit status: 0 if every step passes, non-zero on first failure.
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
 
@@ -57,7 +59,12 @@ confirm() {
 }
 
 fail() {
+    echo "" >&2
     echo "  FAIL: $1" >&2
+    echo "" >&2
+    echo "  The release pipeline stopped at step $STEP." >&2
+    echo "  Fix the issue above and re-run: bash tools/make_release.sh" >&2
+    echo "  Log: $LOG_FILE" >&2
     exit 1
 }
 
@@ -66,15 +73,13 @@ pass() {
 }
 
 # Print a command before running it so the user sees exactly what executes.
-# Usage: run_cmd make clean
-#        run_cmd git push -u origin "$BRANCH"
 run_cmd() {
     echo "  \$ $*"
     "$@"
 }
 
 # -----------------------------------------------------------------------
-# Step 1: Extract version
+# Step 1: Extract version from xelp.h
 # -----------------------------------------------------------------------
 
 do_extract_version() {
@@ -82,20 +87,23 @@ do_extract_version() {
 
     mkdir -p build
     run_cmd gcc tools/extract_version.c -Isrc -o build/extract_version \
-        || fail "Could not compile extract_version.c"
+        || fail "Could not compile extract_version.c.
+  Make sure gcc is installed and src/xelp.h exists."
 
     run_cmd build/extract_version build/xelp_version.yaml \
-        || fail "extract_version failed"
+        || fail "extract_version failed to write build/xelp_version.yaml."
 
     VER_HEX=$(sed -n 's/^version_hex: "\(.*\)"/\1/p' build/xelp_version.yaml)
     VER_STRING=$(sed -n 's/^version: "\(.*\)"/\1/p' build/xelp_version.yaml)
     VER_TAG=$(sed -n 's/^tag: "\(.*\)"/\1/p' build/xelp_version.yaml)
 
-    [ -n "$VER_STRING" ] || fail "No version string produced"
+    [ -n "$VER_STRING" ] || fail "No version string in build/xelp_version.yaml.
+  Check that XELP_VERSION is defined in src/xelp.h."
 
     # Enforce three-component semver (e.g. 0.3.0, never 0.3)
     if ! echo "$VER_STRING" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-        fail "Version '$VER_STRING' is not three-component semver (expected X.Y.Z)"
+        fail "Version '$VER_STRING' is not three-component semver (expected X.Y.Z).
+  Fix XELP_VERSION in src/xelp.h to use format 0x00MMmmpp."
     fi
 
     echo "  Version: $VER_STRING ($VER_HEX)"
@@ -104,13 +112,12 @@ do_extract_version() {
 }
 
 # -----------------------------------------------------------------------
-# Step 1b: Sync version in library manifests
+# Step 2: Sync version in library manifests
 # -----------------------------------------------------------------------
 
 do_sync_manifests() {
     step_header "Sync version in library.json, library.properties, idf_component.yml"
 
-    # Strip leading 'v' if present (VER_STRING is e.g. "0.2.5")
     local ver="$VER_STRING"
 
     # library.json
@@ -128,7 +135,6 @@ d = json.loads(p.read_text())
 d['version'] = '$ver'
 p.write_text(json.dumps(d, indent=4) + '\n')
 "
-            git add library.json
             pass "library.json updated to $ver"
         fi
     fi
@@ -143,7 +149,6 @@ p.write_text(json.dumps(d, indent=4) + '\n')
             echo "  library.properties: $cur_lp -> $ver"
             sed -i.bak "s/^version=.*/version=$ver/" library.properties
             rm -f library.properties.bak
-            git add library.properties
             pass "library.properties updated to $ver"
         fi
     fi
@@ -158,52 +163,27 @@ p.write_text(json.dumps(d, indent=4) + '\n')
             echo "  idf_component.yml: $cur_idf -> $ver"
             sed -i.bak "s/^version: \".*\"/version: \"$ver\"/" idf_component.yml
             rm -f idf_component.yml.bak
-            git add idf_component.yml
             pass "idf_component.yml updated to $ver"
         fi
     fi
 }
 
 # -----------------------------------------------------------------------
-# Step 1c: Update version badges
+# Step 3: Update version badges
 # -----------------------------------------------------------------------
 
 do_update_badges() {
-    echo "==> Updating version badges..."
-    python3 tools/update_badges.py
-    git add README.md pages/index.html
+    step_header "Update version badges in README.md and pages/index.html"
+
+    if [ ! -f build/xelp_version.yaml ]; then
+        fail "build/xelp_version.yaml not found. Run extract_version first."
+    fi
+    run_cmd python3 tools/update_badges.py
+    pass "Badges updated."
 }
 
 # -----------------------------------------------------------------------
-# Step 1d: Cross-compile all targets (Docker) and update size tables
-# -----------------------------------------------------------------------
-
-do_crossbuild() {
-    step_header "Cross-compile all targets (Docker)"
-
-    if ! command -v docker &>/dev/null; then
-        echo "  Docker not found -- skipping cross-compilation."
-        echo "  Size tables will use existing data."
-        return 0
-    fi
-
-    confirm "Run Docker cross-build? (takes a few minutes)"
-    run_cmd bash tools/crossbuild.sh
-    pass "Cross-compilation complete."
-
-    if [ -f build/sizes.csv ]; then
-        echo ""
-        echo "  --- Updating size tables in README.md and pages/index.html ---"
-        run_cmd bash tools/update_sizes.sh
-        git add README.md pages/index.html
-        pass "Size tables updated from build/sizes.csv."
-    else
-        echo "  WARNING: build/sizes.csv not produced."
-    fi
-}
-
-# -----------------------------------------------------------------------
-# Step 2: Local validation
+# Step 4: Local validation (tests, examples, warnings, coverage)
 # -----------------------------------------------------------------------
 
 do_validate() {
@@ -215,7 +195,8 @@ do_validate() {
     echo "  \$ make validate  (tests + examples, capturing for warning scan)"
     build_log=$(make validate 2>&1) || {
         echo "$build_log"
-        fail "make validate failed."
+        fail "make validate failed.
+  Fix the build/test errors above and re-run."
     }
     echo "$build_log" | tail -5
     pass "Tests passed, all examples built."
@@ -225,7 +206,8 @@ do_validate() {
     warnings=$(echo "$build_log" | grep -E "^[^:]+\.(c|h):[0-9]+:[0-9]+: warning:" || true)
     if [ -n "$warnings" ]; then
         echo "$warnings" >&2
-        fail "Compiler warnings detected."
+        fail "Compiler warnings detected.
+  Fix the warnings above (xelp requires zero warnings)."
     fi
     pass "Zero warnings."
 
@@ -244,7 +226,97 @@ do_validate() {
 }
 
 # -----------------------------------------------------------------------
-# Step 3: Check git state
+# Step 5: Cross-compile all targets (Docker) and update size tables
+# -----------------------------------------------------------------------
+
+do_crossbuild() {
+    step_header "Cross-compile all targets (Docker)"
+
+    if ! command -v docker &>/dev/null; then
+        echo "  Docker not found -- skipping cross-compilation."
+        echo "  Size tables will use existing data."
+        echo "  Install Docker or use --skip-cross to suppress this message."
+        return 0
+    fi
+
+    confirm "Run Docker cross-build? (takes a few minutes)"
+    run_cmd bash tools/crossbuild.sh
+    pass "Cross-compilation complete."
+
+    if [ -f build/sizes.csv ]; then
+        echo ""
+        echo "  --- Updating size tables in README.md and pages/index.html ---"
+        run_cmd bash tools/update_sizes.sh
+        pass "Size tables updated from build/sizes.csv."
+    else
+        echo "  WARNING: build/sizes.csv not produced. Size tables unchanged."
+    fi
+}
+
+# -----------------------------------------------------------------------
+# Step 6: Commit pipeline-generated changes
+# -----------------------------------------------------------------------
+
+# Files the pipeline itself may modify (version sync, badge update,
+# size tables, crossbuild). Anything outside this list is unexpected
+# and should block the release.
+PIPELINE_FILES="README.md pages/index.html library.json library.properties idf_component.yml"
+
+do_commit_pipeline_changes() {
+    step_header "Commit pipeline-generated changes"
+
+    local status
+    status=$(git status --porcelain)
+    if [ -z "$status" ]; then
+        pass "Working tree is clean -- nothing to commit."
+        return 0
+    fi
+
+    # Split dirty files into expected (pipeline) and unexpected.
+    local unexpected=""
+    local to_commit=""
+    while IFS= read -r line; do
+        # git status --porcelain: first two chars are status, then space, then path
+        local file="${line:3}"
+        local found=false
+        for known in $PIPELINE_FILES; do
+            if [ "$file" = "$known" ]; then
+                found=true
+                break
+            fi
+        done
+        if $found; then
+            to_commit="$to_commit $file"
+        else
+            unexpected="$unexpected $file"
+        fi
+    done <<< "$status"
+
+    if [ -n "$unexpected" ]; then
+        echo ""
+        echo "  Unexpected uncommitted files:"
+        for f in $unexpected; do
+            echo "    $f"
+        done
+        echo ""
+        fail "Commit or stash these files before running the release pipeline.
+  Only pipeline-generated files ($PIPELINE_FILES) are auto-committed."
+    fi
+
+    echo "  Modified by pipeline:"
+    for f in $to_commit; do
+        echo "    $f"
+    done
+
+    confirm "Commit these files?"
+    # shellcheck disable=SC2086
+    git add $to_commit
+    git commit -m "sync manifests, badges, and sizes for $VER_STRING"
+    pass "Committed pipeline-generated changes."
+}
+
+# -----------------------------------------------------------------------
+# Step 7: Check git state
 # -----------------------------------------------------------------------
 
 do_check_git() {
@@ -276,13 +348,14 @@ do_check_git() {
             echo "  Tag exists but no GitHub Release yet -- will skip to release step."
             TAG_EXISTS=true
         else
-            fail "Tag $VER_TAG already exists. Bump XELP_VERSION in src/xelp.h first."
+            fail "Tag $VER_TAG already exists.
+  Bump XELP_VERSION in src/xelp.h first."
         fi
     else
         pass "Tag $VER_TAG does not exist yet."
     fi
 
-    # Working tree
+    # Working tree -- should be clean after do_commit_pipeline_changes
     local status
     echo "  \$ git status --porcelain"
     status=$(git status --porcelain)
@@ -290,66 +363,60 @@ do_check_git() {
         echo ""
         echo "  Uncommitted changes:"
         run_cmd git status --short
-        if [ "$MODE" = "validate" ]; then
-            echo "  (validate mode -- continuing with warning)"
-            return 0
-        fi
-        echo ""
-        echo "  You need a clean tree before releasing."
-        echo "  Options: commit your changes, stash them, or abort."
-        confirm "Abort so you can commit?"
-        exit 1
+        fail "Working tree is dirty. Commit or stash before releasing.
+  If these are pipeline changes, re-run and the script will auto-commit them."
     else
         pass "Working tree is clean."
     fi
 }
 
 # -----------------------------------------------------------------------
-# Step 4: Sync with master and push branch
+# Step 8: Sync with master and push branch
 # -----------------------------------------------------------------------
 
 do_push_branch() {
-    if $ON_MASTER; then return 0; fi
+    step_header "Push $BRANCH to origin"
 
-    step_header "Sync with master and push branch '$BRANCH'"
-
-    # Merge master into branch to avoid conflicts and ensure CI runs
     run_cmd git fetch origin master
-    local behind
-    behind=$(git rev-list --count "HEAD..origin/master" 2>/dev/null || echo "0")
-    if [ "$behind" -gt 0 ]; then
-        echo "  Branch is $behind commit(s) behind origin/master."
-        echo "  Merging origin/master (preferring branch on conflicts)..."
-        if ! run_cmd git merge origin/master -X ours --no-edit; then
-            # Handle modify/delete conflicts: keep our versions
-            local unresolved
-            unresolved=$(git diff --name-only --diff-filter=U 2>/dev/null || true)
-            if [ -n "$unresolved" ]; then
-                echo "  Resolving remaining conflicts (keeping branch versions)..."
-                echo "$unresolved" | while read -r f; do
-                    git checkout --ours "$f" 2>/dev/null && git add "$f" || git add "$f"
-                done
-                run_cmd git commit --no-edit
+
+    if ! $ON_MASTER; then
+        # Feature branch: merge in latest master first.
+        local behind
+        behind=$(git rev-list --count "HEAD..origin/master" 2>/dev/null || echo "0")
+        if [ "$behind" -gt 0 ]; then
+            echo "  Branch is $behind commit(s) behind origin/master."
+            echo "  Merging origin/master..."
+            if ! run_cmd git merge origin/master --no-edit; then
+                fail "Merge conflict. Resolve manually and re-run.
+  Commands to resolve:
+    git status                       # see conflicted files
+    # ... edit and fix conflicts ...
+    git add <resolved-files>
+    git commit
+    bash tools/make_release.sh       # re-run"
             fi
+            pass "Merged origin/master into $BRANCH."
+        else
+            pass "Branch is up to date with master."
         fi
-        pass "Merged origin/master into $BRANCH."
-    else
-        pass "Branch is up to date with master."
     fi
 
-    # Push
-    local tracking
-    tracking=$(git rev-parse --abbrev-ref --symbolic-full-name "@{u}" 2>/dev/null || true)
-    if [ -n "$tracking" ]; then
+    # Check if remote branch exists and whether we're ahead.
+    local remote_exists=true
+    if ! git rev-parse --verify "origin/$BRANCH" &>/dev/null; then
+        remote_exists=false
+    fi
+
+    if $remote_exists; then
         local ahead
-        ahead=$(git rev-list --count "@{u}..HEAD" 2>/dev/null || echo "0")
+        ahead=$(git rev-list --count "origin/$BRANCH..HEAD" 2>/dev/null || echo "0")
         if [ "$ahead" -eq 0 ]; then
-            pass "Branch is up to date with remote."
+            pass "$BRANCH is up to date with origin."
             return 0
         fi
-        echo "  $ahead commit(s) ahead of remote."
+        echo "  $ahead commit(s) ahead of origin/$BRANCH."
     else
-        echo "  No upstream tracking branch set."
+        echo "  Remote branch origin/$BRANCH does not exist yet."
     fi
 
     confirm "Push $BRANCH to origin?"
@@ -358,7 +425,7 @@ do_push_branch() {
 }
 
 # -----------------------------------------------------------------------
-# Step 5: Open PR
+# Step 9: Open PR
 # -----------------------------------------------------------------------
 
 do_open_pr() {
@@ -367,7 +434,8 @@ do_open_pr() {
     step_header "Open PR to master"
 
     if ! command -v gh &>/dev/null; then
-        fail "gh CLI not found. Install from https://cli.github.com/"
+        fail "gh CLI not found.
+  Install from https://cli.github.com/ and authenticate with: gh auth login"
     fi
 
     # Check for existing PR
@@ -397,11 +465,69 @@ do_open_pr() {
 }
 
 # -----------------------------------------------------------------------
-# Step 6: Wait for CI
+# Step 10: Wait for CI
 # -----------------------------------------------------------------------
 
 do_wait_ci() {
-    if $ON_MASTER; then return 0; fi
+    if $ON_MASTER; then
+        step_header "Wait for CI on master push"
+        echo "  Polling commit status every 30s..."
+        echo ""
+        local sha
+        sha=$(git rev-parse HEAD)
+
+        local attempts=0
+        local max_attempts=40
+        while [ $attempts -lt $max_attempts ]; do
+            # Check combined commit status API
+            local state
+            echo "  \$ gh api repos/:owner/:repo/commits/$sha/status"
+            state=$(gh api "repos/{owner}/{repo}/commits/$sha/status" --jq '.state' 2>/dev/null || echo "pending")
+            echo "  Combined status: $state"
+
+            if [ "$state" = "failure" ] || [ "$state" = "error" ]; then
+                echo ""
+                fail "CI failed on master.
+  Check: https://github.com/deftio/xelp/actions
+  Fix the issue and re-run."
+            fi
+
+            if [ "$state" = "success" ]; then
+                echo ""
+                pass "All CI checks passed on master."
+                return 0
+            fi
+
+            # Also check via check-runs API (GitHub Actions uses this)
+            local any_in_progress any_failed_cr
+            any_in_progress=$(gh api "repos/{owner}/{repo}/commits/$sha/check-runs" \
+                --jq '[.check_runs[] | select(.status != "completed")] | length' 2>/dev/null || echo "1")
+            any_failed_cr=$(gh api "repos/{owner}/{repo}/commits/$sha/check-runs" \
+                --jq '[.check_runs[] | select(.conclusion == "failure")] | length' 2>/dev/null || echo "0")
+
+            if [ "$any_failed_cr" -gt 0 ]; then
+                echo ""
+                fail "CI check-run failed on master.
+  Check: https://github.com/deftio/xelp/actions
+  Fix the issue and re-run."
+            fi
+            if [ "$any_in_progress" -eq 0 ]; then
+                echo ""
+                pass "All CI check-runs passed on master."
+                return 0
+            fi
+
+            attempts=$((attempts + 1))
+            echo "  ... waiting 30s (attempt $attempts/$max_attempts)"
+            echo ""
+            sleep 30
+        done
+
+        echo ""
+        echo "  Timed out waiting for CI after $max_attempts attempts."
+        confirm "Continue without CI? (not recommended)"
+        return 0
+    fi
 
     step_header "Wait for CI on PR #$PR_NUM"
     echo "  Polling every 30s..."
@@ -410,7 +536,7 @@ do_wait_ci() {
     local attempts=0
     local max_attempts=40
     while [ $attempts -lt $max_attempts ]; do
-        local checks_json status_summary
+        local checks_json
         echo "  \$ gh pr checks $PR_NUM"
         checks_json=$(gh pr checks "$PR_NUM" --json name,state 2>/dev/null || true)
 
@@ -445,7 +571,9 @@ print('yes' if any(c['state'] == 'FAILURE' for c in checks) else 'no')
 
         if [ "$any_failed" = "yes" ]; then
             echo ""
-            fail "One or more CI checks failed. Fix the issue and re-run."
+            fail "One or more CI checks failed.
+  Check: https://github.com/deftio/xelp/actions
+  Fix the issue and re-run."
         fi
 
         if [ "$any_pending" = "no" ]; then
@@ -467,7 +595,7 @@ print('yes' if any(c['state'] == 'FAILURE' for c in checks) else 'no')
 }
 
 # -----------------------------------------------------------------------
-# Step 7: Merge PR
+# Step 11: Merge PR
 # -----------------------------------------------------------------------
 
 do_merge_pr() {
@@ -489,14 +617,24 @@ do_merge_pr() {
 }
 
 # -----------------------------------------------------------------------
-# Step 8: Wait for merge, switch to master
+# Step 12: Wait for merge, switch to master
 # -----------------------------------------------------------------------
 
 do_switch_master() {
     if $ON_MASTER; then
-        echo ""
-        echo "  (Already on master, pulling latest)"
-        run_cmd git pull --ff-only origin master
+        step_header "Verify master is in sync with origin"
+        run_cmd git fetch origin master
+        local ahead behind
+        ahead=$(git rev-list --count "origin/master..HEAD" 2>/dev/null || echo "0")
+        behind=$(git rev-list --count "HEAD..origin/master" 2>/dev/null || echo "0")
+        if [ "$ahead" -ne 0 ]; then
+            fail "Local master is $ahead commit(s) ahead of origin.
+  This should not happen. Push or reset before continuing."
+        fi
+        if [ "$behind" -ne 0 ]; then
+            run_cmd git pull --ff-only origin master
+        fi
+        pass "master is in sync with origin at $(git rev-parse --short HEAD)."
         return 0
     fi
 
@@ -513,7 +651,8 @@ do_switch_master() {
             pass "PR #$PR_NUM merged."
             break
         elif [ "$pr_state" = "CLOSED" ]; then
-            fail "PR #$PR_NUM was closed without merging."
+            fail "PR #$PR_NUM was closed without merging.
+  Re-open the PR or create a new one and re-run."
         fi
         attempts=$((attempts + 1))
         echo "  ... PR state: ${pr_state:-unknown} (attempt $attempts/80)"
@@ -521,30 +660,44 @@ do_switch_master() {
     done
 
     if [ $attempts -ge 80 ]; then
-        fail "Timed out waiting for PR to merge. Check branch protection requirements."
+        fail "Timed out waiting for PR to merge.
+  Check branch protection requirements and CI status."
     fi
 
     run_cmd git checkout master
-    run_cmd git pull --ff-only origin master
+    run_cmd git fetch origin master
+    # After a squash-merge, local master and origin/master have diverged
+    # (the squash commit is a new commit). Reset to origin/master which
+    # has the authoritative squash-merged content.
+    if ! git merge-base --is-ancestor origin/master HEAD 2>/dev/null; then
+        echo "  Local master diverged from origin (expected after squash-merge)."
+        run_cmd git reset --hard origin/master
+    else
+        run_cmd git pull --ff-only origin master
+    fi
     BRANCH="master"
     ON_MASTER=true
     pass "On master at $(git rev-parse --short HEAD)."
 }
 
 # -----------------------------------------------------------------------
-# Step 9: Verify on master
+# Step 13: Verify on master
 # -----------------------------------------------------------------------
 
 do_verify_master() {
     step_header "Verify build on master"
 
     run_cmd make clean >/dev/null 2>&1
-    run_cmd make validate 2>&1
+    echo "  \$ make validate"
+    if ! make validate >/dev/null 2>&1; then
+        fail "make validate failed on master.
+  This should not happen after a successful PR merge."
+    fi
     pass "All tests and examples pass on master."
 }
 
 # -----------------------------------------------------------------------
-# Step 10: Tag and push
+# Step 14: Tag and push
 # -----------------------------------------------------------------------
 
 do_tag() {
@@ -557,7 +710,7 @@ do_tag() {
 }
 
 # -----------------------------------------------------------------------
-# Step 11: Wait for release
+# Step 15: Wait for GitHub Release
 # -----------------------------------------------------------------------
 
 do_wait_release() {
@@ -604,8 +757,10 @@ do_wait_release() {
                 echo "  Full log: gh run view $run_id --log-failed"
             fi
             echo ""
-            echo "  Fix the issue, delete the tag, and re-run:"
+            echo "  To retry: delete the tag and re-run:"
             echo "    git tag -d $VER_TAG && git push origin :refs/tags/$VER_TAG"
+            echo "    bash tools/make_release.sh"
+            echo ""
             echo "  Or create the release manually:"
             echo "    gh release create $VER_TAG --title 'xelp $VER_STRING' --notes 'See CHANGELOG.md'"
             exit 1
@@ -625,14 +780,16 @@ do_wait_release() {
 }
 
 # -----------------------------------------------------------------------
-# Step 12: Publish to PlatformIO registry
+# Step 16: Publish to PlatformIO registry
 # -----------------------------------------------------------------------
 
 do_pio_publish() {
     step_header "Publish to PlatformIO registry"
 
     if ! command -v pio &>/dev/null; then
-        fail "pio CLI not found. Install: pip install platformio"
+        echo "  pio CLI not found. Skipping."
+        echo "  Install: pip install platformio"
+        return 0
     fi
 
     # Check if already published at this version
@@ -644,19 +801,22 @@ do_pio_publish() {
     fi
 
     confirm "Publish xelp $VER_STRING to PlatformIO?"
+    run_cmd make clean >/dev/null 2>&1
     run_cmd pio pkg publish . --no-interactive
     pass "Published to PlatformIO registry."
 }
 
 # -----------------------------------------------------------------------
-# Step 13: Publish to ESP-IDF Component Registry
+# Step 17: Publish to ESP-IDF Component Registry
 # -----------------------------------------------------------------------
 
 do_idf_publish() {
     step_header "Publish to ESP-IDF Component Registry"
 
     if ! command -v compote &>/dev/null; then
-        fail "compote CLI not found. Install: pip install idf-component-manager"
+        echo "  compote CLI not found. Skipping."
+        echo "  Install: pip install idf-component-manager"
+        return 0
     fi
 
     confirm "Publish xelp $VER_STRING to ESP-IDF Component Registry?"
@@ -668,7 +828,7 @@ do_idf_publish() {
 }
 
 # -----------------------------------------------------------------------
-# Step 14: Done
+# Step 18: Done
 # -----------------------------------------------------------------------
 
 do_done() {
@@ -693,6 +853,9 @@ do_done() {
 # -----------------------------------------------------------------------
 
 PR_NUM=""
+VER_STRING=""
+VER_TAG=""
+VER_HEX=""
 
 case "${1:-}" in
     --validate)
@@ -723,8 +886,10 @@ echo "  xelp release pipeline"
 echo "  Mode: $MODE"
 echo "============================================"
 
-# -- Always run --
+# -- Always run (validation + pipeline prep) --
 do_extract_version
+do_sync_manifests
+do_update_badges
 do_validate
 
 if [ "$MODE" = "validate" ]; then
@@ -737,17 +902,9 @@ if [ "$MODE" = "validate" ]; then
 fi
 
 # -- Full release flow --
-do_check_git
-do_sync_manifests
-do_update_badges
 do_crossbuild
-
-# Auto-commit manifest, badge, and size-table updates (if any files were staged)
-if [ -n "$(git diff --cached --name-only)" ]; then
-    step_header "Commit manifest, badge, and size-table updates"
-    run_cmd git commit -m "Sync manifests, badges, and sizes for $VER_STRING"
-    pass "Committed version sync changes."
-fi
+do_commit_pipeline_changes
+do_check_git
 
 if $TAG_EXISTS; then
     # Re-run: tag exists but release doesn't -- just wait for it

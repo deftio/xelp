@@ -155,7 +155,7 @@ Workflow:
    ```bash
    git checkout -b dev-my-feature master
    ```
-3. Make your changes. Ensure `make tests` passes with zero warnings
+3. Make your changes. Ensure `make validate` passes with zero warnings
    and coverage doesn't drop.
 4. Push your branch and open a PR against `master`.
 5. CI will run automatically (Ubuntu + macOS, GCC + Clang, 32-bit).
