@@ -200,42 +200,19 @@ do_update_badges() {
 # -----------------------------------------------------------------------
 
 do_validate() {
-    step_header "Local validation (tests, examples, warnings, coverage)"
+    step_header "Local validation (make clean && make validate)"
 
-    echo "  --- Clean build + tests + examples ---"
-    local build_log warnings
     safe_clean
-    echo "  \$ make validate  (tests + examples, capturing for warning scan)"
-    build_log=$(make validate 2>&1) || {
-        echo "$build_log"
-        fail "make validate failed.
+    run_cmd make validate || fail "make validate failed.
   Fix the build/test errors above and re-run."
-    }
-    echo "$build_log" | tail -5
-    pass "Tests passed, all examples built."
+    pass "Tests passed, all examples built, zero warnings (-Werror)."
 
-    echo ""
-    echo "  --- Zero-warning check ---"
-    warnings=$(echo "$build_log" | grep -E "^[^:]+\.(c|h):[0-9]+:[0-9]+: warning:" || true)
-    if [ -n "$warnings" ]; then
-        echo "$warnings" >&2
-        fail "Compiler warnings detected.
-  Fix the warnings above (xelp requires zero warnings)."
-    fi
-    pass "Zero warnings."
-
-    echo ""
-    echo "  --- Coverage ---"
     local cov_line pct
-    echo "  \$ gcov -o build/ src/xelp.c"
     cov_line=$(gcov -o build/ src/xelp.c 2>/dev/null | grep "Lines executed" | head -1)
     pct=$(echo "$cov_line" | grep -o '[0-9]*\.[0-9]*%' | head -1)
-    pass "Coverage: $pct"
+    echo "  Coverage: $pct"
 
-    echo ""
-    echo "  --- Cleaning build artifacts ---"
     safe_clean
-    pass "Build artifacts cleaned."
 }
 
 # -----------------------------------------------------------------------
