@@ -78,6 +78,19 @@ run_cmd() {
     "$@"
 }
 
+# Run make clean while preserving build/xelp_version.yaml (needed by later steps).
+safe_clean() {
+    local saved=""
+    if [ -f build/xelp_version.yaml ]; then
+        saved=$(cat build/xelp_version.yaml)
+    fi
+    make clean >/dev/null 2>&1 || true
+    if [ -n "$saved" ]; then
+        mkdir -p build
+        echo "$saved" > build/xelp_version.yaml
+    fi
+}
+
 # -----------------------------------------------------------------------
 # Step 1: Extract version from xelp.h
 # -----------------------------------------------------------------------
@@ -191,7 +204,7 @@ do_validate() {
 
     echo "  --- Clean build + tests + examples ---"
     local build_log warnings
-    run_cmd make clean >/dev/null 2>&1
+    safe_clean
     echo "  \$ make validate  (tests + examples, capturing for warning scan)"
     build_log=$(make validate 2>&1) || {
         echo "$build_log"
@@ -221,7 +234,7 @@ do_validate() {
 
     echo ""
     echo "  --- Cleaning build artifacts ---"
-    run_cmd make clean >/dev/null 2>&1
+    safe_clean
     pass "Build artifacts cleaned."
 }
 
