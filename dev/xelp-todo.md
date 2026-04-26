@@ -8,7 +8,7 @@ link have detailed specifications in `dev/`.
 - [x] Breaking API change: `XELP *ths` on all command/key signatures
 - [x] XelpBuf macro normalization (SCREAMING_CASE)
 - [x] 100% line coverage (39 units, 531 cases)
-- [x] GitHub Actions CI (build matrix, coverage, fuzz, PlatformIO, release)
+- [x] GitHub Actions CI (build matrix, coverage, release)
 - [x] Cross-compilation Docker tooling (18 targets, 8-bit to 64-bit)
 - [x] Default command handlers (`mpfDefKey`, `mpfDefCLI`)
 - [x] 4 return registers (`mR[0..3]`) with `XELP_R0`-`XELP_R3` macros
@@ -23,7 +23,7 @@ link have detailed specifications in `dev/`.
 - [x] Fuzz testing (found and fixed SEGV in XelpTokLineXB)
 - [x] Multi-instance stress test (two interleaved instances)
 - [x] ESP32-C6 dual-CLI example (Serial + BLE, WiFi provisioning, NVS)
-- [x] PlatformIO CI (pio ci on uno, megaatmega2560, esp32dev)
+- [x] PlatformIO CI removed from CI (run locally; was blocking releases)
 - [x] Cross-build multi-config (KEY/CLI/FULL, `extract_size.py`, 18 targets)
 - [x] README rewrite (3-column size table, grouped by word size)
 - [x] CI aligned with local validation (`make validate` in all workflows)
@@ -100,7 +100,7 @@ Future:
 - [x] PlatformIO Registry (live, v0.3 ghost fixed)
 - [x] Badges (Arduino, PlatformIO, Espressif library)
 - [x] CMake native build (`CMakeLists.txt`)
-- [x] PlatformIO CI in GitHub Actions
+- [x] PlatformIO CI removed (fuzz, 32-bit, pio run locally not in CI)
 - [x] PlatformIO `v0.3` ghost release deleted
 
 ## Testing

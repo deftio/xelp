@@ -29,6 +29,61 @@
 <p>See also: <a href="https://github.com/deftio/xelp/blob/master/CHANGELOG.md">CHANGELOG.md</a>
 on GitHub for the full changelog.</p>
 
+<h2>v0.3.1 (2026-04-26)</h2>
+<ul>
+  <li><strong>Function rename</strong>: all public functions renamed from
+      <code>XELP</code> prefix to <code>Xelp</code> prefix (e.g.
+      <code>XELPInit</code> &rarr; <code>XelpInit</code>). Types, macros,
+      and constants retain <code>XELP</code>.</li>
+  <li><strong>Single-line editing</strong> (<code>XELP_ENABLE_LINE_EDIT</code>):
+      left/right cursor movement, Home/End, insert-at-cursor, Delete.
+      Eliminates garbage <code>[A</code> characters from arrow keys.</li>
+  <li><strong>Multi-byte key support</strong>: <code>XELPKEYCODE</code> type
+      and named macros (<code>XELP_KEYCODE_UP</code>, etc.) for ANSI escape
+      sequences in KEY mode dispatch.</li>
+  <li><strong>Output control</strong>: <code>mOutEnable</code> gates all output;
+      <code>mEchoChar</code> controls echo (normal, off, or mask character).</li>
+  <li><code>XelpArgs</code> sequential argument iterator:
+      <code>XelpArgsInit</code>, <code>XelpNextTok</code>,
+      <code>XelpNextInt</code>, <code>XelpArgCount</code>.</li>
+  <li><code>XelpPutc</code> function for single-character output.</li>
+  <li>Fuzz testing with libFuzzer; found and fixed SEGV in
+      <code>XelpTokLineXB</code>.</li>
+  <li>Multi-instance stress test (two interleaved instances).</li>
+  <li>Cross-build Docker tooling: <code>extract_size.py</code> for robust
+      multi-format size extraction. 18 targets, KEY/CLI/FULL configurations.</li>
+  <li>Internal macros converted to static functions (~28 bytes saved).</li>
+  <li>Test suite expanded to 39 units, 531 test cases.</li>
+  <li><strong>BREAKING</strong>: KEY command signature changed from
+      <code>fn(XELP *ths, int key)</code> to
+      <code>fn(XELP *ths, XELPKEYCODE key)</code>.</li>
+</ul>
+
+<h2>v0.3.0 (2026-04-19)</h2>
+<ul>
+  <li><strong>BREAKING</strong>: CLI command signature changed from
+      <code>fn(const char *args, int len)</code> to
+      <code>fn(XELP *ths, const char *args, int len)</code>.</li>
+  <li><strong>BREAKING</strong>: KEY command signature changed from
+      <code>fn(int key)</code> to <code>fn(XELP *ths, int key)</code>.</li>
+  <li><strong>BREAKING</strong>: XelpBuf macros normalized to SCREAMING_CASE
+      (<code>XELP_XB_INIT</code>, <code>XELP_XB_PUTC</code>, etc.).</li>
+  <li>Cross-compilation targets: m68k, RISC-V rv32, Xtensa LX106 added.</li>
+  <li>Multi-instance example rewritten to use <code>ths</code> pointer.</li>
+</ul>
+
+<h2>v0.2.3 (2026-04-17)</h2>
+<ul>
+  <li>Fixed 10 bugs across xelp.h, xelp.c, xelpcfg.h</li>
+  <li>API naming consistency: all public functions use <code>XELP</code> prefix</li>
+  <li>Status codes normalized to SCREAMING_CASE</li>
+  <li><code>XELP_VERSION</code> changed to 32-bit <code>0x00MMmmpp</code> format</li>
+  <li>Replaced defunct Travis CI with GitHub Actions</li>
+  <li>Default command handlers (<code>mpfDefKey</code>, <code>mpfDefCLI</code>)</li>
+  <li>100% line coverage of xelp.c (269 test cases)</li>
+  <li>Docker cross-compilation tooling, release script, documentation</li>
+</ul>
+
 <h2>v0.2.1 (2024-06-05)</h2>
 <ul>
   <li>Added <code>XelpParseNum</code> for safer string-to-integer conversion</li>

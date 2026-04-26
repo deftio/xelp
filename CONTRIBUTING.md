@@ -11,7 +11,7 @@ every embedded C programmer want this?" and the bar for bug fixes is
 ```bash
 git clone https://github.com/deftio/xelp.git
 cd xelp
-make tests         # build and run the unit test suite
+make validate      # build, run tests, and build all examples
 make clean         # remove build artifacts
 ```
 
@@ -158,7 +158,7 @@ Workflow:
 3. Make your changes. Ensure `make validate` passes with zero warnings
    and coverage doesn't drop.
 4. Push your branch and open a PR against `master`.
-5. CI will run automatically (Ubuntu + macOS, GCC + Clang, 32-bit).
+5. CI will run automatically (Ubuntu + macOS, GCC + Clang, `make validate`).
    All checks must pass.
 6. A maintainer will review and merge.
 
@@ -192,10 +192,9 @@ See `release_management.md` for full details.
 Every push and PR to `master` triggers GitHub Actions
 (`.github/workflows/ci.yml`):
 
-- Build matrix: Ubuntu + macOS, GCC + Clang
-- 32-bit build: Ubuntu with `-m32`
-- Zero-warning enforcement
-- Coverage report (Ubuntu/GCC)
+- **Build matrix**: Ubuntu + macOS, GCC + Clang — runs `make validate`
+- **Coverage report**: gcov on Ubuntu/GCC
+- CI runs exactly what you run locally (`make validate`). No extra jobs.
 
 Tag pushes (`v*`) trigger the release workflow
 (`.github/workflows/release.yml`) which validates and creates a

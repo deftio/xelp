@@ -10,6 +10,8 @@ Versions always use three-component semver (e.g. `0.3.0`, never `0.3`).
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-04-26
+
 ### Changed
 - **Function naming convention**: all public functions renamed from
   `XELP` prefix to `Xelp` prefix (e.g. `XELPInit` -> `XelpInit`,

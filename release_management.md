@@ -129,10 +129,9 @@ Rules:
 
 Runs on every push and PR to `master`:
 
-- **Build matrix**: Ubuntu + macOS, GCC + Clang
-- **32-bit build**: Ubuntu with `-m32`
-- **Zero-warning check**: Fails CI if any compiler warnings detected
+- **Build matrix**: Ubuntu + macOS, GCC + Clang — each runs `make validate`
 - **Coverage**: gcov report on Ubuntu/GCC
+- CI mirrors local validation exactly. No extra jobs beyond `make validate`.
 
 ### Release CI (`.github/workflows/release.yml`)
 
