@@ -106,6 +106,11 @@ do_extract_version() {
   Fix XELP_VERSION in src/xelp.h to use format 0x00MMmmpp."
     fi
 
+    # Enforce three-component semver (e.g. 0.3.0, never 0.3)
+    if ! echo "$VER_STRING" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+        fail "Version '$VER_STRING' is not three-component semver (expected X.Y.Z)"
+    fi
+
     echo "  Version: $VER_STRING ($VER_HEX)"
     echo "  Tag:     $VER_TAG"
     cat build/xelp_version.yaml
@@ -905,8 +910,6 @@ echo "============================================"
 
 # -- Always run (validation + pipeline prep) --
 do_extract_version
-do_sync_manifests
-do_update_badges
 do_validate
 
 if [ "$MODE" = "validate" ]; then
@@ -922,6 +925,15 @@ fi
 do_crossbuild
 do_commit_pipeline_changes
 do_check_git
+do_sync_manifests
+do_update_badges
+
+# Auto-commit manifest and badge updates (if any files were staged)
+if [ -n "$(git diff --cached --name-only)" ]; then
+    step_header "Commit manifest and badge updates"
+    run_cmd git commit -m "Sync manifests and badges for $VER_STRING"
+    pass "Committed version sync changes."
+fi
 
 if $TAG_EXISTS; then
     # Re-run: tag exists but release doesn't -- just wait for it
