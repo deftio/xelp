@@ -27,7 +27,7 @@ const char *script =
     "gain 75\n"
     "status\n";
 
-XELPParse(&cli, script, XELPStrLen(script));
+XELPParse(&cli, script, XelpStrLen(script));
 ```
 
 Semicolons work too:
@@ -36,7 +36,7 @@ Semicolons work too:
 XELPParse(&cli, "echo start; led 1; gain 100; status", ...);
 ```
 
-### Interactive mode (`XELPParseKey`)
+### Interactive mode (`XelpParseKey`)
 
 Process one character at a time. Handles echoing, backspace, line
 editing, and dispatching on ENTER. This is what you use in your main
@@ -45,7 +45,7 @@ loop for serial/USB input from a human.
 ```c
 for (;;) {
     if (uart_rx_ready())
-        XELPParseKey(&cli, uart_getc());
+        XelpParseKey(&cli, uart_getc());
 }
 ```
 
@@ -64,6 +64,6 @@ for (;;) {
 - **Startup scripts** stored as const strings (ROM/flash safe)
 - **One-liner macros** using semicolons as separators
 - **`XELPParseXB`** for driving xelp from a `XelpBuf` struct
-- **Simulated interactive typing** using `XELPParseKey` in a loop
+- **Simulated interactive typing** using `XelpParseKey` in a loop
 - Both modes use the same command table and can be mixed on the same
   instance

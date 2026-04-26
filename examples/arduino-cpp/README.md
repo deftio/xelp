@@ -31,7 +31,7 @@ C-style static command table. Eliminates boilerplate: no manual
 - **`begin()` + `setCommands()` + `setPrompt()`** -- the C-way setup
   using a static `XELPCLIFuncMapEntry[]` array
 - **`poll(Serial)`** in `loop()` -- replaces the manual
-  `Serial.available()` / `Serial.read()` / `XELPParseKey()` pattern
+  `Serial.available()` / `Serial.read()` / `XelpParseKey()` pattern
 - **`run()`** -- execute a startup script at boot
 - **Register accessors** -- `r0()` through `r3()` for reading command
   return values (shown with the `divmod` command)

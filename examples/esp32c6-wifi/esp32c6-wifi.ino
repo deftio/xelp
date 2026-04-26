@@ -113,14 +113,14 @@ XELPRESULT cmdSsid(XELP *ths, const char *args, int len)
 {
     XelpBuf b, tok;
     XELP_XB_INIT(b, (char *)args, len);
-    if (XELPTokN(&b, 1, &tok) == XELP_S_OK) {
+    if (XelpTokN(&b, 1, &tok) == XELP_S_OK) {
         tokCopy(gSsid, sizeof(gSsid), tok.s, tok.p);
         nvsSave();
-        XELPOut(ths, "SSID set: ", 0);
-        XELPOut(ths, gSsid, 0);
-        XELPOut(ths, " (saved)\n", 0);
+        XelpOut(ths, "SSID set: ", 0);
+        XelpOut(ths, gSsid, 0);
+        XelpOut(ths, " (saved)\n", 0);
     } else {
-        XELPOut(ths, "usage: ssid <name>\n", 0);
+        XelpOut(ths, "usage: ssid <name>\n", 0);
     }
     return XELP_S_OK;
 }
@@ -129,12 +129,12 @@ XELPRESULT cmdWifiPass(XELP *ths, const char *args, int len)
 {
     XelpBuf b, tok;
     XELP_XB_INIT(b, (char *)args, len);
-    if (XELPTokN(&b, 1, &tok) == XELP_S_OK) {
+    if (XelpTokN(&b, 1, &tok) == XELP_S_OK) {
         tokCopy(gPass, sizeof(gPass), tok.s, tok.p);
         nvsSave();
-        XELPOut(ths, "Password set (saved)\n", 0);
+        XelpOut(ths, "Password set (saved)\n", 0);
     } else {
-        XELPOut(ths, "usage: wifipass <password>\n", 0);
+        XelpOut(ths, "usage: wifipass <password>\n", 0);
     }
     return XELP_S_OK;
 }
@@ -143,28 +143,28 @@ XELPRESULT cmdConnect(XELP *ths, const char *args, int len)
 {
     (void)args; (void)len;
     if (gSsid[0] == '\0') {
-        XELPOut(ths, "Set SSID first: ssid <name>\n", 0);
+        XelpOut(ths, "Set SSID first: ssid <name>\n", 0);
         return XELP_E_ERR;
     }
-    XELPOut(ths, "Connecting to ", 0);
-    XELPOut(ths, gSsid, 0);
-    XELPOut(ths, "...", 0);
+    XelpOut(ths, "Connecting to ", 0);
+    XelpOut(ths, gSsid, 0);
+    XelpOut(ths, "...", 0);
 
     WiFi.begin(gSsid, gPass);
 
     int timeout = 40; /* 40 * 250ms = 10s */
     while (WiFi.status() != WL_CONNECTED && timeout > 0) {
         delay(250);
-        XELPOut(ths, ".", 0);
+        XelpOut(ths, ".", 0);
         timeout--;
     }
 
     if (WiFi.status() == WL_CONNECTED) {
-        XELPOut(ths, " OK\nIP: ", 0);
-        XELPOut(ths, WiFi.localIP().toString().c_str(), 0);
-        XELPOut(ths, "\n", 0);
+        XelpOut(ths, " OK\nIP: ", 0);
+        XelpOut(ths, WiFi.localIP().toString().c_str(), 0);
+        XelpOut(ths, "\n", 0);
     } else {
-        XELPOut(ths, " FAILED\n", 0);
+        XelpOut(ths, " FAILED\n", 0);
     }
     return XELP_S_OK;
 }
@@ -173,7 +173,7 @@ XELPRESULT cmdDisconnect(XELP *ths, const char *args, int len)
 {
     (void)args; (void)len;
     WiFi.disconnect();
-    XELPOut(ths, "Disconnected\n", 0);
+    XelpOut(ths, "Disconnected\n", 0);
     return XELP_S_OK;
 }
 
@@ -184,23 +184,23 @@ XELPRESULT cmdStatus(XELP *ths, const char *args, int len)
 
     /* WiFi */
     if (WiFi.status() == WL_CONNECTED) {
-        XELPOut(ths, "WiFi: connected\nSSID: ", 0);
-        XELPOut(ths, gSsid, 0);
-        XELPOut(ths, "\nIP:   ", 0);
-        XELPOut(ths, WiFi.localIP().toString().c_str(), 0);
+        XelpOut(ths, "WiFi: connected\nSSID: ", 0);
+        XelpOut(ths, gSsid, 0);
+        XelpOut(ths, "\nIP:   ", 0);
+        XelpOut(ths, WiFi.localIP().toString().c_str(), 0);
         snprintf(buf, sizeof(buf), "\nRSSI: %d dBm\n", WiFi.RSSI());
-        XELPOut(ths, buf, 0);
+        XelpOut(ths, buf, 0);
     } else {
-        XELPOut(ths, "WiFi: not connected\n", 0);
+        XelpOut(ths, "WiFi: not connected\n", 0);
         if (gSsid[0]) {
-            XELPOut(ths, "SSID: ", 0);
-            XELPOut(ths, gSsid, 0);
-            XELPOut(ths, " (saved)\n", 0);
+            XelpOut(ths, "SSID: ", 0);
+            XelpOut(ths, gSsid, 0);
+            XelpOut(ths, " (saved)\n", 0);
         }
     }
 
     /* BLE */
-    XELPOut(ths, bleConnected ? "BLE:  connected\n" : "BLE:  advertising\n", 0);
+    XelpOut(ths, bleConnected ? "BLE:  connected\n" : "BLE:  advertising\n", 0);
 
     return XELP_S_OK;
 }
@@ -209,12 +209,12 @@ XELPRESULT cmdLed(XELP *ths, const char *args, int len)
 {
     XelpBuf b, tok;
     XELP_XB_INIT(b, (char *)args, len);
-    if (XELPTokN(&b, 1, &tok) == XELP_S_OK) {
-        int val = XELPStr2Int(tok.s, (int)(tok.p - tok.s));
+    if (XelpTokN(&b, 1, &tok) == XELP_S_OK) {
+        int val = XelpStr2Int(tok.s, (int)(tok.p - tok.s));
         digitalWrite(LED_BUILTIN, val ? HIGH : LOW);
-        XELPOut(ths, val ? "LED ON\n" : "LED OFF\n", 0);
+        XelpOut(ths, val ? "LED ON\n" : "LED OFF\n", 0);
     } else {
-        XELPOut(ths, "usage: led <0|1>\n", 0);
+        XelpOut(ths, "usage: led <0|1>\n", 0);
     }
     return XELP_S_OK;
 }
@@ -231,16 +231,16 @@ XELPRESULT cmdAdc(XELP *ths, const char *args, int len)
     char buf[32];
     /* dtostrf is available on ESP32 Arduino */
     dtostrf(volts, 1, 3, buf);
-    XELPOut(ths, "A0: ", 0);
-    XELPOut(ths, buf, 0);
-    XELPOut(ths, " V\n", 0);
+    XelpOut(ths, "A0: ", 0);
+    XelpOut(ths, buf, 0);
+    XelpOut(ths, " V\n", 0);
     return XELP_S_OK;
 }
 
 XELPRESULT cmdHelp(XELP *ths, const char *args, int len)
 {
     (void)args; (void)len;
-    return XELPHelp(ths);
+    return XelpHelp(ths);
 }
 
 /* ------------------------------------------------------------------ */
@@ -282,7 +282,7 @@ class RxCallbacks : public NimBLECharacteristicCallbacks {
         (void)connInfo;
         std::string val = c->getValue();
         for (size_t i = 0; i < val.length(); i++) {
-            XELPParseKey(cliBle.raw(), val[i]);
+            XelpParseKey(cliBle.raw(), val[i]);
         }
     }
 };

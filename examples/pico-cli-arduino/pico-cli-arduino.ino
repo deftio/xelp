@@ -40,7 +40,7 @@ void setup()
         }},
         {"adc", "adc <pin> -- read analog", [](XelpCLI& c, int argc, const char** argv) {
             if (argc < 2) { c.print("usage: adc <pin>\n"); return; }
-            int pin = XELPStr2Int(argv[1], XELPStrLen(argv[1]));
+            int pin = XelpStr2Int(argv[1], XelpStrLen(argv[1]));
             int val = analogRead(pin);
             char buf[32];
             snprintf(buf, sizeof(buf), "A%d: %d\n", pin, val);
@@ -48,14 +48,14 @@ void setup()
         }},
         {"pwm", "pwm <pin> <0-255>", [](XelpCLI& c, int argc, const char** argv) {
             if (argc < 3) { c.print("usage: pwm <pin> <duty>\n"); return; }
-            int pin  = XELPStr2Int(argv[1], XELPStrLen(argv[1]));
-            int duty = XELPStr2Int(argv[2], XELPStrLen(argv[2]));
+            int pin  = XelpStr2Int(argv[1], XelpStrLen(argv[1]));
+            int duty = XelpStr2Int(argv[2], XelpStrLen(argv[2]));
             analogWrite(pin, duty);
             c.print("OK\n");
         }},
         {"pin", "pin <n> <in|out>", [](XelpCLI& c, int argc, const char** argv) {
             if (argc < 3) { c.print("usage: pin <n> <in|out>\n"); return; }
-            int pin = XELPStr2Int(argv[1], XELPStrLen(argv[1]));
+            int pin = XelpStr2Int(argv[1], XelpStrLen(argv[1]));
             if (argv[2][0] == 'o') {
                 pinMode(pin, OUTPUT);
                 c.print("output\n");
@@ -66,14 +66,14 @@ void setup()
         }},
         {"set", "set <pin> <0|1>", [](XelpCLI& c, int argc, const char** argv) {
             if (argc < 3) { c.print("usage: set <pin> <0|1>\n"); return; }
-            int pin = XELPStr2Int(argv[1], XELPStrLen(argv[1]));
-            int val = XELPStr2Int(argv[2], XELPStrLen(argv[2]));
+            int pin = XelpStr2Int(argv[1], XelpStrLen(argv[1]));
+            int val = XelpStr2Int(argv[2], XelpStrLen(argv[2]));
             digitalWrite(pin, val ? HIGH : LOW);
             c.print(val ? "HIGH\n" : "LOW\n");
         }},
         {"get", "get <pin> -- read level", [](XelpCLI& c, int argc, const char** argv) {
             if (argc < 2) { c.print("usage: get <pin>\n"); return; }
-            int pin = XELPStr2Int(argv[1], XELPStrLen(argv[1]));
+            int pin = XelpStr2Int(argv[1], XelpStrLen(argv[1]));
             int val = digitalRead(pin);
             c.print(val ? "HIGH\n" : "LOW\n");
         }},

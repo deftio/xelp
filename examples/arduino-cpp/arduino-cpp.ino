@@ -33,7 +33,7 @@ XelpCLI cli;
 XELPRESULT cmdHelp(XELP *ths, const char* args, int len)
 {
     (void)args; (void)len;
-    return XELPHelp(ths);
+    return XelpHelp(ths);
 }
 
 XELPRESULT cmdEcho(XELP *ths, const char* args, int len)
@@ -41,15 +41,15 @@ XELPRESULT cmdEcho(XELP *ths, const char* args, int len)
     XelpBuf b, tok;
     int i, n;
     XELP_XB_INIT(b, (char*)args, len);
-    XELPNumToks(&b, &n);
+    XelpNumToks(&b, &n);
     for (i = 1; i < n; i++) {
         XELP_XB_TOP(b);
-        if (XELPTokN(&b, i, &tok) == XELP_S_OK) {
-            if (i > 1) XELPOut(ths, " ", 0);
-            XELPOut(ths, tok.s, (int)(tok.p - tok.s));
+        if (XelpTokN(&b, i, &tok) == XELP_S_OK) {
+            if (i > 1) XelpOut(ths, " ", 0);
+            XelpOut(ths, tok.s, (int)(tok.p - tok.s));
         }
     }
-    XELPOut(ths, "\n", 0);
+    XelpOut(ths, "\n", 0);
     return XELP_S_OK;
 }
 
@@ -60,10 +60,10 @@ XELPRESULT cmdLed(XELP *ths, const char* args, int len)
     XelpBuf b, tok;
     int val;
     XELP_XB_INIT(b, (char*)args, len);
-    if (XELPTokN(&b, 1, &tok) == XELP_S_OK) {
-        XELPParseNum(tok.s, (int)(tok.p - tok.s), &val);
+    if (XelpTokN(&b, 1, &tok) == XELP_S_OK) {
+        XelpParseNum(tok.s, (int)(tok.p - tok.s), &val);
         digitalWrite(gLedPin, val ? HIGH : LOW);
-        XELPOut(ths, val ? "LED ON\n" : "LED OFF\n", 0);
+        XelpOut(ths, val ? "LED ON\n" : "LED OFF\n", 0);
     }
     return XELP_S_OK;
 }
@@ -76,15 +76,15 @@ XELPRESULT cmdDivmod(XELP *ths, const char *args, int len)
     XELP_XB_INIT(b, (char*)args, len);
 
     XELP_XB_TOP(b);
-    if (XELPTokN(&b, 1, &tok) != XELP_S_OK) goto usage;
-    a = XELPStr2Int(tok.s, (int)(tok.p - tok.s));
+    if (XelpTokN(&b, 1, &tok) != XELP_S_OK) goto usage;
+    a = XelpStr2Int(tok.s, (int)(tok.p - tok.s));
 
     XELP_XB_TOP(b);
-    if (XELPTokN(&b, 2, &tok) != XELP_S_OK) goto usage;
-    d = XELPStr2Int(tok.s, (int)(tok.p - tok.s));
+    if (XelpTokN(&b, 2, &tok) != XELP_S_OK) goto usage;
+    d = XelpStr2Int(tok.s, (int)(tok.p - tok.s));
 
     if (d == 0) {
-        XELPOut(ths, "division by zero\n", 0);
+        XelpOut(ths, "division by zero\n", 0);
         return XELP_E_ERR;
     }
 
@@ -93,7 +93,7 @@ XELPRESULT cmdDivmod(XELP *ths, const char *args, int len)
     return XELP_S_OK;
 
 usage:
-    XELPOut(ths, "usage: divmod <a> <b>\n", 0);
+    XelpOut(ths, "usage: divmod <a> <b>\n", 0);
     return XELP_E_ERR;
 }
 
@@ -104,7 +104,7 @@ XELPRESULT cmdPrintR(XELP *ths, const char *args, int len)
     (void)args; (void)len;
     snprintf(buf, sizeof(buf), "R0=%d R1=%d R2=%d R3=%d\n",
              XELP_R0(*ths), XELP_R1(*ths), XELP_R2(*ths), XELP_R3(*ths));
-    XELPOut(ths, buf, 0);
+    XelpOut(ths, buf, 0);
     return XELP_S_OK;
 }
 

@@ -38,7 +38,7 @@ prompt, command table, and state. Demonstrates that xelp uses no globals.
 
 Demonstrates the difference between **scripting mode** (`XELPParse` /
 `XELPParseXB` -- execute a buffer of commands at once) and **interactive
-mode** (`XELPParseKey` -- character-by-character terminal input). Shows
+mode** (`XelpParseKey` -- character-by-character terminal input). Shows
 startup scripts, one-liner macros with semicolons, and the `XelpBuf` API.
 
 ```bash

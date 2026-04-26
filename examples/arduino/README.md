@@ -27,10 +27,10 @@ and built-in help. No external library dependencies.
 
 ## What It Demonstrates
 
-- Direct use of `XELPInit()`, `XELP_SET_FN_OUT()`, `XELP_SET_FN_CLI()`
+- Direct use of `XelpInit()`, `XELP_SET_FN_OUT()`, `XELP_SET_FN_CLI()`
 - Static `XELPCLIFuncMapEntry[]` command table with sentinel
-- Manual `Serial.available()` / `XELPParseKey()` loop
-- Token parsing with `XELPTokN()` and `XELPNumToks()`
+- Manual `Serial.available()` / `XelpParseKey()` loop
+- Token parsing with `XelpTokN()` and `XelpNumToks()`
 
 For the C++ wrapper approach, see [arduino-cpp](../arduino-cpp/).
 For the Easy API with lambdas, see [pico-cli-arduino](../pico-cli-arduino/).

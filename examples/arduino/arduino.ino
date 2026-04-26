@@ -27,7 +27,7 @@ void writeChar(char c) {
 
 XELPRESULT cmdHelp(XELP *ths, const char* args_str, int maxlen) {
     (void)args_str; (void)maxlen;
-    return XELPHelp(ths);
+    return XelpHelp(ths);
 }
 
 XELPRESULT cmdBanner(XELP *ths, const char* args_str, int maxlen) {
@@ -40,10 +40,10 @@ XELPRESULT cmdLed(XELP *ths, const char* args_str, int maxlen) {
     XelpBuf b, tok;
     int val;
     XELP_XB_INIT(b, (char*)args_str, maxlen);
-    if (XELPTokN(&b, 1, &tok) == XELP_S_OK) {
-        XELPParseNum(tok.s, (int)(tok.p - tok.s), &val);
+    if (XelpTokN(&b, 1, &tok) == XELP_S_OK) {
+        XelpParseNum(tok.s, (int)(tok.p - tok.s), &val);
         digitalWrite(LED_BUILTIN, val ? HIGH : LOW);
-        XELPOut(ths, val ? "LED ON\n" : "LED OFF\n", 0);
+        XelpOut(ths, val ? "LED ON\n" : "LED OFF\n", 0);
     }
     return XELP_S_OK;
 }
@@ -52,18 +52,18 @@ XELPRESULT cmdListToks(XELP *ths, const char* args_str, int maxlen) {
     XelpBuf b, tok;
     int n, i;
     XELP_XB_INIT(b, (char*)args_str, maxlen);
-    XELPNumToks(&b, &n);
+    XelpNumToks(&b, &n);
     Serial.print("[");
     Serial.print(n);
     Serial.print("]");
     for (i = 0; i < n; i++) {
         XELP_XB_TOP(b);
-        XELPTokN(&b, i, &tok);
-        XELPOut(ths, "<", -1);
+        XelpTokN(&b, i, &tok);
+        XelpOut(ths, "<", -1);
         Serial.print(i);
-        XELPOut(ths, ":", -1);
-        XELPOut(ths, tok.s, tok.p - tok.s);
-        XELPOut(ths, "> ", -1);
+        XelpOut(ths, ":", -1);
+        XelpOut(ths, tok.s, tok.p - tok.s);
+        XelpOut(ths, "> ", -1);
     }
     Serial.print("\n");
     return XELP_S_OK;
@@ -91,7 +91,7 @@ void setup() {
 
     pinMode(LED_BUILTIN, OUTPUT);
 
-    XELPInit(&cli, "xelp Arduino example v1.0\n");
+    XelpInit(&cli, "xelp Arduino example v1.0\n");
     XELP_SET_FN_OUT(cli, &writeChar);
     XELP_SET_FN_CLI(cli, gMyCLICommands);
 
@@ -105,6 +105,6 @@ void setup() {
 void loop() {
     if (Serial.available() > 0) {
         char c = Serial.read();
-        XELPParseKey(&cli, c);
+        XelpParseKey(&cli, c);
     }
 }

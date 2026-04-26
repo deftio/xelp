@@ -31,8 +31,8 @@ state. Demonstrates that xelp uses no global variables.
 ## Architecture
 
 ```
-UART0 rx  ──>  XELPParseKey(&cli_a, c)  ──>  uart0_putc()
-UART1 rx  ──>  XELPParseKey(&cli_b, c)  ──>  uart1_putc()
+UART0 rx  ──>  XelpParseKey(&cli_a, c)  ──>  uart0_putc()
+UART1 rx  ──>  XelpParseKey(&cli_b, c)  ──>  uart1_putc()
 ```
 
 Each instance maintains its own line buffer, mode state (CLI/KEY/THR),
