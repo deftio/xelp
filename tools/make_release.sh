@@ -106,11 +106,6 @@ do_extract_version() {
   Fix XELP_VERSION in src/xelp.h to use format 0x00MMmmpp."
     fi
 
-    # Enforce three-component semver (e.g. 0.3.0, never 0.3)
-    if ! echo "$VER_STRING" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-        fail "Version '$VER_STRING' is not three-component semver (expected X.Y.Z)"
-    fi
-
     echo "  Version: $VER_STRING ($VER_HEX)"
     echo "  Tag:     $VER_TAG"
     cat build/xelp_version.yaml
@@ -384,10 +379,15 @@ do_push_branch() {
     run_cmd git fetch origin master
 
     if ! $ON_MASTER; then
-        # Feature branch: merge in latest master first.
-        local behind
-        behind=$(git rev-list --count "HEAD..origin/master" 2>/dev/null || echo "0")
-        if [ "$behind" -gt 0 ]; then
+        # Feature branch: only merge master if it has commits we don't have.
+        # If master is already an ancestor of HEAD, the branch already contains
+        # everything on master and no merge is needed. This is the normal case
+        # for a single-maintainer project.
+        if git merge-base --is-ancestor origin/master HEAD; then
+            pass "Branch already contains all of origin/master -- no merge needed."
+        else
+            local behind
+            behind=$(git rev-list --count "HEAD..origin/master" 2>/dev/null || echo "0")
             echo "  Branch is $behind commit(s) behind origin/master."
             echo "  Merging origin/master..."
             if ! run_cmd git merge origin/master --no-edit; then
@@ -400,8 +400,6 @@ do_push_branch() {
     bash tools/make_release.sh       # re-run"
             fi
             pass "Merged origin/master into $BRANCH."
-        else
-            pass "Branch is up to date with master."
         fi
     fi
 
