@@ -460,11 +460,13 @@ Linker dead-code elimination reduces this to only what's actually called.
      existing prototype (wasteful but compatible)
    - Both, selected per function entry in the table
 
-3. **Shared registers:** Should `vm_regs[]` and the existing `mR[]`
-   register file be unified? They serve different purposes today (mR is
-   for script return values, vm_regs for VM computation), but merging
-   would save RAM and simplify bridging. Depends on whether SCRIPT and
-   VM are expected to interleave on the same instance.
+3. **Shared registers: RESOLVED -- keep separate.** `mR[0..3]` is a
+   return-value mailbox (callee-clobbers-all, read by the caller after
+   command dispatch). `vm_regs[]` is computational state that persists
+   across VM instructions and is saved/restored on CALL/RET frames.
+   They serve fundamentally different purposes. A VM `CFUNC` opcode
+   that dispatches a CLI command will naturally clobber `mR[]` as a
+   side effect, but `vm_regs[]` remains untouched.
 
 4. **32-bit immediates:** The `LOADIL` instruction needs 6 bytes (2 opcode
    + 4 immediate). Is this common enough to justify, or should large

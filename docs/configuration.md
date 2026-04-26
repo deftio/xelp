@@ -9,10 +9,10 @@ compiled out saves code space.
 | Flag | Purpose | Size Impact |
 |------|---------|-------------|
 | `XELP_ENABLE_CLI` | Command line mode with prompt, backspace, and command dispatch | Required for CLI and scripting |
+| `XELP_ENABLE_LINE_EDIT` | Cursor movement (left/right, Home/End), insert-at-cursor, Delete. Requires `XELP_ENABLE_CLI`. | ~800--1000 bytes |
 | `XELP_ENABLE_KEY` | Single key press mode (menus, immediate actions) | ~200--500 bytes |
 | `XELP_ENABLE_THR` | Pass-through mode (redirect keys to another peripheral) | ~50--125 bytes |
 | `XELP_ENABLE_HELP` | Built-in help function listing all commands | ~180--350 bytes |
-| `XELP_ENABLE_LCORE` | Language core features: peek, poke, go | Variable |
 | `XELP_ENABLE_FULL` | Enable all of the above | All combined |
 
 ## Key Mappings
@@ -39,9 +39,8 @@ Override by redefining in `xelpcfg.h`, e.g. `#define XELPKEY_CLI ('c')`
 | Define | Default | Purpose |
 |--------|---------|---------|
 | `XELP_CMDBUFSZ` | 64 | Command line buffer size in bytes |
-| `XELP_REGS_SZ` | 2 | Number of integer registers (min 1, R0 is return value) |
+| `XELP_REGS_SZ` | 4 | Number of callee-clobbers-all return registers (minimum 4). R0 is command status, R1-R3 are command-specific. |
 | `XELPREG` | `int` | Register type (change for platforms where `int` is not ideal) |
-| `XELP_STACK_DEPTH` | 16 | Stack depth for stack machine operations |
 
 ## Prompt
 
@@ -75,7 +74,7 @@ filesystems.
 ```c
 /* xelpcfg.h */
 #define XELP_ENABLE_KEY   1
-/* Leave CLI, THR, HELP, LCORE undefined */
+/* Leave CLI, LINE_EDIT, THR, HELP undefined */
 ```
 
 Estimated size: ~900 bytes

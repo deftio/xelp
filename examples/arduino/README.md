@@ -1,7 +1,36 @@
-# Arduino Example
+# Arduino (Raw C API)
 
-Basic xelp example using the raw C API. Works on any Arduino board
-with a Serial port.
+Basic xelp example using the raw C API directly (no C++ wrapper). Works
+on any Arduino board with a Serial port -- LED control, token listing,
+and built-in help. No external library dependencies.
 
-Install xelp via the Arduino Library Manager, then open this sketch.
-Open the Serial Monitor at 115200 baud and type `help`.
+## Requirements
+
+- Any Arduino board (Uno, Mega, Nano, ESP32, RP2040, etc.)
+- xelp installed via Arduino Library Manager or symlinked from `src/`
+
+## Setup
+
+1. Open `arduino.ino` in the Arduino IDE.
+2. Select your board and port.
+3. Upload and open the Serial Monitor at **115200 baud**.
+4. Type `help` and press ENTER.
+
+## Commands
+
+| Command | Description |
+|---------|-------------|
+| `help` | Show all commands |
+| `banner` | Print xelp ASCII art |
+| `led <0\|1>` | Turn on-board LED on/off |
+| `lt <args>` | List parsed tokens |
+
+## What It Demonstrates
+
+- Direct use of `XelpInit()`, `XELP_SET_FN_OUT()`, `XELP_SET_FN_CLI()`
+- Static `XELPCLIFuncMapEntry[]` command table with sentinel
+- Manual `Serial.available()` / `XelpParseKey()` loop
+- Token parsing with `XelpTokN()` and `XelpNumToks()`
+
+For the C++ wrapper approach, see [arduino-cpp](../arduino-cpp/).
+For the Easy API with lambdas, see [pico-cli-arduino](../pico-cli-arduino/).

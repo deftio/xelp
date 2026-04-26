@@ -7,10 +7,20 @@ Demonstrates CLI commands, KEY mode, THR mode, math operations, and
 token parsing.
 
 ```bash
-make example    # from repo root
+cd posix-simple && make
 ```
 
 Requires ncurses: `sudo apt-get install libncurses5-dev` (Linux).
+
+## posix-simple-cpp
+
+Same functionality as `posix-simple` but written in C++ using the `XelpCLI`
+wrapper and **Easy API** (`commands({...})` with inline lambdas). No static
+function tables, no raw `XELP*` pointers. Requires C++17.
+
+```bash
+cd posix-simple-cpp && make
+```
 
 ## bare-metal
 
@@ -28,12 +38,11 @@ prompt, command table, and state. Demonstrates that xelp uses no globals.
 
 Demonstrates the difference between **scripting mode** (`XELPParse` /
 `XELPParseXB` -- execute a buffer of commands at once) and **interactive
-mode** (`XELPParseKey` -- character-by-character terminal input). Shows
+mode** (`XelpParseKey` -- character-by-character terminal input). Shows
 startup scripts, one-liner macros with semicolons, and the `XelpBuf` API.
 
 ```bash
-gcc -Wall -Isrc examples/scripting/scripting-example.c src/xelp.c -o scripting-example
-./scripting-example
+cd scripting && make
 ```
 
 ## arduino
@@ -58,3 +67,17 @@ over the serial CLI, then fetch the current time and weather from free
 APIs (worldtimeapi.org and open-meteo.com). No API keys needed.
 
 Requires an ESP32 board and the ESP32 Arduino core.
+
+## pico-cli
+
+Pure C example for Raspberry Pi Pico / Pico W / Pico 2 using the
+Pico SDK. Controls GPIO, ADC, and PWM over USB CDC serial. Automatically
+handles Pico W LED (CYW43 driver). See `pico-cli/README.md` for build
+instructions.
+
+## pico-cli-arduino
+
+Raspberry Pi Pico example using the **C++ Easy API**. Commands are
+registered with `commands({...})` using inline lambdas -- no static
+tables, no raw `XELP*` pointers. Uses the Arduino-Pico core by Earle
+Philhower. See `pico-cli-arduino/README.md` for details.

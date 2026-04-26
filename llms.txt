@@ -2,7 +2,8 @@
 
 > xelp is a command line interpreter and script engine for embedded systems,
 > written in pure C. Zero dynamic memory. No OS required. No standard library
-> dependencies. 900 bytes to 4 KB compiled depending on features enabled.
+> dependencies. Under 1 KB (key dispatch only) to ~5 KB (full CLI with line
+> editing) compiled depending on features enabled.
 > Works on 8-bit (AVR, 8051) through 64-bit (ARM64, x86-64) targets.
 
 xelp gives bare-metal firmware a real interactive CLI with scriptable
@@ -21,7 +22,7 @@ commands, single-key menus, and pass-through mode. Three source files
 ## Code
 
 - [xelp.h](https://github.com/deftio/xelp/blob/master/src/xelp.h): Public API header -- types, macros, function declarations
-- [xelp.c](https://github.com/deftio/xelp/blob/master/src/xelp.c): Implementation (~700 lines)
+- [xelp.c](https://github.com/deftio/xelp/blob/master/src/xelp.c): Implementation (~980 lines)
 - [xelpcfg.h](https://github.com/deftio/xelp/blob/master/src/xelpcfg.h): Compile-time configuration
 
 ## Examples

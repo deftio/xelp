@@ -15,12 +15,12 @@ compiler.
 
 - **No malloc, no heap.** Never suggest `malloc`, `calloc`, `strdup`,
   `asprintf`, or any dynamic allocation in xelp-related code.
-- **No stdlib string functions.** xelp provides its own: `XELPStrLen`,
-  `XELPStrEq`, `XELPStr2Int`, `XELPParseNum`. Do not use `strlen`,
+- **No stdlib string functions.** xelp provides its own: `XelpStrLen`,
+  `XelpStrEq`, `XelpStr2Int`, `XelpParseNum`. Do not use `strlen`,
   `strcmp`, `atoi`, `strtol`, or `sprintf` unless the user's platform
   already links them.
 - **No printf.** xelp outputs one character at a time through a
-  user-supplied `void (*)(char)` function. Use `XELPOut()` to print
+  user-supplied `void (*)(char)` function. Use `XelpOut()` to print
   strings.
 - **Strings stored by pointer.** Prompt strings and about messages passed
   to `XELP_SET_VAL_CLI_PROMPT()` and `XELP_SET_ABOUT()` are stored by
@@ -28,16 +28,16 @@ compiler.
   for the life of the instance (string literals, static buffers, or
   globals -- never stack-local buffers that go out of scope).
 
-## Function signatures (v0.3.0+)
+## Function signatures (v0.3.1+)
 
 ### CLI command functions
 
 ```c
 XELPRESULT my_command(XELP *ths, const char *args, int len) {
-    /* ths  -- the invoking xelp instance (use for XELPOut, registers, etc.)
+    /* ths  -- the invoking xelp instance (use for XelpOut, registers, etc.)
        args -- raw argument string (not null-terminated, use len)
        len  -- length of args in bytes */
-    XELPOut(ths, "Hello\n", 0);
+    XelpOut(ths, "Hello\n", 0);
     return XELP_S_OK;
 }
 ```
@@ -45,14 +45,20 @@ XELPRESULT my_command(XELP *ths, const char *args, int len) {
 ### KEY command functions
 
 ```c
-XELPRESULT my_key_handler(XELP *ths, int key) {
+XELPRESULT my_key_handler(XELP *ths, XELPKEYCODE key) {
     /* ths -- the invoking xelp instance
-       key -- the ASCII key that was pressed */
+       key -- XELPKEYCODE (unsigned long): single-char key or packed
+              multi-byte ANSI sequence (e.g. XELP_KEYCODE_UP) */
     (void)key;
-    XELPOut(ths, "Key pressed\n", 0);
+    XelpOut(ths, "Key pressed\n", 0);
     return XELP_S_OK;
 }
 ```
+
+Multi-byte key constants: `XELP_KEYCODE_UP`, `XELP_KEYCODE_DOWN`,
+`XELP_KEYCODE_LEFT`, `XELP_KEYCODE_RIGHT`, `XELP_KEYCODE_HOME`,
+`XELP_KEYCODE_END`, `XELP_KEYCODE_INS`, `XELP_KEYCODE_KDEL`.
+Single-char keys are their natural value (`'?'` == 0x3F).
 
 ### Command tables
 
@@ -64,8 +70,9 @@ XELPCLIFuncMapEntry cli_commands[] = {
 };
 
 XELPKeyFuncMapEntry key_commands[] = {
-    { &my_key_handler, '?', "show help"  },
-    { &toggle_led,     'l', "toggle LED" },
+    { &my_key_handler, '?',              "show help"  },
+    { &toggle_led,     'l',              "toggle LED" },
+    { &on_arrow_up,    XELP_KEYCODE_UP,  "scroll up"  },
     XELP_FUNC_ENTRY_LAST
 };
 ```
@@ -86,7 +93,7 @@ void uart_bksp(void)    { uart_putc('\b'); uart_putc(' '); uart_putc('\b'); }
 XELP cli;
 
 void init(void) {
-    XELPInit(&cli, "My Device v1.0");     /* 1. init instance           */
+    XelpInit(&cli, "My Device v1.0");     /* 1. init instance           */
     XELP_SET_FN_OUT(cli, &uart_putc);     /* 2. set output function     */
     XELP_SET_FN_BKSP(cli, &uart_bksp);   /* 3. set backspace handler   */
     XELP_SET_FN_CLI(cli, cli_commands);   /* 4. register command table  */
@@ -95,25 +102,64 @@ void init(void) {
 
 void loop(void) {
     if (char_available())
-        XELPParseKey(&cli, read_char());  /* 6. feed chars one at a time */
+        XelpParseKey(&cli, read_char());  /* 6. feed chars one at a time */
 }
 ```
 
-## Parsing arguments inside commands
+## Parsing arguments inside commands (XelpArgs -- preferred)
+
+For sequential left-to-right argument parsing, use `XelpArgs`:
 
 ```c
 XELPRESULT cmd_set(XELP *ths, const char *args, int len) {
+    XelpArgs a;
+    int value;
+    XelpArgsInit(&a, args, len);
+    XelpNextTok(&a, 0);              /* skip command name ("set") */
+    XelpNextTok(&a, 0);              /* skip key (or read it into a XelpBuf) */
+    XelpNextInt(&a, &value);
+    return XELP_S_OK;
+}
+```
+
+## Parsing arguments with XelpArgs (full reference)
+
+XelpArgs is a sequential iterator that yields one token at a time in O(1).
+Preferred over `XelpTokN` when arguments are processed left-to-right:
+
+```c
+XELPRESULT cmd_divmod(XELP *ths, const char *args, int len) {
+    XelpArgs a;
+    int dividend, divisor;
+    XelpArgsInit(&a, args, len);
+    XelpNextTok(&a, 0);              /* skip command name */
+    XelpNextInt(&a, &dividend);
+    XelpNextInt(&a, &divisor);
+    /* ... */
+    return XELP_S_OK;
+}
+```
+
+| Function | Purpose |
+|----------|---------|
+| `XelpArgsInit(a, args, len)` | Initialize iterator from `const char *args` |
+| `XelpNextTok(a, &tok)` | Get next token as `XelpBuf` (pass `0` to skip) |
+| `XelpNextInt(a, &val)` | Get next token and parse as int |
+| `XelpArgCount(a, &n)` | Count remaining tokens (does not consume) |
+
+Tokens are NOT null-terminated. Use `tok.s`..`tok.p` or `XELP_XB_LEN(tok)`.
+
+### Random-access alternative (XelpTokN)
+
+For random-access by index, use `XelpTokN`. Note the `(char*)` cast
+required because `XELP_XB_INIT` takes `char*`:
+
+```c
+XELPRESULT cmd_get(XELP *ths, const char *args, int len) {
     XelpBuf b, tok;
-    XELP_XB_INIT(b, args, len);
-
-    /* Token 0 = command name ("set"), token 1 = first arg, etc. */
-    XELPTokN(&b, 1, &tok);
-    int value = XELPStr2Int(tok.s, tok.p - tok.s);
-
-    /* Count tokens */
-    int n;
-    XELPNumToks(&b, &n);  /* n includes the command name */
-
+    XELP_XB_INIT(b, (char*)args, len);
+    XelpTokN(&b, 1, &tok);
+    /* tok.s .. tok.p is the token */
     return XELP_S_OK;
 }
 ```
@@ -124,25 +170,28 @@ Scripts are const strings parsed without modification (ROM-safe):
 
 ```c
 const char *script = "hello; set mode 1; echo done";
-XELPParse(&cli, script, XELPStrLen(script));
+XelpParse(&cli, script, XelpStrLen(script));
 ```
 
 Separators: `;` and `\n`. Comments: `#` to end of line.
 
 ## Output from commands
 
-Always use `XELPOut(ths, ...)` -- never hardcode a global instance:
+Always use `XelpOut(ths, ...)` -- never hardcode a global instance:
 
 ```c
 /* CORRECT: works with any instance */
-XELPOut(ths, "Status: OK\n", 0);
+XelpOut(ths, "Status: OK\n", 0);
 
 /* WRONG: breaks multi-instance */
-XELPOut(&my_global_cli, "Status: OK\n", 0);
+XelpOut(&my_global_cli, "Status: OK\n", 0);
 ```
 
-`XELPOut(ths, msg, maxlen)`: if `maxlen > 0`, prints at most that many
+`XelpOut(ths, msg, maxlen)`: if `maxlen > 0`, prints at most that many
 characters. If `maxlen <= 0`, prints until null terminator.
+
+`XelpPutc(ths, c)`: single-character output through the instance's output
+function. Respects `mOutEnable`. Use instead of `XelpOut` for single chars.
 
 ## Multiple instances
 
@@ -152,8 +201,8 @@ xelp uses no global state. Each instance is independent:
 XELP cli_serial;
 XELP cli_ble;
 
-XELPInit(&cli_serial, "Serial Console");
-XELPInit(&cli_ble,    "BLE Console");
+XelpInit(&cli_serial, "Serial Console");
+XelpInit(&cli_ble,    "BLE Console");
 
 XELP_SET_FN_OUT(cli_serial, &serial_putc);
 XELP_SET_FN_OUT(cli_ble,    &ble_putc);
@@ -182,11 +231,12 @@ Edit `src/xelpcfg.h` to enable/disable features:
 
 | Flag               | Purpose                          | Size impact    |
 |--------------------|----------------------------------|----------------|
-| `XELP_ENABLE_CLI`  | CLI mode + scripting             | Core (~2 KB)   |
-| `XELP_ENABLE_KEY`  | Single keypress mode             | ~200-500 bytes |
-| `XELP_ENABLE_THR`  | Pass-through mode                | ~50-125 bytes  |
-| `XELP_ENABLE_HELP` | Built-in help command            | ~180-350 bytes |
-| `XELP_ENABLE_FULL` | All of the above                 | All combined   |
+| `XELP_ENABLE_CLI`       | CLI mode + scripting             | Core (~2 KB)      |
+| `XELP_ENABLE_LINE_EDIT` | Cursor movement, insert, delete  | ~800-1000 bytes   |
+| `XELP_ENABLE_KEY`       | Single keypress mode             | ~200-500 bytes    |
+| `XELP_ENABLE_THR`       | Pass-through mode                | ~50-125 bytes     |
+| `XELP_ENABLE_HELP`      | Built-in help command            | ~180-350 bytes    |
+| `XELP_ENABLE_FULL`      | All of the above                 | All combined      |
 
 Buffer size: `XELP_CMDBUFSZ` (default 64 bytes).
 
@@ -201,17 +251,64 @@ Default mode switch keys: ESC (KEY), CTRL-P (CLI), CTRL-T (THR).
 ## Common mistakes to avoid
 
 1. Forgetting `XELP *ths` as the first parameter of command functions.
-2. Using `printf` or `puts` instead of `XELPOut(ths, ...)`.
+2. Using `printf` or `puts` instead of `XelpOut(ths, ...)`.
 3. Passing stack-local strings to `XELP_SET_VAL_CLI_PROMPT()`.
 4. Forgetting `XELP_FUNC_ENTRY_LAST` at the end of command tables.
 5. Treating `args` as null-terminated (it is not -- use `len`).
 6. Hardcoding `&global_instance` instead of using `ths` in commands.
 7. Calling `malloc` or stdlib functions in embedded contexts.
 
+## Registers (v0.3.1+)
+
+Each XELP instance has 4 return registers (`mR[0..3]`), accessed via
+macros. Convention: **callee-clobbers-all** -- any command call may
+overwrite all registers. These are a return-value mailbox, NOT
+computational registers (the VM has its own register file).
+
+```c
+/* Read after a command call */
+XELPREG status = XELP_R0(cli);   /* engine writes: XELP_S_OK, etc. */
+XELPREG val1   = XELP_R1(cli);   /* command-specific return value 1 */
+XELPREG val2   = XELP_R2(cli);   /* command-specific return value 2 */
+XELPREG val3   = XELP_R3(cli);   /* command-specific return value 3 */
+
+/* Inside a command handler (pointer access) */
+XELPRESULT cmd_divmod(XELP *ths, const char *args, int len) {
+    /* ... parse a and b ... */
+    ths->mR[1] = a / b;  /* quotient  */
+    ths->mR[2] = a % b;  /* remainder */
+    return XELP_S_OK;
+}
+```
+
+C++ wrapper: `cli.r0()` (read-only), `cli.r1()`-`cli.r3()` (read/write).
+
+## Output Control
+
+Two `char` fields in the XELP struct control output behavior:
+
+- **`mOutEnable`** -- gates ALL output (XelpOut, echo, prompt, help).
+  Set via `XELP_SET_OUT_ENABLE(ths, val)`. Default: 1 (enabled).
+  Set to 0 for silent scripting / batch mode.
+
+- **`mEchoChar`** -- controls how printable chars are echoed during
+  interactive input. Does NOT affect XelpOut, ENTER newline, cursor
+  movement, or prompt.
+  - `XELP_ECHO_NORMAL` (`'\0'`) -- echo as typed (default)
+  - `XELP_ECHO_OFF` (`'\1'`) -- suppress echo
+  - Any other char (e.g. `'*'`) -- mask: echo that char instead
+
+Password entry pattern:
+```c
+XELP_SET_ECHO(*ths, '*');          /* mask during input */
+/* ... user types, sees ****** ... */
+XELP_SET_ECHO(*ths, XELP_ECHO_NORMAL);  /* restore after ENTER */
+```
+
 ## File structure
 
 ```
-src/xelp.c       -- implementation (~700 lines)
+src/xelp.c       -- implementation (~980 lines)
 src/xelp.h       -- public API (types, macros, function declarations)
 src/xelpcfg.h    -- compile-time feature flags and settings
 ```

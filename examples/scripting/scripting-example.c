@@ -2,8 +2,8 @@
  * scripting-example.c -- Using xelp to execute stored scripts.
  *
  * This example shows the difference between interactive CLI mode
- * (XELPParseKey, character-by-character) and scripting mode
- * (XELPParse / XELPParseXB, run a whole buffer at once).
+ * (XelpParseKey, character-by-character) and scripting mode
+ * (XelpParse / XelpParseXB, run a whole buffer at once).
  *
  * Scripting is useful for:
  *   - Startup configuration stored in ROM/flash
@@ -42,16 +42,16 @@ static XELPRESULT cmd_echo(XELP *ths, const char *args, int len)
     XelpBuf b, tok;
     int i, n;
     XELP_XB_INIT(b, (char *)args, len);
-    XELPNumToks(&b, &n);
+    XelpNumToks(&b, &n);
     /* Print tokens 1..N (skip command name at index 0) */
     for (i = 1; i < n; i++) {
         XELP_XB_TOP(b);
-        if (XELPTokN(&b, i, &tok) == XELP_S_OK) {
-            if (i > 1) XELPOut(ths, " ", 0);
-            XELPOut(ths, tok.s, (int)(tok.p - tok.s));
+        if (XelpTokN(&b, i, &tok) == XELP_S_OK) {
+            if (i > 1) XelpOut(ths, " ", 0);
+            XelpOut(ths, tok.s, (int)(tok.p - tok.s));
         }
     }
-    XELPOut(ths, "\n", 0);
+    XelpOut(ths, "\n", 0);
     return XELP_S_OK;
 }
 
@@ -62,13 +62,13 @@ static XELPRESULT cmd_led(XELP *ths, const char *args, int len)
     XelpBuf b, tok;
     int val;
     XELP_XB_INIT(b, (char *)args, len);
-    if (XELPTokN(&b, 1, &tok) == XELP_S_OK) {
-        XELPParseNum(tok.s, (int)(tok.p - tok.s), &val);
+    if (XelpTokN(&b, 1, &tok) == XELP_S_OK) {
+        XelpParseNum(tok.s, (int)(tok.p - tok.s), &val);
         g_led_state = val;
-        XELPOut(ths, "LED -> ", 0);
+        XelpOut(ths, "LED -> ", 0);
         /* print the value using xelp's built-in output */
-        XELPOut(ths, (val ? "ON" : "OFF"), 0);
-        XELPOut(ths, "\n", 0);
+        XelpOut(ths, (val ? "ON" : "OFF"), 0);
+        XelpOut(ths, "\n", 0);
     }
     return XELP_S_OK;
 }
@@ -81,8 +81,8 @@ static XELPRESULT cmd_gain(XELP *ths, const char *args, int len)
     int val;
     (void)ths;
     XELP_XB_INIT(b, (char *)args, len);
-    if (XELPTokN(&b, 1, &tok) == XELP_S_OK) {
-        XELPParseNum(tok.s, (int)(tok.p - tok.s), &val);
+    if (XelpTokN(&b, 1, &tok) == XELP_S_OK) {
+        XelpParseNum(tok.s, (int)(tok.p - tok.s), &val);
         g_gain = val;
     }
     printf("gain = %d\n", g_gain);
@@ -99,7 +99,7 @@ static XELPRESULT cmd_status(XELP *ths, const char *args, int len)
 static XELPRESULT cmd_help(XELP *ths, const char *args, int len)
 {
     (void)args; (void)len;
-    return XELPHelp(ths);
+    return XelpHelp(ths);
 }
 
 /* ------------------------------------------------------------------ */
@@ -125,14 +125,14 @@ int main(void)
 
     /* --- Initialize ------------------------------------------------ */
 
-    XELPInit(&cli, "Scripting Example v1.0\n");
+    XelpInit(&cli, "Scripting Example v1.0\n");
     XELP_SET_FN_OUT(cli, &out_putc);
     XELP_SET_FN_CLI(cli, commands);
 
     /* =============================================================== */
     /* PART 1: SCRIPTING MODE                                          */
     /*                                                                  */
-    /* XELPParse() executes a whole buffer of commands at once.         */
+    /* XelpParse() executes a whole buffer of commands at once.         */
     /* The buffer is const -- xelp never modifies it, so scripts can   */
     /* live in ROM / flash / .rodata.                                   */
     /* =============================================================== */
@@ -151,7 +151,7 @@ int main(void)
             "echo Startup complete\n"
             "status\n";
 
-        XELPParse(&cli, startup_script, XELPStrLen(startup_script));
+        XelpParse(&cli, startup_script, XelpStrLen(startup_script));
     }
 
     printf("\n--- Running one-liner script (semicolons) ---\n");
@@ -160,12 +160,12 @@ int main(void)
      * Handy for macro-style sequences. */
     {
         const char *macro = "echo macro start; led 0; gain 100; status; echo done";
-        XELPParse(&cli, macro, XELPStrLen(macro));
+        XelpParse(&cli, macro, XelpStrLen(macro));
     }
 
-    printf("\n--- Running script via XELPParseXB ---\n");
+    printf("\n--- Running script via XelpParseXB ---\n");
 
-    /* XELPParseXB takes a XelpBuf, which is useful when you already
+    /* XelpParseXB takes a XelpBuf, which is useful when you already
      * have position-tracked buffers (e.g. from a protocol parser). */
     {
         const char *script =
@@ -173,14 +173,14 @@ int main(void)
             "gain 50\n"
             "status\n";
         XelpBuf xb;
-        XELP_XB_INIT(xb, (char *)script, XELPStrLen(script));
-        XELPParseXB(&cli, &xb);
+        XELP_XB_INIT(xb, (char *)script, XelpStrLen(script));
+        XelpParseXB(&cli, &xb);
     }
 
     /* =============================================================== */
     /* PART 2: INTERACTIVE CLI MODE                                    */
     /*                                                                  */
-    /* XELPParseKey() processes one character at a time, just like a   */
+    /* XelpParseKey() processes one character at a time, just like a   */
     /* user typing at a terminal. It handles:                           */
     /*   - Echoing characters                                           */
     /*   - Backspace editing                                            */
@@ -197,16 +197,16 @@ int main(void)
     {
         const char *typed = "status\n";
         int i;
-        for (i = 0; i < XELPStrLen(typed); i++) {
-            XELPParseKey(&cli, typed[i]);
+        for (i = 0; i < XelpStrLen(typed); i++) {
+            XelpParseKey(&cli, typed[i]);
         }
     }
 
     /* =============================================================== */
     /* SUMMARY                                                         */
     /*                                                                  */
-    /*   XELPParse / XELPParseXB  =  scripting (batch, ROM, config)   */
-    /*   XELPParseKey             =  interactive (terminal, serial)    */
+    /*   XelpParse / XelpParseXB  =  scripting (batch, ROM, config)   */
+    /*   XelpParseKey             =  interactive (terminal, serial)    */
     /*                                                                  */
     /* Both use the same command table. Both are non-destructive        */
     /* (the input buffer is never modified). Both can be used on the    */

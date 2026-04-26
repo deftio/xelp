@@ -3,10 +3,36 @@
 Future work for xelp, organized by area. Items marked with a design doc
 link have detailed specifications in `dev/`.
 
-## Scripting Engine
+## Recently Completed (0.3.0 – 0.3.1)
 
-Text-based scripting extensions building on the existing `XELPParse`
+- [x] Breaking API change: `XELP *ths` on all command/key signatures
+- [x] XelpBuf macro normalization (SCREAMING_CASE)
+- [x] 100% line coverage (39 units, 531 cases)
+- [x] GitHub Actions CI (build matrix, coverage, fuzz, PlatformIO, release)
+- [x] Cross-compilation Docker tooling (18 targets, 8-bit to 64-bit)
+- [x] Default command handlers (`mpfDefKey`, `mpfDefCLI`)
+- [x] 4 return registers (`mR[0..3]`) with `XELP_R0`-`XELP_R3` macros
+- [x] C++ wrapper (`XelpArduino.h`) with register accessors, lambdas,
+      `poll()`. Works on Arduino and desktop C++.
+- [x] Published to GitHub, Arduino, ESP-IDF, PlatformIO
+- [x] Full documentation site (pages/, docs/)
+- [x] Release automation (`make_release.sh` -- guided end-to-end pipeline)
+- [x] Single-line editing + multi-byte key support (`XELPKEYCODE`,
+      `XELP_KEYCODE_*` macros, `XELP_ENABLE_LINE_EDIT`, cursor movement,
+      Home/End, insert-at-cursor, Delete at cursor)
+- [x] Fuzz testing (found and fixed SEGV in XelpTokLineXB)
+- [x] Multi-instance stress test (two interleaved instances)
+- [x] ESP32-C6 dual-CLI example (Serial + BLE, WiFi provisioning, NVS)
+- [x] PlatformIO CI (pio ci on uno, megaatmega2560, esp32dev)
+- [x] Cross-build multi-config (KEY/CLI/FULL, `extract_size.py`, 18 targets)
+- [x] README rewrite (3-column size table, grouped by word size)
+- [x] CI aligned with local validation (`make validate` in all workflows)
+
+## Scripting Engine (deferred -- clean up core first)
+
+Text-based scripting extensions building on the existing `XelpParse`
 infrastructure. Tcl/bash-style syntax, no new parsing concepts.
+Not starting until dev experience and examples are solid.
 
 - [ ] Named variables (`$x`, `$count`) -- integer-valued, stored in a
       user-supplied heap buffer
@@ -18,73 +44,95 @@ infrastructure. Tcl/bash-style syntax, no new parsing concepts.
 
 Design doc: [dev/xelp_script.md](xelp_script.md)
 
-## Virtual Machine
+## Virtual Machine (postponed -- likely a separate project)
 
-Register-based bytecode VM for binary protocols, compact ROM scripts,
-and deterministic dispatch timing. Runs alongside the text CLI on the
-same XELP instance.
-
-- [ ] Opcode set: CALL, LOAD, STORE, ADD, SUB, CMP, JMP, JZ, JNZ, RET, HALT
-- [ ] Shared function table with CLI/KEY dispatch
-- [ ] Program counter, register file, small call stack
-- [ ] `XELPVMExec()` entry point
-- [ ] Target: 2-3 KB compiled (ARM Thumb-2)
+Register-based bytecode VM. Feels like its own project that happens to
+include xelp as the text front-end. Parked here for reference.
 
 Design doc: [dev/xelp_vm.md](xelp_vm.md)
 
 ## CLI Ergonomics
 
-Quality-of-life improvements for interactive use. Each is small and
-independent.
+Quality-of-life improvements for interactive use. Each is compile-time
+optional. Design constraint: must not bloat the core or break existing
+bare-metal use cases.
 
 - [ ] **Command history** -- circular buffer of last N command lines,
-      up/down arrow recall. Requires ANSI escape sequence detection
-      (arrow keys are multi-byte: ESC `[` A/B). User-supplied buffer
-      to keep zero-malloc guarantee.
-- [ ] **Line editing** -- left/right arrow cursor movement within the
-      command buffer, insert mode. Requires ANSI cursor control output.
+      up/down arrow recall. User-supplied buffer (e.g. `char hist[4][64]`).
+      Multi-byte key detection is already in place (`XELPKEYCODE` handles
+      ESC sequences). Up/Down are currently silently dropped -- reserved
+      for this feature. ~100-150 lines, ~300 bytes ARM Thumb.
 - [ ] **Tab completion** -- match partial input against the CLI command
       table, complete or show candidates. No extra memory needed (walks
-      the existing table).
+      the existing table). Small and self-contained.
+- [x] **Line editing** -- left/right cursor, Home/End, insert, delete.
+      Implemented via `XELP_ENABLE_LINE_EDIT`. Cursor tracking in
+      `mCur` pointer. Insert-at-cursor with shift model.
 - [ ] **ANSI terminal helpers** -- small utility functions for cursor
-      movement, color, clear screen. Optional compile flag
-      (`XELP_ENABLE_ANSI`). Useful for KEY mode menus and status displays.
+      movement, color, clear screen. Useful for KEY mode menus.
+
+### KEY mode multi-byte keys (done)
+
+KEY mode now matches `XELPKEYCODE` (unsigned long) instead of `char`.
+This naturally handles escape sequences as key bindings. The 4-byte
+packed format (`XELP_KEYCODE_UP`, etc.) allows single-char keys to
+work unchanged while multi-byte ANSI sequences are recognized.
 
 ## C++ Wrappers
 
-Split the current `XelpArduino.h` into two headers.
+Single header `src/XelpArduino.h` serves both audiences:
 
-- [ ] **`xelp_cpp.h`** -- generic C++ wrapper, no platform dependencies.
-      RAII class wrapping the C `XELP` struct. Works on ESP-IDF, Mbed,
-      Zephyr, PlatformIO native, desktop.
-- [ ] **`xelp_arduino.h`** -- Arduino-specific wrapper. Adds `Stream&`
-      binding for input polling, `begin(aboutMsg, outputFn, Stream&)`
-      convenience overload, `poll()` method.
-- [ ] **`XelpBuf` C++ wrapper** -- safer buffer class that handles pointer
-      arithmetic, bounds checking, `getChar()` with auto-increment,
-      iteration, and length queries. Wraps the C `XelpBuf` macros.
+- [x] **`XelpArduino.h`** -- header-only C++ wrapper. RAII class with
+      `poll()`, `begin()` (Arduino), lambda command registration (Easy
+      API), register accessors (`r0()`-`r3()`). Works on Arduino and
+      desktop C++ (compiles without `<Arduino.h>` when not on Arduino).
+
+Future:
+- [ ] **Standalone `xelp_cpp.h`** -- minimal C++ wrapper without any
+      Arduino dependency in the header. For professional embedded devs
+      using ESP-IDF, Zephyr, Mbed, PlatformIO native who won't touch
+      a header with `#include <Arduino.h>` guarded or not.
 
 ## Build and Packaging
 
-- [ ] **ESP Component Registry publishing** -- `idf_component.yml` and
-      `CMakeLists.txt` are in place; register with
-      components.espressif.com and add publish step to release script.
-- [ ] **CMake native build** -- optional `CMakeLists.txt` for non-ESP
-      CMake projects (guard with `if(ESP_PLATFORM)` / `else`).
-- [ ] **PlatformIO library.json CI** -- add PlatformIO build check to
-      GitHub Actions CI.
+- [x] ESP Component Registry publishing (live at components.espressif.com)
+- [x] Arduino Library Manager (live, indexed)
+- [x] PlatformIO Registry (live, v0.3 ghost fixed)
+- [x] Badges (Arduino, PlatformIO, Espressif library)
+- [x] CMake native build (`CMakeLists.txt`)
+- [x] PlatformIO CI in GitHub Actions
+- [x] PlatformIO `v0.3` ghost release deleted
 
 ## Testing
 
-- [ ] **Fuzz testing** -- feed random / adversarial byte streams through
-      `XELPParseKey` and `XELPParse` to catch buffer overflows or hangs.
-- [ ] **Multi-instance stress test** -- run two XELP instances
-      interleaved in the same test to verify no shared state leaks.
+- [x] **Fuzz testing** -- `XelpParseKey` and `XelpParse` harnesses
+      in `tests/fuzz/`. Found and fixed SEGV.
+- [x] **Multi-instance stress test** -- two interleaved XELP instances,
+      shared command table, verified no shared state leaks.
 - [ ] **Cross-platform CI** -- add ARM and RISC-V QEMU builds to GitHub
       Actions to catch word-size or alignment bugs.
 
+## Version Encoding
+
+- [ ] **Add `XELP_BUILD` define** -- separate build counter alongside
+      `XELP_VERSION`. Keep `0x00MMmmpp` encoding unchanged (no breakage).
+      `XELP_BUILD` is 0 for releases, incremented during dev for
+      traceability. `extract_version.c` emits it in YAML.
+      `make_release.sh` validates `XELP_BUILD == 0` before tagging.
+      Print format: `"0.3.1"` (release) or `"0.3.1+3"` (dev build).
+
+## Examples
+
+- [x] **ESP32-C6 dual-CLI example** (`examples/esp32c6-wifi/`) --
+      Serial + BLE simultaneous CLI instances, WiFi provisioning,
+      NVS persistence, web interface.
+- [ ] **Pico W example** (`examples/pico-cli/`) -- RP2040/RP2350
+      demo with USB serial CLI.
+
 ## Documentation
 
+- [x] **README size messaging** -- 3-column table (KEY/CLI/FULL),
+      grouped by word size, clear opening paragraph.
 - [ ] **Interactive web demo** -- Emscripten/WASM build of xelp running
       in the browser on the GitHub Pages site.
 - [ ] **Migration guide** -- standalone doc for upgrading from v0.2.x to
@@ -92,5 +140,5 @@ Split the current `XelpArduino.h` into two headers.
 
 ## Legacy Reference
 
-The original TODO list with historical context and early design notes
-is preserved at [dev/xelp-TODO-legacy.md](xelp-TODO-legacy.md).
+Historical design notes and early brainstorming are preserved at
+[dev/manu_xelp_notes_legacy.md](manu_xelp_notes_legacy.md).

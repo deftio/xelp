@@ -55,12 +55,12 @@ XELP_SET_FN_OUT(myXelp, &amp;uart_putc);
 
 <h2>Required: character feeding</h2>
 
-<p>Feed received characters one at a time via <code>XELPParseKey</code>:</p>
+<p>Feed received characters one at a time via <code>XelpParseKey</code>:</p>
 
 <pre><code>/* In your UART ISR or main loop */
 void UART_RX_ISR(void) {
     char c = UART_RX_REG;
-    XELPParseKey(&amp;myXelp, c);
+    XelpParseKey(&amp;myXelp, c);
 }
 </code></pre>
 
@@ -118,18 +118,15 @@ registers, override <code>XELPREG</code> in <code>xelpcfg.h</code>:</p>
 <pre><code>#define XELPREG long
 </code></pre>
 
-<h3>6502 (cc65)</h3>
-<pre><code>cc65 -t none -Os xelp.c
-</code></pre>
-<p>Extremely constrained. Use KEY-only mode to minimize footprint.</p>
-
 <h2>Cross-compilation test</h2>
 
-<p>The <code>tools/compactbuilds.sh</code> script compiles xelp with
-various cross-toolchains and reports code sizes. Run it to verify your
-toolchain produces a clean build:</p>
+<p>The <code>tools/compactbuilds-docker.sh</code> script compiles xelp with
+various cross-toolchains inside Docker and reports code sizes in three
+configurations (KEY-only, CLI, FULL) grouped by word size. Run via
+the crossbuild wrapper:</p>
 
-<pre><code>bash tools/compactbuilds.sh
+<pre><code>bash tools/crossbuild.sh            # builds Docker image (first time) and runs
+bash tools/crossbuild.sh --build    # force rebuild the Docker image
 </code></pre>
 
 <h2>Minimal example</h2>
@@ -141,27 +138,27 @@ void my_putc(char c) { /* ... */ }
 void my_bksp(void)   { /* ... */ }
 
 /* Commands */
-XELPRESULT cmd_hello(const char *args, int len) {
-    XELPOut(&amp;x, "Hello!\n", 0);
+XELPRESULT cmd_hello(XELP *ths, const char *args, int len) {
+    XelpOut(ths, "Hello!\n", 0);
     return XELP_S_OK;
 }
 
 XELPCLIFuncMapEntry cmds[] = {
     {&amp;cmd_hello, "hello", "say hello"},
-    {0, 0, 0}
+    XELP_FUNC_ENTRY_LAST
 };
 
 XELP x;
 
 void main(void) {
-    XELPInit(&amp;x, "My Device v1.0");
+    XelpInit(&amp;x, "My Device v1.0");
     XELP_SET_FN_OUT(x, &amp;my_putc);
     XELP_SET_FN_BKSP(x, &amp;my_bksp);
     XELP_SET_FN_CLI(x, cmds);
 
     for (;;) {
         if (char_available())
-            XELPParseKey(&amp;x, get_char());
+            XelpParseKey(&amp;x, get_char());
     }
 }
 </code></pre>

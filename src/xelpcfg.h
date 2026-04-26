@@ -33,7 +33,7 @@
  Escape character mappings:  used to skip symbols that otherwise might be parsed such as ; or "
  */
 #define XELP_CLI_ESC		('`')		  /* character used  for escaping at command line or in script */
-#define XELP_QUO_ESC		('\\')		  /* character used  for escaping inside quoted strings        */
+#define XELP_QUO_ESC		('\\')		/* character used  for escaping inside quoted strings        */
 
 
 
@@ -43,6 +43,15 @@
 
  */
 #define XELP_ENABLE_CLI       1
+
+/****************************************************************************************************
+ Enable Line Editing in CLI Mode.
+ When defined, provides cursor movement (left/right, Home/End), mid-line insert,
+ and delete-at-cursor using only \b for terminal repositioning.
+ Requires XELP_ENABLE_CLI. Adds ~800-1000 bytes on ARM Thumb.
+ When not defined, CLI uses append-only input with mpfBksp callback.
+ */
+#define XELP_ENABLE_LINE_EDIT 1
 
 
 /****************************************************************************************************
@@ -75,7 +84,7 @@
  */
 #define XELP_HELP_KEY_STR    "\nKey functions\n"        /* Help section for single-key press commands such as menus */
 #define XELP_HELP_CLI_STR    "\nCLI functions\n"        /* Help string displayed before script or CLI commands      */
-#define XELP_HELP_ABT_STR    (ths->mpAboutMsg)		    /* You may set to any null terminated string e.g. "My Embedded System About Message" */
+#define XELP_HELP_ABT_STR    (ths->mpAboutMsg)		      /* You may set to any null terminated string e.g. "My Embedded System About Message" */
 
 /**************************************************************************************************** 
   prompt string, leave undefined (commented out) for no prompt and to save space 
@@ -89,7 +98,7 @@
   #define XELP_CLI_PROMPT   (ths->mpPrompt)
 
   Then use the macros in Xelp.h 
-  XELP_SET_VAL_CLI_PROMPT(myXelp,"your message")   //myXelp is the instance variable, message will be only for that instance.
+  XELP_SET_VAL_CLI_PROMPT(myXelp,"yourPrompt")   //myXelp is the instance variable, message will be only for that instance.
 
 */
 #define XELP_CLI_PROMPT		"xelp>"					
@@ -98,7 +107,7 @@
 /****************************************************************************************************
   XELP_REGS_SZ is the number of callee-clobbers-all return registers per instance.
   R0: command status (written by engine after dispatch).
-  R1-R3: command-specific return values (engine never touches these).
+  R1-R3: command-specific return values (xelp engine never touches these).
   Minimum is 4. Size of each register is set by XELPREG (default is machine int).
  */
 #define XELP_REGS_SZ    4

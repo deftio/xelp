@@ -23,9 +23,18 @@ do_build() {
 
 do_run() {
     echo "Running cross-compilation report..."
+    mkdir -p "$REPO_ROOT/build"
     docker run --rm --platform linux/amd64 \
+        -v "$REPO_ROOT/src:/xelp/src:ro" \
         -v "$SCRIPT_DIR/compactbuilds-docker.sh:/xelp/tools/compactbuilds-docker.sh:ro" \
+        -v "$SCRIPT_DIR/extract_size.py:/xelp/tools/extract_size.py:ro" \
+        -v "$REPO_ROOT/build:/xelp/build" \
         "$IMAGE_NAME"
+    if [ -f "$REPO_ROOT/build/sizes.csv" ]; then
+        echo ""
+        echo "Size data written to build/sizes.csv"
+        echo "Run 'bash tools/update_sizes.sh' to update docs."
+    fi
 }
 
 case "${1:-}" in
@@ -36,7 +45,12 @@ case "${1:-}" in
         do_run
         ;;
     *)
-        do_build
+        # Only rebuild if image doesn't exist; use --build to force
+        if ! docker image inspect "$IMAGE_NAME" >/dev/null 2>&1; then
+            do_build
+        else
+            echo "Image '$IMAGE_NAME' exists (use --build to rebuild)."
+        fi
         do_run
         ;;
 esac

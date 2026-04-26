@@ -1158,69 +1158,36 @@ x->fn_err("ERR: undefined var\n");
 
 ## 7. Implementation Phases
 
-### Phase 1: File Reorganization (No Code Changes)
+### Phase 1: File Reorganization -- DONE (v0.2.3)
 
-**Duration:** 1-2 hours
+Completed: directory restructure (pages/, docs/, tools/, dev/),
+.gitignore cleanup, Makefile updates. Note: the proposed renames
+(`xelpcfg.h` → `xelp_cfg.h`, `posix-simple/` → `posix/`) were
+rejected to avoid breaking existing users.
 
-1. Create new directory structure
-2. Move/rename files as planned
-3. Update #include paths
-4. Update makefile for new paths
-5. Verify build works
-6. Update .gitignore
-7. Commit
+### Phase 2: Documentation -- DONE (v0.2.3 – v0.3.0)
 
-**Deliverable:** Clean repo structure, same functionality
+Completed: README.md rewrite, CHANGELOG.md, docs/api-reference.md,
+docs/configuration.md, docs/porting.md, docs/tutorial.md,
+CONTRIBUTING.md, AGENTS.md. Full HTML site at pages/.
 
-### Phase 2: Documentation
+### Phase 3: Test Infrastructure -- DONE (v0.2.3)
 
-**Duration:** 2-4 hours
+Completed: jumpbug framework with output capture, char-by-char feeding,
+coverage reporting in Makefile, GitHub Actions CI
+(.github/workflows/ci.yml, release.yml).
 
-1. Update README.md with new structure
-2. Create CHANGELOG.md (start with current state)
-3. Create docs/API.md (document existing API)
-4. Create docs/CONFIGURATION.md (existing options)
-5. Create docs/PORTING.md (capture existing platform knowledge)
-6. Create CONTRIBUTING.md
+### Phase 4: Test Coverage -- DONE (v0.2.3 – v0.3.0)
 
-**Deliverable:** Comprehensive documentation
+Completed: 100% line coverage of xelp.c. All tests in single file
+(xelp_unit_tests.c) -- 22 units, 295 cases. Includes tokenizer,
+strings, dispatch, interactive, buffer boundaries, stress/malformed
+input, default handlers, multi-instance, and registers.
 
-### Phase 3: Test Infrastructure
+### Phase 5: Test Coverage Edge Cases -- DONE (v0.2.3 – v0.3.0)
 
-**Duration:** 4-8 hours
-
-1. Review existing jumpbug framework
-2. Add output capture helpers
-3. Add char-by-char feeding helpers
-4. Create test file stubs for each category
-5. Add coverage reporting to makefile
-6. Add CI workflow (.github/workflows/ci.yml)
-
-**Deliverable:** Test framework ready for expansion
-
-### Phase 4: Test Coverage - Foundation
-
-**Duration:** 8-16 hours
-
-1. Implement test_tokenizer.c (all cases from plan)
-2. Implement test_strings.c
-3. Implement test_dispatch.c
-4. Run coverage, identify gaps
-5. Add tests until 100% of existing code covered
-
-**Deliverable:** 100% coverage of existing functionality
-
-### Phase 5: Test Coverage - Edge Cases
-
-**Duration:** 4-8 hours
-
-1. Implement test_interactive.c
-2. Implement test_edge_cases.c
-3. Verify no crashes on adversarial input
-4. Add memory safety checks (buffer canaries)
-5. Run under valgrind (if POSIX)
-
-**Deliverable:** Robust edge case handling verified
+Completed: adversarial input tests, buffer boundary verification (20
+cases), stress malformed input tests. Valgrind clean on POSIX.
 
 ### Phase 6: Unified Command Structure
 

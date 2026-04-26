@@ -11,14 +11,84 @@ Versions always use three-component semver (e.g. `0.3.0`, never `0.3`).
 ## [Unreleased]
 
 ### Changed
+- **Function naming convention**: all public functions renamed from
+  `XELP` prefix to `Xelp` prefix (e.g. `XELPInit` -> `XelpInit`,
+  `XELPOut` -> `XelpOut`). Types, macros, and constants retain the
+  `XELP` prefix.
+- Replaced `int mEchoState` (unused) with `char mOutEnable` +
+  `char mEchoChar` in `XELP` struct (saves 2 bytes).
+- Internal macros `_PUTC`, `_ECHO`, `_CURSOR` converted to static
+  functions for code size reduction (~28 bytes saved).
+- `_xelpKeyAccum` rewritten as table-driven switch on `mKeyLen`.
+- `_xelpPrintKeyName` rewritten to table-driven approach (~219 bytes
+  saved).
+- `XelpParseKey` refactored: cursor movement collapsed into
+  `_xelpCursorMove` helper, ENTER handling extracted to
+  `_xelpHandleEnter` helper.
+- Test suite expanded to 39 units, 531 test cases (from 36/477).
+- **BREAKING:** KEY command function signature changed from
+  `XELPRESULT fn(XELP *ths, int key)` to
+  `XELPRESULT fn(XELP *ths, XELPKEYCODE key)`.
+  `XELPKEYCODE` is `unsigned long`, so single-char keys still work
+  unchanged, but multi-byte ANSI sequences are now dispatched as a
+  single packed value.
+- **BREAKING:** `XELPKeyFuncMapEntry.mKey` changed from `char` to
+  `XELPKEYCODE`. Use `XELP_KEYCODE_UP`, `XELP_KEYCODE_LEFT`, etc.
+  for multi-byte keys. Single-char keys (`'?'`, `'h'`, etc.) are
+  unchanged.
 - Default `XELP_REGS_SZ` changed from 1 to 4 (4 callee-clobbers-all
   return registers per instance). Minimum clamped to 4.
+- `tools/compactbuilds-docker.sh` rewritten: builds each target in
+  three configurations (KEY / CLI / FULL), grouped by word size.
 
 ### Added
+- **Single-line editing** (`XELP_ENABLE_LINE_EDIT`): left/right cursor
+  movement, Home/End, insert-at-cursor, Delete. Eliminates garbage
+  `[A` characters when users press arrow keys. ~800-1000 bytes on ARM
+  Thumb.
+- **Multi-byte key accumulator** in `XelpParseKey`: recognizes ANSI
+  escape sequences (arrow keys, Home/End, Delete, Insert, PgUp/PgDn)
+  and dispatches them as `XELPKEYCODE` values.
+- `XELPKEYCODE` type (`unsigned long`) and named key macros:
+  `XELP_KEYCODE_UP`, `XELP_KEYCODE_DOWN`, `XELP_KEYCODE_LEFT`,
+  `XELP_KEYCODE_RIGHT`, `XELP_KEYCODE_HOME`, `XELP_KEYCODE_END`,
+  `XELP_KEYCODE_INS`, `XELP_KEYCODE_KDEL`, `XELP_KEYCODE_PGUP`,
+  `XELP_KEYCODE_PGDN`.
+- Key code accessor macros: `XELP_KC_B0`-`XELP_KC_B3`,
+  `XELP_KC_IS_MULTI`.
 - `XELP_R0`-`XELP_R3` accessor macros for register access
 - `r0()`-`r3()` methods on C++ `XelpCLI` wrapper (`XelpArduino.h`)
 - `divmod` example command demonstrating multi-register returns
 - Register tests (9 cases covering init, dispatch, macros, survival)
+- Fuzz testing: libFuzzer harnesses for `XelpParseKey` and `XelpParse`
+  (`tests/fuzz/`). Seed corpora included. `make fuzz` target.
+- Multi-instance stress test verifying no shared state between
+  interleaved XELP instances (5 test sections, 50-round stress loop).
+- PlatformIO CI job in GitHub Actions (builds for Uno, Mega, ESP32).
+- Cross-build Docker tooling: added `extract_size.py` for robust
+  multi-format size extraction (ELF, SDCC .rel, SDCC .map, Intel HEX).
+  18 targets now produce real sizes across KEY/CLI/FULL configurations.
+- **Output control**: `mOutEnable` (char) gates all output; `mEchoChar`
+  (char) controls echo during interactive input (normal, off, or mask
+  character). Macros: `XELP_SET_OUT_ENABLE`, `XELP_GET_OUT_ENABLE`,
+  `XELP_SET_ECHO`, `XELP_GET_ECHO`. Constants: `XELP_ECHO_NORMAL`,
+  `XELP_ECHO_OFF`.
+- `XelpPutc` function: single-character output respecting `mOutEnable`.
+- `XelpArgs` sequential argument iterator: `XelpArgsInit`,
+  `XelpNextTok`, `XelpNextInt`, `XelpArgCount`. O(1) per token
+  alternative to `XelpTokN`.
+- `dev/size_profiles.sh`: reusable build profile size reporting tool
+  using Docker cross-compilation (ARM Cortex-M0 Thumb) with host GCC
+  fallback.
+
+### Fixed
+- **SEGV in XelpTokLineXB**: buffer exhaustion in `_PS_ESCA` state
+  (CLI escape char at end of input) returned `XELP_S_OK` with
+  uninitialized `tok->s`, causing crash in `XelpStrEq` during command
+  dispatch. Found by fuzz testing.
+- **KEY-only build failure**: `XELP_XB_INIT(ths->mCmdXB,...)` in
+  `XelpInit` was not guarded by `#ifdef XELP_ENABLE_CLI`, preventing
+  KEY-only configurations from compiling.
 
 ## [0.3.0] - 2026-04-19
 

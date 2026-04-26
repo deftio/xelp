@@ -1,73 +1,121 @@
+<a href="https://deftio.github.io/xelp/pages/"><img src="https://deftio.github.io/xelp/img/xelp-prompt-med.png" width="30%"></img></a>
 
-<a href="https://www.deftio.com/xelp"><img src="./img/xelp-prompt-med.png" width="30%"></img></a>
-
-![Version](https://img.shields.io/badge/version-0.3.0-blue.svg)
+![Version](https://img.shields.io/badge/version-0.3.1-blue.svg)
 [![License](https://img.shields.io/badge/License-BSD%202--Clause-blue.svg)](https://opensource.org/licenses/BSD-2-Clause)
 [![CI](https://github.com/deftio/xelp/actions/workflows/ci.yml/badge.svg)](https://github.com/deftio/xelp/actions/workflows/ci.yml)
-![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen.svg)
-![RISC-V](https://img.shields.io/badge/RISC--V-2.0KB-informational.svg)
+![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen.svg)  
+[![PlatformIO](https://img.shields.io/badge/PlatformIO-library-teal.svg)](https://registry.platformio.org/libraries/deftio/xelp)
+[![Arduino](https://img.shields.io/badge/Arduino-library-teal.svg)](https://github.com/deftio/xelp)
+[![ESP Component](https://img.shields.io/badge/ESP--IDF-component-teal.svg)](https://components.espressif.com/components/deftio/xelp)
 
 # xelp
 
-A command line interpreter and script engine for embedded systems, written in
-pure C. No dynamic memory. No OS required. No standard library dependencies.
-900 bytes to 4 KB compiled depending on features enabled.
+A tiny extensible command interpreter with scripting support for embedded systems. 
+Add an interactive serial CLI, single-key menus, or scripted command sequences to any microcontroller --
+from an 8-bit ATtiny85 to a 64-bit ARM Cortex-A. Pure C, no malloc, no OS,
+under 3-5 KB fully featured depending on archicture. 
 
-xelp gives bare-metal firmware a real interactive CLI, with scriptable commands
- (just store command(s) as strings), and also single-key (instant response) menus -- in a package small enough for 8051 or
-ATtiny85 through the latest processors.
+Xelp is instance based so it's possible to run distinct copies on different ports and it can be run inside interrupts (pending your own functions are safe).
 
-<img src="./img/xelp-cli-demo.png" width="70%" alt="xelp CLI demo session">
+<img src="https://deftio.github.io/xelp/img/xelp-cli-demo.png" width="70%" alt="xelp CLI demo session">
 
 ## Why xelp
 
 Many embedded projects end up with an ad-hoc `if (char == 'x')` debug
 console. xelp replaces that with a proper CLI that:
 
-- Compiles on 8-bit to 64-bittargets with any C89 or later compiler
-- Fits in under 1 KB for in KEY-only mode, and still under 4 KB fully featured with script support
-- Uses **zero dynamic memory** -- no malloc, no heap, works in ISRs
-- Supports ultiple independent imnstances -- one per UART, no globals.  Each can have different functions to call
-- Scripts are ROM-able const strings -- the parser never modifies input no strtok style processing
-- Function dispatch tables allow any C/C++ functions callable from the CLI
-- Live command help (optional)
+- Compiles on 8-bit to 64-bit targets with any C89 or later compiler
+- Fits in ~1 KB (key dispatch only) to ~5 KB (full CLI with line editing)
+- Uses zero dynamic memory -- no malloc, no heap, safe for ISRs
+- Supports multiple independent instances -- one per UART, no globals
+- Multiple commands can be saved as strings (scripts) and run from C or from the CLI.
+- Scripts are ROM-able const strings -- the parser never modifies its input (e.g. no strtok style processing)
+- Function dispatch tables make any C/C++ function callable from the CLI
+- Live help listing (optional, compile-time removable), commands can have run time assistance
+- CLI commands can be called from C or C functions can be called from the CLI.
+- A cpp wrapper is provided with identical functionality and some syntactic sugar for ease of use (still no memory allocation)
 
-## Features
+## History
+Xelp was first built for some embedded projects in the late 90s (though under different names) and then made more uniform in the late 2000s.
 
-| Feature | Description | Size impact |
-|---------|-------------|-------------|
-| **CLI mode** | Line-buffered command prompt with backspace, prompt string, command dispatch | Core (~2 KB) |
-| **KEY mode** | Single keypress menus and actions, no ENTER needed | ~200-500 bytes |
-| **THR mode** | Pass-through redirects all keys to another peripheral (modem, debug port) | ~50-125 bytes |
-| **Scripting** | Parse multi-statement scripts from ROM or RAM strings | Included with CLI |
-| **Help** | Built-in help listing all registered commands | ~180-350 bytes |
-| **Tokenizer** | Quoted strings, escape sequences, comments, semicolons | Included with CLI |
 
-All features are independently compilable via `#define` flags in
-`src/xelpcfg.h`. Disable what you don't need to save space.
+## Build Profiles
 
-## Quick Start
+xelp is modular -- enable only what you need. Three profiles cover most use cases.
+
+### KEY only (~1 KB)
+
+Single-keypress dispatch: each key triggers a function immediately, no
+ENTER needed. Ideal for debug menus and hardware test jigs.
+
+```c
+#define XELP_ENABLE_KEY  1
+```
+
+### CLI Lean (~1.4 KB)
+
+Append-only command line with tokenizer, scripting, and command dispatch.
+No line editing, no cursor movement, no help listing. Ideal for the
+most size-constrained targets that still need a CLI.
+
+```c
+#define XELP_ENABLE_CLI  1
+```
+
+### CLI (~3-5 KB)
+
+Line-buffered command prompt with cursor movement, line editing, multi-byte
+ANSI key recognition, tokenizer, scripting, and help. This is the typical
+interactive configuration.
+
+```c
+#define XELP_ENABLE_CLI        1
+#define XELP_ENABLE_LINE_EDIT  1
+#define XELP_ENABLE_KEY        1
+#define XELP_ENABLE_HELP       1
+```
+
+### Full (~3-6 KB)
+
+Adds THR pass-through mode (~50-125 bytes more) for forwarding all
+keystrokes to another peripheral such as a modem or radio module. This enables 
+the cli to flip in to a mode where one can send raw commands (such AT commands) to another device.  
+
+```c
+#define XELP_ENABLE_FULL  1
+```
+
+Every flag is independent -- mix and match. For the full reference see
+[Build Profiles & Configuration Guide](docs/build-profiles.md).
+
+## Quick Start (Pure C)
+
+See examples for simpler C++ version.
 
 Add these three files to your project: `xelp.c`, `xelp.h`, `xelpcfg.h`.
 
 ```c
+#include "xelpcfg.h"
 #include "xelp.h"
 
 /* Your output function -- write one char to UART, LCD, etc. */
 void uart_putc(char c) { UART_TX = c; }
+
+/* Your destructive backspace function - customize for your OS */
 void uart_bksp(void)   { uart_putc('\b'); uart_putc(' '); uart_putc('\b'); }
 
 /* Commands -- any C function with this signature */
 XELPRESULT cmd_hello(XELP *ths, const char *args, int len) {
-    XELPOut(ths, "Hello!\n", 0);
+    XelpOut(ths, "Hello!\n", 0);
     return XELP_S_OK;
 }
 
 XELPRESULT cmd_led(XELP *ths, const char *args, int len) {
-    XelpBuf b, tok;
-    XELP_XB_INIT(b, args, len);
-    XELPTokN(&b, 1, &tok);                  /* get second token */
-    int val = XELPStr2Int(tok.s, tok.p - tok.s);
+    XelpArgs a;
+    int val;
+    XelpArgsInit(&a, args, len);
+    XelpNextTok(&a, 0);                      /* skip command name */
+    XelpNextInt(&a, &val);
     LED_PORT = val;
     return XELP_S_OK;
 }
@@ -82,14 +130,14 @@ XELPCLIFuncMapEntry commands[] = {
 XELP cli;
 
 void main(void) {
-    XELPInit(&cli, "My Device v1.0");
+    XelpInit(&cli, "My Device v1.0");
     XELP_SET_FN_OUT(cli, &uart_putc);
     XELP_SET_FN_BKSP(cli, &uart_bksp);
     XELP_SET_FN_CLI(cli, commands);
 
     for (;;) {
         if (uart_rx_ready())
-            XELPParseKey(&cli, uart_getc());
+            XelpParseKey(&cli, uart_getc());
     }
 }
 ```
@@ -113,14 +161,16 @@ The prompt is stored by pointer, not copied. It must be a null-terminated
 string that remains valid for the life of the instance (string literal,
 static, or global -- not a stack buffer that goes out of scope).
 
+Prompts can be global (all instances share a prompt), or per-instance (each peripheral gets its own prompt)
+
 ## Scripting
 
 Anything typed at the CLI can be run as a script. Scripts are const strings
 parsed without modification -- they can live in ROM:
 
 ```c
-const char *startup_script = "hello; led 1";
-XELPParse(&cli, startup_script, XELPStrLen(startup_script));
+const char *startup_script = "hello; led 1";   /* cli functions that are available plus mode switch imperatives are allowed */
+XelpParse(&cli, startup_script, XelpStrLen(startup_script));
 ```
 
 Scripts support semicolons (`;`), newlines, `#` comments, quoted strings
@@ -140,59 +190,92 @@ CLI mode -------> KEY mode -----> THR mode
 - **KEY**: Each keypress triggers a command immediately. For menus.
 - **THR**: All keys pass through to another peripheral. For debugging modems, serial devices.
 
-Mode switch keys are configurable in `xelpcfg.h`.
+Mode switch keys are configurable in `xelpcfg.h`.  If any mode is not enabled then the mode switch skips that mode
 
 ## Building and Testing
 
+### Local development (fast, no Docker)
+
 ```bash
-make tests          # build + run unit tests + coverage report
+make validate       # build + run tests + build all examples (the everyday check)
+make tests          # unit tests + coverage only
+make examples       # build all examples (no interactive launch)
+make example        # build and run the posix ncurses demo (interactive)
 make coverage       # tests + coverage summary
-make example        # build + run the posix ncurses example
-make clean          # remove all build artifacts
+make fuzz           # fuzz testing with libFuzzer (requires clang)
+make funcsizes      # per-function compiled sizes (x86-32, ARM32)
+make sizes          # print compiled sizes for all feature profiles
+make clean          # remove test build artifacts
+make clean-all      # clean tests + all examples
 ```
 
-19 test units, 207 test cases, 100% line coverage of `xelp.c`.
+39 test units, 531 test cases, 100% line coverage of `xelp.c`.
 
-## Cross-Platform Size Table
+Feature profile sizes: `dev/size_profiles.sh` (uses Docker for ARM Cortex-M0, falls back to host GCC).
 
-Compiled sizes with `-Os` (all features enabled):
+### Pre-release (validates + updates size tables)
 
-| Target | Compiler | Code size (bytes) |
-|--------|----------|-------------------|
-| ARM32 Thumb | arm-none-eabi-gcc | 1556 |
-| Xtensa LX106 (ESP8266) | xtensa-lx106-elf-gcc | 1742 |
-| RISC-V (rv32) | riscv64-unknown-elf-gcc | 1786 |
-| MSP430 | msp430-gcc | 1924 |
-| m68k | m68k-linux-gnu-gcc | 1992 |
-| RISC-V (rv64) | riscv64-linux-gnu-gcc | 2008 |
-| ARM32 | arm-none-eabi-gcc | 2476 |
-| AVR (ATtiny85) | avr-gcc | 2506 |
-| AVR (ATmega328P) | avr-gcc | 2538 |
-| x86-64 | GCC | 2875 |
-| x86-32 | GCC | 2908 |
-| x86-64 | Clang | 3071 |
-| ARM64 | aarch64-linux-gnu-gcc | 3228 |
-| PowerPC | powerpc-linux-gnu-gcc | 3890 |
-| 68HC11 | m68hc11-gcc | 4436 |
+```bash
+make prerelease     # tests + examples + Docker cross-compile + update README size tables
+```
 
-Sizes measured via Docker cross-compilation. KEY-only mode: 900 bytes.
-Run `bash tools/crossbuild.sh` to reproduce.
+Runs `make validate`, then `tools/crossbuild.sh` (Docker), then
+`tools/update_sizes.sh` to patch the compiled-size tables in README.md
+and pages/index.html. Does not tag, push, or publish.
+
+### Full release
+
+```bash
+bash tools/make_release.sh             # full guided release (includes Docker cross-build)
+bash tools/make_release.sh --validate  # local validation only (no git, no push)
+```
+
+The release script handles everything end-to-end: validation (tests +
+examples), manifest sync, badge update, Docker cross-compilation, size
+table update, push, PR, CI, merge, tag, and publish. The Docker
+cross-build step is skipped if Docker is not installed. Day-to-day
+development uses `make validate` which takes seconds.
+
+## Compiled Sizes
+
+Compiled `.text` section sizes with `-Os`. Three configurations: KEY
+(single-key dispatch only), CLI (typical interactive use), FULL (all
+features). Even the largest full build is under 7 KB.
+
+<!-- Build Size Table -->
+| CPU | Width | Compiler | KEY (bytes) | CLI (bytes) | FULL (bytes) |
+|-----|------:|----------|------------:|------------:|-------------:|
+| AVR (ATtiny85) | 8 | avr-gcc | 1046 | 4038 | 4096 |
+| AVR (ATmega328P) | 8 | avr-gcc | 1054 | 4132 | 4190 |
+| Z80 | 8 | SDCC | 2121 | 6966 | 7074 |
+| 6800 (HC08) | 8 | SDCC | 2471 | 8147 | 8288 |
+| MSP430 | 16 | msp430-gcc | 770 | 3260 | 3306 |
+| 68HC11 | 16 | m68hc11-gcc | 2369 | 6570 | 6641 |
+| Xtensa LX7 (ESP32-S3) | 32 | xtensa-esp-elf-gcc | 576 | 2508 | 2540 |
+| ARM Thumb | 32 | arm-none-eabi-gcc | 580 | 2482 | 2526 |
+| RISC-V (rv32) | 32 | riscv64-unknown-elf-gcc | 722 | 2970 | 3008 |
+| Xtensa LX106 (ESP8266) | 32 | xtensa-lx106-elf-gcc | 723 | 2831 | 2863 |
+| m68k | 32 | m68k-linux-gnu-gcc | 728 | 3146 | 3194 |
+| ARM32 | 32 | arm-none-eabi-gcc | 980 | 3746 | 3806 |
+| x86-32 | 32 | GCC | 1081 | 4604 | 4654 |
+| MIPS32 | 32 | mipsel-linux-gnu-gcc | 1296 | 4888 | 4936 |
+| PowerPC | 32 | powerpc-linux-gnu-gcc | 1504 | 5674 | 5738 |
+| RISC-V (rv64) | 64 | riscv64-linux-gnu-gcc | 756 | 3332 | 3366 |
+| x86-64 | 64 | Clang | 1043 | 5013 | 5055 |
+| x86-64 | 64 | GCC | 1063 | 4787 | 4836 |
+| AArch64 (ARM64) | 64 | aarch64-linux-gnu-gcc | 1324 | 5178 | 5234 |
+| MIPS64 | 64 | mips64el-linux-gnuabi64-gcc | 1360 | 5512 | 5560 |
+<!-- Build Size Table -->
+
+x86-64 GCC row is measured directly; others from cross-compilation via
+`tools/Dockerfile.crossbuild`.  This is for size tracking, older versions / cousins of xelp were compiled and run on several (but not all of the above platforms)
 
 ## Configuration
 
-Compile-time options in `src/xelpcfg.h`:
-
-| Flag | Purpose |
-|------|---------|
-| `XELP_ENABLE_CLI` | Command line mode (required for scripting) |
-| `XELP_ENABLE_KEY` | Single keypress mode |
-| `XELP_ENABLE_THR` | Pass-through mode |
-| `XELP_ENABLE_HELP` | Built-in help command |
-| `XELP_ENABLE_LCORE` | Language core (peek, poke, go) |
-| `XELP_ENABLE_FULL` | Enable all of the above |
-
-Buffer size, register count, prompt string, escape characters, and mode
-switch keys are all configurable. See [Configuration Guide](docs/configuration.md).
+All compile-time options (buffer size, key mappings, prompt, escape
+characters, register count) are controlled via `#define` flags in
+`src/xelpcfg.h`. See the
+[Build Profiles & Configuration Guide](docs/build-profiles.md).
 
 ## Porting
 
@@ -200,50 +283,52 @@ xelp compiles on anything with a C89 compiler. To port:
 
 1. Add `xelp.c`, `xelp.h`, `xelpcfg.h` to your build
 2. Write a `void putc(char c)` function for your output hardware
-3. Call `XELP_SET_FN_OUT()` and `XELPParseKey()` -- that's it
+3. Call `XELP_SET_FN_OUT()` and `XelpParseKey()` -- that's it
 
 No assembly. No platform `#ifdefs` (except optional SDCC `__reentrant`).
 See [Porting Guide](docs/porting.md).
 
 ## Architecture Support
 
-Tested with zero warnings on:
+The following toolchains compile xelp with zero warnings. Verified via
+Docker cross-compilation (`tools/Dockerfile.crossbuild`):
 
 | Architecture | Compiler | Word Size |
 |-------------|----------|-----------|
 | x86-64 | GCC, Clang | 64-bit |
-| x86-32 | GCC, Clang, TCC | 32-bit |
+| x86-32 | GCC, Clang | 32-bit |
 | ARM64 | aarch64-linux-gnu-gcc | 64-bit |
 | ARM32 / Thumb | arm-none-eabi-gcc | 32-bit |
 | RISC-V (rv64) | riscv64-linux-gnu-gcc | 64-bit |
 | RISC-V (rv32) | riscv64-unknown-elf-gcc | 32-bit |
 | Xtensa LX106 (ESP8266) | xtensa-lx106-elf-gcc | 32-bit |
+| Xtensa LX7 (ESP32-S3) | xtensa-esp-elf-gcc | 32-bit |
 | MSP430 | msp430-gcc | 16-bit |
 | m68k (68000) | m68k-linux-gnu-gcc | 32-bit |
 | AVR (ATmega, ATtiny) | avr-gcc | 8-bit |
 | 8051 | SDCC | 8-bit |
-| 68HC11/12 | m68hc11-gcc | 8-bit |
+| 68HC11/12 | m68hc11-gcc | 16-bit |
 | PowerPC | powerpc-linux-gnu-gcc | 32-bit |
-| 6502 | cc65 | 8-bit |
 
 ## Repository Structure
 
 ```
 xelp/
   src/            xelp.c, xelp.h, xelpcfg.h (the library -- add these to your project)
-  tests/          unit tests (jumpbug framework), 100% coverage
-  examples/       posix ncurses demo, bare-metal template, multi-instance
+  tests/          unit tests (jumpbug framework), fuzz harnesses, 100% coverage
+  examples/       POSIX ncurses, Arduino, C++ wrapper, bare-metal, scripting, ESP32 Wi-Fi
   tools/          cross-build scripts, release script, banner generator
   docs/           API reference, configuration guide, porting guide
   pages/          GitHub Pages site
-  dev/            design notes and planning
-  .github/        CI workflows (build, test, release)
+  dev/            design notes, planning docs, size profiling tools
+  .github/        CI workflows (build, test, fuzz, PlatformIO)
 ```
 
 ## Contributing
 
 PRs welcome. `master` is protected -- all changes go through pull requests.
-CI must pass (zero warnings, all tests, coverage) before merge.
+CI must pass (zero warnings, all tests, coverage) before merge.  Please note that 
+PRs which affect multi-instance support or require dynamic memory may not be accepted.
 
 ```bash
 git checkout -b dev-my-feature master
@@ -259,7 +344,8 @@ what we welcome, branch model, and the release process.
 - [Tutorial](docs/tutorial.md) -- step-by-step introduction to xelp
 - [Examples](docs/examples.md) -- annotated code for various platforms
 - [API Reference](docs/api-reference.md) -- all public functions, macros, types
-- [Configuration Guide](docs/configuration.md) -- compile-time options
+- [Build Profiles & Configuration Guide](docs/build-profiles.md) -- feature system and compile-time options
+- [Configuration Quick Reference](docs/configuration.md) -- all `#define` flags at a glance
 - [Porting Guide](docs/porting.md) -- bringing up xelp on a new platform
 - [Release Management](release_management.md) -- versioning, CI, release workflow
 - [Tools](tools/README_TOOLS.md) -- build utilities and code generators

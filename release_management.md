@@ -7,14 +7,14 @@ Reference for building, testing, and releasing xelp.
 The `XELP_VERSION` macro in `src/xelp.h` is the single source of truth:
 
 ```c
-#define XELP_VERSION      (0x00000203UL) /* 32-bit: 0x00MMmmpp */
+#define XELP_VERSION      (0x00000301UL) /* 32-bit: 0x00MMmmpp */
 #define XELP_VER_MAJOR(v) (((v) >> 16) & 0xFF)
 #define XELP_VER_MINOR(v) (((v) >>  8) & 0xFF)
 #define XELP_VER_PATCH(v) ( (v)        & 0xFF)
 ```
 
 The 32-bit hex format encodes `0x00MMmmpp` (major.minor.patch), one byte
-each. Example: `0x00010000` = version 1.0.0, `0x00000203` = version 0.2.3.
+each. Example: `0x00010000` = version 1.0.0, `0x00000301` = version 0.3.1.
 Accessor macros resolve to constants at compile time on all targets.
 
 The build tool `tools/extract_version.c` reads the version via the C
@@ -27,24 +27,52 @@ make version   # compile + run, writes build/xelp_version.yaml
 
 ## Quick Reference
 
+### Local development (fast, no Docker)
+
 | Command | Purpose |
 | --- | --- |
-| `make tests` | Build + run unit tests + gcov |
+| `make validate` | Tests + build all examples -- the everyday pre-push check |
+| `make tests` | Unit tests + gcov only |
+| `make examples` | Build all examples (no interactive launch) |
+| `make example` | Build + run posix ncurses example (interactive) |
 | `make coverage` | Tests + coverage summary |
+| `make funcsizes` | Per-function compiled sizes (x86-32, ARM32) |
+| `make sizes` | Feature profile compiled sizes (ARM + host) |
+| `make fuzz` | Fuzz testing with libFuzzer (requires clang) |
 | `make version` | Extract version to build/xelp_version.yaml |
-| `make example` | Build + run posix ncurses example |
-| `make clean` | Remove all build artifacts |
-| `bash tools/make_release.sh` | Validate build for release (dry run) |
-| `bash tools/make_release.sh --tag` | Validate + tag + push (CI creates release) |
-| `bash tools/make_release.sh --release` | Validate + tag + push + local release (fallback) |
-| `bash tools/crossbuild.sh` | Docker cross-compilation size report |
+| `make clean` | Remove test build artifacts |
+| `make clean-all` | Clean tests + all examples |
+
+### Pre-release (validate + update size tables, requires Docker)
+
+| Command | Purpose |
+| --- | --- |
+| `make prerelease` | Validate + Docker cross-compile + update README size tables |
+
+Runs `make validate`, then `tools/crossbuild.sh` (Docker), then
+`tools/update_sizes.sh` to patch the compiled-size tables in README.md
+and pages/index.html. Does not tag, push, or publish.
+
+### Full release
+
+| Command | Purpose |
+| --- | --- |
+| `bash tools/make_release.sh` | Full guided release pipeline (includes Docker cross-build) |
+| `bash tools/make_release.sh --validate` | Local validation only (no git, no push) |
+| `bash tools/make_release.sh --release-local` | Full flow, creates GH release locally (fallback) |
+| `bash tools/crossbuild.sh` | Docker cross-compile only (standalone, writes `build/sizes.csv`) |
+
+The cross-build step is expensive (~minutes, requires Docker). It runs
+automatically during `make_release.sh` and is skipped gracefully if Docker
+is unavailable. Day-to-day development uses `make validate` which takes
+seconds.
 
 ## Development Workflow
 
 ```bash
 git checkout -b dev-my-feature master
 # ... make changes ...
-make clean && make tests        # must pass with zero warnings
+make validate                   # tests + examples, zero warnings
 make coverage                   # check coverage didn't drop
 ```
 
@@ -53,16 +81,19 @@ make coverage                   # check coverage didn't drop
 1. Bump `XELP_VERSION` in `src/xelp.h`
 2. Update `CHANGELOG.md` with release notes
 3. Commit on your working branch
+4. Run the guided release script:
+   ```bash
+   bash tools/make_release.sh
+   ```
 
-Then run the guided release script:
+The script handles everything end-to-end: extract version, validate
+(tests + examples + warnings + coverage), sync manifests, update
+badges, Docker cross-compilation, size table update, push branch,
+open PR, wait for CI, merge, tag, and wait for the GitHub Release.
+It pauses for confirmation before anything that affects the remote.
 
-```bash
-bash tools/make_release.sh
-```
-
-The script walks through every step: local validation, push, PR, CI,
-merge, tag, and waits for the GitHub Release to appear. It pauses for
-confirmation before anything that affects the remote.
+If Docker is not installed, the cross-build step is skipped and
+existing size tables are preserved.
 
 For local validation only (no git, no PR):
 
@@ -117,21 +148,22 @@ Runs automatically when a version tag (`v*`) is pushed:
 This means the release flow is:
 
 ```bash
-bash tools/make_release.sh --tag   # creates + pushes tag
+bash tools/make_release.sh               # full guided release (includes tag + push)
 # GitHub Actions takes over: validates, creates release
 ```
 
-Or for full local control:
+Or for full local control (if GitHub Actions is unavailable):
 
 ```bash
-bash tools/make_release.sh --release   # creates tag + release via gh CLI
+bash tools/make_release.sh --release-local   # creates tag + release via gh CLI
 ```
 
 ## Cross-Compilation
 
 ```bash
-bash tools/crossbuild.sh        # Docker-based, all targets
-bash tools/compactbuilds.sh     # host-native (requires toolchains)
+bash tools/crossbuild.sh                    # Docker-based, all targets -> build/sizes.csv
+bash tools/crossbuild.sh --build            # force rebuild the Docker image
 ```
 
+The cross-build is also run automatically as part of `make_release.sh`.
 See `tools/README_TOOLS.md` for details.

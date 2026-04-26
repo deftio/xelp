@@ -44,16 +44,16 @@ static char uart_getc(void)
 /* KEY mode commands (single keypress, no ENTER)                       */
 /* ------------------------------------------------------------------ */
 
-static XELPRESULT key_help(XELP *ths, int c)
+static XELPRESULT key_help(XELP *ths, XELPKEYCODE c)
 {
     (void)c;
-    return XELPHelp(ths);
+    return XelpHelp(ths);
 }
 
-static XELPRESULT key_banner(XELP *ths, int c)
+static XELPRESULT key_banner(XELP *ths, XELPKEYCODE c)
 {
     (void)c;
-    XELPOut(ths, XELP_BANNER_STR, 0);
+    XelpOut(ths, XELP_BANNER_STR, 0);
     return XELP_S_OK;
 }
 
@@ -70,22 +70,22 @@ XELPKeyFuncMapEntry key_commands[] = {
 static XELPRESULT cmd_help(XELP *ths, const char *args, int len)
 {
     (void)args; (void)len;
-    return XELPHelp(ths);
+    return XelpHelp(ths);
 }
 
 static XELPRESULT cmd_echo(XELP *ths, const char *args, int len)
 {
-    XELPOut(ths, args, len);
-    XELPOut(ths, "\n", 0);
+    XelpOut(ths, args, len);
+    XelpOut(ths, "\n", 0);
     return XELP_S_OK;
 }
 
 static XELPRESULT cmd_info(XELP *ths, const char *args, int len)
 {
     (void)args; (void)len;
-    XELPOut(ths, "XELP size: ", 0);
+    XelpOut(ths, "XELP size: ", 0);
     /* On a real target you'd format sizeof(XELP) here */
-    XELPOut(ths, " bytes\n", 0);
+    XelpOut(ths, " bytes\n", 0);
     return XELP_S_OK;
 }
 
@@ -114,11 +114,11 @@ static void on_mode_change(int mode)
 {
     extern XELP cli;
     if (mode == XELP_MODE_CLI)
-        XELPOut(&cli, "[CLI mode]\n", 0);
+        XelpOut(&cli, "[CLI mode]\n", 0);
     else if (mode == XELP_MODE_KEY)
-        XELPOut(&cli, "[KEY mode]\n", 0);
+        XelpOut(&cli, "[KEY mode]\n", 0);
     else if (mode == XELP_MODE_THR)
-        XELPOut(&cli, "[THR mode]\n", 0);
+        XelpOut(&cli, "[THR mode]\n", 0);
 }
 
 /* ------------------------------------------------------------------ */
@@ -129,7 +129,7 @@ XELP cli;
 
 void main(void)
 {
-    XELPInit(&cli, "Bare Metal Example v1.0\n");
+    XelpInit(&cli, "Bare Metal Example v1.0\n");
 
     /* Wire up the platform abstraction layer */
     XELP_SET_FN_OUT(cli, &uart_putc);
@@ -142,16 +142,16 @@ void main(void)
     XELP_SET_FN_CLI(cli, cli_commands);
 
     /* Print startup banner and help */
-    XELPOut(&cli, XELP_BANNER_STR, 0);
-    XELPHelp(&cli);
+    XelpOut(&cli, XELP_BANNER_STR, 0);
+    XelpHelp(&cli);
 
     /* Show initial prompt */
-    XELPParseKey(&cli, '\n');
+    XelpParseKey(&cli, '\n');
 
     /* Main loop */
     for (;;) {
         if (uart_rx_ready()) {
-            XELPParseKey(&cli, uart_getc());
+            XelpParseKey(&cli, uart_getc());
         }
     }
 }

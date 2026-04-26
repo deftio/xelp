@@ -41,6 +41,8 @@ directory.</p>
 <tr><td><a href="#arduino-cpp">Arduino C++</a></td><td>Any Arduino board</td><td>C++ wrapper class for easy integration</td></tr>
 <tr><td><a href="#esp32-wifi">ESP32 WiFi</a></td><td>ESP32</td><td>WiFi config, time and weather fetch via CLI</td></tr>
 <tr><td><a href="#scripting">Scripting</a></td><td>Linux / macOS</td><td>Batch scripting vs interactive mode</td></tr>
+<tr><td><a href="#pico-cli">Pico CLI (C)</a></td><td>Raspberry Pi Pico</td><td>GPIO, ADC, PWM control over USB serial</td></tr>
+<tr><td><a href="#pico-cli-arduino">Pico CLI (Arduino Easy API)</a></td><td>Raspberry Pi Pico</td><td>Tier 3 Easy API with lambdas</td></tr>
 </tbody>
 </table>
 
@@ -81,19 +83,19 @@ XELPCLIFuncMapEntry cli_commands[] = {
 XELP cli;
 
 void main(void) {
-    XELPInit(&amp;cli, "My Device v1.0\n");
+    XelpInit(&amp;cli, "My Device v1.0\n");
 
     XELP_SET_FN_OUT(cli,  &amp;uart_putc);
     XELP_SET_FN_BKSP(cli, &amp;uart_bksp);
     XELP_SET_FN_KEY(cli,  key_commands);
     XELP_SET_FN_CLI(cli,  cli_commands);
 
-    XELPHelp(&amp;cli);
-    XELPParseKey(&amp;cli, '\n');   /* show initial prompt */
+    XelpHelp(&amp;cli);
+    XelpParseKey(&amp;cli, '\n');   /* show initial prompt */
 
     for (;;) {
         if (uart_rx_ready())
-            XELPParseKey(&amp;cli, uart_getc());
+            XelpParseKey(&amp;cli, uart_getc());
     }
 }
 </code></pre>
@@ -121,8 +123,8 @@ output function, command table, prompt, and internal state.</p>
 
 <pre><code>XELP debug_cli, field_cli;
 
-XELPInit(&amp;debug_cli, "Debug Console (UART0)");
-XELPInit(&amp;field_cli, "Service Port (UART1)");
+XelpInit(&amp;debug_cli, "Debug Console (UART0)");
+XelpInit(&amp;field_cli, "Service Port (UART1)");
 
 XELP_SET_FN_OUT(debug_cli, &amp;uart0_putc);
 XELP_SET_FN_OUT(field_cli, &amp;uart1_putc);
@@ -135,8 +137,8 @@ XELP_SET_VAL_CLI_PROMPT(field_cli, "svc&gt;");
 
 /* Poll both UARTs */
 for (;;) {
-    if (uart0_rx_ready()) XELPParseKey(&amp;debug_cli, uart0_getc());
-    if (uart1_rx_ready()) XELPParseKey(&amp;field_cli, uart1_getc());
+    if (uart0_rx_ready()) XelpParseKey(&amp;debug_cli, uart0_getc());
+    if (uart1_rx_ready()) XelpParseKey(&amp;field_cli, uart1_getc());
 }
 </code></pre>
 
@@ -156,7 +158,8 @@ for (;;) {
 
 <p>Full interactive demo for Linux and macOS using ncurses for terminal handling.</p>
 
-<pre><code>make example    # from repo root
+<pre><code>cd examples/posix-simple
+make
 </code></pre>
 
 <p>Requires ncurses: <code>sudo apt-get install libncurses5-dev</code> (Debian/Ubuntu).</p>
@@ -180,7 +183,7 @@ for (;;) {
 <pre><code>stdin (ncurses getch)
   |
   v
-XELPParseKey(&amp;example, char)
+XelpParseKey(&amp;example, char)
   |
   +--&gt; CLI: line buffer -&gt; tokenize -&gt; dispatch
   +--&gt; KEY: immediate dispatch
@@ -205,7 +208,7 @@ external library dependencies.</p>
 
 void setup() {
     Serial.begin(115200);
-    XELPInit(&amp;cli, "xelp Arduino example v1.0\n");
+    XelpInit(&amp;cli, "xelp Arduino example v1.0\n");
     XELP_SET_FN_OUT(cli, &amp;writeChar);
     XELP_SET_FN_CLI(cli, gMyCLICommands);
 }
@@ -213,7 +216,7 @@ void setup() {
 void loop() {
     if (Serial.available() &gt; 0) {
         char c = Serial.read();
-        XELPParseKey(&amp;cli, c);
+        XelpParseKey(&amp;cli, c);
     }
 }
 </code></pre>
@@ -267,13 +270,118 @@ the serial CLI, then fetch the current time and weather from free APIs
 <a href="https://github.com/deftio/xelp/blob/master/examples/scripting/scripting-example.c"><code>examples/scripting/scripting-example.c</code></a></p>
 
 <p>Demonstrates the difference between <strong>scripting mode</strong>
-(<code>XELPParse</code> / <code>XELPParseXB</code> &mdash; execute a buffer of
-commands at once) and <strong>interactive mode</strong> (<code>XELPParseKey</code>
+(<code>XelpParse</code> / <code>XelpParseXB</code> &mdash; execute a buffer of
+commands at once) and <strong>interactive mode</strong> (<code>XelpParseKey</code>
 &mdash; character-by-character terminal input).</p>
 
-<pre><code>gcc -Wall -Isrc examples/scripting/scripting-example.c src/xelp.c -o scripting-example
-./scripting-example
+<pre><code>cd examples/scripting
+make
 </code></pre>
+
+<!-- ============================================================ -->
+
+<h2 id="pico-cli">Pico CLI (C)</h2>
+
+<p><strong>Files:</strong>
+<a href="https://github.com/deftio/xelp/tree/master/examples/pico-cli"><code>examples/pico-cli/</code></a></p>
+
+<p>Pure C example for Raspberry Pi Pico, Pico W, Pico 2, and Pico 2 W using
+the Pico SDK. Controls GPIO, ADC, and PWM over USB CDC serial. Automatically
+detects Pico W boards and uses the CYW43 driver for the wireless-chip LED.</p>
+
+<pre><code>mkdir build &amp;&amp; cd build
+cmake -DPICO_BOARD=pico ..   # or pico_w, pico2, pico2_w
+make
+</code></pre>
+
+<h3>Commands</h3>
+<ul>
+  <li><code>help</code> &mdash; list all commands</li>
+  <li><code>led &lt;0|1&gt;</code> &mdash; set on-board LED</li>
+  <li><code>pin &lt;n&gt; &lt;in|out&gt;</code> &mdash; configure GPIO direction</li>
+  <li><code>set &lt;pin&gt; &lt;0|1&gt;</code> / <code>get &lt;pin&gt;</code> &mdash; write/read GPIO</li>
+  <li><code>adc &lt;0-3&gt;</code> &mdash; read ADC channel</li>
+  <li><code>pwm &lt;pin&gt; &lt;0-255&gt;</code> &mdash; set PWM duty</li>
+</ul>
+
+<h3>Key snippet</h3>
+
+<pre><code>XELP cli;
+
+int main(void) {
+    stdio_init_all();
+    gpio_init(PICO_DEFAULT_LED_PIN);
+    gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
+
+    XelpInit(&amp;cli, "Pico CLI (xelp)\n");
+    XELP_SET_FN_OUT(cli, &amp;uart_putc_fn);
+    XELP_SET_FN_CLI(cli, cli_commands);
+
+    for (;;) {
+        int c = getchar_timeout_us(0);
+        if (c &gt;= 0) XelpParseKey(&amp;cli, (char)c);
+    }
+}
+</code></pre>
+
+<!-- ============================================================ -->
+
+<h2 id="pico-cli-arduino">Pico CLI (Arduino Easy API)</h2>
+
+<p><strong>Files:</strong>
+<a href="https://github.com/deftio/xelp/tree/master/examples/pico-cli-arduino"><code>examples/pico-cli-arduino/</code></a></p>
+
+<p>Showcases the <strong>C++ Easy API</strong> on Raspberry Pi Pico using
+the <a href="https://github.com/earlephilhower/arduino-pico">Arduino-Pico
+core</a>. Commands are registered with <code>commands({...})</code>
+&mdash; no static tables, no raw <code>XELP*</code> pointers. Lambda callbacks
+receive a <code>XelpCLI&amp;</code> reference, <code>argc</code>, and
+<code>argv</code> &mdash; similar to a standard <code>main()</code>.</p>
+
+<h3>Key snippet</h3>
+
+<pre><code>XelpCLI cli;
+
+void setup() {
+    Serial.begin(115200);
+    cli.begin("Pico CLI Demo\n", nullptr);
+    cli.output(Serial);
+    cli.prompt("pico&gt;");
+
+    cli.commands({
+        {"help", "show help", [](XelpCLI&amp; c, int, const char**) {
+            c.help();
+        }},
+        {"led", "led &lt;0|1&gt;", [](XelpCLI&amp; c, int argc, const char** argv) {
+            if (argc &lt; 2) { c.print("usage: led &lt;0|1&gt;\n"); return; }
+            int v = argv[1][0] - '0';
+            digitalWrite(LED_BUILTIN, v ? HIGH : LOW);
+            c.print(v ? "LED ON\n" : "LED OFF\n");
+        }},
+    });
+
+    cli.keyCommands({
+        {'l', "toggle LED", [](XelpCLI&amp; c, XELPKEYCODE) {
+            static bool on = false;
+            on = !on;
+            digitalWrite(LED_BUILTIN, on ? HIGH : LOW);
+        }},
+    });
+}
+
+void loop() { cli.poll(Serial); }
+</code></pre>
+
+<h3>Two ways to register commands</h3>
+
+<ul>
+  <li><strong>C way</strong>: <code>setCommands()</code> with a static
+      <code>XELPCLIFuncMapEntry[]</code> array (see <a href="#arduino-cpp">Arduino C++</a>
+      example).</li>
+  <li><strong>C++ way</strong>: <code>commands({...})</code> with inline lambdas
+      (this example). <code>argv[0]</code> is the command name,
+      <code>argv[1..argc-1]</code> are the arguments.</li>
+</ul>
 
 <!-- ============================================================ -->
 
@@ -298,21 +406,21 @@ commands at once) and <strong>interactive mode</strong> (<code>XELPParseKey</cod
     int n;
 
     XELP_XB_INIT(b, args, len);
-    XELPNumToks(&amp;b, &amp;n);
+    XelpNumToks(&amp;b, &amp;n);
 
     if (n &lt; 3) {
-        XELPOut(ths, "usage: set &lt;key&gt; &lt;value&gt;\n", 0);
+        XelpOut(ths, "usage: set &lt;key&gt; &lt;value&gt;\n", 0);
         return XELP_E_ERR;
     }
 
     /* Token 0 = "set", Token 1 = key, Token 2 = value */
     XELP_XB_TOP(b);
-    XELPTokN(&amp;b, 1, &amp;tok);
+    XelpTokN(&amp;b, 1, &amp;tok);
     /* tok.s .. tok.p is the key string */
 
     XELP_XB_TOP(b);
-    XELPTokN(&amp;b, 2, &amp;tok);
-    int value = XELPStr2Int(tok.s, tok.p - tok.s);
+    XelpTokN(&amp;b, 2, &amp;tok);
+    int value = XelpStr2Int(tok.s, tok.p - tok.s);
 
     return XELP_S_OK;
 }
@@ -320,17 +428,17 @@ commands at once) and <strong>interactive mode</strong> (<code>XELPParseKey</cod
 
 <h3>Pattern: output without printf</h3>
 
-<p>xelp has no printf. Use <code>XELPOut</code> for strings. For numbers,
+<p>xelp has no printf. Use <code>XelpOut</code> for strings. For numbers,
 use your platform&rsquo;s <code>sprintf</code> into a local buffer, or write
 a simple helper:</p>
 
 <pre><code>void print_int(XELP *x, int val) {
     char buf[12];
     int i = 0;
-    if (val &lt; 0) { XELPOut(x, "-", 1); val = -val; }
-    if (val == 0) { XELPOut(x, "0", 1); return; }
+    if (val &lt; 0) { XelpOut(x, "-", 1); val = -val; }
+    if (val == 0) { XelpOut(x, "0", 1); return; }
     while (val &gt; 0) { buf[i++] = '0' + (val % 10); val /= 10; }
-    while (i &gt; 0) { XELPOut(x, &amp;buf[--i], 1); }
+    while (i &gt; 0) { XelpOut(x, &amp;buf[--i], 1); }
 }
 </code></pre>
 

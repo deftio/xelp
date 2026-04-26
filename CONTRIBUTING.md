@@ -96,16 +96,36 @@ Avoid: `update stuff`, `fix`, `wip`, `clean up code`.
 ## Building and testing
 
 ```bash
-make tests              # build + run unit tests + gcov
+make validate           # tests + build all examples -- the everyday check
+make tests              # unit tests + gcov only
+make examples           # build all examples (no interactive launch)
 make coverage           # tests + coverage summary
-make clean              # remove all build artifacts
+make funcsizes          # per-function compiled sizes (x86-32, ARM32)
+make sizes              # feature profile compiled sizes (ARM + host)
+make version            # extract and print library version
+make fuzz               # fuzz testing with libFuzzer (requires clang)
+make clean-all          # remove all build artifacts including examples
 ```
+
+`make validate` is the recommended pre-push check. It runs the full test
+suite with `-Werror` and builds all examples, confirming zero warnings
+everywhere. Takes seconds on any modern machine.
+
+Before a release, run:
+
+```bash
+make prerelease         # validate + Docker cross-compile + update README size tables
+```
+
+This chains `make validate`, `tools/crossbuild.sh` (Docker), and
+`tools/update_sizes.sh` to patch the compiled-size tables in README.md
+and pages/index.html. Does not tag, push, or publish.
 
 The test suite uses the jumpbug framework. All tests must pass with
 **zero compiler warnings** and **100% line coverage** of `xelp.c`
 before a PR will be accepted.
 
-The full `xelp.c.gcov` file is written to `tests/` for line-by-line
+The full `xelp.c.gcov` file is written to `build/` for line-by-line
 details. Don't let coverage drop when adding new code -- add tests.
 
 ## Compile-time configuration
@@ -135,7 +155,7 @@ Workflow:
    ```bash
    git checkout -b dev-my-feature master
    ```
-3. Make your changes. Ensure `make tests` passes with zero warnings
+3. Make your changes. Ensure `make validate` passes with zero warnings
    and coverage doesn't drop.
 4. Push your branch and open a PR against `master`.
 5. CI will run automatically (Ubuntu + macOS, GCC + Clang, 32-bit).
@@ -152,13 +172,16 @@ Only maintainers create releases. The process is:
 
 1. Bump `XELP_VERSION` in `src/xelp.h`
 2. Move the `[Unreleased]` section in `CHANGELOG.md` to a versioned
-   heading (e.g. `## [0.34] - 2025-07-01`)
-3. Commit, push, merge to `master`
-4. Run the release script from `master`:
+   heading (e.g. `## [0.3.1] - 2025-07-01`)
+3. Commit on your working branch
+4. Run the guided release script:
    ```bash
-   bash tools/make_release.sh          # dry run -- validates everything
-   bash tools/make_release.sh --tag    # validates, tags, pushes
+   bash tools/make_release.sh              # full guided release
+   bash tools/make_release.sh --validate   # local validation only
    ```
+   The script handles everything end-to-end: validation (tests +
+   examples), manifest sync, badge update, Docker cross-compilation,
+   size table update, push, PR, CI, merge, tag, and publish.
 5. GitHub Actions picks up the tag push, validates again in CI, and
    creates a GitHub Release with notes from `CHANGELOG.md`.
 

@@ -37,18 +37,158 @@
 /**
 local defines (this file only)
  */
-#ifndef _PUTC
-#define _PUTC(c)	((ths->mpfOut)((char)(c)))   /* write char to output */
-#endif
+/* static version kept separate from public XelpPutc -- the compiler can
+   inline this at each call site, saving ~44 bytes vs routing through the
+   non-static XelpPutc which must emit a callable symbol. */
+static void _xelp_putc(XELP *ths, char c) {
+    if (ths->mOutEnable && ths->mpfOut) ths->mpfOut(c);
+}
+#define _PUTC(c)    _xelp_putc(ths, (c))
+#define _XOUTC(x,c) _xelp_putc((x), (c))
 
+static void _xelp_echo(XELP *ths, char c) {
+    if (!ths->mOutEnable || !ths->mpfOut) return;
+    if (ths->mEchoChar == XELP_ECHO_NORMAL)   ths->mpfOut(c);
+    else if (ths->mEchoChar != XELP_ECHO_OFF) ths->mpfOut(ths->mEchoChar);
+}
+#define _ECHO(c)    _xelp_echo(ths, (c))
 
-#ifndef _XOUTC
-#define _XOUTC(x,c)    do{if(x->mpfOut){x->mpfOut(c);}}while(0) /* write a char to output (null ptr safe) */
-#endif
-/***************************************** 
- XELPStrLen() - find length of a string in bytes assuming its null terminated
+static void _xelp_cursor(XELP *ths, char c) {
+    if (ths->mEchoChar != XELP_ECHO_OFF && ths->mOutEnable && ths->mpfOut)
+        ths->mpfOut(c);
+}
+#define _CURSOR(c)  _xelp_cursor(ths, (c))
+/*****************************************
+ _xelp_memmove() - overlap-safe byte copy (avoids stdlib dependency for bare-metal).
+ Copies bytes from [src .. src+n) to [dst .. dst+n).  Handles the overlapping-
+ region case that arises when shifting characters within the CLI buffer
+ (insert → shift right, delete → shift left).
+ dst, src may overlap.  n==0 is a no-op.
  */
-int XELPStrLen (const char* c) {
+static void _xelp_memmove(char *dst, const char *src, int n) {
+    if (dst < src) {                   /* shift-left: copy forward  */
+        const char *e = src + n;
+        while (src < e) *dst++ = *src++;
+    } else if (dst > src) {            /* shift-right: copy backward */
+        const char *e = src;
+        dst += n; src += n;
+        while (src > e) *--dst = *--src;
+    }
+}
+
+/*****************************************
+ _xelpKeyAccum() - key-input accumulator state machine.
+
+ This is separate from the main CLI/script parser (the PSM tokenizer in
+ gPSMStates).  The two state machines handle different layers:
+
+   _xelpKeyAccum   → byte layer: assembles raw bytes into keycodes
+   gPSMStates/PSM  → token layer: splits a text buffer into commands
+
+ _xelpKeyAccum runs inside XelpParseKey() which feeds one hardware byte
+ at a time.  It packs bytes into a XELPKEYCODE (unsigned long, little-endian):
+
+   byte[0] in bits  0-7   (always present)
+   byte[1] in bits  8-15  (ESC [ ... sequences)
+   byte[2] in bits 16-23
+   byte[3] in bits 24-31
+
+ Single chars complete immediately (keycode == the char value).
+ ESC is held: if the next byte is '[' we enter CSI mode and collect
+ until a terminator (letter or '~'); if the next byte is anything else,
+ ESC is flushed as a standalone keycode and the current byte is flagged
+ for reprocessing (*reprocess=1).
+
+ The PSM tokenizer, by contrast, works on whole buffers submitted via
+ XelpParse/XelpParseXB and never sees raw hardware bytes.
+
+ Returns: 1 = complete key in ths->mKeyAccum, 0 = need more bytes.
+ */
+static int _xelpKeyAccum(XELP *ths, char byte, int *reprocess) {
+    unsigned char ub = (unsigned char)byte;
+    *reprocess = 0;
+
+    /* clear accumulator at start of a new keycode */
+    if (ths->mKeyLen == 0) ths->mKeyAccum = 0;
+
+    /* pack byte into accumulator at current position */
+    ths->mKeyAccum |= ((XELPKEYCODE)ub) << (ths->mKeyLen * 8);
+    ths->mKeyLen++;
+
+    switch (ths->mKeyLen) {
+    case 1:  /* first byte */
+        if (ub == 0x1B) return 0;              /* ESC: wait for next */
+        break;                                 /* ordinary char: done */
+
+    case 2:  /* got ESC, peeking */
+        if (ub == '[') return 0;               /* CSI intro: keep going */
+        ths->mKeyAccum = 0x1B;                 /* flush bare ESC */
+        *reprocess = 1;
+        break;
+
+    case 3:  /* ESC [ x */
+        if (ub >= 0x40 && ub <= 0x7E) break;  /* letter terminator: done */
+        if (ub >= '0' && ub <= '9') return 0;  /* digit param: keep going */
+        break;                                 /* anything else: flush */
+
+    case 4:  /* ESC [ digit ~ (or overflow) */
+        break;
+    }
+
+    ths->mKeyLen = 0;
+    return 1;
+}
+
+#if defined(XELP_ENABLE_CLI) && defined(XELP_ENABLE_LINE_EDIT)
+/*****************************************
+ _xelpRedrawFromCursor() - reprint from cursor to end, erase trailing, reposition
+ */
+static void _xelpRedrawFromCursor(XELP *ths) {
+    char *p;
+    int tail;
+    if (!ths->mOutEnable || !ths->mpfOut) return;
+    if (ths->mEchoChar == XELP_ECHO_OFF) return;
+    /* print from cursor to end of content */
+    for (p = ths->mCur; p < ths->mCmdXB.p; p++) {
+        if (ths->mEchoChar != XELP_ECHO_NORMAL) ths->mpfOut(ths->mEchoChar);
+        else ths->mpfOut(*p);
+    }
+    /* erase one trailing char (covers deletion case) */
+    ths->mpfOut(' ');
+    /* backspace to cursor position */
+    tail = (int)(ths->mCmdXB.p - ths->mCur) + 1;
+    while (tail-- > 0)
+        ths->mpfOut('\b');
+}
+#endif
+
+#ifdef XELP_ENABLE_HELP
+/*****************************************
+ _xelpPrintKeyName() - print human-readable name for a keycode in help output
+ */
+static void _xelpPrintKeyName(XELP *ths, XELPKEYCODE key) {
+    static const XELPKEYCODE codes[] = {
+        XELP_KEYCODE_UP,  XELP_KEYCODE_DOWN, XELP_KEYCODE_LEFT, XELP_KEYCODE_RIGHT,
+        XELP_KEYCODE_HOME,XELP_KEYCODE_END,  XELP_KEYCODE_KDEL, XELP_KEYCODE_INS,
+        XELP_KEYCODE_PGUP,XELP_KEYCODE_PGDN };
+    static const char names[] = "UpDnLtRtHmEnDlInPUPD";
+    static const char hex[]   = "0123456789ABCDEF";
+    int i;
+    if (!XELP_KC_IS_MULTI(key)) { _XOUTC(ths, (char)key); return; }
+    for (i = (int)(sizeof(codes)/sizeof(codes[0])); i--;)
+        if (key == codes[i]) { _XOUTC(ths, names[i*2]); _XOUTC(ths, names[i*2+1]); return; }
+    _XOUTC(ths, '0'); _XOUTC(ths, 'x');
+    for (i = 28; i >= 0; i -= 4) {
+        char nib = (char)((key >> i) & 0xF);
+        if (nib || i < 8) _XOUTC(ths, hex[(int)nib]);
+    }
+}
+#endif
+
+/*****************************************
+ XelpStrLen() - find length of a string in bytes assuming its null terminated
+ */
+int XelpStrLen (const char* c) {
     int l=0;
     while (*c++ != 0) {
         l++;
@@ -57,26 +197,33 @@ int XELPStrLen (const char* c) {
 }
 
 /***************************************** 
- XELPOut() - print a string.
+ XelpOut() - print a string.
  takes a length specified string and prints to output stream
  */
-XELPRESULT XELPOut (XELP *ths, const char* msg, int maxlen)
+XELPRESULT XelpOut (XELP *ths, const char* msg, int maxlen)
 {
+	if (!ths->mOutEnable) return XELP_S_OK;
 	if ((0 != msg) && (0 !=ths->mpfOut)) {
 		while (*msg != 0) {
 			(ths->mpfOut)(*msg++);
 			if ((maxlen > 0) && (--maxlen == 0)) break;
 		}
 	}
-	return XELP_S_OK;	
+	return XELP_S_OK;
+}
+
+XELPRESULT XelpPutc(XELP *ths, char c)
+{
+	_xelp_putc(ths, c);  /* reuse static version to avoid code duplication */
+	return XELP_S_OK;
 }
 /******************************************
- XELPHelp() - print out help strings for functions
+ XelpHelp() - print out help strings for functions
  see xelpcfg.h for setting or overriding
  XELP_HELP_ABT_STR, XELP_HELP_KEY_STR, XELP_HELP_CLI_STR
  */
 #ifdef XELP_ENABLE_HELP
-XELPRESULT XELPHelp(XELP* ths)
+XELPRESULT XelpHelp(XELP* ths)
 {
 #ifdef XELP_ENABLE_KEY
 	XELPKeyFuncMapEntry *e = ths->mpKeyModeFuncs;
@@ -86,15 +233,14 @@ XELPRESULT XELPHelp(XELP* ths)
 #endif
 	const int x=0xff;
 
-	XELPOut(ths,XELP_HELP_ABT_STR,x);
+	XelpOut(ths,XELP_HELP_ABT_STR,x);
 #ifdef XELP_ENABLE_KEY
 	if (e) { //check and see if first entry is not terminator
-		XELPOut(ths,XELP_HELP_KEY_STR,x);
+		XelpOut(ths,XELP_HELP_KEY_STR,x);
 		do 	{
-			_PUTC(e->mKey);
-            /* XELPOut(ths,&(e->mKey),1); */
+			_xelpPrintKeyName(ths, e->mKey);
 			_PUTC(':');
-			XELPOut(ths,e->mpHelpString,x);
+			XelpOut(ths,e->mpHelpString,x);
 			_PUTC('\n');
 			e++;
 		} while (e->mFunPtr);
@@ -102,11 +248,11 @@ XELPRESULT XELPHelp(XELP* ths)
 #endif
 #ifdef XELP_ENABLE_CLI
 	if (s) {
-		XELPOut(ths,XELP_HELP_CLI_STR,x);
+		XelpOut(ths,XELP_HELP_CLI_STR,x);
 		do	{
-			XELPOut(ths,s->mpCmd,x);
+			XelpOut(ths,s->mpCmd,x);
 			_PUTC(':');
-			XELPOut(ths,s->mpHelpString,x);			
+			XelpOut(ths,s->mpHelpString,x);			
 			_PUTC('\n');	
 			s++;	
 		} while (s->mFunPtr);
@@ -115,7 +261,7 @@ XELPRESULT XELPHelp(XELP* ths)
 	return XELP_S_OK;
 }
 #endif
-XELPRESULT XELPInit 	 (
+XELPRESULT XelpInit 	 (
 						XELP *ths,
 						const char *			pAboutMsg
 						)
@@ -129,9 +275,19 @@ XELPRESULT XELPInit 	 (
 	while (i--)
 		*p++=0;
 	
+	ths->mOutEnable = 1;
 	ths->mpAboutMsg = pAboutMsg;
+#ifdef XELP_ENABLE_CLI
+	/* Guard needed: mCmdXB and mCmdMsgBuf only exist in the struct when
+	   XELP_ENABLE_CLI is defined (see xelp.h).  Without this guard,
+	   KEY-only builds (XELP_CONFIG_OVERRIDE with only XELP_ENABLE_KEY)
+	   fail to compile. */
 	XELP_XB_INIT(ths->mCmdXB,ths->mCmdMsgBuf,XELP_CMDBUFSZ-1);
-	/* comand mode mssage index 
+#endif
+#if defined(XELP_ENABLE_CLI) && defined(XELP_ENABLE_LINE_EDIT)
+	ths->mCur = ths->mCmdXB.s;
+#endif
+	/* comand mode mssage index
 	ths->mCmdMsgIndex = 0;  //set to 0 by ptr loop at top
 	*/
 	/* i/o handlers			note: each set to 0 using ptr loop
@@ -144,35 +300,16 @@ XELPRESULT XELPInit 	 (
 	
 	return XELP_S_OK;
 }
-/****************************
- XELPStrEq() : test if 2 strings are equal.  used for parsing commands at CLI, scripts
- cmd is assumed to be 0 terminated e.g. "mycommand" === mycommand0 
-*/
-#ifdef XELP_ENABLE_CLI
-XELPRESULT XELPStrEq (const char* pbuf, int blen, const char *cmd)
-{
-	if (0 == blen) {
-        return (*cmd == 0) ? XELP_S_OK : XELP_S_NOTFOUND;
-    }
-	while(blen--){
-		if (*cmd == 0) 
-			return XELP_S_NOTFOUND;
-		if (*pbuf++ != *cmd++)
-			return XELP_S_NOTFOUND;
-	}
-	if (*cmd != 0)
-		return XELP_S_NOTFOUND;
-	return XELP_S_OK;
-}
 /********************************************************
- XELPStrEq2 (pbuf, pend, cmd)
-  takes a string specified by start and stop ptrs pbuf ... penf and compares if equal
-  to null termintaed string cmd.
+ XelpStrEq2 (pbuf, pend, cmd)
+  Compare a pointer-pair buffer [pbuf..pend) to a null-terminated string cmd.
+  This is the primary comparison function; XelpStrEq is a thin wrapper.
  */
-XELPRESULT XELPStrEq2 (const char* pbuf, const char* pend, const char *cmd)
+#ifdef XELP_ENABLE_CLI
+XELPRESULT XelpStrEq2 (const char* pbuf, const char* pend, const char *cmd)
 {
 	while(pbuf<pend){
-		if (*cmd == 0) 
+		if (*cmd == 0)
 			return XELP_S_NOTFOUND;
 		if (*pbuf++ != *cmd++)
 			return XELP_S_NOTFOUND;
@@ -181,8 +318,16 @@ XELPRESULT XELPStrEq2 (const char* pbuf, const char* pend, const char *cmd)
 		return XELP_S_NOTFOUND;
 	return XELP_S_OK;
 }
+/****************************
+ XelpStrEq() : length-based wrapper around XelpStrEq2.
+ cmd is assumed to be 0 terminated e.g. "mycommand" === mycommand\0
+*/
+XELPRESULT XelpStrEq (const char* pbuf, int blen, const char *cmd)
+{
+	return XelpStrEq2(pbuf, pbuf + blen, cmd);
+}
 /********************************************************
- XELPBufCmp() : test if 2 buffers have byte for byte equality.  Used for finding if tokens match commands or labels
+ XelpBufCmp() : test if 2 buffers have byte for byte equality.  Used for finding if tokens match commands or labels
  The buffers are specified by their start and end pointers [as .. ae] and [bs .. be]
  cmpType: (comparison type)
  XELP_CMP_TYPE_BUF : both buffers are only tested for byte for byte comparison by length (\0 is not treated as end-of-buf)
@@ -192,7 +337,7 @@ XELPRESULT XELPStrEq2 (const char* pbuf, const char* pend, const char *cmd)
  returns XELP_S_OK if they are equal else XELP_S_NOTFOUND 
  
 */
-XELPRESULT XELPBufCmp (const char *as, const char *ae, const char *bs, const char *be, int cmpType) 
+XELPRESULT XelpBufCmp (const char *as, const char *ae, const char *bs, const char *be, int cmpType) 
 {
     while ((as < ae) && (bs < be) ) {
         if (*as != *bs)
@@ -216,7 +361,7 @@ XELPRESULT XELPBufCmp (const char *as, const char *ae, const char *bs, const cha
     return XELP_S_NOTFOUND; 
 }
 /********************************************************
- XELPFindTok() : find a matching token in a buffer.  The buffer is a XelpBuf, the token is passed as 
+ XelpFindTok() : find a matching token in a buffer.  The buffer is a XelpBuf, the token is passed as 
     ptr to its beginning and a ptr to one position beyond its end 
  
  srchType: 
@@ -227,19 +372,19 @@ XELPRESULT XELPBufCmp (const char *as, const char *ae, const char *bs, const cha
 
 */
 
-XELPRESULT XELPFindTok(XelpBuf *x, const char *t0s, const char *t0e, int srchType) 
+XELPRESULT XelpFindTok(XelpBuf *x, const char *t0s, const char *t0e, int srchType) 
 {
     XelpBuf tok;
     
-    while (XELP_S_OK == XELPTokLineXB(x,&tok,srchType)) {
-        if (XELP_S_OK == XELPBufCmp(t0s,t0e,tok.s,tok.p,XELP_CMP_TYPE_BUF))
+    while (XELP_S_OK == XelpTokLineXB(x,&tok,srchType)) {
+        if (XELP_S_OK == XelpBufCmp(t0s,t0e,tok.s,tok.p,XELP_CMP_TYPE_BUF))
             return XELP_S_OK;
     }
     return XELP_S_NOTFOUND;
 }
 #endif
 /********************************************************
-XELPRESULT XELPExecKC(char)  : (execute key-command)
+XELPRESULT XelpExecKC(char)  : (execute key-command)
 
 Attempts to execute first matching single-key command.  
 the key value is passed to the command as an int
@@ -251,20 +396,20 @@ XelpExecKC(myInstance,'a');  // execute the single key command 'a' if it exists
 
 */
 #ifdef XELP_ENABLE_KEY
-XELPRESULT XELPExecKC(XELP* ths, char key) {
+XELPRESULT XelpExecKC(XELP* ths, XELPKEYCODE key) {
 	XELPKeyFuncMapEntry *p = ths->mpKeyModeFuncs;
-    if (p) 
-    {          
+    if (p)
+    {
         while (p->mFunPtr) {
             if (p->mKey == key)			{
-                ths->mR[0] = p->mFunPtr(ths, (int)key);
+                ths->mR[0] = p->mFunPtr(ths, key);
                 return ths->mR[0];
             }
             p++;
         }
     }
     if (ths->mpfDefKey) {
-        ths->mR[0] = ths->mpfDefKey(ths, (int)key);
+        ths->mR[0] = ths->mpfDefKey(ths, key);
     } else {
         ths->mR[0] = XELP_S_NOTFOUND;
     }
@@ -339,7 +484,7 @@ static unsigned char const gPSMJumpTable[8]= {
  81 /* _PS_QEND */
 };
 #ifdef XTOKLINE_OLD
-XELPRESULT XELPTokLine (const char *bs, const char *be, const char **t0s, const char **t0e, const char **eol, int srchType) {
+XELPRESULT XelpTokLine (const char *bs, const char *be, const char **t0s, const char **t0e, const char **eol, int srchType) {
  	const char *s;		 /* state ptr */
 	char cs=_PS_SEEK,prev=_PS_SEEK,tmp;   
 	int tm=1; /*  (token mode) allows capture of t0e, t0s only for first token seen */
@@ -375,13 +520,13 @@ XELPRESULT XELPTokLine (const char *bs, const char *be, const char **t0s, const 
 }
 #endif
 /*
-XELPRESULT XELPTokLine(char* bs, char* be, const char **t0s, const char **t0e, const char **eol, int srchType) {
+XELPRESULT XelpTokLine(char* bs, char* be, const char **t0s, const char **t0e, const char **eol, int srchType) {
     XelpBuf xc,tok;
     XELPRESULT r;
 
     XELP_XB_INIT_PTRS(xc,bs,bs,be);
 
-    r=XELPTokLineXB(&xc,&tok,srchType);
+    r=XelpTokLineXB(&xc,&tok,srchType);
     *t0s = tok.s;
     *t0e = tok.p;
     *eol = tok.e;
@@ -390,13 +535,13 @@ XELPRESULT XELPTokLine(char* bs, char* be, const char **t0s, const char **t0e, c
 */
 
 /********************************************************
-  XELPTokLineXB(buf, output, srch) - main tokenizer - handles whitespaces, linefeeds, comments, quoted strings
+  XelpTokLineXB(buf, output, srch) - main tokenizer - handles whitespaces, linefeeds, comments, quoted strings
 
   if srchType == XELP_TOK_ONLY ==> looks for next token starting from position buf->p.  
   if srchType == XELP_TOK_LINE ==> looks for entire line with tok(s,p,e)  returning (tok0 start, tok0 end, end of line) 
 
  */
-XELPRESULT XELPTokLineXB (XelpBuf *buf, XelpBuf *tok, int srchType) {
+XELPRESULT XelpTokLineXB (XelpBuf *buf, XelpBuf *tok, int srchType) {
  	const char *s;		 /*parser state ptr */
 	char cs=_PS_SEEK,prev=_PS_SEEK,tmp;   
 	int tm=1; /*  (token mode) allows capture of t0e, t0s only for first token seen */
@@ -433,8 +578,16 @@ XELPRESULT XELPTokLineXB (XelpBuf *buf, XelpBuf *tok, int srchType) {
 
 		(buf->p)++; /* advance char ptr */
 	}
-    /* buffer exhausted: if still seeking (no token started) or in a comment, nothing was found */
-    if (tm && (cs == _PS_SEEK || cs == _PS_CMNT))
+    /* Buffer exhausted before a token was completed.  If tok->s was never
+       assigned (_EF_TS never fired) we must return NOTFOUND — otherwise the
+       caller would use the uninitialised tok->s pointer, causing a SEGV in
+       XelpStrEq during command dispatch.  States where _EF_TS has not fired:
+         _PS_SEEK  – still looking for a token
+         _PS_CMNT  – inside a comment (no token started)
+         _PS_ESCA  – consumed a CLI escape char at end-of-buffer
+       Bug found by libFuzzer: input " ` \n" (backtick = XELP_CLI_ESC) left
+       the tokeniser in _PS_ESCA at EOB, returning OK with garbage tok->s. */
+    if (tm && (cs == _PS_SEEK || cs == _PS_CMNT || cs == _PS_ESCA))
         return XELP_S_NOTFOUND;
     if (tm)
         tok->p  = buf->p;
@@ -448,17 +601,17 @@ XELPRESULT XELPTokLineXB (XelpBuf *buf, XelpBuf *tok, int srchType) {
  XelpParseXB() parse buffer and execute commands 
  */
 
-XELPRESULT XELPParseXB (XELP* ths, XelpBuf *args) {
+XELPRESULT XelpParseXB (XELP* ths, XelpBuf *args) {
 	XelpBuf line;
 	XELPCLIFuncMapEntry   *f;
 
-	while (XELP_S_OK ==  XELPTokLineXB(args,&line,XELP_TOK_LINE) ) { /* for each logical line */
+	while (XELP_S_OK ==  XelpTokLineXB(args,&line,XELP_TOK_LINE) ) { /* for each logical line */
         
         f=ths->mpCLIModeFuncs;
         if (f) { /* make sure fn dispatch table exists */
         	ths->mR[0] = XELP_E_CMDNOTFOUND;
             while(f->mpCmd) {    
-                if (XELP_S_OK == XELPStrEq(line.s,(int)(line.p-line.s),f->mpCmd)){
+                if (XELP_S_OK == XelpStrEq2(line.s,line.p,f->mpCmd)){
                     
                     ths->mR[0] = (f->mFunPtr)(ths, line.s,(int)(line.e-line.s));
                     break;
@@ -473,26 +626,26 @@ XELPRESULT XELPParseXB (XELP* ths, XelpBuf *args) {
 	}
 	return XELP_S_OK;
 }
-XELPRESULT XELPParse 		(XELP *ths, const char *buf, int blen)
+XELPRESULT XelpParse 		(XELP *ths, const char *buf, int blen)
 {
-    XelpBufC args;
-    XELP_XB_INIT(args,buf,blen);
-    return XELPParseXB(ths,(XelpBuf *)&args);
+    XelpBuf args;
+    XELP_XB_INIT(args,(char*)buf,blen); /* const discard is safe: tokenizer only reads */
+    return XelpParseXB(ths,&args);
 }
 /********************************************************
- XELPTokN() find the nth token (if it exists) - useful for parsing arguments
+ XelpTokN() find the nth token (if it exists) - useful for parsing arguments
 
  XelpTokN finds the nth token (starting from the current buffer position buf->p);
  note: tok has last successfully found token regardless of result (check return value == XELP_S_OK)
  buf.p is pointing to position just after nth token.
 
  */
-XELPRESULT XELPTokN (XelpBuf *buf, int n, XelpBuf *tok)
+XELPRESULT XelpTokN (XelpBuf *buf, int n, XelpBuf *tok)
 {
     XELPRESULT r;
     buf->p = buf->s;
     do {
-        r = XELPTokLineXB(buf,tok,XELP_TOK_ONLY);
+        r = XelpTokLineXB(buf,tok,XELP_TOK_ONLY);
         if (XELP_S_OK != r) {
             tok->p = tok->s;
             tok->e = tok->s;
@@ -504,193 +657,323 @@ XELPRESULT XELPTokN (XelpBuf *buf, int n, XelpBuf *tok)
 }
 
 /********************************************************
- XELPNumToks() find the number of tokens in a buffer.
+ XelpNumToks() find the number of tokens in a buffer.
 
  */
 
-XELPRESULT XELPNumToks (XelpBuf *b, int *n)
+XELPRESULT XelpNumToks (XelpBuf *b, int *n)
 {
     XelpBuf t;
     *n=0;
-    while (XELP_S_OK == XELPTokLineXB(b,&t,XELP_TOK_ONLY))
+    while (XELP_S_OK == XelpTokLineXB(b,&t,XELP_TOK_ONLY))
         (*n)++;
-        
+
     return XELP_S_OK;
-};
+}
+
+/********************************************************
+ XelpArgs -- sequential argument iterator.
+ See xelp.h for API documentation.
+ */
+
+XELPRESULT XelpArgsInit (XelpArgs *a, const char *args, int len)
+{
+    XELP_XB_INIT(a->buf, (char*)args, len);
+    return XELP_S_OK;
+}
+
+XELPRESULT XelpNextTok (XelpArgs *a, XelpBuf *tok)
+{
+    XelpBuf t;
+    XELPRESULT r = XelpTokLineXB(&a->buf, &t, XELP_TOK_ONLY);
+    if (r != XELP_S_OK) {
+        if (tok) { tok->s = 0; tok->p = 0; }
+        return r;
+    }
+    if (tok) *tok = t;
+    return XELP_S_OK;
+}
+
+XELPRESULT XelpNextInt (XelpArgs *a, int *val)
+{
+    XelpBuf tok;
+    XELPRESULT r = XelpNextTok(a, &tok);
+    if (r != XELP_S_OK) return r;
+    return XelpParseNum(tok.s, (int)(tok.p - tok.s), val);
+}
+
+XELPRESULT XelpArgCount (XelpArgs *a, int *n)
+{
+    XelpBuf save;
+    XELP_XB_COPY(a->buf, save);
+    XELP_XB_TOP(a->buf);
+    XelpNumToks(&a->buf, n);
+    XELP_XB_COPY(save, a->buf);
+    return XELP_S_OK;
+}
 #endif /* XELP_ENABLE_CLI */
 
 /********************************************************
-	XELPParseKey() 
+	XelpParseKey() 
 	live command line handling. 
 	first looks for mode switch commans (single-key --> cli ---> thru)
 	then if in single-key mode looks up single key.
 	then if in command mode looks for <ENTER> and the attempts to parse current buffer.
 
 */
-XELPRESULT XELPParseKey (XELP *ths, char key)
-{
-	int i=ths->mCurMode;
-    int modeChangeAttempt = 1;
-    XelpBuf line; // this represents a tokenized "line" see XelpTokLineXB()
-	/* 	
-    First we test to see if we should switch modes.  this is a "key" difference  btw 
-	just submitting a buffer to be parsed and running a live command line interpreter.
-	*/
-	switch (key) {
+#ifdef XELP_ENABLE_LINE_EDIT
+/* move cursor left (dir<0) or right (dir>0); all=1 moves to boundary */
+static void _xelpCursorMove(XELP *ths, int dir, int all) {
+	do {
+		if (dir < 0) {
+			if (ths->mCur <= ths->mCmdXB.s) break;
+			ths->mCur--;
+			_CURSOR('\b');
+		} else {
+			if (ths->mCur >= ths->mCmdXB.p) break;
+			_CURSOR(*ths->mCur);
+			ths->mCur++;
+		}
+	} while (all);
+}
+#endif
+
 #ifdef XELP_ENABLE_CLI
-		case XELPKEY_CLI:
-			ths->mCurMode = (ths->mpCLIModeFuncs) ? XELP_MODE_CLI : i;
-			break;
+/* handle ENTER: echo newline, execute buffer, reset, show prompt */
+static void _xelpHandleEnter(XELP *ths) {
+	XelpBuf line;
+	_PUTC(XELPKEY_ENTER);
+	XELP_XB_INIT_PTRS(line, ths->mCmdXB.s, ths->mCmdXB.s, ths->mCmdXB.p);
+	XelpParseXB(ths, &line);
+	XELP_XB_TOP(ths->mCmdXB);
+#ifdef XELP_ENABLE_LINE_EDIT
+	ths->mCur = ths->mCmdXB.s;
+#endif
+#ifdef XELP_CLI_PROMPT
+	XelpOut(ths, XELP_CLI_PROMPT, -1);
+#endif
+}
+#endif
+
+XELPRESULT XelpParseKey (XELP *ths, char key)
+{
+	int reprocess;
+	do {
+		XELPKEYCODE keycode;
+		int is_single;
+		reprocess = 0;
+
+		if (!_xelpKeyAccum(ths, key, &reprocess))
+			return XELP_S_OK; /* incomplete sequence */
+
+		keycode = ths->mKeyAccum;
+		ths->mKeyLen = 0;
+		is_single = !XELP_KC_IS_MULTI(keycode);
+
+		/* mode-switch check (only for single-char keys) */
+		if (is_single) {
+			char ch = (char)keycode;
+			int i = ths->mCurMode;
+			int modeChangeAttempt = 1;
+
+			switch (ch) {
+#ifdef XELP_ENABLE_CLI
+				case XELPKEY_CLI:
+					ths->mCurMode = (ths->mpCLIModeFuncs) ? XELP_MODE_CLI : i;
+					break;
 #endif
 #ifdef XELP_ENABLE_KEY
-		case XELPKEY_KEY:
-			ths->mCurMode = (ths->mpKeyModeFuncs) ? XELP_MODE_KEY : i;
-			break;
+				case XELPKEY_KEY:
+					ths->mCurMode = (ths->mpKeyModeFuncs) ? XELP_MODE_KEY : i;
+					break;
 #endif
-#ifdef XELP_ENABLE_THR			
-		case XELPKEY_THR:
-			ths->mCurMode = (ths->mpfPassThru)	  ? XELP_MODE_THR : i;
-			break;
-#endif /* XELP_ENABLE_THR */
-		default:
-            modeChangeAttempt = 0;
-			break;
-	}
-	
-	if ((ths->mCurMode != i) && (modeChangeAttempt)) {
-		if (ths->mpfEditModeChg) /* if we have changed modes call the mode-change callback (if supplied) */
-			ths->mpfEditModeChg(ths->mCurMode);
-	}
-	else { /* we haven't changed modes so we act on the key */
+#ifdef XELP_ENABLE_THR
+				case XELPKEY_THR:
+					ths->mCurMode = (ths->mpfPassThru) ? XELP_MODE_THR : i;
+					break;
+#endif
+				default:
+					modeChangeAttempt = 0;
+					break;
+			}
+
+			if ((ths->mCurMode != i) && (modeChangeAttempt)) {
+				if (ths->mpfEditModeChg)
+					ths->mpfEditModeChg(ths->mCurMode);
+				continue; /* if reprocess is set, loop; else done */
+			}
+		}
+
+		/* dispatch by current mode */
 		switch(ths->mCurMode) {
 			case XELP_MODE_KEY:
 #ifdef XELP_ENABLE_KEY
-				XELPExecKC(ths,key);
+				XelpExecKC(ths, keycode);
 #endif
 				break;
 			case XELP_MODE_THR:
-#ifdef XELP_ENABLE_THR				
-				if (ths->mpfPassThru)
-					ths->mpfPassThru(key);
+#ifdef XELP_ENABLE_THR
+				if (is_single && ths->mpfPassThru)
+					ths->mpfPassThru((char)keycode);
 #endif
 				break;
 			default: /* XELP_MODE_CLI */
 #ifdef XELP_ENABLE_CLI
-                if (key == XELPKEY_BKSP){ 
-                    if (ths->mCmdXB.p > ths->mCmdXB.s ) {
-                        (ths->mCmdXB.p)--;
-                    if(ths->mpfBksp)
-                        ths->mpfBksp();
-                    }
-				}
-				else {
-					_PUTC(key); /* echo to output */
-                    
-					if (key == XELPKEY_ENTER )	{
-                        
-						/* XELP_XB_PUTC_RAW(ths->mCmdXB,';'); write this explictly b/c XELPKEY_ENTER may not be a parser term */
-                        XELP_XB_INIT_PTRS(line,ths->mCmdXB.s,ths->mCmdXB.s,ths->mCmdXB.p);
-                        XELPParseXB(ths,&line);
-                        line.p=line.s;
-                        XELP_XB_TOP(ths->mCmdXB);/* reset command buf to beginning */
-#ifdef XELP_CLI_PROMPT
-						XELPOut(ths,XELP_CLI_PROMPT,-1);
-#endif
+			{
+#ifdef XELP_ENABLE_LINE_EDIT
+				/* --- Line editing enabled --- */
+				if (!is_single) {
+					/* multi-byte key in CLI mode */
+					switch (keycode) {
+						case XELP_KEYCODE_LEFT:  _xelpCursorMove(ths, -1, 0); break;
+						case XELP_KEYCODE_RIGHT: _xelpCursorMove(ths, +1, 0); break;
+						case XELP_KEYCODE_HOME:  _xelpCursorMove(ths, -1, 1); break;
+						case XELP_KEYCODE_END:   _xelpCursorMove(ths, +1, 1); break;
+						case XELP_KEYCODE_KDEL: {
+							if (ths->mCur < ths->mCmdXB.p) {
+								int tail = (int)(ths->mCmdXB.p - ths->mCur - 1);
+								_xelp_memmove(ths->mCur, ths->mCur + 1, tail);
+								ths->mCmdXB.p--;
+								_xelpRedrawFromCursor(ths);
+							}
+							break;
+						}
+						case XELP_KEYCODE_UP:
+						case XELP_KEYCODE_DOWN:
+							/* silently drop (reserved for future history) */
+							break;
+						default:
+							/* silently drop other multi-byte keys */
+							break;
 					}
-					else {
-                        XELP_XB_PUTC(ths->mCmdXB,key);
+				} else {
+					/* single-char key in CLI mode with line editing */
+					char ch = (char)keycode;
+					if (ch == XELPKEY_BKSP || ch == XELPKEY_DEL) {
+						/* delete char before cursor */
+						if (ths->mCur > ths->mCmdXB.s) {
+							int tail = (int)(ths->mCmdXB.p - ths->mCur);
+							ths->mCur--;
+							_xelp_memmove(ths->mCur, ths->mCur + 1, tail);
+							ths->mCmdXB.p--;
+							_CURSOR('\b');
+							_xelpRedrawFromCursor(ths);
+						}
+					} else if (ch == XELPKEY_ENTER) {
+						_xelpHandleEnter(ths);
+					} else if (ch >= 0x20 && ch <= 0x7E) {
+						/* printable character */
+						if (ths->mCur == ths->mCmdXB.p) {
+							/* append at end (fast path) */
+							XELP_XB_PUTC(ths->mCmdXB, ch);
+							if (ths->mCmdXB.p > ths->mCur) {
+								ths->mCur++;
+								_ECHO(ch);
+							}
+						} else {
+							/* insert at cursor */
+							if (ths->mCmdXB.p < ths->mCmdXB.e) {
+								int tail = (int)(ths->mCmdXB.p - ths->mCur);
+								_xelp_memmove(ths->mCur + 1, ths->mCur, tail);
+								*ths->mCur = ch;
+								ths->mCmdXB.p++;
+								ths->mCur++;
+								_ECHO(ch);
+								_xelpRedrawFromCursor(ths);
+							}
+						}
+					}
+					/* other control chars silently dropped */
+				}
+#else
+				/* --- Line editing NOT enabled (append-only, old behavior) --- */
+				if (!is_single) {
+					/* silently drop multi-byte keys */
+				} else {
+					char ch = (char)keycode;
+					if (ch == XELPKEY_BKSP) {
+						if (ths->mCmdXB.p > ths->mCmdXB.s) {
+							(ths->mCmdXB.p)--;
+							if (ths->mpfBksp)
+								ths->mpfBksp();
+						}
+					} else if (ch == XELPKEY_ENTER) {
+						_xelpHandleEnter(ths);
+					} else {
+						_ECHO(ch);
+						XELP_XB_PUTC(ths->mCmdXB,ch);
 					}
 				}
-#endif
+#endif /* XELP_ENABLE_LINE_EDIT */
+			}
+#endif /* XELP_ENABLE_CLI */
 				break;
 		}
-	}
-	
+	} while (reprocess);
+
 	return XELP_S_OK;
 }
+#define XELP_MUL10(x)	(((x)<<3)+(((x)<<1)))  /* many old micros don't have multiply in core inst set */
+#define XELP_INT_MAX    ((int)(((unsigned)-1) >> 1))  /* portable INT_MAX without <limits.h> */
 /********************************************************
-  XELPSStr2Int()
-  parse a string return an integer
-  345  --> read as decimal
-  345h --> read as hex
+  XelpParseNum()
+  parse a string, return an integer via *n.
+  Returns XELP_S_OK on success, XELP_E_ERR on invalid input.
+  345   --> decimal
+  345h  --> hex (suffix)
+  0x345 --> hex (prefix)
  */
-#define FR_SMUL10(x)	(((x)<<3)+(((x)<<1)))  /* many old micros don't have multiply in core inst set */
+XELPRESULT XelpParseNum (const char* s, int maxlen, int* n) {
+	const char *end = s + maxlen; /* one past last byte -- never dereferenced */
+	int r=0, neg=0, d, isHex=0;
 
-int XELPStr2Int (const char* s,int  maxlen) {
-	const char *p = s+maxlen-1;
-	int r=0,x=0,d;
+	if (maxlen <= 0) return XELP_E_ERR;
 
-	if ('h' == *p)
-    { /* hexadecimal */
-		while (s<p) {
-			d = (*s >= 'a') ? (*s-'a'+0xa) : (*s >= 'A') ? (*s-'A'+0xa) : (*s-'0');
-			r = (r<<4)|d;
+	/* detect hex: 0x prefix takes priority over h suffix */
+	if (maxlen >= 3 && s[0] == '0' && s[1] == 'x') {
+		isHex = 1;
+		s += 2;                    /* skip "0x", end stays */
+	} else if (s[maxlen-1] == 'h') {
+		isHex = 1;
+		end--;                     /* exclude trailing 'h' */
+	}
+
+	if (isHex) {
+		if (s >= end) return XELP_E_ERR; /* no hex digits */
+		while (s < end) {
+			if      (*s >= 'a' && *s <= 'f') d = *s - 'a' + 0xa;
+			else if (*s >= 'A' && *s <= 'F') d = *s - 'A' + 0xa;
+			else if (*s >= '0' && *s <= '9') d = *s - '0';
+			else return XELP_E_ERR;
+			if ((unsigned)r > ((unsigned)XELP_INT_MAX >> 4)) return XELP_E_ERR;
+			r = (r << 4) | d;
 			s++;
 		}
 	}
 	else { /* base 10 */
-		if (*s == '-') {
-			x = -1;
-			s++;
-		} else {
-			if (*s == '+') {
-				s++;
-			}
-		}
-		while (s<=p) {
+		if      (*s == '-') { neg = 1; s++; }
+		else if (*s == '+') {          s++; }
+		if (s >= end) return XELP_E_ERR; /* sign only, no digits */
+		while (s < end) {
 			d = *s - '0';
-			r = FR_SMUL10(r) + d;
+			if (d < 0 || d > 9) return XELP_E_ERR;
+			if (r > (XELP_INT_MAX - d) / 10) return XELP_E_ERR;
+			r = XELP_MUL10(r) + d;
 			s++;
 		}
-		r = x ? -r : r;
-	}
-	return r;
-}
-/********************************************************
-  XELPParseNum()
-  parse a string return an integer
-  345  	--> read as decimal
-  345h 	--> read as hex
-  0x345 --> read as hex
- */
-XELPRESULT XELPParseNum (const char* s, int maxlen, int* n) {
-	const char *p = s+maxlen-1;
-	int r=0,x=0,d, isHex=0;
-
-	if ('h' == *p)
-		isHex = 1;
-
-	if (('0' == *s) && ('x' == *(s+1))) {
-		isHex = 1;
-		s+=2;
-		p++;
-	}
-
-	if (isHex)
-    { /* hexadecimal */
-		while (s<p) {
-			d = (*s >= 'a') ? (*s-'a'+0xa) : (*s >= 'A') ? (*s-'A'+0xa) : (*s-'0');
-			r = (r<<4)|d;
-			s++;
-		}
-	}
-	else { /* base 10 */
-		if (*s == '-') {
-			x = -1;
-			s++;
-		} else {
-			if (*s == '+') {
-				s++;
-			}
-		}
-		while (s<=p) {
-			d = *s - '0';
-			r = FR_SMUL10(r) + d;
-			s++;
-		}
-		r = x ? -r : r;
+		if (neg) r = -r;
 	}
 	*n = r;
 
-    return XELP_S_OK;
+	return XELP_S_OK;
+}
+/********************************************************
+  XelpStr2Int()
+  Convenience wrapper: parse a string, return an integer directly.
+  Calls XelpParseNum internally.  Returns 0 on invalid input.
+ */
+int XelpStr2Int (const char* s, int maxlen) {
+	int n = 0;
+	XelpParseNum(s, maxlen, &n);
+	return n;
 }

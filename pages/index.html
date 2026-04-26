@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>xelp — embedded CLI and script interpreter</title>
-  <meta name="description" content="xelp is a C language command line interpreter and script parser for embedded systems. No dynamic memory, multi-instance, 900 bytes to 4KB.">
+  <meta name="description" content="xelp is a C language command line interpreter and script parser for embedded systems. No dynamic memory, multi-instance, under 1 KB to ~5 KB.">
   <link rel="stylesheet" href="assets/main.css">
   <link rel="icon" href="../img/favicon-32x32.png" type="image/png">
 </head>
@@ -29,26 +29,29 @@
   <img src="../img/xelp-prompt-med.png" alt="xelp" class="logo">
   <p class="tagline">A command line interpreter and script engine for embedded systems.</p>
   <div class="badges">
-    <img src="https://img.shields.io/badge/version-0.3.0-blue.svg" alt="Version">
+    <img src="https://img.shields.io/badge/version-0.3.1-blue.svg" alt="Version">
     <a href="https://opensource.org/licenses/BSD-2-Clause"><img src="https://img.shields.io/badge/License-BSD%202--Clause-blue.svg" alt="License"></a>
     <a href="https://github.com/deftio/xelp/actions/workflows/ci.yml"><img src="https://github.com/deftio/xelp/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
     <img src="https://img.shields.io/badge/coverage-100%25-brightgreen.svg" alt="Coverage">
-    <img src="https://img.shields.io/badge/RISC--V-1.9KB-informational.svg" alt="RISC-V code size">
+    <a href="https://registry.platformio.org/libraries/deftio/xelp"><img src="https://img.shields.io/badge/PlatformIO-library-orange.svg" alt="PlatformIO"></a>
+    <a href="https://github.com/deftio/xelp"><img src="https://img.shields.io/badge/Arduino-library-teal.svg" alt="Arduino"></a>
+    <a href="https://components.espressif.com/components/deftio/xelp"><img src="https://img.shields.io/badge/ESP--IDF-component-red.svg" alt="ESP Component"></a>
   </div>
 </div>
 
 <p>xelp is an interactive command line interpreter, script engine, and
-single-key menu system for embedded C projects. It compiles to under 4 KB
+single-key menu system for embedded C projects. It compiles to under 5 KB
 with all features enabled and runs on targets from 8-bit microcontrollers
-to 64-bit hosts. Register your own C functions as commands and call them
-from the prompt or from scripts stored in ROM. No OS, no dynamic memory,
-no standard library dependencies.</p>
+to 64-bit hosts with code sizes from under 1 KB to ~5 KB. Register your
+own C functions as commands and call them from the prompt or from scripts
+stored in ROM. No OS, no dynamic memory, no standard library
+dependencies.</p>
 
 <h2>Features</h2>
 
 <ul>
   <li>Pure C (C89 compliant), optional C++ <code>extern "C"</code> support</li>
-  <li>Compiled sizes: <strong>900 bytes &ndash; 4 KB</strong> depending on features enabled</li>
+  <li>Compiled sizes: <strong>under 1 KB to ~5 KB</strong> depending on features enabled</li>
   <li>No <code>malloc</code>, no globals &mdash; all state in an instance struct</li>
   <li><strong>Bring your own functions</strong> &mdash; register any C function as a CLI command
       with a one-line table entry, callable interactively or from scripts</li>
@@ -132,7 +135,7 @@ entry:</p>
 void uart_putc(char c) { UART_TX = c; }
 
 XELPRESULT cmd_hello(XELP *ths, const char *args, int len) {
-    XELPOut(ths, "Hello!\n", 0);
+    XelpOut(ths, "Hello!\n", 0);
     return XELP_S_OK;
 }
 
@@ -144,51 +147,67 @@ XELPCLIFuncMapEntry commands[] = {
 XELP cli;
 
 void main(void) {
-    XELPInit(&amp;cli, "My Device v1.0");
+    XelpInit(&amp;cli, "My Device v1.0");
     XELP_SET_FN_OUT(cli, &amp;uart_putc);
     XELP_SET_FN_CLI(cli, commands);
 
     for (;;) {
         if (uart_rx_ready())
-            XELPParseKey(&amp;cli, uart_getc());
+            XelpParseKey(&amp;cli, uart_getc());
     }
 }
 </code></pre>
 
-<h2>Platform support and build sizes</h2>
+<h2>Compiled sizes</h2>
 
-<p>Compiled with <code>-Os</code>, all features enabled:</p>
+<p>Compiled <code>.text</code> section sizes with <code>-Os</code>.
+Three configurations: KEY (single-key dispatch only), CLI (typical
+interactive use), FULL (all features). Even the largest full build is
+under 7 KB.</p>
 
+<!-- Build Size Table -->
 <table>
-<thead><tr><th>Architecture</th><th>Compiler</th><th>Word size</th><th>Code size (bytes)</th></tr></thead>
+<thead><tr><th>CPU</th><th style="text-align:right">Width</th><th>Compiler</th><th style="text-align:right">KEY (bytes)</th><th style="text-align:right">CLI (bytes)</th><th style="text-align:right">FULL (bytes)</th></tr></thead>
 <tbody>
-<tr><td>ARM32 Thumb</td><td>arm-none-eabi-gcc</td><td>32-bit</td><td>1488</td></tr>
-<tr><td>MSP430</td><td>msp430-gcc</td><td>16-bit</td><td>1804</td></tr>
-<tr><td>RISC-V (rv64)</td><td>riscv64-linux-gnu-gcc</td><td>64-bit</td><td>1960</td></tr>
-<tr><td>ARM32</td><td>arm-none-eabi-gcc</td><td>32-bit</td><td>2372</td></tr>
-<tr><td>AVR (ATtiny85)</td><td>avr-gcc</td><td>8-bit</td><td>2420</td></tr>
-<tr><td>AVR (ATmega328P)</td><td>avr-gcc</td><td>8-bit</td><td>2452</td></tr>
-<tr><td>x86-64</td><td>GCC</td><td>64-bit</td><td>2775</td></tr>
-<tr><td>x86-32</td><td>GCC</td><td>32-bit</td><td>2826</td></tr>
-<tr><td>x86-64</td><td>Clang</td><td>64-bit</td><td>3003</td></tr>
-<tr><td>ARM64</td><td>aarch64-linux-gnu-gcc</td><td>64-bit</td><td>3148</td></tr>
-<tr><td>PowerPC</td><td>powerpc-linux-gnu-gcc</td><td>32-bit</td><td>3778</td></tr>
-<tr><td>68HC11</td><td>m68hc11-gcc</td><td>8-bit</td><td>4247</td></tr>
+<tr><td>AVR (ATtiny85)</td><td style="text-align:right">8</td><td>avr-gcc</td><td style="text-align:right">1046</td><td style="text-align:right">4038</td><td style="text-align:right">4096</td></tr>
+<tr><td>AVR (ATmega328P)</td><td style="text-align:right">8</td><td>avr-gcc</td><td style="text-align:right">1054</td><td style="text-align:right">4132</td><td style="text-align:right">4190</td></tr>
+<tr><td>Z80</td><td style="text-align:right">8</td><td>SDCC</td><td style="text-align:right">2121</td><td style="text-align:right">6966</td><td style="text-align:right">7074</td></tr>
+<tr><td>6800 (HC08)</td><td style="text-align:right">8</td><td>SDCC</td><td style="text-align:right">2471</td><td style="text-align:right">8147</td><td style="text-align:right">8288</td></tr>
+<tr><td>MSP430</td><td style="text-align:right">16</td><td>msp430-gcc</td><td style="text-align:right">770</td><td style="text-align:right">3260</td><td style="text-align:right">3306</td></tr>
+<tr><td>68HC11</td><td style="text-align:right">16</td><td>m68hc11-gcc</td><td style="text-align:right">2369</td><td style="text-align:right">6570</td><td style="text-align:right">6641</td></tr>
+<tr><td>Xtensa LX7 (ESP32-S3)</td><td style="text-align:right">32</td><td>xtensa-esp-elf-gcc</td><td style="text-align:right">576</td><td style="text-align:right">2508</td><td style="text-align:right">2540</td></tr>
+<tr><td>ARM Thumb</td><td style="text-align:right">32</td><td>arm-none-eabi-gcc</td><td style="text-align:right">580</td><td style="text-align:right">2482</td><td style="text-align:right">2526</td></tr>
+<tr><td>RISC-V (rv32)</td><td style="text-align:right">32</td><td>riscv64-unknown-elf-gcc</td><td style="text-align:right">722</td><td style="text-align:right">2970</td><td style="text-align:right">3008</td></tr>
+<tr><td>Xtensa LX106 (ESP8266)</td><td style="text-align:right">32</td><td>xtensa-lx106-elf-gcc</td><td style="text-align:right">723</td><td style="text-align:right">2831</td><td style="text-align:right">2863</td></tr>
+<tr><td>m68k</td><td style="text-align:right">32</td><td>m68k-linux-gnu-gcc</td><td style="text-align:right">728</td><td style="text-align:right">3146</td><td style="text-align:right">3194</td></tr>
+<tr><td>ARM32</td><td style="text-align:right">32</td><td>arm-none-eabi-gcc</td><td style="text-align:right">980</td><td style="text-align:right">3746</td><td style="text-align:right">3806</td></tr>
+<tr><td>x86-32</td><td style="text-align:right">32</td><td>GCC</td><td style="text-align:right">1081</td><td style="text-align:right">4604</td><td style="text-align:right">4654</td></tr>
+<tr><td>MIPS32</td><td style="text-align:right">32</td><td>mipsel-linux-gnu-gcc</td><td style="text-align:right">1296</td><td style="text-align:right">4888</td><td style="text-align:right">4936</td></tr>
+<tr><td>PowerPC</td><td style="text-align:right">32</td><td>powerpc-linux-gnu-gcc</td><td style="text-align:right">1504</td><td style="text-align:right">5674</td><td style="text-align:right">5738</td></tr>
+<tr><td>RISC-V (rv64)</td><td style="text-align:right">64</td><td>riscv64-linux-gnu-gcc</td><td style="text-align:right">756</td><td style="text-align:right">3332</td><td style="text-align:right">3366</td></tr>
+<tr><td>x86-64</td><td style="text-align:right">64</td><td>Clang</td><td style="text-align:right">1043</td><td style="text-align:right">5013</td><td style="text-align:right">5055</td></tr>
+<tr><td>x86-64</td><td style="text-align:right">64</td><td>GCC</td><td style="text-align:right">1063</td><td style="text-align:right">4787</td><td style="text-align:right">4836</td></tr>
+<tr><td>AArch64 (ARM64)</td><td style="text-align:right">64</td><td>aarch64-linux-gnu-gcc</td><td style="text-align:right">1324</td><td style="text-align:right">5178</td><td style="text-align:right">5234</td></tr>
+<tr><td>MIPS64</td><td style="text-align:right">64</td><td>mips64el-linux-gnuabi64-gcc</td><td style="text-align:right">1360</td><td style="text-align:right">5512</td><td style="text-align:right">5560</td></tr>
 </tbody>
 </table>
+<!-- Build Size Table -->
 
-<p>Sizes measured via Docker cross-compilation (<code>bash tools/crossbuild.sh</code>).
-KEY-only mode: <strong>900 bytes</strong>.</p>
+<p>x86-64 GCC row is measured directly; others from cross-compilation via
+<code>tools/Dockerfile.crossbuild</code>.</p>
 
 <h2>Building and testing</h2>
 
-<pre><code>make tests        # build and run unit tests + coverage
+<pre><code>make validate     # tests + build all examples (the everyday check)
+make tests        # unit tests + coverage only
+make examples     # build all examples (no interactive launch)
+make example      # build and run the posix ncurses demo (interactive)
 make coverage     # tests + coverage summary
-make example      # build and run the posix ncurses example
-make clean        # remove build artifacts
+make fuzz         # fuzz testing with libFuzzer (requires clang)
+make clean-all    # remove all build artifacts
 </code></pre>
 
-<p>19 test units, 207 test cases, 100% line coverage of <code>xelp.c</code>.</p>
+<p>39 test units, 531 test cases, 100% line coverage of <code>xelp.c</code>.</p>
 
 <h2>Documentation</h2>
 
@@ -205,7 +224,7 @@ make clean        # remove build artifacts
 <h2>License</h2>
 
 <p>BSD 2-Clause &mdash; see <a href="https://github.com/deftio/xelp/blob/master/LICENSE.txt">LICENSE.txt</a>.
-&copy; 2005&ndash;2025 M. A. Chatterjee</p>
+&copy; 2005&ndash;2026 M. A. Chatterjee</p>
 
 </main>
 
