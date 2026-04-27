@@ -28,7 +28,7 @@ compiler.
   for the life of the instance (string literals, static buffers, or
   globals -- never stack-local buffers that go out of scope).
 
-## Function signatures (v0.3.1+)
+## Function signatures (v0.3.2+)
 
 ### CLI command functions
 
@@ -149,6 +149,27 @@ XELPRESULT cmd_divmod(XELP *ths, const char *args, int len) {
 
 Tokens are NOT null-terminated. Use `tok.s`..`tok.p` or `XELP_XB_LEN(tok)`.
 
+## Direct argument access (XelpArgInt / XelpArgStr)
+
+For one-shot access to a specific argument by index:
+
+```c
+XELPRESULT cmd_set(XELP *ths, const char *args, int len) {
+    const char *key;
+    int klen, value;
+    XelpArgStr(args, len, 1, &key, &klen);  /* arg 1 = key name */
+    XelpArgInt(args, len, 2, &value);        /* arg 2 = int value */
+    return XELP_S_OK;
+}
+```
+
+| Function | Purpose |
+|----------|---------|
+| `XelpArgInt(args, len, n, &val)` | Get arg N as int (wraps TokN + ParseNum) |
+| `XelpArgStr(args, len, n, &s, &slen)` | Get arg N as string span (pointer + length) |
+
+Arg 0 is the command name (per argc/argv convention).
+
 ### Random-access alternative (XelpTokN)
 
 For random-access by index, use `XelpTokN`. Note the `(char*)` cast
@@ -236,9 +257,11 @@ Edit `src/xelpcfg.h` to enable/disable features:
 | `XELP_ENABLE_KEY`       | Single keypress mode             | ~200-500 bytes    |
 | `XELP_ENABLE_THR`       | Pass-through mode                | ~50-125 bytes     |
 | `XELP_ENABLE_HELP`      | Built-in help command            | ~180-350 bytes    |
+| `XELP_ENABLE_HISTORY`  | Command history (UP/DOWN recall)   | ~420 bytes        |
 | `XELP_ENABLE_FULL`      | All of the above                 | All combined      |
 
 Buffer size: `XELP_CMDBUFSZ` (default 64 bytes).
+History depth: `XELP_HIST_DEPTH` (default 4 commands). Override at compile time or via `XELP_CONFIG_OVERRIDE`.
 
 ## Three modes
 
@@ -258,7 +281,7 @@ Default mode switch keys: ESC (KEY), CTRL-P (CLI), CTRL-T (THR).
 6. Hardcoding `&global_instance` instead of using `ths` in commands.
 7. Calling `malloc` or stdlib functions in embedded contexts.
 
-## Registers (v0.3.1+)
+## Registers (v0.3.2+)
 
 Each XELP instance has 4 return registers (`mR[0..3]`), accessed via
 macros. Convention: **callee-clobbers-all** -- any command call may
@@ -308,7 +331,7 @@ XELP_SET_ECHO(*ths, XELP_ECHO_NORMAL);  /* restore after ENTER */
 ## File structure
 
 ```
-src/xelp.c       -- implementation (~980 lines)
+src/xelp.c       -- implementation (~1130 lines)
 src/xelp.h       -- public API (types, macros, function declarations)
 src/xelpcfg.h    -- compile-time feature flags and settings
 ```

@@ -292,6 +292,19 @@ beyond standard VT100/ANSI support.
 Without `XELP_ENABLE_LINE_EDIT`, CLI uses append-only input with
 backspace via the `mpfBksp` callback.
 
+## 10a. Command history
+
+When `XELP_ENABLE_HISTORY` is defined (requires `XELP_ENABLE_LINE_EDIT`),
+the CLI remembers previously entered commands. Press UP to recall older
+commands, DOWN to return to newer ones.
+
+- Empty commands are never stored
+- Consecutive duplicates are suppressed (typing "help" three times stores one entry)
+- In-progress text is saved when you first press UP and restored when you press DOWN past the newest entry
+- The number of stored commands is configurable via `XELP_HIST_DEPTH` (default 4)
+
+No API calls are needed -- history works automatically once enabled.
+
 ## 11. Mode change callback
 
 Get notified when the user switches modes:

@@ -1,6 +1,6 @@
 <a href="https://deftio.github.io/xelp/pages/"><img src="https://deftio.github.io/xelp/img/xelp-prompt-med.png" width="30%"></img></a>
 
-![Version](https://img.shields.io/badge/version-0.3.1-blue.svg)
+![Version](https://img.shields.io/badge/version-0.3.2-blue.svg)
 [![License](https://img.shields.io/badge/License-BSD%202--Clause-blue.svg)](https://opensource.org/licenses/BSD-2-Clause)
 [![CI](https://github.com/deftio/xelp/actions/workflows/ci.yml/badge.svg)](https://github.com/deftio/xelp/actions/workflows/ci.yml)
 ![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen.svg)  
@@ -74,6 +74,9 @@ interactive configuration.
 #define XELP_ENABLE_KEY        1
 #define XELP_ENABLE_HELP       1
 ```
+
+Optional: add `XELP_ENABLE_HISTORY` for UP/DOWN arrow command recall
+(~420 bytes, requires `XELP_ENABLE_LINE_EDIT`).
 
 ### Full (~3-6 KB)
 
@@ -209,7 +212,7 @@ make clean          # remove test build artifacts
 make clean-all      # clean tests + all examples
 ```
 
-39 test units, 531 test cases, 100% line coverage of `xelp.c`.
+47 test units, 598 test cases, 100% line coverage of `xelp.c`.
 
 Feature profile sizes: `dev/size_profiles.sh` (uses Docker for ARM Cortex-M0, falls back to host GCC).
 
@@ -245,26 +248,26 @@ features). Even the largest full build is under 7 KB.
 <!-- Build Size Table -->
 | CPU | Width | Compiler | KEY (bytes) | CLI (bytes) | FULL (bytes) |
 |-----|------:|----------|------------:|------------:|-------------:|
-| AVR (ATtiny85) | 8 | avr-gcc | 1046 | 4038 | 4096 |
-| AVR (ATmega328P) | 8 | avr-gcc | 1054 | 4132 | 4190 |
-| Z80 | 8 | SDCC | 2121 | 6966 | 7074 |
-| 6800 (HC08) | 8 | SDCC | 2471 | 8147 | 8288 |
-| MSP430 | 16 | msp430-gcc | 770 | 3260 | 3306 |
-| 68HC11 | 16 | m68hc11-gcc | 2369 | 6570 | 6641 |
-| Xtensa LX7 (ESP32-S3) | 32 | xtensa-esp-elf-gcc | 576 | 2508 | 2540 |
-| ARM Thumb | 32 | arm-none-eabi-gcc | 580 | 2482 | 2526 |
-| RISC-V (rv32) | 32 | riscv64-unknown-elf-gcc | 722 | 2970 | 3008 |
-| Xtensa LX106 (ESP8266) | 32 | xtensa-lx106-elf-gcc | 723 | 2831 | 2863 |
-| m68k | 32 | m68k-linux-gnu-gcc | 728 | 3146 | 3194 |
-| ARM32 | 32 | arm-none-eabi-gcc | 980 | 3746 | 3806 |
-| x86-32 | 32 | GCC | 1081 | 4604 | 4654 |
-| MIPS32 | 32 | mipsel-linux-gnu-gcc | 1296 | 4888 | 4936 |
-| PowerPC | 32 | powerpc-linux-gnu-gcc | 1504 | 5674 | 5738 |
-| RISC-V (rv64) | 64 | riscv64-linux-gnu-gcc | 756 | 3332 | 3366 |
-| x86-64 | 64 | Clang | 1043 | 5013 | 5055 |
-| x86-64 | 64 | GCC | 1063 | 4787 | 4836 |
-| AArch64 (ARM64) | 64 | aarch64-linux-gnu-gcc | 1324 | 5178 | 5234 |
-| MIPS64 | 64 | mips64el-linux-gnuabi64-gcc | 1360 | 5512 | 5560 |
+| AVR (ATtiny85) | 8 | avr-gcc | 1046 | 4266 | 4324 |
+| AVR (ATmega328P) | 8 | avr-gcc | 1054 | 4366 | 4424 |
+| Z80 | 8 | SDCC | 2121 | 7280 | 7388 |
+| 6800 (HC08) | 8 | SDCC | 2471 | 8614 | 8715 |
+| MSP430 | 16 | msp430-gcc | 770 | 3482 | 3528 |
+| 68HC11 | 16 | m68hc11-gcc | 2369 | 6884 | 6955 |
+| Xtensa LX7 (ESP32-S3) | 32 | xtensa-esp-elf-gcc | 576 | 2592 | 2624 |
+| ARM Thumb | 32 | arm-none-eabi-gcc | 580 | 2598 | 2642 |
+| RISC-V (rv32) | 32 | riscv64-unknown-elf-gcc | 722 | 3094 | 3132 |
+| Xtensa LX106 (ESP8266) | 32 | xtensa-lx106-elf-gcc | 723 | 2955 | 2987 |
+| m68k | 32 | m68k-linux-gnu-gcc | 728 | 3332 | 3380 |
+| ARM32 | 32 | arm-none-eabi-gcc | 980 | 3930 | 3990 |
+| x86-32 | 32 | GCC | 1081 | 4916 | 4966 |
+| MIPS32 | 32 | mipsel-linux-gnu-gcc | 1296 | 5224 | 5272 |
+| PowerPC | 32 | powerpc-linux-gnu-gcc | 1504 | 6058 | 6122 |
+| RISC-V (rv64) | 64 | riscv64-linux-gnu-gcc | 756 | 3548 | 3582 |
+| x86-64 | 64 | Clang | 1043 | 5268 | 5310 |
+| x86-64 | 64 | GCC | 1063 | 5136 | 5185 |
+| AArch64 (ARM64) | 64 | aarch64-linux-gnu-gcc | 1324 | 5566 | 5622 |
+| MIPS64 | 64 | mips64el-linux-gnuabi64-gcc | 1360 | 5864 | 5928 |
 <!-- Build Size Table -->
 
 x86-64 GCC row is measured directly; others from cross-compilation via

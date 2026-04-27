@@ -10,6 +10,31 @@ Versions always use three-component semver (e.g. `0.3.0`, never `0.3`).
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-04-26
+
+### Added
+- **Command history** (`XELP_ENABLE_HISTORY`): UP/DOWN arrow recall of
+  previously entered commands using a fixed-slot ring buffer. Requires
+  `XELP_ENABLE_CLI` and `XELP_ENABLE_LINE_EDIT`. Configurable depth via
+  `XELP_HIST_DEPTH` (default 4). Consecutive duplicate suppression, empty
+  command filtering, in-progress line save/restore on browse.
+  RAM cost: `XELP_HIST_DEPTH * XELP_CMDBUFSZ + XELP_CMDBUFSZ + 4` bytes
+  per instance. Code cost: ~420 bytes on ARM Thumb (`-Os`).
+- `XelpArgInt(args, len, n, &val)` -- get argument N as an integer in one
+  call. Wraps `XelpTokN` + `XelpParseNum`. ~108 bytes ARM Thumb (combined
+  with XelpArgStr).
+- `XelpArgStr(args, len, n, &s, &slen)` -- get argument N as a string
+  span (pointer + length) in one call. Wraps `XelpTokN`.
+
+### Fixed
+- `XELPKEY_BKSP` was defined as 0x07 (BEL), not 0x08 (ASCII BS). Added
+  `XELPKEY_BS` (0x08) and both backspace paths in `XelpParseKey` now
+  accept 0x07, 0x08, and 0x7F (DEL).
+
+### Changed
+- Test suite expanded to 47 units, 598 test cases (from 39/531).
+- `dev/size_profiles.sh` updated with profile 10 (Full + history).
+
 ## [0.3.1] - 2026-04-26
 
 ### Changed

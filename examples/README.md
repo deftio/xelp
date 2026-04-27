@@ -3,8 +3,8 @@
 ## posix-simple
 
 Interactive CLI demo using ncurses for terminal handling on Linux/macOS.
-Demonstrates CLI commands, KEY mode, THR mode, math operations, and
-token parsing.
+Demonstrates CLI commands, KEY mode, THR mode, command history (UP/DOWN
+arrow recall), line editing, math operations, and token parsing.
 
 ```bash
 cd posix-simple && make

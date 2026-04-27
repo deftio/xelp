@@ -52,6 +52,21 @@ void handle_bksp(void) {
 XELP_SET_FN_BKSP(myXelp, &handle_bksp);
 ```
 
+## Optional: Command History
+
+If you enable `XELP_ENABLE_HISTORY` (requires `XELP_ENABLE_CLI` + `XELP_ENABLE_LINE_EDIT`),
+users can recall previous commands with UP/DOWN arrows. No extra setup needed --
+it works automatically. Be aware of the RAM cost:
+
+```
+RAM = XELP_HIST_DEPTH * XELP_CMDBUFSZ + XELP_CMDBUFSZ + 4 bytes
+    = 4 * 64 + 64 + 4 = 324 bytes  (default settings)
+```
+
+Reduce `XELP_HIST_DEPTH` (default 4) or `XELP_CMDBUFSZ` (default 64) if RAM is tight.
+Override via compiler flag (`-DXELP_HIST_DEPTH=2`) or `xelp_ovr.h` when using
+`XELP_CONFIG_OVERRIDE`.
+
 ## Optional: Other Callbacks
 
 | Callback | Signature | Purpose |

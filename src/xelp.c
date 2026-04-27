@@ -162,6 +162,112 @@ static void _xelpRedrawFromCursor(XELP *ths) {
 }
 #endif
 
+#if defined(XELP_ENABLE_CLI) && defined(XELP_ENABLE_LINE_EDIT) && defined(XELP_ENABLE_HISTORY)
+
+/*****************************************
+ _xelpHistReplaceLine() - clear displayed line and load new content.
+ */
+static void _xelpHistReplaceLine(XELP *ths, const char *src, int slen) {
+    int oldlen = (int)(ths->mCmdXB.p - ths->mCmdXB.s);
+    int i;
+
+    /* move cursor to beginning of line (visual) */
+    while (ths->mCur > ths->mCmdXB.s) {
+        ths->mCur--;
+        _CURSOR('\b');
+    }
+    /* overwrite old content with spaces */
+    for (i = 0; i < oldlen; i++) _CURSOR(' ');
+    /* backspace back to start */
+    for (i = 0; i < oldlen; i++) _CURSOR('\b');
+
+    /* copy new content into command buffer */
+    for (i = 0; i < slen && i < XELP_CMDBUFSZ - 1; i++)
+        ths->mCmdMsgBuf[i] = src[i];
+    ths->mCmdXB.p = ths->mCmdXB.s + slen;
+    ths->mCur = ths->mCmdXB.p;
+
+    /* echo new content */
+    for (i = 0; i < slen; i++) _ECHO(src[i]);
+}
+
+/*****************************************
+ _xelpHistSave() - save command to history ring.
+ Called from _xelpHandleEnter before buffer reset.
+ Skips empty commands and consecutive duplicates.
+ */
+static void _xelpHistSave(XELP *ths) {
+    int len = (int)(ths->mCmdXB.p - ths->mCmdXB.s);
+    int prev;
+    ths->mHistBrowse = -1;  /* ENTER always ends browse session */
+    if (len <= 0) return;
+
+    /* skip consecutive duplicate */
+    if (ths->mHistCount > 0) {
+        prev = ((int)ths->mHistWrite - 1 + XELP_HIST_DEPTH) % XELP_HIST_DEPTH;
+        if (XelpStrEq(ths->mCmdXB.s, len, ths->mHistBuf[prev]) == XELP_S_OK)
+            return;
+    }
+
+    /* copy command into ring slot */
+    {
+        char *dst = ths->mHistBuf[(int)ths->mHistWrite];
+        int i;
+        for (i = 0; i < len && i < XELP_CMDBUFSZ - 1; i++)
+            dst[i] = ths->mCmdXB.s[i];
+        dst[i] = 0;
+    }
+    ths->mHistWrite = (char)(((int)ths->mHistWrite + 1) % XELP_HIST_DEPTH);
+    if (ths->mHistCount < XELP_HIST_DEPTH)
+        ths->mHistCount++;
+}
+
+/*****************************************
+ _xelpHistRecall() - handle UP/DOWN arrow for history browsing.
+ dir: -1 = UP (older), +1 = DOWN (newer)
+ */
+static void _xelpHistRecall(XELP *ths, int dir) {
+    if (dir < 0) {
+        /* UP: go to older entry */
+        if (ths->mHistCount == 0) return;
+
+        if (ths->mHistBrowse == -1) {
+            /* first UP: save in-progress line */
+            int len = (int)(ths->mCmdXB.p - ths->mCmdXB.s);
+            int i;
+            for (i = 0; i < len; i++)
+                ths->mHistSaved[i] = ths->mCmdXB.s[i];
+            ths->mHistSaved[len] = 0;
+            ths->mHistSavedLen = (char)len;
+            /* start at most recent entry */
+            ths->mHistBrowse = ths->mHistCount - 1;
+        } else if (ths->mHistBrowse > 0) {
+            ths->mHistBrowse--;
+        } else {
+            return; /* already at oldest */
+        }
+    } else {
+        /* DOWN: go to newer entry */
+        if (ths->mHistBrowse == -1) return; /* not browsing */
+
+        if (ths->mHistBrowse < ths->mHistCount - 1) {
+            ths->mHistBrowse++;
+        } else {
+            /* past newest: restore in-progress line */
+            ths->mHistBrowse = -1;
+            _xelpHistReplaceLine(ths, ths->mHistSaved, (int)ths->mHistSavedLen);
+            return;
+        }
+    }
+
+    /* load the entry at mHistBrowse (0=oldest, count-1=newest) */
+    {
+        int slot = ((int)ths->mHistWrite - (int)ths->mHistCount + (int)ths->mHistBrowse + XELP_HIST_DEPTH) % XELP_HIST_DEPTH;
+        _xelpHistReplaceLine(ths, ths->mHistBuf[slot], XelpStrLen(ths->mHistBuf[slot]));
+    }
+}
+#endif /* XELP_ENABLE_CLI && XELP_ENABLE_LINE_EDIT && XELP_ENABLE_HISTORY */
+
 #ifdef XELP_ENABLE_HELP
 /*****************************************
  _xelpPrintKeyName() - print human-readable name for a keycode in help output
@@ -286,6 +392,9 @@ XELPRESULT XelpInit 	 (
 #endif
 #if defined(XELP_ENABLE_CLI) && defined(XELP_ENABLE_LINE_EDIT)
 	ths->mCur = ths->mCmdXB.s;
+#endif
+#if defined(XELP_ENABLE_CLI) && defined(XELP_ENABLE_HISTORY)
+	ths->mHistBrowse = -1;
 #endif
 	/* comand mode mssage index
 	ths->mCmdMsgIndex = 0;  //set to 0 by ptr loop at top
@@ -711,6 +820,36 @@ XELPRESULT XelpArgCount (XelpArgs *a, int *n)
     XELP_XB_COPY(save, a->buf);
     return XELP_S_OK;
 }
+
+/********************************************************
+ XelpArgInt() - get the Nth argument as an integer (random access).
+ Arg 0 is the command name. Returns XELP_E_ERR if arg N doesn't exist
+ or is not a valid number.
+ */
+XELPRESULT XelpArgInt (const char *args, int len, int n, int *val)
+{
+    XelpBuf b, tok;
+    XELP_XB_INIT(b, (char*)args, len);
+    if (XelpTokN(&b, n, &tok) != XELP_S_OK) return XELP_E_ERR;
+    return XelpParseNum(tok.s, (int)(tok.p - tok.s), val);
+}
+
+/********************************************************
+ XelpArgStr() - get the Nth argument as a string span (random access).
+ Sets *s to start of token and *slen to its length.
+ Token is NOT null-terminated (buffer is not modified).
+ Returns XELP_E_ERR if arg N doesn't exist.
+ */
+XELPRESULT XelpArgStr (const char *args, int len, int n,
+                       const char **s, int *slen)
+{
+    XelpBuf b, tok;
+    XELP_XB_INIT(b, (char*)args, len);
+    if (XelpTokN(&b, n, &tok) != XELP_S_OK) return XELP_E_ERR;
+    *s = tok.s;
+    *slen = (int)(tok.p - tok.s);
+    return XELP_S_OK;
+}
 #endif /* XELP_ENABLE_CLI */
 
 /********************************************************
@@ -739,9 +878,12 @@ static void _xelpCursorMove(XELP *ths, int dir, int all) {
 #endif
 
 #ifdef XELP_ENABLE_CLI
-/* handle ENTER: echo newline, execute buffer, reset, show prompt */
+/* handle ENTER: echo newline, save to history, execute buffer, reset, show prompt */
 static void _xelpHandleEnter(XELP *ths) {
 	XelpBuf line;
+#if defined(XELP_ENABLE_LINE_EDIT) && defined(XELP_ENABLE_HISTORY)
+	_xelpHistSave(ths);
+#endif
 	_PUTC(XELPKEY_ENTER);
 	XELP_XB_INIT_PTRS(line, ths->mCmdXB.s, ths->mCmdXB.s, ths->mCmdXB.p);
 	XelpParseXB(ths, &line);
@@ -839,8 +981,14 @@ XELPRESULT XelpParseKey (XELP *ths, char key)
 							break;
 						}
 						case XELP_KEYCODE_UP:
+#ifdef XELP_ENABLE_HISTORY
+							_xelpHistRecall(ths, -1);
+#endif
+							break;
 						case XELP_KEYCODE_DOWN:
-							/* silently drop (reserved for future history) */
+#ifdef XELP_ENABLE_HISTORY
+							_xelpHistRecall(ths, +1);
+#endif
 							break;
 						default:
 							/* silently drop other multi-byte keys */
@@ -849,7 +997,7 @@ XELPRESULT XelpParseKey (XELP *ths, char key)
 				} else {
 					/* single-char key in CLI mode with line editing */
 					char ch = (char)keycode;
-					if (ch == XELPKEY_BKSP || ch == XELPKEY_DEL) {
+					if (ch == XELPKEY_BKSP || ch == XELPKEY_BS || ch == XELPKEY_DEL) {
 						/* delete char before cursor */
 						if (ths->mCur > ths->mCmdXB.s) {
 							int tail = (int)(ths->mCmdXB.p - ths->mCur);
@@ -891,7 +1039,7 @@ XELPRESULT XelpParseKey (XELP *ths, char key)
 					/* silently drop multi-byte keys */
 				} else {
 					char ch = (char)keycode;
-					if (ch == XELPKEY_BKSP) {
+					if (ch == XELPKEY_BKSP || ch == XELPKEY_BS) {
 						if (ths->mCmdXB.p > ths->mCmdXB.s) {
 							(ths->mCmdXB.p)--;
 							if (ths->mpfBksp)

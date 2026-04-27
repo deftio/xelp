@@ -351,6 +351,7 @@ int main (int argc, char *argv[])
 		"ESC     : single-key mode  (x = exit, h = help)\n"
 		"CTRL-P  : CLI mode         (type command + ENTER)\n"
 		"CTRL-T  : pass-through mode\n"
+		"UP/DOWN : recall previous commands\n"
 		"\n";
 
 	XelpInit(&example, pAboutStr);

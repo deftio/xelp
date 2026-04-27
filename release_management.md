@@ -7,14 +7,14 @@ Reference for building, testing, and releasing xelp.
 The `XELP_VERSION` macro in `src/xelp.h` is the single source of truth:
 
 ```c
-#define XELP_VERSION      (0x00000301UL) /* 32-bit: 0x00MMmmpp */
+#define XELP_VERSION      (0x00000302UL) /* 32-bit: 0x00MMmmpp */
 #define XELP_VER_MAJOR(v) (((v) >> 16) & 0xFF)
 #define XELP_VER_MINOR(v) (((v) >>  8) & 0xFF)
 #define XELP_VER_PATCH(v) ( (v)        & 0xFF)
 ```
 
 The 32-bit hex format encodes `0x00MMmmpp` (major.minor.patch), one byte
-each. Example: `0x00010000` = version 1.0.0, `0x00000301` = version 0.3.1.
+each. Example: `0x00010000` = version 1.0.0, `0x00000302` = version 0.3.2.
 Accessor macros resolve to constants at compile time on all targets.
 
 The build tool `tools/extract_version.c` reads the version via the C

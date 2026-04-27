@@ -29,6 +29,21 @@
 <p>See also: <a href="https://github.com/deftio/xelp/blob/master/CHANGELOG.md">CHANGELOG.md</a>
 on GitHub for the full changelog.</p>
 
+<h2>v0.3.2 (2026-04-26)</h2>
+<ul>
+  <li><strong>Command history</strong> (<code>XELP_ENABLE_HISTORY</code>):
+      UP/DOWN arrow recall of previously entered commands. Fixed-slot ring
+      buffer, configurable depth (<code>XELP_HIST_DEPTH</code>, default 4).
+      Consecutive duplicate suppression, in-progress line save/restore.
+      ~420 bytes ARM Thumb.</li>
+  <li><code>XelpArgInt</code> / <code>XelpArgStr</code>: direct-access
+      convenience functions for getting the Nth argument as an integer or
+      string span in a single call.</li>
+  <li>Fixed <code>XELPKEY_BKSP</code> (0x07 BEL): added <code>XELPKEY_BS</code>
+      (0x08) so both backspace codes are accepted.</li>
+  <li>Test suite expanded to 47 units, 598 test cases.</li>
+</ul>
+
 <h2>v0.3.1 (2026-04-26)</h2>
 <ul>
   <li><strong>Function rename</strong>: all public functions renamed from
