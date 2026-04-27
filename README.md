@@ -248,25 +248,25 @@ features). Even the largest full build is under 7 KB.
 <!-- Build Size Table -->
 | CPU | Width | Compiler | KEY (bytes) | CLI (bytes) | FULL (bytes) |
 |-----|------:|----------|------------:|------------:|-------------:|
-| AVR (ATtiny85) | 8 | avr-gcc | 1046 | 4266 | 4324 |
-| AVR (ATmega328P) | 8 | avr-gcc | 1054 | 4366 | 4424 |
-| Z80 | 8 | SDCC | 2121 | 7280 | 7388 |
-| 6800 (HC08) | 8 | SDCC | 2471 | 8614 | 8715 |
-| MSP430 | 16 | msp430-gcc | 770 | 3482 | 3528 |
-| 68HC11 | 16 | m68hc11-gcc | 2369 | 6884 | 6955 |
-| Xtensa LX7 (ESP32-S3) | 32 | xtensa-esp-elf-gcc | 576 | 2592 | 2624 |
+| AVR (ATtiny85) | 8 | avr-gcc | 1046 | 4270 | 4328 |
+| AVR (ATmega328P) | 8 | avr-gcc | 1054 | 4370 | 4428 |
+| Z80 | 8 | SDCC | 2121 | 7287 | 7395 |
+| 6800 (HC08) | 8 | SDCC | 2471 | 8616 | 8718 |
+| MSP430 | 16 | msp430-gcc | 770 | 3486 | 3532 |
+| 68HC11 | 16 | m68hc11-gcc | 2369 | 6895 | 6966 |
+| Xtensa LX7 (ESP32-S3) | 32 | xtensa-esp-elf-gcc | 576 | 2600 | 2632 |
 | ARM Thumb | 32 | arm-none-eabi-gcc | 580 | 2598 | 2642 |
-| RISC-V (rv32) | 32 | riscv64-unknown-elf-gcc | 722 | 3094 | 3132 |
-| Xtensa LX106 (ESP8266) | 32 | xtensa-lx106-elf-gcc | 723 | 2955 | 2987 |
-| m68k | 32 | m68k-linux-gnu-gcc | 728 | 3332 | 3380 |
-| ARM32 | 32 | arm-none-eabi-gcc | 980 | 3930 | 3990 |
-| x86-32 | 32 | GCC | 1081 | 4916 | 4966 |
+| RISC-V (rv32) | 32 | riscv64-unknown-elf-gcc | 722 | 3100 | 3138 |
+| Xtensa LX106 (ESP8266) | 32 | xtensa-lx106-elf-gcc | 723 | 2947 | 2979 |
+| m68k | 32 | m68k-linux-gnu-gcc | 728 | 3336 | 3384 |
+| ARM32 | 32 | arm-none-eabi-gcc | 980 | 3934 | 3994 |
+| x86-32 | 32 | GCC | 1081 | 4919 | 4969 |
 | MIPS32 | 32 | mipsel-linux-gnu-gcc | 1296 | 5224 | 5272 |
-| PowerPC | 32 | powerpc-linux-gnu-gcc | 1504 | 6058 | 6122 |
-| RISC-V (rv64) | 64 | riscv64-linux-gnu-gcc | 756 | 3548 | 3582 |
-| x86-64 | 64 | Clang | 1043 | 5268 | 5310 |
-| x86-64 | 64 | GCC | 1063 | 5136 | 5185 |
-| AArch64 (ARM64) | 64 | aarch64-linux-gnu-gcc | 1324 | 5566 | 5622 |
+| PowerPC | 32 | powerpc-linux-gnu-gcc | 1504 | 6066 | 6130 |
+| RISC-V (rv64) | 64 | riscv64-linux-gnu-gcc | 756 | 3554 | 3588 |
+| x86-64 | 64 | Clang | 1043 | 5269 | 5311 |
+| x86-64 | 64 | GCC | 1063 | 5138 | 5187 |
+| AArch64 (ARM64) | 64 | aarch64-linux-gnu-gcc | 1324 | 5574 | 5630 |
 | MIPS64 | 64 | mips64el-linux-gnuabi64-gcc | 1360 | 5864 | 5928 |
 <!-- Build Size Table -->
 
