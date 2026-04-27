@@ -3,7 +3,7 @@
 Future work for xelp, organized by area. Items marked with a design doc
 link have detailed specifications in `dev/`.
 
-## Recently Completed (0.3.0 – 0.3.1)
+## Recently Completed (0.3.0 – 0.3.2)
 
 - [x] Breaking API change: `XELP *ths` on all command/key signatures
 - [x] XelpBuf macro normalization (SCREAMING_CASE)
@@ -27,6 +27,12 @@ link have detailed specifications in `dev/`.
 - [x] Cross-build multi-config (KEY/CLI/FULL, `extract_size.py`, 18 targets)
 - [x] README rewrite (3-column size table, grouped by word size)
 - [x] CI aligned with local validation (`make validate` in all workflows)
+- [x] Command history (`XELP_ENABLE_HISTORY`): ring-buffer recall with
+      UP/DOWN arrows, consecutive dup suppression, in-progress save/restore.
+      ~420 bytes ARM Thumb.
+- [x] `XelpArgInt` / `XelpArgStr` convenience functions for direct argument
+      access by index.
+- [x] Test suite: 47 units, 598 cases, 100% line coverage
 
 ## Scripting Engine (deferred -- clean up core first)
 
@@ -51,13 +57,41 @@ include xelp as the text front-end. Parked here for reference.
 
 Design doc: [dev/xelp_vm.md](xelp_vm.md)
 
+## Argument Parsing Ergonomics
+
+Two-phase plan to reduce per-command boilerplate. Design doc:
+[dev/arg_parse_updates.md](arg_parse_updates.md).
+
+### 0.3.2: Non-breaking convenience functions
+
+- [x] **`XelpArgInt(args, len, n, &val)`** -- get arg N as int, one call.
+      Wrapper over XelpTokN + XelpParseNum. ~50 bytes ARM Thumb.
+- [x] **`XelpArgStr(args, len, n, &s, &slen)`** -- get arg N as string
+      span. ~40 bytes ARM Thumb.
+
+Functions (not macros) in the base CLI API. No new flag. Arg 0 is the
+command name per argc/argv convention.
+
+### 0.4.0: Breaking handler signature change (argc/argv)
+
+- [ ] **Change CLI handler signature** from
+      `fn(XELP *ths, const char *args, int len)` to
+      `fn(XELP *ths, int argc, XelpBuf *argv)`.
+      Dispatcher pre-tokenizes into stack-allocated `XelpBuf argv[]`.
+      `XelpArgInt`/`XelpArgStr` simplify to take `XelpBuf *` directly.
+
+Last planned breaking change before the scripting engine. Stack cost
+(~12 bytes per arg on 32-bit) is acceptable -- the primary audience
+is 32-bit targets (ARM, ESP32, RISC-V). 8/16-bit builds remain
+supported but are not the optimization target.
+
 ## CLI Ergonomics
 
 Quality-of-life improvements for interactive use. Each is compile-time
 optional. Design constraint: must not bloat the core or break existing
 bare-metal use cases.
 
-- [ ] **Command history** -- circular buffer of last N command lines,
+- [x] **Command history** -- ring buffer of last N command lines,
       up/down arrow recall. User-supplied buffer (e.g. `char hist[4][64]`).
       Multi-byte key detection is already in place (`XELPKEYCODE` handles
       ESC sequences). Up/Down are currently silently dropped -- reserved

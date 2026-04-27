@@ -2506,10 +2506,17 @@ XELPRESULT test_KeyAccumulator() {
     if (JB_ASSERT(XELP_XB_POS(x.mCmdXB) != 0, "accum CSI stalls"))
         return XELP_E_ERR;
 
-    /* ESC + '[' + 'A' = UP arrow: silently dropped in CLI (no change to buf) */
+    /* ESC + '[' + 'A' = UP arrow in CLI */
     XelpParseKey(&x, 'A');
+#ifdef XELP_ENABLE_HISTORY
+    /* history recalls "a" (typed above): buf should have 1 char */
+    if (JB_ASSERT(XELP_XB_POS(x.mCmdXB) != 1, "accum UP arrow recalls from history"))
+        return XELP_E_ERR;
+    XelpParseKey(&x, XELPKEY_ENTER); /* reset for next test */
+#else
     if (JB_ASSERT(XELP_XB_POS(x.mCmdXB) != 0, "accum UP arrow dropped in CLI"))
         return XELP_E_ERR;
+#endif
 
     /* 4-byte sequence: ESC [ 3 ~ (KDEL) at empty buf: no effect */
     XelpParseKey(&x, 0x1B);
@@ -2707,6 +2714,200 @@ XELPRESULT test_CLILineEdit_Backspace() {
     getCmdBuf(&x, buf, sizeof(buf));
     if (JB_ASSERT(XELP_S_OK != XelpStrEq(buf, XelpStrLen(buf), "helo"), "line edit backspace"))
         return XELP_E_ERR;
+
+    return XELP_S_OK;
+}
+
+/* ====================================================================
+ test_CLIBackspaceBS() -- comprehensive tests for 0x08 (ASCII BS)
+ Verifies that 0x08 works identically to XELPKEY_BKSP (0x07) in all contexts.
+ */
+XELPRESULT test_CLIBackspaceBS() {
+    XELP x;
+    char buf[64];
+
+    /* --- 1. 0x08 deletes char at end of line --- */
+    {
+        XelpInit(&x,"TestBS1");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,dummyOut);
+
+        feedString(&x, "abc");
+        XelpParseKey(&x, XELPKEY_BS);
+
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XELP_S_OK != XelpStrEq(buf, XelpStrLen(buf), "ab"),
+                      "BS 0x08 delete at end"))
+            return XELP_E_ERR;
+    }
+
+    /* --- 2. 0x08 deletes char mid-line (with line editing) --- */
+    {
+        XelpInit(&x,"TestBS2");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,dummyOut);
+
+        feedString(&x, "hello");
+        feedKeycode(&x, XELP_KEYCODE_LEFT);
+        feedKeycode(&x, XELP_KEYCODE_LEFT);
+        XelpParseKey(&x, XELPKEY_BS);
+
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XELP_S_OK != XelpStrEq(buf, XelpStrLen(buf), "helo"),
+                      "BS 0x08 mid-line"))
+            return XELP_E_ERR;
+    }
+
+    /* --- 3. 0x08 at start of line: no-op (no crash, no change) --- */
+    {
+        XelpInit(&x,"TestBS3");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,dummyOut);
+
+        feedString(&x, "ab");
+        feedKeycode(&x, XELP_KEYCODE_HOME);
+        XelpParseKey(&x, XELPKEY_BS);
+
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XELP_S_OK != XelpStrEq(buf, XelpStrLen(buf), "ab"),
+                      "BS 0x08 at start no-op"))
+            return XELP_E_ERR;
+    }
+
+    /* --- 4. 0x08 on empty buffer: no crash --- */
+    {
+        XelpInit(&x,"TestBS4");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,dummyOut);
+
+        XelpParseKey(&x, XELPKEY_BS);
+
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XelpStrLen(buf) != 0,
+                      "BS 0x08 empty buf no crash"))
+            return XELP_E_ERR;
+    }
+
+    /* --- 5. 0x08 and 0x07 produce identical results --- */
+    {
+        XELP x1, x2;
+        char buf1[64], buf2[64];
+
+        XelpInit(&x1,"TestBS5a");
+        XELP_SET_FN_CLI(x1,gMyCLICommands);
+        XELP_SET_FN_OUT(x1,dummyOut);
+        XelpInit(&x2,"TestBS5b");
+        XELP_SET_FN_CLI(x2,gMyCLICommands);
+        XELP_SET_FN_OUT(x2,dummyOut);
+
+        feedString(&x1, "test");
+        feedKeycode(&x1, XELP_KEYCODE_LEFT);
+        XelpParseKey(&x1, XELPKEY_BKSP);
+
+        feedString(&x2, "test");
+        feedKeycode(&x2, XELP_KEYCODE_LEFT);
+        XelpParseKey(&x2, XELPKEY_BS);
+
+        getCmdBuf(&x1, buf1, sizeof(buf1));
+        getCmdBuf(&x2, buf2, sizeof(buf2));
+
+        if (JB_ASSERT(XELP_S_OK != XelpStrEq(buf1, XelpStrLen(buf1), buf2),
+                      "BS 0x08 == BKSP 0x07"))
+            return XELP_E_ERR;
+    }
+
+    /* --- 6. Multiple 0x08 deletions --- */
+    {
+        XelpInit(&x,"TestBS6");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,dummyOut);
+
+        feedString(&x, "abcde");
+        XelpParseKey(&x, XELPKEY_BS);
+        XelpParseKey(&x, XELPKEY_BS);
+        XelpParseKey(&x, XELPKEY_BS);
+
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XELP_S_OK != XelpStrEq(buf, XelpStrLen(buf), "ab"),
+                      "BS 0x08 triple delete"))
+            return XELP_E_ERR;
+    }
+
+    /* --- 7. 0x08 after insert mid-line --- */
+    {
+        XelpInit(&x,"TestBS7");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,dummyOut);
+
+        feedString(&x, "abcd");
+        feedKeycode(&x, XELP_KEYCODE_LEFT);
+        feedKeycode(&x, XELP_KEYCODE_LEFT);
+        feedString(&x, "XY");
+        XelpParseKey(&x, XELPKEY_BS);
+
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XELP_S_OK != XelpStrEq(buf, XelpStrLen(buf), "abXcd"),
+                      "BS 0x08 after insert"))
+            return XELP_E_ERR;
+    }
+
+    /* --- 8. 0x08 delete all chars one by one --- */
+    {
+        int i;
+        XelpInit(&x,"TestBS8");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,dummyOut);
+
+        feedString(&x, "abcd");
+        for (i = 0; i < 4; i++)
+            XelpParseKey(&x, XELPKEY_BS);
+
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XelpStrLen(buf) != 0,
+                      "BS 0x08 delete all"))
+            return XELP_E_ERR;
+
+        /* one more should be harmless */
+        XelpParseKey(&x, XELPKEY_BS);
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XelpStrLen(buf) != 0,
+                      "BS 0x08 past empty"))
+            return XELP_E_ERR;
+    }
+
+    /* --- 9. 0x08 with echo mask --- */
+    {
+        XelpInit(&x,"TestBS9");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,gDummyBufOut);
+        XELP_SET_ECHO(x, '*');
+
+        resetDummyBuf();
+        feedString(&x, "abc");
+        XelpParseKey(&x, XELPKEY_BS);
+
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XELP_S_OK != XelpStrEq(buf, XelpStrLen(buf), "ab"),
+                      "BS 0x08 with mask buffer"))
+            return XELP_E_ERR;
+    }
+
+    /* --- 10. Mixed 0x07 and 0x08 in same session --- */
+    {
+        XelpInit(&x,"TestBS10");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,dummyOut);
+
+        feedString(&x, "abcdef");
+        XelpParseKey(&x, XELPKEY_BKSP); /* 0x07: remove 'f' */
+        XelpParseKey(&x, XELPKEY_BS);   /* 0x08: remove 'e' */
+        XelpParseKey(&x, XELPKEY_BKSP); /* 0x07: remove 'd' */
+
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XELP_S_OK != XelpStrEq(buf, XelpStrLen(buf), "abc"),
+                      "BS mixed 0x07 0x08"))
+            return XELP_E_ERR;
+    }
 
     return XELP_S_OK;
 }
@@ -3244,6 +3445,109 @@ XELPRESULT test_XelpArgs() {
         XelpNextTok(&a, 0);
         r = XelpNextInt(&a, &val);
         if (JB_ASSERT(r != XELP_S_OK || val != -42, "Args negative int"))
+            return XELP_E_ERR;
+    }
+
+    return XELP_S_OK;
+}
+
+/* ====================================================================
+ test_XelpArgIntStr() - direct-access argument helpers
+ */
+XELPRESULT test_XelpArgIntStr() {
+    XELPRESULT r;
+    int val;
+    const char *s;
+    int slen;
+
+    /* 1. XelpArgInt: get arg 1 as int */
+    {
+        char buf[] = "led 42";
+        r = XelpArgInt(buf, XelpStrLen(buf), 1, &val);
+        if (JB_ASSERT(r != XELP_S_OK || val != 42, "ArgInt basic"))
+            return XELP_E_ERR;
+    }
+
+    /* 2. XelpArgInt: arg 0 is the command name */
+    {
+        char buf[] = "divmod 10 3";
+        r = XelpArgInt(buf, XelpStrLen(buf), 0, &val);
+        /* "divmod" is not a number */
+        if (JB_ASSERT(r != XELP_E_ERR, "ArgInt arg0 not a number"))
+            return XELP_E_ERR;
+    }
+
+    /* 3. XelpArgInt: multi args */
+    {
+        char buf[] = "divmod 10 3";
+        r = XelpArgInt(buf, XelpStrLen(buf), 1, &val);
+        if (JB_ASSERT(r != XELP_S_OK || val != 10, "ArgInt arg1=10"))
+            return XELP_E_ERR;
+        r = XelpArgInt(buf, XelpStrLen(buf), 2, &val);
+        if (JB_ASSERT(r != XELP_S_OK || val != 3, "ArgInt arg2=3"))
+            return XELP_E_ERR;
+    }
+
+    /* 4. XelpArgInt: hex */
+    {
+        char buf[] = "cmd 0xFF";
+        r = XelpArgInt(buf, XelpStrLen(buf), 1, &val);
+        if (JB_ASSERT(r != XELP_S_OK || val != 255, "ArgInt hex 0xFF"))
+            return XELP_E_ERR;
+    }
+
+    /* 5. XelpArgInt: arg past end */
+    {
+        char buf[] = "cmd 1";
+        val = -1;
+        r = XelpArgInt(buf, XelpStrLen(buf), 5, &val);
+        if (JB_ASSERT(r != XELP_E_ERR, "ArgInt past end"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(val != -1, "ArgInt past end val unchanged"))
+            return XELP_E_ERR;
+    }
+
+    /* 6. XelpArgInt: negative */
+    {
+        char buf[] = "adj -7";
+        r = XelpArgInt(buf, XelpStrLen(buf), 1, &val);
+        if (JB_ASSERT(r != XELP_S_OK || val != -7, "ArgInt negative"))
+            return XELP_E_ERR;
+    }
+
+    /* 7. XelpArgStr: basic */
+    {
+        char buf[] = "ssid MyNetwork";
+        r = XelpArgStr(buf, XelpStrLen(buf), 1, &s, &slen);
+        if (JB_ASSERT(r != XELP_S_OK || slen != 9, "ArgStr basic len"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(s[0] != 'M' || s[8] != 'k', "ArgStr basic content"))
+            return XELP_E_ERR;
+    }
+
+    /* 8. XelpArgStr: arg 0 = command name */
+    {
+        char buf[] = "echo hello";
+        r = XelpArgStr(buf, XelpStrLen(buf), 0, &s, &slen);
+        if (JB_ASSERT(r != XELP_S_OK || slen != 4, "ArgStr arg0 len"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(XELP_S_OK != XelpStrEq(s, slen, "echo"), "ArgStr arg0 echo"))
+            return XELP_E_ERR;
+    }
+
+    /* 9. XelpArgStr: past end */
+    {
+        char buf[] = "help";
+        r = XelpArgStr(buf, XelpStrLen(buf), 1, &s, &slen);
+        if (JB_ASSERT(r != XELP_E_ERR, "ArgStr past end"))
+            return XELP_E_ERR;
+    }
+
+    /* 10. XelpArgStr: empty buffer */
+    {
+        char buf[] = "";
+        r = XelpArgStr(buf, 0, 0, &s, &slen);
+        if (JB_ASSERT(r != XELP_E_ERR, "ArgStr empty buf"))
             return XELP_E_ERR;
     }
 
@@ -3858,6 +4162,648 @@ XELPRESULT test_EchoControl() {
     return XELP_S_OK;
 }
 
+/* ====================================================================
+ Command History tests -- guarded by both XELP_ENABLE_LINE_EDIT and
+ XELP_ENABLE_HISTORY so they compile out when history is disabled.
+ */
+#if defined(XELP_ENABLE_LINE_EDIT) && defined(XELP_ENABLE_HISTORY)
+
+/* ====================================================================
+ test_HistoryBasic() -- ~8 cases covering fundamental history recall
+ */
+XELPRESULT test_HistoryBasic() {
+    char buf[64];
+
+    /* 1. Fresh init: UP does nothing, buffer stays empty */
+    {
+        XELP x;
+        XelpInit(&x,"HB1");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,dummyOut);
+
+        feedKeycode(&x, XELP_KEYCODE_UP);
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XelpStrLen(buf) != 0, "Fresh UP does nothing"))
+            return XELP_E_ERR;
+    }
+
+    /* 2. Type "hello" + ENTER, UP recalls "hello" */
+    {
+        XELP x;
+        XelpInit(&x,"HB2");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,dummyOut);
+
+        feedString(&x, "hello");
+        XelpParseKey(&x, XELPKEY_ENTER);
+        feedKeycode(&x, XELP_KEYCODE_UP);
+
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XELP_S_OK != XelpStrEq(buf, XelpStrLen(buf), "hello"),
+                      "UP recalls hello"))
+            return XELP_E_ERR;
+    }
+
+    /* 3. "aaa" ENTER, "bbb" ENTER, UP=bbb, UP=aaa */
+    {
+        XELP x;
+        XelpInit(&x,"HB3");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,dummyOut);
+
+        feedString(&x, "aaa"); XelpParseKey(&x, XELPKEY_ENTER);
+        feedString(&x, "bbb"); XelpParseKey(&x, XELPKEY_ENTER);
+
+        feedKeycode(&x, XELP_KEYCODE_UP);
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XELP_S_OK != XelpStrEq(buf, XelpStrLen(buf), "bbb"),
+                      "UP1 = bbb"))
+            return XELP_E_ERR;
+
+        feedKeycode(&x, XELP_KEYCODE_UP);
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XELP_S_OK != XelpStrEq(buf, XelpStrLen(buf), "aaa"),
+                      "UP2 = aaa"))
+            return XELP_E_ERR;
+    }
+
+    /* 4. DOWN after UP: returns to more recent entry */
+    {
+        XELP x;
+        XelpInit(&x,"HB4");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,dummyOut);
+
+        feedString(&x, "aaa"); XelpParseKey(&x, XELPKEY_ENTER);
+        feedString(&x, "bbb"); XelpParseKey(&x, XELPKEY_ENTER);
+
+        feedKeycode(&x, XELP_KEYCODE_UP);  /* bbb */
+        feedKeycode(&x, XELP_KEYCODE_UP);  /* aaa */
+        feedKeycode(&x, XELP_KEYCODE_DOWN); /* bbb */
+
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XELP_S_OK != XelpStrEq(buf, XelpStrLen(buf), "bbb"),
+                      "DOWN returns to bbb"))
+            return XELP_E_ERR;
+    }
+
+    /* 5. DOWN past newest: restores empty line */
+    {
+        XELP x;
+        XelpInit(&x,"HB5");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,dummyOut);
+
+        feedString(&x, "aaa"); XelpParseKey(&x, XELPKEY_ENTER);
+        feedKeycode(&x, XELP_KEYCODE_UP);   /* aaa */
+        feedKeycode(&x, XELP_KEYCODE_DOWN); /* past newest → empty */
+
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XelpStrLen(buf) != 0, "DOWN past newest = empty"))
+            return XELP_E_ERR;
+    }
+
+    /* 6. UP past oldest: stays on oldest, no crash */
+    {
+        XELP x;
+        XelpInit(&x,"HB6");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,dummyOut);
+
+        feedString(&x, "aaa"); XelpParseKey(&x, XELPKEY_ENTER);
+        feedString(&x, "bbb"); XelpParseKey(&x, XELPKEY_ENTER);
+
+        feedKeycode(&x, XELP_KEYCODE_UP);  /* bbb */
+        feedKeycode(&x, XELP_KEYCODE_UP);  /* aaa */
+        feedKeycode(&x, XELP_KEYCODE_UP);  /* clamped at aaa */
+        feedKeycode(&x, XELP_KEYCODE_UP);  /* still aaa */
+
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XELP_S_OK != XelpStrEq(buf, XelpStrLen(buf), "aaa"),
+                      "UP past oldest stays on aaa"))
+            return XELP_E_ERR;
+    }
+
+    /* 7. ENTER on recalled line dispatches it */
+    {
+        XELP x;
+        XelpInit(&x,"HB7");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,dummyOut);
+
+        gGlobalCallbackData.c1 = 0;
+        feedString(&x, "foo"); XelpParseKey(&x, XELPKEY_ENTER);
+        if (JB_ASSERT(gGlobalCallbackData.c1 != 1, "foo executed first time"))
+            return XELP_E_ERR;
+
+        /* reset and recall */
+        gGlobalCallbackData.c1 = 0;
+        feedKeycode(&x, XELP_KEYCODE_UP);
+        XelpParseKey(&x, XELPKEY_ENTER);
+        if (JB_ASSERT(gGlobalCallbackData.c1 != 1, "Recalled foo executes"))
+            return XELP_E_ERR;
+    }
+
+    /* 8. Empty ENTER does NOT store in history */
+    {
+        XELP x;
+        XelpInit(&x,"HB8");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,dummyOut);
+
+        XelpParseKey(&x, XELPKEY_ENTER); /* empty */
+        XelpParseKey(&x, XELPKEY_ENTER); /* empty */
+        feedKeycode(&x, XELP_KEYCODE_UP);
+
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XelpStrLen(buf) != 0, "Empty ENTER not stored"))
+            return XELP_E_ERR;
+    }
+
+    return XELP_S_OK;
+}
+
+/* ====================================================================
+ test_HistoryInProgressSave() -- ~4 cases for in-progress line stashing
+ */
+XELPRESULT test_HistoryInProgressSave() {
+    char buf[64];
+
+    /* 1. Type "partial", UP, DOWN: "partial" restored */
+    {
+        XELP x;
+        XelpInit(&x,"HIP1");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,dummyOut);
+
+        feedString(&x, "aaa"); XelpParseKey(&x, XELPKEY_ENTER);
+        feedString(&x, "partial");
+        feedKeycode(&x, XELP_KEYCODE_UP);   /* saves "partial", shows "aaa" */
+        feedKeycode(&x, XELP_KEYCODE_DOWN); /* restores "partial" */
+
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XELP_S_OK != XelpStrEq(buf, XelpStrLen(buf), "partial"),
+                      "In-progress restored after UP DOWN"))
+            return XELP_E_ERR;
+    }
+
+    /* 2. Type "partial", UP, UP, DOWN, DOWN: "partial" restored exactly */
+    {
+        XELP x;
+        XelpInit(&x,"HIP2");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,dummyOut);
+
+        feedString(&x, "aaa"); XelpParseKey(&x, XELPKEY_ENTER);
+        feedString(&x, "bbb"); XelpParseKey(&x, XELPKEY_ENTER);
+        feedString(&x, "partial");
+
+        feedKeycode(&x, XELP_KEYCODE_UP);   /* bbb */
+        feedKeycode(&x, XELP_KEYCODE_UP);   /* aaa */
+        feedKeycode(&x, XELP_KEYCODE_DOWN); /* bbb */
+        feedKeycode(&x, XELP_KEYCODE_DOWN); /* partial */
+
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XELP_S_OK != XelpStrEq(buf, XelpStrLen(buf), "partial"),
+                      "In-progress restored multi bounce"))
+            return XELP_E_ERR;
+    }
+
+    /* 3. Type "partial", UP, type over, ENTER: new text executes + saves */
+    {
+        XELP x;
+        XelpInit(&x,"HIP3");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,dummyOut);
+
+        feedString(&x, "aaa"); XelpParseKey(&x, XELPKEY_ENTER);
+        feedString(&x, "partial");
+        feedKeycode(&x, XELP_KEYCODE_UP); /* "aaa" recalled */
+
+        /* clear and type "bar" */
+        feedKeycode(&x, XELP_KEYCODE_HOME);
+        {
+            int j;
+            for (j = 0; j < 3; j++) feedKeycode(&x, XELP_KEYCODE_KDEL);
+        }
+        gGlobalCallbackData.c2 = -1;
+        feedString(&x, "bar");
+        XelpParseKey(&x, XELPKEY_ENTER);
+        if (JB_ASSERT(gGlobalCallbackData.c2 != 2, "Overtyped recalled cmd executes bar"))
+            return XELP_E_ERR;
+
+        /* "bar" should be in history now */
+        feedKeycode(&x, XELP_KEYCODE_UP);
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XELP_S_OK != XelpStrEq(buf, XelpStrLen(buf), "bar"),
+                      "Overtyped cmd saved in history"))
+            return XELP_E_ERR;
+    }
+
+    /* 4. Type "partial", UP, ENTER: partial is lost */
+    {
+        XELP x;
+        XelpInit(&x,"HIP4");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,dummyOut);
+
+        feedString(&x, "aaa"); XelpParseKey(&x, XELPKEY_ENTER);
+        feedString(&x, "partial");
+        feedKeycode(&x, XELP_KEYCODE_UP);  /* "aaa" recalled */
+        XelpParseKey(&x, XELPKEY_ENTER);   /* executes "aaa" */
+
+        /* history should now have "aaa" at top (re-executed), not "partial" */
+        feedKeycode(&x, XELP_KEYCODE_UP);
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XELP_S_OK != XelpStrEq(buf, XelpStrLen(buf), "aaa"),
+                      "Partial lost after recall+enter"))
+            return XELP_E_ERR;
+    }
+
+    return XELP_S_OK;
+}
+
+/* ====================================================================
+ test_HistoryFull() -- ~4 cases for ring buffer capacity/eviction
+ */
+XELPRESULT test_HistoryFull() {
+    char buf[64];
+
+    /* 1. Fill to capacity, verify all recallable */
+    {
+        XELP x;
+        int i;
+        char cmd[8];
+
+        XelpInit(&x,"HF1");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,dummyOut);
+
+        for (i = 0; i < XELP_HIST_DEPTH; i++) {
+            cmd[0] = 'a' + (char)i; cmd[1] = 0;
+            feedString(&x, cmd);
+            XelpParseKey(&x, XELPKEY_ENTER);
+        }
+        /* UP should recall in reverse: last entered first */
+        for (i = XELP_HIST_DEPTH - 1; i >= 0; i--) {
+            feedKeycode(&x, XELP_KEYCODE_UP);
+            getCmdBuf(&x, buf, sizeof(buf));
+            cmd[0] = 'a' + (char)i; cmd[1] = 0;
+            if (JB_ASSERT(XELP_S_OK != XelpStrEq(buf, XelpStrLen(buf), cmd),
+                          "Full ring recall"))
+                return XELP_E_ERR;
+        }
+    }
+
+    /* 2. Overfill: oldest evicted, newest stored */
+    {
+        XELP x;
+        int i;
+        char cmd[8];
+
+        XelpInit(&x,"HF2");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,dummyOut);
+
+        /* store DEPTH+1 entries: "a","b","c","d","e" (for DEPTH=4) */
+        for (i = 0; i <= XELP_HIST_DEPTH; i++) {
+            cmd[0] = 'a' + (char)i; cmd[1] = 0;
+            feedString(&x, cmd);
+            XelpParseKey(&x, XELPKEY_ENTER);
+        }
+        /* "a" should be evicted; first UP gives last entered */
+        feedKeycode(&x, XELP_KEYCODE_UP);
+        getCmdBuf(&x, buf, sizeof(buf));
+        cmd[0] = 'a' + (char)XELP_HIST_DEPTH; cmd[1] = 0;
+        if (JB_ASSERT(XELP_S_OK != XelpStrEq(buf, XelpStrLen(buf), cmd),
+                      "Overfill newest at top"))
+            return XELP_E_ERR;
+
+        /* go to oldest -- should NOT be "a" */
+        for (i = 1; i < XELP_HIST_DEPTH; i++)
+            feedKeycode(&x, XELP_KEYCODE_UP);
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XELP_S_OK == XelpStrEq(buf, XelpStrLen(buf), "a"),
+                      "Overfill oldest evicted"))
+            return XELP_E_ERR;
+    }
+
+    /* 3. Fill + evict several times, verify ring integrity */
+    {
+        XELP x;
+        int i;
+        char cmd[8];
+
+        XelpInit(&x,"HF3");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,dummyOut);
+
+        /* push 3 * DEPTH entries */
+        for (i = 0; i < 3 * XELP_HIST_DEPTH; i++) {
+            cmd[0] = 'A' + (char)(i % 26); cmd[1] = 0;
+            feedString(&x, cmd);
+            XelpParseKey(&x, XELPKEY_ENTER);
+        }
+        /* last DEPTH entries should be recallable */
+        for (i = 3 * XELP_HIST_DEPTH - 1; i >= 3 * XELP_HIST_DEPTH - XELP_HIST_DEPTH; i--) {
+            feedKeycode(&x, XELP_KEYCODE_UP);
+            getCmdBuf(&x, buf, sizeof(buf));
+            cmd[0] = 'A' + (char)(i % 26); cmd[1] = 0;
+            if (JB_ASSERT(XELP_S_OK != XelpStrEq(buf, XelpStrLen(buf), cmd),
+                          "Ring integrity after many evictions"))
+                return XELP_E_ERR;
+        }
+    }
+
+    /* 4. Very long command near XELP_CMDBUFSZ: stored and recalled */
+    {
+        XELP x;
+        int i, len;
+
+        XelpInit(&x,"HF4");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,dummyOut);
+
+        len = XELP_CMDBUFSZ - 2; /* max usable (CMDBUFSZ-1 is buf limit, -1 for safety) */
+        for (i = 0; i < len; i++)
+            XelpParseKey(&x, 'Z');
+        XelpParseKey(&x, XELPKEY_ENTER);
+
+        feedKeycode(&x, XELP_KEYCODE_UP);
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XelpStrLen(buf) != len, "Long cmd recalled correct len"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(buf[0] != 'Z' || buf[len-1] != 'Z', "Long cmd content correct"))
+            return XELP_E_ERR;
+    }
+
+    return XELP_S_OK;
+}
+
+/* ====================================================================
+ test_HistoryWithEditing() -- ~5 cases for cursor editing of recalled cmds
+ */
+XELPRESULT test_HistoryWithEditing() {
+    char buf[64];
+
+    /* 1. Recall with UP, LEFT/RIGHT works on recalled text */
+    {
+        XELP x;
+        XelpInit(&x,"HE1");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,dummyOut);
+
+        feedString(&x, "abcde"); XelpParseKey(&x, XELPKEY_ENTER);
+        feedKeycode(&x, XELP_KEYCODE_UP);
+        feedKeycode(&x, XELP_KEYCODE_LEFT);
+        feedKeycode(&x, XELP_KEYCODE_LEFT);
+        XelpParseKey(&x, 'X');
+
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XELP_S_OK != XelpStrEq(buf, XelpStrLen(buf), "abcXde"),
+                      "Edit recalled: insert X"))
+            return XELP_E_ERR;
+    }
+
+    /* 2. Recall, HOME, type prefix, ENTER: modified version executes */
+    {
+        XELP x;
+        XelpInit(&x,"HE2");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,dummyOut);
+
+        feedString(&x, "oo"); XelpParseKey(&x, XELPKEY_ENTER);
+        feedKeycode(&x, XELP_KEYCODE_UP);
+        feedKeycode(&x, XELP_KEYCODE_HOME);
+        XelpParseKey(&x, 'f');
+
+        gGlobalCallbackData.c1 = 0;
+        XelpParseKey(&x, XELPKEY_ENTER);
+        if (JB_ASSERT(gGlobalCallbackData.c1 != 1, "Modified recalled cmd foo executes"))
+            return XELP_E_ERR;
+    }
+
+    /* 3. Recall, KDEL at cursor */
+    {
+        XELP x;
+        XelpInit(&x,"HE3");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,dummyOut);
+
+        feedString(&x, "abcd"); XelpParseKey(&x, XELPKEY_ENTER);
+        feedKeycode(&x, XELP_KEYCODE_UP);
+        feedKeycode(&x, XELP_KEYCODE_HOME);
+        feedKeycode(&x, XELP_KEYCODE_KDEL); /* delete 'a' */
+
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XELP_S_OK != XelpStrEq(buf, XelpStrLen(buf), "bcd"),
+                      "Recalled KDEL deletes char"))
+            return XELP_E_ERR;
+    }
+
+    /* 4. Recall, backspace */
+    {
+        XELP x;
+        XelpInit(&x,"HE4");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,dummyOut);
+
+        feedString(&x, "abcd"); XelpParseKey(&x, XELPKEY_ENTER);
+        feedKeycode(&x, XELP_KEYCODE_UP);
+        XelpParseKey(&x, XELPKEY_BKSP); /* delete last char 'd' */
+
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XELP_S_OK != XelpStrEq(buf, XelpStrLen(buf), "abc"),
+                      "Recalled bksp works"))
+            return XELP_E_ERR;
+    }
+
+    /* 5. Recall, HOME, END: cursor at correct positions */
+    {
+        XELP x;
+        XelpInit(&x,"HE5");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,dummyOut);
+
+        feedString(&x, "hello"); XelpParseKey(&x, XELPKEY_ENTER);
+        feedKeycode(&x, XELP_KEYCODE_UP);
+        feedKeycode(&x, XELP_KEYCODE_HOME);
+        XelpParseKey(&x, 'A');   /* insert at start */
+        feedKeycode(&x, XELP_KEYCODE_END);
+        XelpParseKey(&x, 'Z');   /* append at end */
+
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XELP_S_OK != XelpStrEq(buf, XelpStrLen(buf), "AhelloZ"),
+                      "HOME/END on recalled line"))
+            return XELP_E_ERR;
+    }
+
+    return XELP_S_OK;
+}
+
+/* ====================================================================
+ test_HistoryDuplicates() -- ~3 cases for consecutive duplicate suppression
+ */
+XELPRESULT test_HistoryDuplicates() {
+    char buf[64];
+
+    /* 1. "aaa" three times: only one entry (skip consecutive dups) */
+    {
+        XELP x;
+        XelpInit(&x,"HD1");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,dummyOut);
+
+        feedString(&x, "aaa"); XelpParseKey(&x, XELPKEY_ENTER);
+        feedString(&x, "aaa"); XelpParseKey(&x, XELPKEY_ENTER);
+        feedString(&x, "aaa"); XelpParseKey(&x, XELPKEY_ENTER);
+
+        feedKeycode(&x, XELP_KEYCODE_UP);  /* aaa */
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XELP_S_OK != XelpStrEq(buf, XelpStrLen(buf), "aaa"),
+                      "Dup: first UP = aaa"))
+            return XELP_E_ERR;
+
+        feedKeycode(&x, XELP_KEYCODE_UP);  /* should still be aaa (no more entries) */
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XELP_S_OK != XelpStrEq(buf, XelpStrLen(buf), "aaa"),
+                      "Dup: second UP still aaa (only 1 entry)"))
+            return XELP_E_ERR;
+    }
+
+    /* 2. "aaa", "bbb", "aaa": all three stored (non-consecutive) */
+    {
+        XELP x;
+        XelpInit(&x,"HD2");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,dummyOut);
+
+        feedString(&x, "aaa"); XelpParseKey(&x, XELPKEY_ENTER);
+        feedString(&x, "bbb"); XelpParseKey(&x, XELPKEY_ENTER);
+        feedString(&x, "aaa"); XelpParseKey(&x, XELPKEY_ENTER);
+
+        feedKeycode(&x, XELP_KEYCODE_UP);  /* aaa (newest) */
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XELP_S_OK != XelpStrEq(buf, XelpStrLen(buf), "aaa"),
+                      "Non-consec: UP1 = aaa"))
+            return XELP_E_ERR;
+
+        feedKeycode(&x, XELP_KEYCODE_UP);  /* bbb */
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XELP_S_OK != XelpStrEq(buf, XelpStrLen(buf), "bbb"),
+                      "Non-consec: UP2 = bbb"))
+            return XELP_E_ERR;
+
+        feedKeycode(&x, XELP_KEYCODE_UP);  /* aaa (oldest) */
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XELP_S_OK != XelpStrEq(buf, XelpStrLen(buf), "aaa"),
+                      "Non-consec: UP3 = aaa"))
+            return XELP_E_ERR;
+    }
+
+    /* 3. Empty string never stored regardless */
+    {
+        XELP x;
+        XelpInit(&x,"HD3");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,dummyOut);
+
+        feedString(&x, "aaa"); XelpParseKey(&x, XELPKEY_ENTER);
+        XelpParseKey(&x, XELPKEY_ENTER); /* empty */
+        XelpParseKey(&x, XELPKEY_ENTER); /* empty */
+
+        feedKeycode(&x, XELP_KEYCODE_UP);
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XELP_S_OK != XelpStrEq(buf, XelpStrLen(buf), "aaa"),
+                      "Empty not stored, UP = aaa"))
+            return XELP_E_ERR;
+    }
+
+    return XELP_S_OK;
+}
+
+/* ====================================================================
+ test_HistoryAndEcho() -- ~3 cases for history interaction with echo/output
+ */
+XELPRESULT test_HistoryAndEcho() {
+    char buf[64];
+
+    /* 1. Echo mask '*': recall works, output shows masked chars */
+    {
+        XELP x;
+        XelpInit(&x,"HEC1");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,gDummyBufOut);
+        XELP_SET_ECHO(x, '*');
+
+        feedString(&x, "secret");
+        XelpParseKey(&x, XELPKEY_ENTER);
+
+        resetDummyBuf();
+        feedKeycode(&x, XELP_KEYCODE_UP);
+        gDummyBufOut(0);
+
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XELP_S_OK != XelpStrEq(buf, XelpStrLen(buf), "secret"),
+                      "Echo mask: buffer has real text"))
+            return XELP_E_ERR;
+        /* output should contain '*' chars, not real text */
+        {
+            int i, stars = 0;
+            for (i = 0; i < XelpStrLen(gDummyBuf); i++)
+                if (gDummyBuf[i] == '*') stars++;
+            if (JB_ASSERT(stars < 6, "Echo mask: output has stars"))
+                return XELP_E_ERR;
+        }
+    }
+
+    /* 2. Output disabled: history still saves and recalls */
+    {
+        XELP x;
+        XelpInit(&x,"HEC2");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,gDummyBufOut);
+        XELP_SET_OUT_ENABLE(x, 0);
+
+        feedString(&x, "silent");
+        XelpParseKey(&x, XELPKEY_ENTER);
+        feedKeycode(&x, XELP_KEYCODE_UP);
+
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XELP_S_OK != XelpStrEq(buf, XelpStrLen(buf), "silent"),
+                      "Output disabled: recall works"))
+            return XELP_E_ERR;
+
+        XELP_SET_OUT_ENABLE(x, 1);
+    }
+
+    /* 3. After recall with echo off, re-enable, type: echo resumes */
+    {
+        XELP x;
+        XelpInit(&x,"HEC3");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,gDummyBufOut);
+
+        feedString(&x, "cmd1");
+        XelpParseKey(&x, XELPKEY_ENTER);
+
+        XELP_SET_ECHO(x, XELP_ECHO_OFF);
+        feedKeycode(&x, XELP_KEYCODE_UP);
+        XelpParseKey(&x, XELPKEY_ENTER);
+
+        XELP_SET_ECHO(x, XELP_ECHO_NORMAL);
+        resetDummyBuf();
+        XelpParseKey(&x, 'Q');
+        gDummyBufOut(0);
+        if (JB_ASSERT(gDummyBuf[0] != 'Q', "Echo resumes after recall"))
+            return XELP_E_ERR;
+    }
+
+    return XELP_S_OK;
+}
+
+#endif /* XELP_ENABLE_LINE_EDIT && XELP_ENABLE_HISTORY */
+
 /* 	************************************************
 	Xelp Simple Unit Test suite.
 */
@@ -3907,6 +4853,7 @@ int run_tests() {
     JumpBug_RunUnit(test_CLILineEdit_Delete,"LineEditDelete");
     JumpBug_RunUnit(test_CLILineEdit_HomeEnd,"LineEditHomeEnd");
     JumpBug_RunUnit(test_CLILineEdit_Backspace,"LineEditBackspace");
+    JumpBug_RunUnit(test_CLIBackspaceBS,"BackspaceBS");
     JumpBug_RunUnit(test_CLIArrowsDrop,"CLIArrowsDrop");
     JumpBug_RunUnit(test_CLILineEdit_BufferFull,"LineEditBufferFull");
     JumpBug_RunUnit(test_CLILineEdit_Right,"LineEditRight");
@@ -3916,11 +4863,20 @@ int run_tests() {
     JumpBug_RunUnit(test_CLIMalformedKeys,"CLIMalformedKeys");
     JumpBug_RunUnit(test_MultiInstance,"MultiInstance");
     JumpBug_RunUnit(test_XelpArgs,"XelpArgs");
+    JumpBug_RunUnit(test_XelpArgIntStr,"XelpArgIntStr");
 #ifdef XELP_ENABLE_LINE_EDIT
     JumpBug_RunUnit(test_CursorWithEcho,"CursorWithEcho");
 #endif
     JumpBug_RunUnit(test_OutputEnable,"OutputEnable");
     JumpBug_RunUnit(test_EchoControl,"EchoControl");
+#if defined(XELP_ENABLE_LINE_EDIT) && defined(XELP_ENABLE_HISTORY)
+    JumpBug_RunUnit(test_HistoryBasic,"HistoryBasic");
+    JumpBug_RunUnit(test_HistoryInProgressSave,"HistInProgress");
+    JumpBug_RunUnit(test_HistoryFull,"HistoryFull");
+    JumpBug_RunUnit(test_HistoryWithEditing,"HistoryEditing");
+    JumpBug_RunUnit(test_HistoryDuplicates,"HistoryDups");
+    JumpBug_RunUnit(test_HistoryAndEcho,"HistoryEcho");
+#endif
 
     JumpBug_PrintResults();
 

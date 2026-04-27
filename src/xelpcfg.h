@@ -15,8 +15,16 @@
 #define __XELP_CONFIG_H__
 
 #ifdef XELP_CONFIG_OVERRIDE
-#include "xelp_ovr.h"  /* 8.3 filenaming convention used due to old-school compilers and filesystem support */
-#else  /* use the rest of this file's conventions */
+/*
+ To use your own configuration without modifying this file:
+   1. Define XELP_CONFIG_OVERRIDE in your compiler flags (-DXELP_CONFIG_OVERRIDE)
+   2. Create xelp_ovr.h in your include path with the defines you need
+   3. Any XELP_XXX define not set in xelp_ovr.h will use the default from xelp.h
+ This keeps the library source untouched across updates.
+ See docs/build-profiles.md for details and examples.
+*/
+#include "xelp_ovr.h"
+#else  /* use the defaults below */
 
 
 /****************************************************************************************************
@@ -52,6 +60,17 @@
  When not defined, CLI uses append-only input with mpfBksp callback.
  */
 #define XELP_ENABLE_LINE_EDIT 1
+
+/****************************************************************************************************
+ Enable Command History (UP/DOWN arrow recall).
+ When defined, provides a ring buffer of previously entered commands that can
+ be browsed with UP/DOWN arrows. Requires XELP_ENABLE_CLI and XELP_ENABLE_LINE_EDIT.
+ XELP_HIST_DEPTH sets the number of commands stored (default 4, overridable via
+ compiler flag or xelp_ovr.h when XELP_CONFIG_OVERRIDE is defined).
+ RAM cost: XELP_HIST_DEPTH * XELP_CMDBUFSZ + XELP_CMDBUFSZ + 4 bytes per instance.
+ Code cost: ~420 bytes on ARM Thumb (-Os).
+ */
+#define XELP_ENABLE_HISTORY 1
 
 
 /****************************************************************************************************

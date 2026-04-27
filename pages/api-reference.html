@@ -27,7 +27,7 @@
 <h1>API Reference</h1>
 
 <p>All public types, functions, and macros defined in <code>xelp.h</code>.
-Version 0.3.1.</p>
+Version 0.3.2.</p>
 
 <h2>Types</h2>
 
@@ -106,7 +106,7 @@ complete command or multi-statement script.</p>
 <p>Same as <code>XelpParse</code> but takes a <code>XelpBuf</code>.</p>
 
 <h3><code>XelpExecKC</code></h3>
-<pre><code>XELPRESULT XelpExecKC(XELP *ths, char key);
+<pre><code>XELPRESULT XelpExecKC(XELP *ths, XELPKEYCODE key);
 </code></pre>
 <p>Execute a single-key command directly (bypasses mode checking).</p>
 
@@ -114,7 +114,7 @@ complete command or multi-statement script.</p>
 <pre><code>XELPRESULT XelpOut(XELP *ths, const char *msg, int maxlen);
 </code></pre>
 <p>Output a string through the instance&rsquo;s output function. If
-<code>maxlen &gt; 0</code>, prints exactly that many characters. If
+<code>maxlen &gt; 0</code>, prints at most that many characters. If
 <code>maxlen == 0</code>, prints until null terminator.</p>
 
 <h3><code>XelpHelp</code></h3>
@@ -140,6 +140,52 @@ when <code>XELP_ENABLE_HELP</code> is defined.</p>
 <pre><code>XELPRESULT XelpNumToks(XelpBuf *buf, int *n);
 </code></pre>
 <p>Count the number of tokens in a buffer.</p>
+
+<h2>XelpArgs &mdash; Sequential Argument Iterator</h2>
+
+<p>A left-to-right token iterator for CLI command handlers. O(1) per token.</p>
+
+<h3><code>XelpArgsInit</code></h3>
+<pre><code>XELPRESULT XelpArgsInit(XelpArgs *a, const char *args, int len);
+</code></pre>
+<p>Initialize an argument iterator from the callback&rsquo;s <code>args</code> and <code>len</code>.</p>
+
+<h3><code>XelpNextTok</code></h3>
+<pre><code>XELPRESULT XelpNextTok(XelpArgs *a, XelpBuf *tok);
+</code></pre>
+<p>Get the next token. Pass <code>NULL</code> for <code>tok</code> to skip.</p>
+
+<h3><code>XelpNextInt</code></h3>
+<pre><code>XELPRESULT XelpNextInt(XelpArgs *a, int *val);
+</code></pre>
+<p>Get the next token and parse it as an integer (decimal or hex).</p>
+
+<h3><code>XelpArgCount</code></h3>
+<pre><code>XELPRESULT XelpArgCount(XelpArgs *a, int *n);
+</code></pre>
+<p>Count total tokens without consuming them.</p>
+
+<h2>Direct Argument Access</h2>
+
+<h3><code>XelpArgInt</code></h3>
+<pre><code>XELPRESULT XelpArgInt(const char *args, int len, int n, int *val);
+</code></pre>
+<p>Get argument <code>n</code> (0-indexed) as an integer in one call.
+Wraps <code>XelpTokN</code> + <code>XelpParseNum</code>.</p>
+
+<h3><code>XelpArgStr</code></h3>
+<pre><code>XELPRESULT XelpArgStr(const char *args, int len, int n,
+                      const char **s, int *slen);
+</code></pre>
+<p>Get argument <code>n</code> (0-indexed) as a string span. On success,
+<code>*s</code> points to the token and <code>*slen</code> is its length.
+Not null-terminated.</p>
+
+<h3><code>XelpPutc</code></h3>
+<pre><code>XELPRESULT XelpPutc(XELP *ths, char c);
+</code></pre>
+<p>Output a single character through the instance&rsquo;s output function.
+Respects <code>mOutEnable</code>.</p>
 
 <h2>String utilities</h2>
 
@@ -218,7 +264,7 @@ command handlers, use <code>ths-&gt;mR[1]</code> directly.</p>
 <table>
 <thead><tr><th>Constant</th><th>Value</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td><code>XELP_VERSION</code></td><td>0x00000300</td><td>Library version (32-bit hex: <code>0x00MMmmpp</code>)</td></tr>
+<tr><td><code>XELP_VERSION</code></td><td>0x00000302</td><td>Library version (32-bit hex: <code>0x00MMmmpp</code>)</td></tr>
 <tr><td><code>XELP_VER_MAJOR(v)</code></td><td></td><td>Extract major version byte</td></tr>
 <tr><td><code>XELP_VER_MINOR(v)</code></td><td></td><td>Extract minor version byte</td></tr>
 <tr><td><code>XELP_VER_PATCH(v)</code></td><td></td><td>Extract patch version byte</td></tr>

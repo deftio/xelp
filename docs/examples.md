@@ -143,6 +143,7 @@ Requires ncurses (`sudo apt-get install libncurses5-dev` on Debian/Ubuntu).
 - Backspace handling with ncurses `delch()`
 - Mode change callback showing mode transitions
 - Token parsing and numeric argument handling
+- Command history: UP/DOWN arrow recall of previous commands
 
 ### Architecture
 

@@ -13,6 +13,7 @@ compiled out saves code space.
 | `XELP_ENABLE_KEY` | Single key press mode (menus, immediate actions) | ~200--500 bytes |
 | `XELP_ENABLE_THR` | Pass-through mode (redirect keys to another peripheral) | ~50--125 bytes |
 | `XELP_ENABLE_HELP` | Built-in help function listing all commands | ~180--350 bytes |
+| `XELP_ENABLE_HISTORY` | Command history (UP/DOWN arrow recall). Requires `XELP_ENABLE_CLI` + `XELP_ENABLE_LINE_EDIT`. | ~420 bytes |
 | `XELP_ENABLE_FULL` | Enable all of the above | All combined |
 
 ## Key Mappings
@@ -39,6 +40,7 @@ Override by redefining in `xelpcfg.h`, e.g. `#define XELPKEY_CLI ('c')`
 | Define | Default | Purpose |
 |--------|---------|---------|
 | `XELP_CMDBUFSZ` | 64 | Command line buffer size in bytes |
+| `XELP_HIST_DEPTH` | 4 | Number of commands stored in history ring (requires `XELP_ENABLE_HISTORY`) |
 | `XELP_REGS_SZ` | 4 | Number of callee-clobbers-all return registers (minimum 4). R0 is command status, R1-R3 are command-specific. |
 | `XELPREG` | `int` | Register type (change for platforms where `int` is not ideal) |
 

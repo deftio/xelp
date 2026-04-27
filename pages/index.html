@@ -29,7 +29,7 @@
   <img src="../img/xelp-prompt-med.png" alt="xelp" class="logo">
   <p class="tagline">A command line interpreter and script engine for embedded systems.</p>
   <div class="badges">
-    <img src="https://img.shields.io/badge/version-0.3.1-blue.svg" alt="Version">
+    <img src="https://img.shields.io/badge/version-0.3.2-blue.svg" alt="Version">
     <a href="https://opensource.org/licenses/BSD-2-Clause"><img src="https://img.shields.io/badge/License-BSD%202--Clause-blue.svg" alt="License"></a>
     <a href="https://github.com/deftio/xelp/actions/workflows/ci.yml"><img src="https://github.com/deftio/xelp/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
     <img src="https://img.shields.io/badge/coverage-100%25-brightgreen.svg" alt="Coverage">
@@ -57,6 +57,8 @@ dependencies.</p>
       with a one-line table entry, callable interactively or from scripts</li>
   <li>Multiple independent instances on different serial ports, BLE, USB CDC</li>
   <li>Char-at-a-time parsing &mdash; feed from UART, ISR, or any byte stream</li>
+  <li><strong>Command history</strong> &mdash; UP/DOWN arrow recall of previous commands
+      (optional, <code>XELP_ENABLE_HISTORY</code>)</li>
   <li>Built-in tokenizer with quoted strings, escape sequences, <code>#</code> comments</li>
   <li>Scriptable &mdash; run multi-command const strings from ROM or RAM</li>
   <li>Zero dependencies (no stdio.h, string.h, etc.)</li>
@@ -169,26 +171,26 @@ under 7 KB.</p>
 <table>
 <thead><tr><th>CPU</th><th style="text-align:right">Width</th><th>Compiler</th><th style="text-align:right">KEY (bytes)</th><th style="text-align:right">CLI (bytes)</th><th style="text-align:right">FULL (bytes)</th></tr></thead>
 <tbody>
-<tr><td>AVR (ATtiny85)</td><td style="text-align:right">8</td><td>avr-gcc</td><td style="text-align:right">1046</td><td style="text-align:right">4038</td><td style="text-align:right">4096</td></tr>
-<tr><td>AVR (ATmega328P)</td><td style="text-align:right">8</td><td>avr-gcc</td><td style="text-align:right">1054</td><td style="text-align:right">4132</td><td style="text-align:right">4190</td></tr>
-<tr><td>Z80</td><td style="text-align:right">8</td><td>SDCC</td><td style="text-align:right">2121</td><td style="text-align:right">6966</td><td style="text-align:right">7074</td></tr>
-<tr><td>6800 (HC08)</td><td style="text-align:right">8</td><td>SDCC</td><td style="text-align:right">2471</td><td style="text-align:right">8147</td><td style="text-align:right">8288</td></tr>
-<tr><td>MSP430</td><td style="text-align:right">16</td><td>msp430-gcc</td><td style="text-align:right">770</td><td style="text-align:right">3260</td><td style="text-align:right">3306</td></tr>
-<tr><td>68HC11</td><td style="text-align:right">16</td><td>m68hc11-gcc</td><td style="text-align:right">2369</td><td style="text-align:right">6570</td><td style="text-align:right">6641</td></tr>
-<tr><td>Xtensa LX7 (ESP32-S3)</td><td style="text-align:right">32</td><td>xtensa-esp-elf-gcc</td><td style="text-align:right">576</td><td style="text-align:right">2508</td><td style="text-align:right">2540</td></tr>
-<tr><td>ARM Thumb</td><td style="text-align:right">32</td><td>arm-none-eabi-gcc</td><td style="text-align:right">580</td><td style="text-align:right">2482</td><td style="text-align:right">2526</td></tr>
-<tr><td>RISC-V (rv32)</td><td style="text-align:right">32</td><td>riscv64-unknown-elf-gcc</td><td style="text-align:right">722</td><td style="text-align:right">2970</td><td style="text-align:right">3008</td></tr>
-<tr><td>Xtensa LX106 (ESP8266)</td><td style="text-align:right">32</td><td>xtensa-lx106-elf-gcc</td><td style="text-align:right">723</td><td style="text-align:right">2831</td><td style="text-align:right">2863</td></tr>
-<tr><td>m68k</td><td style="text-align:right">32</td><td>m68k-linux-gnu-gcc</td><td style="text-align:right">728</td><td style="text-align:right">3146</td><td style="text-align:right">3194</td></tr>
-<tr><td>ARM32</td><td style="text-align:right">32</td><td>arm-none-eabi-gcc</td><td style="text-align:right">980</td><td style="text-align:right">3746</td><td style="text-align:right">3806</td></tr>
-<tr><td>x86-32</td><td style="text-align:right">32</td><td>GCC</td><td style="text-align:right">1081</td><td style="text-align:right">4604</td><td style="text-align:right">4654</td></tr>
-<tr><td>MIPS32</td><td style="text-align:right">32</td><td>mipsel-linux-gnu-gcc</td><td style="text-align:right">1296</td><td style="text-align:right">4888</td><td style="text-align:right">4936</td></tr>
-<tr><td>PowerPC</td><td style="text-align:right">32</td><td>powerpc-linux-gnu-gcc</td><td style="text-align:right">1504</td><td style="text-align:right">5674</td><td style="text-align:right">5738</td></tr>
-<tr><td>RISC-V (rv64)</td><td style="text-align:right">64</td><td>riscv64-linux-gnu-gcc</td><td style="text-align:right">756</td><td style="text-align:right">3332</td><td style="text-align:right">3366</td></tr>
-<tr><td>x86-64</td><td style="text-align:right">64</td><td>Clang</td><td style="text-align:right">1043</td><td style="text-align:right">5013</td><td style="text-align:right">5055</td></tr>
-<tr><td>x86-64</td><td style="text-align:right">64</td><td>GCC</td><td style="text-align:right">1063</td><td style="text-align:right">4787</td><td style="text-align:right">4836</td></tr>
-<tr><td>AArch64 (ARM64)</td><td style="text-align:right">64</td><td>aarch64-linux-gnu-gcc</td><td style="text-align:right">1324</td><td style="text-align:right">5178</td><td style="text-align:right">5234</td></tr>
-<tr><td>MIPS64</td><td style="text-align:right">64</td><td>mips64el-linux-gnuabi64-gcc</td><td style="text-align:right">1360</td><td style="text-align:right">5512</td><td style="text-align:right">5560</td></tr>
+<tr><td>AVR (ATtiny85)</td><td style="text-align:right">8</td><td>avr-gcc</td><td style="text-align:right">1046</td><td style="text-align:right">4270</td><td style="text-align:right">4328</td></tr>
+<tr><td>AVR (ATmega328P)</td><td style="text-align:right">8</td><td>avr-gcc</td><td style="text-align:right">1054</td><td style="text-align:right">4370</td><td style="text-align:right">4428</td></tr>
+<tr><td>Z80</td><td style="text-align:right">8</td><td>SDCC</td><td style="text-align:right">2121</td><td style="text-align:right">7287</td><td style="text-align:right">7395</td></tr>
+<tr><td>6800 (HC08)</td><td style="text-align:right">8</td><td>SDCC</td><td style="text-align:right">2471</td><td style="text-align:right">8616</td><td style="text-align:right">8718</td></tr>
+<tr><td>MSP430</td><td style="text-align:right">16</td><td>msp430-gcc</td><td style="text-align:right">770</td><td style="text-align:right">3486</td><td style="text-align:right">3532</td></tr>
+<tr><td>68HC11</td><td style="text-align:right">16</td><td>m68hc11-gcc</td><td style="text-align:right">2369</td><td style="text-align:right">6895</td><td style="text-align:right">6966</td></tr>
+<tr><td>Xtensa LX7 (ESP32-S3)</td><td style="text-align:right">32</td><td>xtensa-esp-elf-gcc</td><td style="text-align:right">576</td><td style="text-align:right">2600</td><td style="text-align:right">2632</td></tr>
+<tr><td>ARM Thumb</td><td style="text-align:right">32</td><td>arm-none-eabi-gcc</td><td style="text-align:right">580</td><td style="text-align:right">2598</td><td style="text-align:right">2642</td></tr>
+<tr><td>RISC-V (rv32)</td><td style="text-align:right">32</td><td>riscv64-unknown-elf-gcc</td><td style="text-align:right">722</td><td style="text-align:right">3100</td><td style="text-align:right">3138</td></tr>
+<tr><td>Xtensa LX106 (ESP8266)</td><td style="text-align:right">32</td><td>xtensa-lx106-elf-gcc</td><td style="text-align:right">723</td><td style="text-align:right">2947</td><td style="text-align:right">2979</td></tr>
+<tr><td>m68k</td><td style="text-align:right">32</td><td>m68k-linux-gnu-gcc</td><td style="text-align:right">728</td><td style="text-align:right">3336</td><td style="text-align:right">3384</td></tr>
+<tr><td>ARM32</td><td style="text-align:right">32</td><td>arm-none-eabi-gcc</td><td style="text-align:right">980</td><td style="text-align:right">3934</td><td style="text-align:right">3994</td></tr>
+<tr><td>x86-32</td><td style="text-align:right">32</td><td>GCC</td><td style="text-align:right">1081</td><td style="text-align:right">4919</td><td style="text-align:right">4969</td></tr>
+<tr><td>MIPS32</td><td style="text-align:right">32</td><td>mipsel-linux-gnu-gcc</td><td style="text-align:right">1296</td><td style="text-align:right">5224</td><td style="text-align:right">5272</td></tr>
+<tr><td>PowerPC</td><td style="text-align:right">32</td><td>powerpc-linux-gnu-gcc</td><td style="text-align:right">1504</td><td style="text-align:right">6066</td><td style="text-align:right">6130</td></tr>
+<tr><td>RISC-V (rv64)</td><td style="text-align:right">64</td><td>riscv64-linux-gnu-gcc</td><td style="text-align:right">756</td><td style="text-align:right">3554</td><td style="text-align:right">3588</td></tr>
+<tr><td>x86-64</td><td style="text-align:right">64</td><td>Clang</td><td style="text-align:right">1043</td><td style="text-align:right">5269</td><td style="text-align:right">5311</td></tr>
+<tr><td>x86-64</td><td style="text-align:right">64</td><td>GCC</td><td style="text-align:right">1063</td><td style="text-align:right">5138</td><td style="text-align:right">5187</td></tr>
+<tr><td>AArch64 (ARM64)</td><td style="text-align:right">64</td><td>aarch64-linux-gnu-gcc</td><td style="text-align:right">1324</td><td style="text-align:right">5574</td><td style="text-align:right">5630</td></tr>
+<tr><td>MIPS64</td><td style="text-align:right">64</td><td>mips64el-linux-gnuabi64-gcc</td><td style="text-align:right">1360</td><td style="text-align:right">5864</td><td style="text-align:right">5928</td></tr>
 </tbody>
 </table>
 <!-- Build Size Table -->
@@ -207,7 +209,7 @@ make fuzz         # fuzz testing with libFuzzer (requires clang)
 make clean-all    # remove all build artifacts
 </code></pre>
 
-<p>39 test units, 531 test cases, 100% line coverage of <code>xelp.c</code>.</p>
+<p>47 test units, 598 test cases, 100% line coverage of <code>xelp.c</code>.</p>
 
 <h2>Documentation</h2>
 

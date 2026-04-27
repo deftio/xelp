@@ -44,7 +44,7 @@ extern "C"
 {
 #endif
 
-#define XELP_VERSION      (0x00000301UL) /* 32-bit version: 0x00MMmmpp (major.minor.patch) */
+#define XELP_VERSION      (0x00000302UL) /* 32-bit version: 0x00MMmmpp (major.minor.patch) */
 #define XELP_VER_MAJOR(v) (((v) >> 16) & 0xFF)
 #define XELP_VER_MINOR(v) (((v) >>  8) & 0xFF)
 #define XELP_VER_PATCH(v) ( (v)        & 0xFF)
@@ -140,7 +140,11 @@ typedef unsigned long XELPKEYCODE;
 #define XELP_T_OK(r) ((r)>=0) 	/* simple macro for testing OK or warning (e.g. not a failure) */
 
 
-#define XELP_CMDBUFSZ 		(64) 
+#ifndef XELP_HIST_DEPTH
+#define XELP_HIST_DEPTH		(4)  /* history ring depth (overridable)     */
+#endif
+
+#define XELP_CMDBUFSZ 		(64)
 
 /**
  used by tokenizer funciton
@@ -238,7 +242,8 @@ typedef struct
 
 #define XELPKEY_ENTER    ('\n')  /* Enter Key for Cmd Mode */
 #define XELPKEY_SPC      (0x20)  /* space char             */
-#define XELPKEY_BKSP	 (0x7)	 /* back space             */
+#define XELPKEY_BKSP	 (0x7)	 /* back space (legacy)    */
+#define XELPKEY_BS       (0x08)  /* ASCII BS               */
 #define XELPKEY_DEL		 (0x7f)	 /* DEL                    */
 #define XELPKEY_ESC 	 (0x1b)  /* Escape                 */
 
@@ -300,6 +305,15 @@ typedef struct XELP_tag
 
 #if defined(XELP_ENABLE_CLI) && defined(XELP_ENABLE_LINE_EDIT)
 	char*					mCur;			 /* cursor position in [mCmdXB.s .. mCmdXB.p]  */
+#endif
+
+#if defined(XELP_ENABLE_CLI) && defined(XELP_ENABLE_HISTORY)
+	char  mHistBuf[XELP_HIST_DEPTH][XELP_CMDBUFSZ]; /* history ring             */
+	char  mHistWrite;    /* next write slot (ring index)                          */
+	char  mHistCount;    /* entries stored (0..DEPTH)                             */
+	char  mHistBrowse;   /* browse position (-1 = not browsing)                  */
+	char  mHistSaved[XELP_CMDBUFSZ]; /* stash of in-progress line on first UP   */
+	char  mHistSavedLen; /* length of saved in-progress line                     */
 #endif
 
 	/****
@@ -405,6 +419,12 @@ XELPRESULT XelpArgsInit  (XelpArgs *a, const char *args, int len);
 XELPRESULT XelpNextTok   (XelpArgs *a, XelpBuf *tok);
 XELPRESULT XelpNextInt   (XelpArgs *a, int *val);
 XELPRESULT XelpArgCount  (XelpArgs *a, int *n);
+
+/* Direct-access argument helpers (random access, O(N) per call).
+   Arg 0 is the command name, arg 1 is the first real argument. */
+XELPRESULT XelpArgInt (const char *args, int len, int n, int *val);
+XELPRESULT XelpArgStr (const char *args, int len, int n,
+                       const char **s, int *slen);
 
 /* XELPNEXTTOK get next token in a string buffer.  This is just a macro call to XelpTokLine             */
 /* #define    XELPNEXTTOK(buf,blen,tok_s,tok_e)    (XelpTokLine(buf, buf+blen, tok_s, tok_e, 0, XELP_TOK_ONLY)) */

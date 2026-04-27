@@ -1,6 +1,6 @@
 # API Reference
 
-All public types, functions, and macros defined in `xelp.h`. Version 0.3.1.
+All public types, functions, and macros defined in `xelp.h`. Version 0.3.2.
 
 ## Types
 
@@ -208,6 +208,41 @@ XELPRESULT cmd_divmod(XELP *ths, const char *args, int len) {
 }
 ```
 
+### `XelpArgInt`
+
+```c
+XELPRESULT XelpArgInt(const char *args, int len, int n, int *val);
+```
+
+Get argument `n` (0-indexed) and parse it as an integer in a single call.
+Wraps `XelpTokN` + `XelpParseNum`. Returns `XELP_S_OK` on success,
+`XELP_E_ERR` if the token does not exist or is not a valid number.
+
+### `XelpArgStr`
+
+```c
+XELPRESULT XelpArgStr(const char *args, int len, int n,
+                      const char **s, int *slen);
+```
+
+Get argument `n` (0-indexed) as a string span. On success, `*s` points to
+the first character of the token and `*slen` is its length. The token is
+NOT null-terminated. Returns `XELP_S_OK` on success, `XELP_E_ERR` if the
+token does not exist.
+
+### Example
+
+```c
+XELPRESULT cmd_set(XELP *ths, const char *args, int len) {
+    const char *key;
+    int klen, value;
+    XelpArgStr(args, len, 1, &key, &klen);  /* arg 1 = key name */
+    XelpArgInt(args, len, 2, &value);        /* arg 2 = int value */
+    /* ... use key/klen and value ... */
+    return XELP_S_OK;
+}
+```
+
 ## String Utilities
 
 ### `XelpStrLen`
@@ -341,7 +376,7 @@ natural value (e.g. `'a'` == 0x61). Multi-byte keys are >= 0x100.
 
 | Constant | Value | Description |
 |----------|-------|-------------|
-| `XELP_VERSION` | 0x00000301 | Library version (32-bit hex: `0x00MMmmpp`) |
+| `XELP_VERSION` | 0x00000302 | Library version (32-bit hex: `0x00MMmmpp`) |
 | `XELP_VER_MAJOR(v)` | | Extract major version byte |
 | `XELP_VER_MINOR(v)` | | Extract minor version byte |
 | `XELP_VER_PATCH(v)` | | Extract patch version byte |
@@ -359,15 +394,16 @@ Cortex-M0 (Thumb, `-Os`):
 
 | Profile | .text (bytes) | Flags |
 |---------|------------:|-------|
-| CLI only | 1396 | `XELP_ENABLE_CLI` |
-| CLI + help | 1496 | + `XELP_ENABLE_HELP` |
-| CLI + key | 1500 | + `XELP_ENABLE_KEY` |
-| CLI + help + key | 1874 | + both |
-| CLI + help + key + thru | 1910 | + `XELP_ENABLE_THR` |
-| CLI + line edit | 1840 | + `XELP_ENABLE_LINE_EDIT` |
-| CLI + line edit + help | 1936 | + both |
-| CLI + LE + help + key | 2358 | + all three |
-| Full (all features) | 2394 | all flags |
+| CLI only | 1508 | `XELP_ENABLE_CLI` |
+| CLI + help | 1608 | + `XELP_ENABLE_HELP` |
+| CLI + key | 1612 | + `XELP_ENABLE_KEY` |
+| CLI + help + key | 1986 | + both |
+| CLI + help + key + thru | 2026 | + `XELP_ENABLE_THR` |
+| CLI + line edit | 1952 | + `XELP_ENABLE_LINE_EDIT` |
+| CLI + line edit + help | 2048 | + both |
+| CLI + LE + help + key | 2466 | + all three |
+| Full (all features) | 2506 | all flags |
+| Full + history | 2922 | all flags + `XELP_ENABLE_HISTORY` |
 
 Use `dev/size_profiles.sh` to regenerate this table for your toolchain.
 

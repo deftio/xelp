@@ -70,3 +70,5 @@ make clean    # remove build artifacts
 - Token parsing and numeric arguments
 - Math operations dispatched to the same handler function
 - Register file (R0-R3) for command return values
+- Line editing (left/right, Home/End, Delete) and multi-byte key recognition
+- Command history: UP/DOWN arrow recall of previous commands
