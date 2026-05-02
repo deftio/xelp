@@ -13,14 +13,14 @@ BUILD_DIR=build
 INCLUDES=\
     -I$(LIB_DIR)\
 
-.PHONY: help tests clean clean-all coverage version fuzz fuzz-parsekey fuzz-parse examples example validate prerelease funcsizes sizes
+.PHONY: help tests clean clean-all coverage version fuzz fuzz-parsekey fuzz-parse examples example validate prerelease funcsizes sizes lint
 
 #=======================================================================
 # Default target: print available targets
 help:
 	@echo "xelp build targets:"
 	@echo ""
-	@echo "  make validate     Build + run tests + build examples (pre-push check)"
+	@echo "  make validate     Lint + build + run tests + build examples (pre-push check)"
 	@echo "  make prerelease   Validate + cross-build sizes + update README tables"
 	@echo "  make tests        Build + run unit tests with coverage"
 	@echo "  make examples     Build all examples (no interactive launch)"
@@ -30,6 +30,7 @@ help:
 	@echo "  make sizes        Feature profile compiled sizes (ARM + host)"
 	@echo "  make version      Extract and print library version"
 	@echo "  make fuzz         Run fuzz tests (requires clang + libFuzzer)"
+	@echo "  make lint         Run cppcheck static analysis on src + examples"
 	@echo "  make clean        Remove test build artifacts"
 	@echo "  make clean-all    Remove all build artifacts including examples"
 	@echo ""
@@ -79,24 +80,47 @@ version:
 
 examples:
 	@echo "--- Building posix-simple ---"
-	$(MAKE) -C examples/posix-simple build
+	$(MAKE) -C examples/posix-simple BUILD_DIR=../../build/examples/posix-simple build
 	@echo "--- Building posix-simple-cpp ---"
-	$(MAKE) -C examples/posix-simple-cpp build
+	$(MAKE) -C examples/posix-simple-cpp BUILD_DIR=../../build/examples/posix-simple-cpp build
 	@echo "--- Building scripting ---"
-	$(MAKE) -C examples/scripting build
+	$(MAKE) -C examples/scripting BUILD_DIR=../../build/examples/scripting build
 	@echo "--- All examples built ---"
 
 # Build and run the posix ncurses demo (interactive)
 example:
-	$(MAKE) -C examples/posix-simple
+	$(MAKE) -C examples/posix-simple BUILD_DIR=../../build/examples/posix-simple
 
 #=======================================================================
-# Local validation: tests + examples build (no Docker, no release)
+# Static analysis with cppcheck
+
+lint:
+	@if command -v cppcheck >/dev/null 2>&1; then \
+		echo "--- cppcheck: src + examples (C) ---"; \
+		cppcheck --enable=warning,performance,portability \
+			--error-exitcode=1 \
+			--suppress=missingIncludeSystem \
+			-I src \
+			src/ examples/posix-simple/ examples/scripting/; \
+		echo "--- cppcheck: examples (C++) ---"; \
+		cppcheck --enable=warning,performance,portability \
+			--error-exitcode=1 \
+			--suppress=missingIncludeSystem \
+			-I src \
+			--language=c++ \
+			examples/posix-simple-cpp/xelp-example-cpp.cpp; \
+		echo "--- cppcheck passed ---"; \
+	else \
+		echo "--- cppcheck not found, skipping lint (install: brew/apt install cppcheck) ---"; \
+	fi
+
+#=======================================================================
+# Local validation: lint + tests + examples build (no Docker, no release)
 # Use this for day-to-day development before pushing.
 
-validate: tests examples
+validate: lint tests examples
 	@echo ""
-	@echo "=== Validation passed: tests + examples build clean ==="
+	@echo "=== Validation passed: lint + tests + examples build clean ==="
 
 #=======================================================================
 # Pre-release: validate + cross-compile sizes + update README tables
@@ -152,7 +176,7 @@ clean:
 
 # clean-all -- clean tests + all examples
 clean-all: clean
-	-$(MAKE) -C examples/posix-simple clean
-	-$(MAKE) -C examples/posix-simple-cpp clean
-	-$(MAKE) -C examples/scripting clean
+	-$(MAKE) -C examples/posix-simple BUILD_DIR=../../build/examples/posix-simple clean
+	-$(MAKE) -C examples/posix-simple-cpp BUILD_DIR=../../build/examples/posix-simple-cpp clean
+	-$(MAKE) -C examples/scripting BUILD_DIR=../../build/examples/scripting clean
 

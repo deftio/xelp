@@ -13,7 +13,9 @@ CXX     = g++
 CFLAGS  = -Wall -Wextra -I../../src -Os
 CXXFLAGS = -std=c++17 -Wall -Wextra -I../../src -Os
 LDFLAGS = -lncurses -lm
-TARGET  = xelp-example-cpp
+
+BUILD_DIR ?= build
+TARGET     = $(BUILD_DIR)/xelp-example-cpp
 
 .PHONY: all build run clean
 
@@ -21,17 +23,20 @@ all: build run
 
 build: $(TARGET)
 
-xelp.o: ../../src/xelp.c ../../src/xelp.h ../../src/xelpcfg.h
+$(BUILD_DIR)/xelp.o: ../../src/xelp.c ../../src/xelp.h ../../src/xelpcfg.h
+	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c ../../src/xelp.c -o $@
 
-xelp-example-cpp.o: xelp-example-cpp.cpp ../../src/xelp.h ../../src/xelpcfg.h ../../src/XelpArduino.h
+$(BUILD_DIR)/xelp-example-cpp.o: xelp-example-cpp.cpp ../../src/xelp.h ../../src/xelpcfg.h ../../src/XelpArduino.h
+	@mkdir -p $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) -c xelp-example-cpp.cpp -o $@
 
-$(TARGET): xelp.o xelp-example-cpp.o
-	$(CXX) xelp.o xelp-example-cpp.o $(LDFLAGS) -o $@
+$(TARGET): $(BUILD_DIR)/xelp.o $(BUILD_DIR)/xelp-example-cpp.o
+	@mkdir -p $(BUILD_DIR)
+	$(CXX) $(BUILD_DIR)/xelp.o $(BUILD_DIR)/xelp-example-cpp.o $(LDFLAGS) -o $@
 
 run: $(TARGET)
 	./$(TARGET)
 
 clean:
-	rm -f $(TARGET) *.o
+	rm -rf $(BUILD_DIR)

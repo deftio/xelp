@@ -8,7 +8,9 @@
 CC      = gcc
 CFLAGS  = -Wall -Wextra -I../../src
 SRC     = scripting-example.c ../../src/xelp.c
-TARGET  = scripting-example
+
+BUILD_DIR ?= build
+TARGET     = $(BUILD_DIR)/scripting-example
 
 .PHONY: all build run clean
 
@@ -17,10 +19,11 @@ all: build run
 build: $(TARGET)
 
 $(TARGET): $(SRC) ../../src/xelp.h ../../src/xelpcfg.h
+	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) $(SRC) -o $@
 
 run: $(TARGET)
 	./$(TARGET)
 
 clean:
-	rm -f $(TARGET)
+	rm -rf $(BUILD_DIR)
