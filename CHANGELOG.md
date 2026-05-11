@@ -10,6 +10,31 @@ Versions always use three-component semver (e.g. `0.3.0`, never `0.3`).
 
 ## [Unreleased]
 
+### Added
+- **ESP32 BLE CLI example** (`examples/esp32-ble-cli/`): dual-instance xelp
+  demo with one CLI on USB Serial and one on BLE (Nordic UART Service).
+  Both instances share the same command table. Includes Web Bluetooth
+  terminal (`web/index.html`), Makefile, and cross-instance messaging
+  (`sendmsg` command). Compatible with any BLE-capable ESP32 variant.
+  Requires NimBLE-Arduino library.
+- `rgb` command in esp32-ble-cli for direct RGB NeoPixel color control on
+  boards like Unexpected Maker ProS3/TinyS3/FeatherS3.
+- `sendmsg <serial|ble> <text>` cross-instance messaging command in
+  esp32-ble-cli, with thread-safe deferred delivery via loop().
+- Drip-feed BLE notification pacing (one 20-byte chunk per connection
+  interval) for reliable output over Nordic UART Service.
+- Deferred serial banner (press Enter to show) to avoid USB CDC boot
+  truncation on ESP32-S3.
+
+### Fixed
+- `\r` stripping in Web Bluetooth terminals (`esp32-ble-cli` and
+  `esp32c6-wifi`) to prevent line overwrite in browsers.
+
+### Changed
+- Updated READMEs for arduino, arduino-cpp, esp32-wifi, pico-cli, and
+  pico-cli-arduino examples with arduino-cli compile/upload/monitor
+  commands.
+
 ## [0.3.2] - 2026-04-26
 
 ### Added

@@ -1,41 +1,149 @@
 # xelp
 
-> xelp is a command line interpreter and script engine for embedded systems,
-> written in pure C. Zero dynamic memory. No OS required. No standard library
-> dependencies. Under 1 KB (key dispatch only) to ~5 KB (full CLI with line
-> editing) compiled depending on features enabled.
-> Works on 8-bit (AVR, 8051) through 64-bit (ARM64, x86-64) targets.
+> xelp is a command line interpreter, script engine, and single-key menu
+> system for embedded systems. Pure C, zero dynamic memory, no OS, no
+> standard library dependencies. Under 1 KB (key dispatch only) to ~5 KB
+> (full CLI with line editing) compiled. Works on 8-bit (AVR, 8051)
+> through 64-bit (ARM64, x86-64) targets. Version 0.3.2.
 
 xelp gives bare-metal firmware a real interactive CLI with scriptable
 commands, single-key menus, and pass-through mode. Three source files
-(`xelp.c`, `xelp.h`, `xelpcfg.h`) are all that are needed.
+(`xelp.c`, `xelp.h`, `xelpcfg.h`) are all that are needed. The library
+uses zero dynamic memory (no malloc), supports multiple independent
+instances on different serial ports, and compiles with any C89 or later
+compiler. Scripts are ROM-able const strings -- the parser never modifies
+its input. Function dispatch tables make any C/C++ function callable from
+the CLI or from scripts.
+
+## Key characteristics
+
+- Pure C (C89 compliant), optional C++ `extern "C"` support
+- Instance-based: no globals, multiple independent CLIs on different ports
+- Three modes: CLI (line-buffered), KEY (single keypress), THR (pass-through)
+- Table-driven parser state machine (8 states, 94-byte lookup table)
+- Command history with UP/DOWN arrow recall (optional)
+- Line editing: cursor movement, insert, delete (optional)
+- Multi-byte ANSI key recognition (arrow keys, Home/End, etc.)
+- 4 callee-clobbers-all return registers per instance
+- Output control: mute all output, echo masking (password mode)
+- Quoted strings, escape sequences, comments, semicolon statement separator
+- Hex + decimal number parsing (0xFF, FFh, -123 formats)
+- 47 test units, 598 test cases, 100% line coverage
+- Fuzz tested with libFuzzer
+- BSD 2-Clause license
 
 ## Docs
 
+- [AGENTS.md](https://github.com/deftio/xelp/blob/master/AGENTS.md): AI coding agent reference -- function signatures, setup patterns, parser internals, common mistakes, testing patterns
 - [API Reference](https://github.com/deftio/xelp/blob/master/docs/api-reference.md): All public types, functions, macros, and return codes
 - [Tutorial](https://github.com/deftio/xelp/blob/master/docs/tutorial.md): Step-by-step introduction with complete code examples
 - [Configuration Guide](https://github.com/deftio/xelp/blob/master/docs/configuration.md): Compile-time feature flags, buffer sizes, key mappings
+- [Build Profiles](https://github.com/deftio/xelp/blob/master/docs/build-profiles.md): Feature system and compile-time options with size impact
 - [Porting Guide](https://github.com/deftio/xelp/blob/master/docs/porting.md): How to bring up xelp on a new platform
-- [Examples](https://github.com/deftio/xelp/blob/master/docs/examples.md): Annotated code for POSIX, Arduino, ESP32, bare-metal, multi-instance
-- [AGENTS.md](https://github.com/deftio/xelp/blob/master/AGENTS.md): Concise coding reference for AI agents integrating xelp
+- [Examples Guide](https://github.com/deftio/xelp/blob/master/docs/examples.md): Annotated code for POSIX, Arduino, ESP32, bare-metal, multi-instance
+- [Testing Guide](https://github.com/deftio/xelp/blob/master/docs/testing.md): JumpBug test framework reference
 
 ## Code
 
-- [xelp.h](https://github.com/deftio/xelp/blob/master/src/xelp.h): Public API header -- types, macros, function declarations
-- [xelp.c](https://github.com/deftio/xelp/blob/master/src/xelp.c): Implementation (~1100 lines)
-- [xelpcfg.h](https://github.com/deftio/xelp/blob/master/src/xelpcfg.h): Compile-time configuration
+- [xelp.h](https://github.com/deftio/xelp/blob/master/src/xelp.h): Public API header -- types, macros, function declarations (~450 lines)
+- [xelp.c](https://github.com/deftio/xelp/blob/master/src/xelp.c): Implementation -- parser state machine, tokenizer, dispatch, line editing, history (~1141 lines)
+- [xelpcfg.h](https://github.com/deftio/xelp/blob/master/src/xelpcfg.h): Compile-time configuration -- feature flags, key mappings, buffer sizes (~207 lines)
+- [XelpArduino.h](https://github.com/deftio/xelp/blob/master/src/XelpArduino.h): C++ wrapper class for Arduino integration
 
 ## Examples
 
-- [POSIX example](https://github.com/deftio/xelp/blob/master/examples/posix-simple/xelp-example.c): Full featured CLI with ncurses
-- [Bare-metal example](https://github.com/deftio/xelp/blob/master/examples/bare-metal/bare-metal-example.c): Minimal embedded template
+- [POSIX example](https://github.com/deftio/xelp/blob/master/examples/posix-simple/xelp-example.c): Full interactive CLI with ncurses (Linux/macOS)
+- [POSIX C++ example](https://github.com/deftio/xelp/blob/master/examples/posix-simple-cpp/xelp-example-cpp.cpp): C++ wrapper version of POSIX example
+- [Bare-metal example](https://github.com/deftio/xelp/blob/master/examples/bare-metal/bare-metal-example.c): Minimal MCU porting template with all three modes
 - [Multi-instance example](https://github.com/deftio/xelp/blob/master/examples/multi-instance/multi-instance-example.c): Two independent CLIs on different UARTs
 - [Scripting example](https://github.com/deftio/xelp/blob/master/examples/scripting/scripting-example.c): ROM-able scripts, multi-statement parsing
-- [Arduino example](https://github.com/deftio/xelp/blob/master/examples/arduino/arduino.ino): Serial CLI for Arduino boards
-- [ESP32 WiFi example](https://github.com/deftio/xelp/blob/master/examples/esp32-wifi/esp32-wifi.ino): CLI over WiFi telnet + serial
+- [Arduino example](https://github.com/deftio/xelp/blob/master/examples/arduino/arduino.ino): Serial CLI for Arduino boards (raw C API)
+- [Arduino C++ example](https://github.com/deftio/xelp/blob/master/examples/arduino-cpp/arduino-cpp.ino): XelpCLI C++ wrapper class
+- [Arduino live CLI](https://github.com/deftio/xelp/blob/master/examples/arduino-live-cli/arduino-live-cli.ino): Interactive Arduino serial CLI
+- [ESP32 WiFi example](https://github.com/deftio/xelp/blob/master/examples/esp32-wifi/esp32-wifi.ino): CLI over WiFi telnet + serial, time/weather fetch
+- [ESP32-C6 WiFi example](https://github.com/deftio/xelp/blob/master/examples/esp32c6-wifi/): Dual-instance Serial + BLE with WiFi commands, Web Bluetooth terminal
+- [ESP32 BLE CLI](https://github.com/deftio/xelp/blob/master/examples/esp32-ble-cli/): Dual-instance Serial + BLE CLI with Web Bluetooth terminal, cross-instance messaging
+- [Pico CLI](https://github.com/deftio/xelp/blob/master/examples/pico-cli/): Raspberry Pi Pico pure C (GPIO, ADC, PWM)
+- [Pico Arduino CLI](https://github.com/deftio/xelp/blob/master/examples/pico-cli-arduino/): Raspberry Pi Pico with Arduino-Pico core + C++ wrapper
 
-## Optional
+## Tests
 
+- [Unit tests](https://github.com/deftio/xelp/blob/master/tests/xelp_unit_tests.c): 47 test units, 598 test cases (JumpBug framework)
+- [JumpBug framework](https://github.com/deftio/xelp/blob/master/tests/jumpbug_unit_test_fw.c): Minimal C89-compatible unit test framework
+- [Fuzz parse](https://github.com/deftio/xelp/blob/master/tests/fuzz/fuzz_parse.c): libFuzzer harness for XelpParse
+- [Fuzz parsekey](https://github.com/deftio/xelp/blob/master/tests/fuzz/fuzz_parsekey.c): libFuzzer harness for XelpParseKey
+
+## Build & tools
+
+- [CMakeLists.txt](https://github.com/deftio/xelp/blob/master/CMakeLists.txt): CMake configuration (ESP-IDF component + plain CMake library)
+- [Makefile](https://github.com/deftio/xelp/blob/master/makefile): Development makefile (validate, tests, examples, coverage, fuzz, sizes)
+- [Release script](https://github.com/deftio/xelp/blob/master/tools/make_release.sh): Full guided release pipeline
+- [Cross-build script](https://github.com/deftio/xelp/blob/master/tools/crossbuild.sh): Docker cross-compilation for 18+ architectures
+- [Dockerfile](https://github.com/deftio/xelp/blob/master/tools/Dockerfile.crossbuild): Docker image with 18 cross-compilation toolchains
+- [Size profiles](https://github.com/deftio/xelp/blob/master/dev/size_profiles.sh): Feature profile sizing tool
+
+## Package manifests
+
+- [library.json](https://github.com/deftio/xelp/blob/master/library.json): PlatformIO package manifest
+- [library.properties](https://github.com/deftio/xelp/blob/master/library.properties): Arduino Library Manager manifest
+- [idf_component.yml](https://github.com/deftio/xelp/blob/master/idf_component.yml): ESP-IDF Component Registry manifest
+
+## Project docs
+
+- [README.md](https://github.com/deftio/xelp/blob/master/README.md): Main project README with quick start, size tables, architecture support
 - [Changelog](https://github.com/deftio/xelp/blob/master/CHANGELOG.md): Version history and migration notes
 - [Contributing](https://github.com/deftio/xelp/blob/master/CONTRIBUTING.md): Coding standards, branch model, PR guidelines
 - [Release Management](https://github.com/deftio/xelp/blob/master/release_management.md): Versioning and release workflow
+- [License](https://github.com/deftio/xelp/blob/master/LICENSE.txt): BSD 2-Clause license
+
+## API quick reference
+
+Core functions:
+- `XelpInit(XELP *ths, const char *aboutMsg)` -- initialize instance
+- `XelpParseKey(XELP *ths, char key)` -- feed one interactive character
+- `XelpParse(XELP *ths, const char *buf, int len)` -- execute script buffer
+- `XelpParseXB(XELP *ths, XelpBuf *script)` -- execute script from XelpBuf
+- `XelpExecKC(XELP *ths, XELPKEYCODE key)` -- execute single-key command
+- `XelpOut(XELP *ths, const char *msg, int maxlen)` -- output string
+- `XelpPutc(XELP *ths, char c)` -- output single character
+- `XelpHelp(XELP *ths)` -- print help listing
+
+Argument parsing:
+- `XelpArgsInit(XelpArgs *a, const char *args, int len)` -- init iterator
+- `XelpNextTok(XelpArgs *a, XelpBuf *tok)` -- get next token
+- `XelpNextInt(XelpArgs *a, int *val)` -- get next token as int
+- `XelpArgCount(XelpArgs *a, int *n)` -- count tokens (non-destructive)
+- `XelpArgInt(const char *args, int len, int n, int *val)` -- random access int
+- `XelpArgStr(const char *args, int len, int n, const char **s, int *slen)` -- random access string
+
+Tokenizer:
+- `XelpTokLineXB(XelpBuf *buf, XelpBuf *tok, int type)` -- get next token or line
+- `XelpTokN(XelpBuf *buf, int n, XelpBuf *tok)` -- get Nth token
+- `XelpNumToks(XelpBuf *buf, int *n)` -- count tokens
+
+String utilities:
+- `XelpStrLen(const char *s)` -- string length
+- `XelpStrEq(const char *buf, int len, const char *cmd)` -- compare
+- `XelpStrEq2(const char *buf, const char *end, const char *cmd)` -- compare pointer-pair
+- `XelpStr2Int(const char *s, int maxlen)` -- parse to int
+- `XelpParseNum(const char *s, int maxlen, int *n)` -- parse with result code
+- `XelpBufCmp(const char *as, const char *ae, const char *bs, const char *be, int type)` -- compare buffers
+- `XelpFindTok(XelpBuf *x, const char *t0s, const char *t0e, int type)` -- find token
+
+Command function signatures:
+- CLI: `XELPRESULT fn(XELP *ths, const char *args, int len)`
+- KEY: `XELPRESULT fn(XELP *ths, XELPKEYCODE key)`
+
+Return codes: XELP_S_OK (0), XELP_W_WARN (1), XELP_S_NOTFOUND (2),
+XELP_E_ERR (-1), XELP_E_CMDBUFFULL (-2), XELP_E_CMDNOTFOUND (-3).
+
+## Compile-time feature flags
+
+- `XELP_ENABLE_CLI` -- CLI mode + scripting (core, ~1.5-2.6 KB)
+- `XELP_ENABLE_LINE_EDIT` -- cursor movement, insert, delete (~800-1000 bytes)
+- `XELP_ENABLE_HISTORY` -- UP/DOWN command recall (~420 bytes, requires LINE_EDIT)
+- `XELP_ENABLE_KEY` -- single keypress mode (~200-500 bytes)
+- `XELP_ENABLE_THR` -- pass-through mode (~50-125 bytes)
+- `XELP_ENABLE_HELP` -- built-in help listing (~180-350 bytes)
+- `XELP_ENABLE_FULL` -- all of the above (except history)
+- `XELP_CONFIG_OVERRIDE` -- use project-specific xelp_ovr.h for config

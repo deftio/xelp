@@ -25,7 +25,11 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libncurses-dev
+          sudo apt-get install -y libncurses-dev cppcheck
+
+      - name: Install dependencies (macOS)
+        if: matrix.os == 'macos-latest'
+        run: brew install cppcheck
 
       - name: Set compiler
         run: |
@@ -34,6 +38,9 @@ jobs:
           else
             echo "CC=clang" >> $GITHUB_ENV
           fi
+
+      - name: Lint (cppcheck static analysis)
+        run: make lint
 
       - name: Validate (tests + examples, -Werror)
         run: make validate

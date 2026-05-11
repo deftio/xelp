@@ -248,26 +248,26 @@ features). Even the largest full build is under 7 KB.
 <!-- Build Size Table -->
 | CPU | Width | Compiler | KEY (bytes) | CLI (bytes) | FULL (bytes) |
 |-----|------:|----------|------------:|------------:|-------------:|
-| AVR (ATtiny85) | 8 | avr-gcc | 1046 | 4270 | 4328 |
-| AVR (ATmega328P) | 8 | avr-gcc | 1054 | 4370 | 4428 |
-| Z80 | 8 | SDCC | 2121 | 7287 | 7395 |
-| 6800 (HC08) | 8 | SDCC | 2471 | 8616 | 8718 |
-| MSP430 | 16 | msp430-gcc | 770 | 3486 | 3532 |
-| 68HC11 | 16 | m68hc11-gcc | 2369 | 6895 | 6966 |
-| Xtensa LX7 (ESP32-S3) | 32 | xtensa-esp-elf-gcc | 576 | 2600 | 2632 |
-| ARM Thumb | 32 | arm-none-eabi-gcc | 580 | 2598 | 2642 |
-| RISC-V (rv32) | 32 | riscv64-unknown-elf-gcc | 722 | 3100 | 3138 |
-| Xtensa LX106 (ESP8266) | 32 | xtensa-lx106-elf-gcc | 723 | 2947 | 2979 |
-| m68k | 32 | m68k-linux-gnu-gcc | 728 | 3336 | 3384 |
-| ARM32 | 32 | arm-none-eabi-gcc | 980 | 3934 | 3994 |
-| x86-32 | 32 | GCC | 1081 | 4919 | 4969 |
-| MIPS32 | 32 | mipsel-linux-gnu-gcc | 1296 | 5224 | 5272 |
-| PowerPC | 32 | powerpc-linux-gnu-gcc | 1504 | 6066 | 6130 |
-| RISC-V (rv64) | 64 | riscv64-linux-gnu-gcc | 756 | 3554 | 3588 |
-| x86-64 | 64 | Clang | 1043 | 5269 | 5311 |
-| x86-64 | 64 | GCC | 1063 | 5138 | 5187 |
-| AArch64 (ARM64) | 64 | aarch64-linux-gnu-gcc | 1324 | 5574 | 5630 |
-| MIPS64 | 64 | mips64el-linux-gnuabi64-gcc | 1360 | 5864 | 5928 |
+| AVR (ATtiny85) | 8 | avr-gcc | 5174 | 5174 | 5174 |
+| AVR (ATmega328P) | 8 | avr-gcc | 5284 | 5284 | 5284 |
+| Z80 | 8 | SDCC | 8386 | 8386 | 8386 |
+| 6800 (HC08) | 8 | SDCC | 10078 | 10078 | 10078 |
+| MSP430 | 16 | msp430-gcc | 4272 | 4272 | 4272 |
+| 68HC11 | 16 | m68hc11-gcc | 8701 | 8701 | 8701 |
+| Xtensa LX7 (ESP32-S3) | 32 | xtensa-esp-elf-gcc | 3060 | 3060 | 3060 |
+| ARM Thumb | 32 | arm-none-eabi-gcc | 3074 | 3074 | 3074 |
+| Xtensa LX106 (ESP8266) | 32 | xtensa-lx106-elf-gcc | 3447 | 3447 | 3447 |
+| RISC-V (rv32) | 32 | riscv64-unknown-elf-gcc | 3654 | 3654 | 3654 |
+| m68k | 32 | m68k-linux-gnu-gcc | 4044 | 4044 | 4044 |
+| ARM32 | 32 | arm-none-eabi-gcc | 4638 | 4638 | 4638 |
+| x86-32 | 32 | GCC | 5628 | 5628 | 5628 |
+| MIPS32 | 32 | mipsel-linux-gnu-gcc | 6056 | 6056 | 6056 |
+| PowerPC | 32 | powerpc-linux-gnu-gcc | 6842 | 6842 | 6842 |
+| RISC-V (rv64) | 64 | riscv64-linux-gnu-gcc | 4136 | 4136 | 4136 |
+| x86-64 | 64 | GCC | 5935 | 5935 | 5935 |
+| AArch64 (ARM64) | 64 | aarch64-linux-gnu-gcc | 6282 | 6282 | 6282 |
+| x86-64 | 64 | Clang | 6495 | 6495 | 6495 |
+| MIPS64 | 64 | mips64el-linux-gnuabi64-gcc | 6904 | 6904 | 6904 |
 <!-- Build Size Table -->
 
 x86-64 GCC row is measured directly; others from cross-compilation via
@@ -319,7 +319,7 @@ Docker cross-compilation (`tools/Dockerfile.crossbuild`):
 xelp/
   src/            xelp.c, xelp.h, xelpcfg.h (the library -- add these to your project)
   tests/          unit tests (jumpbug framework), fuzz harnesses, 100% coverage
-  examples/       POSIX ncurses, Arduino, C++ wrapper, bare-metal, scripting, ESP32 Wi-Fi
+  examples/       POSIX ncurses, Arduino, C++ wrapper, bare-metal, scripting, ESP32 Wi-Fi/BLE, Pico
   tools/          cross-build scripts, release script, banner generator
   docs/           API reference, configuration guide, porting guide
   pages/          GitHub Pages site
@@ -359,8 +359,8 @@ what we welcome, branch model, and the release process.
 If you use AI coding agents (Claude Code, Cursor, Copilot, etc.), xelp
 provides machine-readable context files for accurate code generation:
 
-- [AGENTS.md](AGENTS.md) -- concise coding reference: function signatures, setup patterns, common mistakes
-- [llms.txt](llms.txt) -- project overview and documentation index ([llmstxt.org](https://llmstxt.org) format)
+- [AGENTS.md](AGENTS.md) -- comprehensive coding reference: architecture, function signatures, parser internals, setup patterns, testing, common mistakes
+- [llms.txt](llms.txt) -- project overview and full documentation index ([llmstxt.org](https://llmstxt.org) format)
 
 ## License
 

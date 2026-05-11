@@ -39,7 +39,10 @@ directory.</p>
 <tr><td><a href="#posix-simple">Posix simple</a></td><td>Linux / macOS</td><td>Full interactive demo with ncurses</td></tr>
 <tr><td><a href="#arduino">Arduino</a></td><td>Any Arduino board</td><td>LED control, token listing via CLI</td></tr>
 <tr><td><a href="#arduino-cpp">Arduino C++</a></td><td>Any Arduino board</td><td>C++ wrapper class for easy integration</td></tr>
+<tr><td><a href="#arduino-live-cli">Arduino Live CLI</a></td><td>Any Arduino board</td><td>Full hardware CLI: GPIO, ADC, PWM, tone, pulse</td></tr>
 <tr><td><a href="#esp32-wifi">ESP32 WiFi</a></td><td>ESP32</td><td>WiFi config, time and weather fetch via CLI</td></tr>
+<tr><td><a href="#esp32c6-wifi">ESP32-C6 WiFi + BLE</a></td><td>ESP32-C6</td><td>Dual-CLI: Serial + BLE with WiFi commands</td></tr>
+<tr><td><a href="#esp32-ble-cli">ESP32 BLE CLI</a></td><td>Any ESP32 with BLE</td><td>Dual-CLI: Serial + BLE with GPIO, cross-instance messaging</td></tr>
 <tr><td><a href="#scripting">Scripting</a></td><td>Linux / macOS</td><td>Batch scripting vs interactive mode</td></tr>
 <tr><td><a href="#pico-cli">Pico CLI (C)</a></td><td>Raspberry Pi Pico</td><td>GPIO, ADC, PWM control over USB serial</td></tr>
 <tr><td><a href="#pico-cli-arduino">Pico CLI (Arduino Easy API)</a></td><td>Raspberry Pi Pico</td><td>Tier 3 Easy API with lambdas</td></tr>
@@ -231,6 +234,29 @@ void loop() {
 
 <!-- ============================================================ -->
 
+<h2 id="arduino-live-cli">Arduino Live CLI</h2>
+
+<p><strong>File:</strong>
+<a href="https://github.com/deftio/xelp/blob/master/examples/arduino-live-cli/arduino-live-cli.ino"><code>examples/arduino-live-cli/arduino-live-cli.ino</code></a></p>
+
+<p>Full interactive hardware CLI using the C++ wrapper class. Over 15 commands
+for GPIO, ADC, PWM, tone, pulse width measurement, and pin scanning. Works
+on any Arduino-compatible board &mdash; AVR, ARM, ESP32, RP2040.</p>
+
+<h3>Commands</h3>
+<ul>
+  <li><code>help</code> / <code>?</code> &mdash; list all commands</li>
+  <li><code>setpin &lt;pin&gt; &lt;0|1&gt;</code> / <code>getpin &lt;pin&gt;</code> &mdash; digital I/O</li>
+  <li><code>pinmode &lt;pin&gt; &lt;in|out|pullup&gt;</code> &mdash; configure pin direction</li>
+  <li><code>setpwm &lt;pin&gt; &lt;0-255&gt;</code> / <code>readadc &lt;pin&gt;</code> &mdash; analog I/O</li>
+  <li><code>tone &lt;pin&gt; &lt;freq&gt;</code> / <code>notone &lt;pin&gt;</code> &mdash; generate tones</li>
+  <li><code>pulsein &lt;pin&gt;</code> &mdash; measure pulse width</li>
+  <li><code>scanpins &lt;start&gt; &lt;end&gt;</code> &mdash; scan GPIO pin states</li>
+  <li><code>reboot</code> &mdash; software reset</li>
+</ul>
+
+<!-- ============================================================ -->
+
 <h2 id="arduino-cpp">Arduino C++</h2>
 
 <p><strong>File:</strong>
@@ -261,6 +287,69 @@ the serial CLI, then fetch the current time and weather from free APIs
   <li><code>time</code> &mdash; fetch current time</li>
   <li><code>weather &lt;lat&gt; &lt;lon&gt;</code> &mdash; fetch weather for coordinates</li>
 </ul>
+
+<!-- ============================================================ -->
+
+<h2 id="esp32c6-wifi">ESP32-C6 WiFi + BLE</h2>
+
+<p><strong>Files:</strong>
+<a href="https://github.com/deftio/xelp/tree/master/examples/esp32c6-wifi"><code>examples/esp32c6-wifi/</code></a></p>
+
+<p>Dual-instance demo for the Seeed XIAO ESP32-C6: one CLI on USB Serial,
+one on BLE (Nordic UART Service).  WiFi commands for scanning and connecting.
+Includes a Web Bluetooth terminal in <code>web/index.html</code>.</p>
+
+<h3>Commands</h3>
+<ul>
+  <li><code>help</code> &mdash; list commands</li>
+  <li><code>ssid &lt;name&gt;</code> / <code>wifipass &lt;pw&gt;</code> &mdash; set WiFi credentials</li>
+  <li><code>connect</code> / <code>disconnect</code> &mdash; manage WiFi</li>
+  <li><code>status</code> &mdash; show WiFi and BLE status</li>
+  <li><code>led &lt;0|1&gt;</code> / <code>adc</code> &mdash; hardware control</li>
+</ul>
+
+<!-- ============================================================ -->
+
+<h2 id="esp32-ble-cli">ESP32 BLE CLI</h2>
+
+<p><strong>Files:</strong>
+<a href="https://github.com/deftio/xelp/tree/master/examples/esp32-ble-cli"><code>examples/esp32-ble-cli/</code></a></p>
+
+<p>Dual-instance CLI demo for any BLE-capable ESP32 (ESP32, ESP32-S3,
+ESP32-C3, ESP32-C6, ESP32-H2).  One xelp instance on USB Serial, one on
+BLE (Nordic UART Service), both sharing the same command table.  Includes
+a Web Bluetooth terminal, Makefile, and cross-instance messaging.</p>
+
+<h3>Commands</h3>
+<ul>
+  <li><code>help</code> / <code>?</code> &mdash; list commands</li>
+  <li><code>info</code> &mdash; app version, board type, uptime, xelp version</li>
+  <li><code>led &lt;0|1&gt;</code> &mdash; built-in LED (auto-detects RGB NeoPixel)</li>
+  <li><code>rgb &lt;r&gt; &lt;g&gt; &lt;b&gt;</code> &mdash; set RGB LED color (boards with NeoPixel)</li>
+  <li><code>setpin</code> / <code>getpin</code> / <code>pinmode</code> &mdash; digital I/O</li>
+  <li><code>setpwm</code> / <code>readadc</code> &mdash; analog I/O</li>
+  <li><code>status</code> &mdash; Serial, BLE, LED type, uptime</li>
+  <li><code>sendmsg &lt;serial|ble&gt; &lt;text&gt;</code> &mdash; cross-instance messaging</li>
+  <li><code>reboot</code> &mdash; software reset</li>
+</ul>
+
+<h3>Architecture</h3>
+
+<pre><code>USB Serial                          BLE (Nordic UART Service)
+    |                                       |
+    v                                       v
+XelpParseKey(&amp;cliSerial, ch)     XelpParseKey(&amp;cliBle, ch)
+    |                                       |
+    +------ shared command table -----------+
+    |                                       |
+    v                                       v
+serialOut(char c)                  bleOut(char c)
+ -> Serial.write()                  -> bleTxBuf[] -> drip-feed notify()
+</code></pre>
+
+<p>Both instances share a single <code>XELPCLIFuncMapEntry[]</code> command table
+but have separate output functions, buffers, and history state.
+Cross-instance messaging is supported via <code>sendmsg</code>.</p>
 
 <!-- ============================================================ -->
 

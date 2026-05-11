@@ -12,7 +12,12 @@ example source code is in the `examples/` directory of the repository.
 | [Posix simple](#posix-simple) | Linux / macOS | Full interactive demo with ncurses |
 | [Arduino](#arduino) | Any Arduino board | LED control, token listing via CLI |
 | [Arduino C++](#arduino-cpp) | Any Arduino board | C++ wrapper class for easy integration |
+| [Arduino Live CLI](#arduino-live-cli) | Any Arduino board | Full hardware CLI: GPIO, ADC, PWM, tone, pulse |
 | [ESP32 WiFi](#esp32-wifi) | ESP32 | WiFi config, time and weather fetch via CLI |
+| [ESP32-C6 WiFi + BLE](#esp32c6-wifi) | ESP32-C6 | Dual-instance Serial + BLE with WiFi |
+| [ESP32 BLE CLI](#esp32-ble-cli) | Any ESP32 with BLE | Dual-instance Serial + BLE, Web Bluetooth terminal |
+| [Pico CLI (C)](#pico-cli) | Raspberry Pi Pico | GPIO, ADC, PWM over USB serial (Pico SDK) |
+| [Pico CLI (Arduino)](#pico-cli-arduino) | Raspberry Pi Pico | C++ Easy API with lambdas |
 | [Scripting](#scripting) | Linux / macOS | Batch scripting vs interactive mode |
 
 ## Bare metal
@@ -218,6 +223,79 @@ APIs (worldtimeapi.org and open-meteo.com). No API keys needed.
 - `status` -- show WiFi status, IP, RSSI
 - `time` -- fetch current time
 - `weather <lat> <lon>` -- fetch weather for coordinates
+
+## Arduino Live CLI
+
+**File:** `examples/arduino-live-cli/arduino-live-cli.ino`
+
+Full interactive hardware CLI using the C++ wrapper. Over 15 commands for
+GPIO, ADC, PWM, tone generation, pulse width measurement, and pin scanning.
+Works on any Arduino-compatible board (AVR, ARM, ESP32, RP2040).
+
+### Commands
+
+- `help` / `?` -- list all commands
+- `setpin <pin> <0|1>` / `getpin <pin>` -- digital I/O
+- `pinmode <pin> <in|out|pullup>` -- configure direction
+- `setpwm <pin> <0-255>` / `readadc <pin>` -- analog I/O
+- `tone <pin> <freq>` / `notone <pin>` -- tone generation
+- `pulsein <pin>` -- measure pulse width
+- `scanpins <start> <end>` -- scan GPIO states
+- `reboot` -- software reset
+
+## ESP32-C6 WiFi + BLE
+
+**Files:** `examples/esp32c6-wifi/`
+
+Dual-instance demo for Seeed XIAO ESP32-C6: one CLI on USB Serial, one on
+BLE (Nordic UART Service). WiFi commands for scanning and connecting.
+Includes Web Bluetooth terminal in `web/index.html`.
+
+## ESP32 BLE CLI
+
+**Files:** `examples/esp32-ble-cli/`
+
+Dual-instance CLI for any BLE-capable ESP32. One xelp instance on USB
+Serial, one on BLE (Nordic UART Service), both sharing the same command
+table. Demonstrates zero-dynamic-memory multi-instance CLI over two
+different transports with cross-instance messaging.
+
+### Key features
+
+- Drip-feed BLE notification pacing (one 20-byte chunk per connection interval)
+- Cross-instance messaging (`sendmsg serial|ble <text>`)
+- RGB NeoPixel LED support with automatic LDO2 power enable
+- Web Bluetooth terminal (`web/index.html`) for Chrome/Edge
+- App version tracking in `info` command
+
+### Commands
+
+- `help` / `?`, `banner`, `echo`, `info`
+- `led <0|1>`, `rgb <r> <g> <b>` -- LED control
+- `setpin`, `getpin`, `pinmode`, `setpwm`, `readadc` -- GPIO/analog
+- `status`, `sendmsg <serial|ble> <text>`, `reboot`
+
+## Pico CLI (C)
+
+**Files:** `examples/pico-cli/`
+
+Pure C example for Raspberry Pi Pico / Pico W / Pico 2 using the Pico SDK.
+Controls GPIO, ADC, and PWM over USB CDC serial. Automatically detects Pico W
+boards and uses the CYW43 driver for the wireless-chip LED.
+
+```bash
+mkdir build && cd build
+cmake -DPICO_BOARD=pico ..   # or pico_w, pico2, pico2_w
+make
+```
+
+## Pico CLI (Arduino)
+
+**Files:** `examples/pico-cli-arduino/`
+
+Showcases the C++ Easy API on Raspberry Pi Pico using the Arduino-Pico core.
+Commands registered with `commands({...})` -- no static tables, no raw `XELP*`
+pointers. Lambda callbacks receive `XelpCLI&`, `argc`, and `argv`.
 
 ## Scripting
 

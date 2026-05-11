@@ -17,7 +17,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libncurses-dev
+          sudo apt-get install -y libncurses-dev cppcheck
 
       - name: Extract version from xelp.h
         id: version
@@ -39,6 +39,9 @@ jobs:
             echo "ERROR: Tag $TAG_VER does not match XELP_VERSION $SRC_VER in src/xelp.h"
             exit 1
           fi
+
+      - name: Lint (cppcheck static analysis)
+        run: make lint
 
       - name: Validate (tests + examples, -Werror)
         run: make validate
@@ -83,3 +86,41 @@ jobs:
           body_path: /tmp/release_notes.md
           draft: false
           prerelease: false
+
+  pio-publish:
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install PlatformIO
+        run: pip install platformio
+
+      - name: Publish to PlatformIO registry
+        run: pio pkg publish . --no-interactive
+        env:
+          PLATFORMIO_AUTH_TOKEN: ${{ secrets.PLATFORMIO_AUTH_TOKEN }}
+
+  idf-publish:
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install idf-component-manager
+        run: pip install idf-component-manager
+
+      - name: Pack and upload to ESP-IDF Component Registry
+        run: |
+          compote component pack --name xelp
+          compote component upload --name xelp
+        env:
+          IDF_COMPONENT_API_TOKEN: ${{ secrets.IDF_COMPONENT_API_TOKEN }}

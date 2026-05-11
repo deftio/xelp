@@ -381,15 +381,48 @@ do_push_branch() {
             echo "  Branch is $behind commit(s) behind origin/master."
             echo "  Merging origin/master..."
             if ! run_cmd git merge origin/master --no-edit; then
-                fail "Merge conflict. Resolve manually and re-run.
+                # Check if all conflicted files are pipeline-managed.
+                # If so, auto-resolve by keeping ours (the feature branch
+                # already has the correct version from do_sync_manifests).
+                local conflicted
+                conflicted=$(git diff --name-only --diff-filter=U)
+                local all_known=true
+                while IFS= read -r cfile; do
+                    [ -z "$cfile" ] && continue
+                    local found=false
+                    for known in $PIPELINE_FILES; do
+                        if [ "$cfile" = "$known" ]; then
+                            found=true
+                            break
+                        fi
+                    done
+                    if ! $found; then
+                        all_known=false
+                        break
+                    fi
+                done <<< "$conflicted"
+
+                if $all_known && [ -n "$conflicted" ]; then
+                    echo "  Auto-resolving pipeline file conflicts (keeping ours)..."
+                    while IFS= read -r cfile; do
+                        [ -z "$cfile" ] && continue
+                        run_cmd git checkout --ours "$cfile"
+                        run_cmd git add "$cfile"
+                    done <<< "$conflicted"
+                    run_cmd git commit --no-edit
+                    pass "Auto-resolved pipeline file conflicts and completed merge."
+                else
+                    fail "Merge conflict in non-pipeline files. Resolve manually and re-run.
   Commands to resolve:
     git status                       # see conflicted files
     # ... edit and fix conflicts ...
     git add <resolved-files>
     git commit
     bash tools/make_release.sh       # re-run"
+                fi
+            else
+                pass "Merged origin/master into $BRANCH."
             fi
-            pass "Merged origin/master into $BRANCH."
         fi
     fi
 
@@ -910,25 +943,15 @@ if [ "$MODE" = "validate" ]; then
 fi
 
 # -- Full release flow --
+do_sync_manifests
+do_update_badges
 do_crossbuild
 do_commit_pipeline_changes
 do_check_git
-do_sync_manifests
-do_update_badges
-
-# Auto-commit manifest and badge updates (if any files were staged)
-if [ -n "$(git diff --cached --name-only)" ]; then
-    step_header "Commit manifest and badge updates"
-    run_cmd git commit -m "Sync manifests and badges for $VER_STRING"
-    pass "Committed version sync changes."
-fi
 
 if $TAG_EXISTS; then
     # Re-run: tag exists but release doesn't -- just wait for it
     do_wait_release
-    do_pio_publish
-    do_idf_publish
-    do_done
 else
     do_push_branch
     do_open_pr
@@ -938,7 +961,16 @@ else
     do_verify_master
     do_tag
     do_wait_release
+fi
+
+# Publish to package registries
+if [ "$MODE" = "release-local" ]; then
     do_pio_publish
     do_idf_publish
-    do_done
+else
+    echo ""
+    echo "  PIO and ESP-IDF publishing is handled by CI (release.yml)."
+    echo "  To publish locally instead, re-run with --release-local."
 fi
+
+do_done
