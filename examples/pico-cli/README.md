@@ -33,9 +33,14 @@ cmake -DPICO_BOARD=pico ..    # or pico_w, pico2, pico2_w
 make
 
 # Flash xelp_pico_cli.uf2 via USB bootloader
-```
+# Hold BOOTSEL, plug in USB, copy .uf2 to the mounted drive:
+cp xelp_pico_cli.uf2 /Volumes/RP2350/   # macOS
+# cp xelp_pico_cli.uf2 /media/$USER/RP2350/  # Linux
 
-Open a serial terminal at 115200 baud after flashing.
+# Serial monitor
+screen /dev/tty.usbmodem* 115200         # macOS
+# screen /dev/ttyACM0 115200             # Linux
+```
 
 ## Pico W LED
 

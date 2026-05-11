@@ -5,16 +5,47 @@ and play tones from any serial terminal.
 
 ## Requirements
 
-- Any Arduino board with a Serial port (Uno, Nano, Mega 2560, Leonardo, etc.)
-- Arduino IDE 1.8+ or Arduino Cloud
+- Any Arduino board with a Serial port (Uno, Nano, Mega 2560, Leonardo,
+  Raspberry Pi Pico / Pico 2, ESP32, etc.)
+- Arduino IDE 1.8+, Arduino Cloud, arduino-cli, or PlatformIO
 
-## Quick start
+## Quick start (Arduino IDE)
 
 1. Open `arduino-live-cli.ino` in the Arduino IDE
 2. Select your board and port
 3. Upload
 4. Open Serial Monitor at **115200 baud**
 5. Type `help` (or just `?`)
+
+## Quick start (arduino-cli)
+
+```bash
+# Compile (substitute the FQBN for your board):
+arduino-cli compile --fqbn rp2040:rp2040:rpipico2 --library path/to/xelp/src .
+
+# Upload via serial port:
+arduino-cli upload --fqbn rp2040:rp2040:rpipico2 -p /dev/ttyACM0 .
+
+# Or for RP2040/RP2350 boards: copy the UF2 file directly.
+# Hold BOOTSEL, plug in USB, then:
+cp build/rp2040.rp2040.rpipico2/arduino-live-cli.ino.uf2 /Volumes/RP2350/
+```
+
+Common FQBNs:
+
+| Board | FQBN |
+|-------|------|
+| Raspberry Pi Pico 2 | `rp2040:rp2040:rpipico2` |
+| Raspberry Pi Pico | `rp2040:rp2040:rpipico` |
+| Arduino Mega 2560 | `arduino:avr:mega` |
+| Arduino Uno | `arduino:avr:uno` |
+| ESP32 Dev Module | `esp32:esp32:esp32` |
+
+## Quick start (PlatformIO)
+
+Install xelp from the PlatformIO registry (`pio pkg install -l xelp`),
+copy `arduino-live-cli.ino` into your project's `src/` directory, and
+build normally with `pio run`.
 
 ## Commands
 
@@ -30,18 +61,22 @@ and play tones from any serial terminal.
 | `pinmode` | `pinmode <pin> <in\|out\|pullup>` | Configure pin direction |
 | `setpwm` | `setpwm <pin> <0-255>` | `analogWrite` -- set PWM duty cycle |
 | `readadc` | `readadc <pin>` | `analogRead` -- print 0-1023 |
-| `tone` | `tone <pin> <hz> [ms]` | Play a frequency on a buzzer/speaker |
-| `notone` | `notone <pin>` | Stop tone output |
-| `pulsein` | `pulsein <pin> <high\|low> [timeout]` | Measure pulse width (microseconds) |
+| `tone` | `tone <pin> <hz> [ms]` | Play a frequency on a buzzer/speaker * |
+| `notone` | `notone <pin>` | Stop tone output * |
+| `pulsein` | `pulsein <pin> <high\|low> [timeout]` | Measure pulse width (microseconds) * |
 | `delay` | `delay <ms>` | Pause for N milliseconds |
 | `millis` | `millis` | Print uptime in milliseconds |
-| `micros` | `micros` | Print uptime in microseconds |
-| `scanpins` | `scanpins [first] [last]` | Read all digital pins in range |
-| `setprompt` | `setprompt <text>` | Change the CLI prompt string |
-| `demo-blink3` | `demo-blink3` | Blink LED 3x -- scripting demo |
-| `demo-scan` | `demo-scan` | Configure + scan pins -- scripting demo |
-| `demo-info` | `demo-info` | Chain info commands -- scripting demo |
+| `micros` | `micros` | Print uptime in microseconds * |
+| `scanpins` | `scanpins [first] [last]` | Read all digital pins in range * |
+| `demo-blink3` | `demo-blink3` | Blink LED 3x -- scripting demo * |
+| `demo-scan` | `demo-scan` | Configure + scan pins -- scripting demo * |
+| `demo-info` | `demo-info` | Chain info commands -- scripting demo * |
 | `reboot` | `reboot` | Software reset (AVR / ESP32) |
+
+Commands marked with **\*** are excluded on ATmega328P/168 boards (see
+notes below).
+
+Unrecognized commands print an error: `foo: unknown command`.
 
 ## Command history
 
@@ -76,3 +111,6 @@ the box.  For the full demo, connect:
   On other platforms it prints an error.
 - Free SRAM reporting is AVR-only; other platforms show xelp version
   and uptime only.
+- **ATmega328P / ATmega168** (Uno, Nano): a reduced command set is
+  compiled automatically (`XELP_SMALL_TARGET`).  Commands marked with
+  **\*** in the table above are excluded to fit within 2 KB SRAM.

@@ -319,7 +319,7 @@ Docker cross-compilation (`tools/Dockerfile.crossbuild`):
 xelp/
   src/            xelp.c, xelp.h, xelpcfg.h (the library -- add these to your project)
   tests/          unit tests (jumpbug framework), fuzz harnesses, 100% coverage
-  examples/       POSIX ncurses, Arduino, C++ wrapper, bare-metal, scripting, ESP32 Wi-Fi
+  examples/       POSIX ncurses, Arduino, C++ wrapper, bare-metal, scripting, ESP32 Wi-Fi/BLE, Pico
   tools/          cross-build scripts, release script, banner generator
   docs/           API reference, configuration guide, porting guide
   pages/          GitHub Pages site
@@ -359,8 +359,8 @@ what we welcome, branch model, and the release process.
 If you use AI coding agents (Claude Code, Cursor, Copilot, etc.), xelp
 provides machine-readable context files for accurate code generation:
 
-- [AGENTS.md](AGENTS.md) -- concise coding reference: function signatures, setup patterns, common mistakes
-- [llms.txt](llms.txt) -- project overview and documentation index ([llmstxt.org](https://llmstxt.org) format)
+- [AGENTS.md](AGENTS.md) -- comprehensive coding reference: architecture, function signatures, parser internals, setup patterns, testing, common mistakes
+- [llms.txt](llms.txt) -- project overview and full documentation index ([llmstxt.org](https://llmstxt.org) format)
 
 ## License
 

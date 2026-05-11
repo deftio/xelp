@@ -312,6 +312,10 @@ Variable packing format:
   010 = integer (sizeof int)
   011 = float32 in 8.24 format
   111 = extended form (future)
+  
+[byte1..name_len] # string name of variable, if applicable
+[if string size of var content] # if str or array this is a 2 byte size, other wise its the beginning of the value bytes
+[bytes : variable content]  # if string or array will be size bytes long
 ```
 
 ## Namespace hierarchy

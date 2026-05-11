@@ -21,7 +21,25 @@ ln -s ../../src/xelpcfg.h .
 ln -s ../../src/XelpArduino.h .
 ```
 
+### Arduino IDE
+
 Open `pico-cli-arduino.ino` in the Arduino IDE and upload.
+
+### arduino-cli
+
+```bash
+# List connected boards to find your port and FQBN
+arduino-cli board list
+
+# Compile (replace FQBN with your board)
+arduino-cli compile --fqbn rp2040:rp2040:rpipico examples/pico-cli-arduino
+
+# Upload
+arduino-cli upload --fqbn rp2040:rp2040:rpipico -p /dev/ttyACM0 examples/pico-cli-arduino
+
+# Serial monitor
+arduino-cli monitor -p /dev/ttyACM0 -c baudrate=115200
+```
 
 ## Commands
 

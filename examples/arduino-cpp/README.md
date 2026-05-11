@@ -12,9 +12,27 @@ C-style static command table. Eliminates boilerplate: no manual
 
 ## Setup
 
+### Arduino IDE
+
 1. Open `arduino-cpp.ino` in the Arduino IDE.
 2. Select your board and port.
 3. Upload and open the Serial Monitor at **115200 baud**.
+
+### arduino-cli
+
+```bash
+# List connected boards to find your port and FQBN
+arduino-cli board list
+
+# Compile (replace FQBN with your board)
+arduino-cli compile --fqbn arduino:avr:uno examples/arduino-cpp
+
+# Upload
+arduino-cli upload --fqbn arduino:avr:uno -p /dev/ttyACM0 examples/arduino-cpp
+
+# Serial monitor
+arduino-cli monitor -p /dev/ttyACM0 -c baudrate=115200
+```
 
 ## Commands
 

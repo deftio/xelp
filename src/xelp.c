@@ -46,13 +46,26 @@ static void _xelp_putc(XELP *ths, char c) {
 #define _PUTC(c)    _xelp_putc(ths, (c))
 #define _XOUTC(x,c) _xelp_putc((x), (c))
 
+#ifdef XELP_ENABLE_CLI
 static void _xelp_echo(XELP *ths, char c) {
     if (!ths->mOutEnable || !ths->mpfOut) return;
     if (ths->mEchoChar == XELP_ECHO_NORMAL)   ths->mpfOut(c);
     else if (ths->mEchoChar != XELP_ECHO_OFF) ths->mpfOut(ths->mEchoChar);
 }
 #define _ECHO(c)    _xelp_echo(ths, (c))
+#endif
 
+/* Enter key test for interactive mode — respects XELP_ENTER_CR / XELP_ENTER_LF
+   from xelpcfg.h.  Only used in XelpParseKey; script parsing is unaffected. */
+#if defined(XELP_ENTER_CR) && defined(XELP_ENTER_LF)
+#define _XELP_IS_ENTER(ch) ((ch) == '\n' || (ch) == '\r')
+#elif defined(XELP_ENTER_CR)
+#define _XELP_IS_ENTER(ch) ((ch) == '\r')
+#else
+#define _XELP_IS_ENTER(ch) ((ch) == '\n')
+#endif
+
+#if defined(XELP_ENABLE_CLI) && defined(XELP_ENABLE_LINE_EDIT)
 static void _xelp_cursor(XELP *ths, char c) {
     if (ths->mEchoChar != XELP_ECHO_OFF && ths->mOutEnable && ths->mpfOut)
         ths->mpfOut(c);
@@ -75,6 +88,7 @@ static void _xelp_memmove(char *dst, const char *src, int n) {
         while (src > e) *--dst = *--src;
     }
 }
+#endif
 
 /*****************************************
  _xelpKeyAccum() - key-input accumulator state machine.
@@ -268,7 +282,7 @@ static void _xelpHistRecall(XELP *ths, int dir) {
 }
 #endif /* XELP_ENABLE_CLI && XELP_ENABLE_LINE_EDIT && XELP_ENABLE_HISTORY */
 
-#ifdef XELP_ENABLE_HELP
+#if defined(XELP_ENABLE_HELP) && defined(XELP_ENABLE_KEY)
 /*****************************************
  _xelpPrintKeyName() - print human-readable name for a keycode in help output
  */
@@ -345,7 +359,7 @@ XELPRESULT XelpHelp(XELP* ths)
 		XelpOut(ths,XELP_HELP_KEY_STR,x);
 		do 	{
 			_xelpPrintKeyName(ths, e->mKey);
-			_PUTC(':');
+			_PUTC('\t');
 			XelpOut(ths,e->mpHelpString,x);
 			_PUTC('\n');
 			e++;
@@ -357,8 +371,8 @@ XELPRESULT XelpHelp(XELP* ths)
 		XelpOut(ths,XELP_HELP_CLI_STR,x);
 		do	{
 			XelpOut(ths,s->mpCmd,x);
-			_PUTC(':');
-			XelpOut(ths,s->mpHelpString,x);			
+			_PUTC('\t');
+			XelpOut(ths,s->mpHelpString,x);
 			_PUTC('\n');	
 			s++;	
 		} while (s->mFunPtr);
@@ -1007,7 +1021,7 @@ XELPRESULT XelpParseKey (XELP *ths, char key)
 							_CURSOR('\b');
 							_xelpRedrawFromCursor(ths);
 						}
-					} else if (ch == XELPKEY_ENTER) {
+					} else if (_XELP_IS_ENTER(ch)) {
 						_xelpHandleEnter(ths);
 					} else if (ch >= 0x20 && ch <= 0x7E) {
 						/* printable character */
@@ -1045,7 +1059,7 @@ XELPRESULT XelpParseKey (XELP *ths, char key)
 							if (ths->mpfBksp)
 								ths->mpfBksp();
 						}
-					} else if (ch == XELPKEY_ENTER) {
+					} else if (_XELP_IS_ENTER(ch)) {
 						_xelpHandleEnter(ths);
 					} else {
 						_ECHO(ch);

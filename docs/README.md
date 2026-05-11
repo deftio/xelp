@@ -12,6 +12,11 @@ Detailed documentation for the xelp embedded CLI/script interpreter library.
 - [Porting Guide](porting.md) -- How to integrate xelp on your target platform
 - [Testing Guide](testing.md) -- JumpBug test framework reference
 
+## AI / LLM Integration
+
+- [AGENTS.md](../AGENTS.md) -- Comprehensive coding reference for AI agents: function signatures, parser internals, setup patterns, testing, common mistakes
+- [llms.txt](../llms.txt) -- Project overview and documentation index ([llmstxt.org](https://llmstxt.org) format)
+
 ## Quick Links
 
 - [Source code](https://github.com/deftio/xelp)

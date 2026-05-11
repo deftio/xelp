@@ -134,9 +134,11 @@ async function bleConnect() {
       var val = e.target.value;
       var text = '';
       for (var i = 0; i < val.byteLength; i++) {
-        text += String.fromCharCode(val.getUint8(i));
+        var ch = val.getUint8(i);
+        if (ch !== 0x0D) /* strip \r */
+          text += String.fromCharCode(ch);
       }
-      termWrite(text);
+      if (text) termWrite(text);
     });
 
     setConnected(true);
