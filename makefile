@@ -13,7 +13,7 @@ BUILD_DIR=build
 INCLUDES=\
     -I$(LIB_DIR)\
 
-.PHONY: help tests clean clean-all coverage version fuzz fuzz-parsekey fuzz-parse examples example validate prerelease funcsizes sizes lint
+.PHONY: help tests clean clean-all coverage version fuzz fuzz-parsekey fuzz-parse fuzz-buf2argv examples example validate prerelease funcsizes sizes lint
 
 #=======================================================================
 # Default target: print available targets
@@ -85,6 +85,8 @@ examples:
 	$(MAKE) -C examples/posix-simple-cpp BUILD_DIR=../../build/examples/posix-simple-cpp build
 	@echo "--- Building scripting ---"
 	$(MAKE) -C examples/scripting BUILD_DIR=../../build/examples/scripting build
+	@echo "--- Building posix-argv ---"
+	$(MAKE) -C examples/posix-argv BUILD_DIR=../../build/examples/posix-argv build
 	@echo "--- All examples built ---"
 
 # Build and run the posix ncurses demo (interactive)
@@ -101,7 +103,7 @@ lint:
 			--error-exitcode=1 \
 			--suppress=missingIncludeSystem \
 			-I src \
-			src/ examples/posix-simple/ examples/scripting/; \
+			src/ examples/posix-simple/ examples/scripting/ examples/posix-argv/; \
 		echo "--- cppcheck: examples (C++) ---"; \
 		cppcheck --enable=warning,performance,portability \
 			--error-exitcode=1 \
@@ -156,7 +158,13 @@ fuzz-parse: | $(BUILD_DIR)
 	@mkdir -p $(FUZZ_DIR)/corpus_parse
 	$(BUILD_DIR)/fuzz_parse $(FUZZ_DIR)/corpus_parse -max_total_time=$(FUZZ_TIME)
 
-fuzz: fuzz-parsekey fuzz-parse
+fuzz-buf2argv: | $(BUILD_DIR)
+	$(FUZZ_CC) $(FUZZ_FLAGS) $(LIB_DIR)/xelp.c $(FUZZ_DIR)/fuzz_buf2argv.c \
+		-o $(BUILD_DIR)/fuzz_buf2argv
+	@mkdir -p $(FUZZ_DIR)/corpus_buf2argv
+	$(BUILD_DIR)/fuzz_buf2argv $(FUZZ_DIR)/corpus_buf2argv -max_total_time=$(FUZZ_TIME)
+
+fuzz: fuzz-parsekey fuzz-parse fuzz-buf2argv
 
 #=======================================================================
 # Per-function compiled sizes (x86-32 and ARM32 if available)
@@ -179,4 +187,5 @@ clean-all: clean
 	-$(MAKE) -C examples/posix-simple BUILD_DIR=../../build/examples/posix-simple clean
 	-$(MAKE) -C examples/posix-simple-cpp BUILD_DIR=../../build/examples/posix-simple-cpp clean
 	-$(MAKE) -C examples/scripting BUILD_DIR=../../build/examples/scripting clean
+	-$(MAKE) -C examples/posix-argv BUILD_DIR=../../build/examples/posix-argv clean
 

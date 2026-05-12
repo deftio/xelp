@@ -4804,6 +4804,528 @@ XELPRESULT test_HistoryAndEcho() {
 
 #endif /* XELP_ENABLE_LINE_EDIT && XELP_ENABLE_HISTORY */
 
+/* ====================================================================
+ test_XelpBuf2Argv() - opt-in argc/argv tokenizer
+ */
+XELPRESULT test_XelpBuf2Argv() {
+    XELP x;
+    char *argv[XELP_ARGV_MAX];
+    int argc;
+    XELPRESULT r;
+    int val;
+    const char *s;
+    int slen;
+
+    XelpInit(&x, "b2a");
+
+    /* 1. Basic: "echo hello" -> argc=2 */
+    {
+        char buf[] = "echo hello";
+        r = XelpBuf2Argv(&x, buf, XelpStrLen(buf), &argc, argv, XELP_ARGV_MAX);
+        if (JB_ASSERT(r != XELP_S_OK || argc != 2, "B2A basic argc"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(XelpStrEq(argv[0], XelpStrLen(argv[0]), "echo") != XELP_S_OK, "B2A argv[0]"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(XelpStrEq(argv[1], XelpStrLen(argv[1]), "hello") != XELP_S_OK, "B2A argv[1]"))
+            return XELP_E_ERR;
+    }
+
+    /* 2. Multiple args: "divmod 10 3" -> argc=3 */
+    {
+        char buf[] = "divmod 10 3";
+        r = XelpBuf2Argv(&x, buf, XelpStrLen(buf), &argc, argv, XELP_ARGV_MAX);
+        if (JB_ASSERT(r != XELP_S_OK || argc != 3, "B2A multi argc"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(XelpStrEq(argv[0], XelpStrLen(argv[0]), "divmod") != XELP_S_OK, "B2A multi argv0"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(XelpStrEq(argv[1], XelpStrLen(argv[1]), "10") != XELP_S_OK, "B2A multi argv1"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(XelpStrEq(argv[2], XelpStrLen(argv[2]), "3") != XELP_S_OK, "B2A multi argv2"))
+            return XELP_E_ERR;
+    }
+
+    /* 3. Quoted string: "echo \"hello world\"" -> argv[1]="hello world" */
+    {
+        char buf[] = "echo \"hello world\"";
+        r = XelpBuf2Argv(&x, buf, XelpStrLen(buf), &argc, argv, XELP_ARGV_MAX);
+        if (JB_ASSERT(r != XELP_S_OK || argc != 2, "B2A quoted argc"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(XelpStrEq(argv[1], XelpStrLen(argv[1]), "hello world") != XELP_S_OK, "B2A quoted"))
+            return XELP_E_ERR;
+    }
+
+    /* 4. Escape in quotes: \n -> 0x0A */
+    {
+        char buf[] = "echo \"line1\\nline2\"";
+        r = XelpBuf2Argv(&x, buf, XelpStrLen(buf), &argc, argv, XELP_ARGV_MAX);
+        if (JB_ASSERT(r != XELP_S_OK || argc != 2, "B2A esc-n argc"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(argv[1][5] != 0x0A, "B2A esc-n char"))
+            return XELP_E_ERR;
+    }
+
+    /* 5. Tab escape: \t -> 0x09 */
+    {
+        char buf[] = "echo \"col1\\tcol2\"";
+        r = XelpBuf2Argv(&x, buf, XelpStrLen(buf), &argc, argv, XELP_ARGV_MAX);
+        if (JB_ASSERT(r != XELP_S_OK || argc != 2, "B2A esc-t argc"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(argv[1][4] != 0x09, "B2A esc-t char"))
+            return XELP_E_ERR;
+    }
+
+    /* 6. Backslash escape: \\\\ -> single backslash */
+    {
+        char buf[] = "echo \"path\\\\file\"";
+        r = XelpBuf2Argv(&x, buf, XelpStrLen(buf), &argc, argv, XELP_ARGV_MAX);
+        if (JB_ASSERT(r != XELP_S_OK || argc != 2, "B2A esc-bs argc"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(argv[1][4] != '\\', "B2A esc-bs char"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(XelpStrLen(argv[1]) != 9, "B2A esc-bs len"))
+            return XELP_E_ERR;
+    }
+
+    /* 7. Quote escape: say \"hi\" */
+    {
+        char buf[] = "echo \"say \\\"hi\\\"\"";
+        r = XelpBuf2Argv(&x, buf, XelpStrLen(buf), &argc, argv, XELP_ARGV_MAX);
+        if (JB_ASSERT(r != XELP_S_OK || argc != 2, "B2A esc-q argc"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(argv[1][4] != '"' || argv[1][7] != '"', "B2A esc-q chars"))
+            return XELP_E_ERR;
+    }
+
+    /* 8. CLI escape (backtick): echo `; -> argv[1]=";" */
+    {
+        char buf[] = "echo `;";
+        r = XelpBuf2Argv(&x, buf, XelpStrLen(buf), &argc, argv, XELP_ARGV_MAX);
+        if (JB_ASSERT(r != XELP_S_OK || argc != 2, "B2A cli-esc argc"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(argv[1][0] != ';', "B2A cli-esc char"))
+            return XELP_E_ERR;
+    }
+
+    /* 9. Empty input -> argc=0 */
+    {
+        r = XelpBuf2Argv(&x, "", 0, &argc, argv, XELP_ARGV_MAX);
+        if (JB_ASSERT(r != XELP_S_OK || argc != 0, "B2A empty"))
+            return XELP_E_ERR;
+    }
+
+    /* 10. Whitespace only -> argc=0 */
+    {
+        char buf[] = "   ";
+        r = XelpBuf2Argv(&x, buf, XelpStrLen(buf), &argc, argv, XELP_ARGV_MAX);
+        if (JB_ASSERT(r != XELP_S_OK || argc != 0, "B2A whitespace"))
+            return XELP_E_ERR;
+    }
+
+    /* 11. Semicolon terminator: stops at ; */
+    {
+        char buf[] = "echo hi; echo bye";
+        r = XelpBuf2Argv(&x, buf, XelpStrLen(buf), &argc, argv, XELP_ARGV_MAX);
+        if (JB_ASSERT(r != XELP_S_OK || argc != 2, "B2A semi argc"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(XelpStrEq(argv[1], XelpStrLen(argv[1]), "hi") != XELP_S_OK, "B2A semi stops"))
+            return XELP_E_ERR;
+    }
+
+    /* 12. Comment terminator: stops at # */
+    {
+        char buf[] = "echo hi # comment";
+        r = XelpBuf2Argv(&x, buf, XelpStrLen(buf), &argc, argv, XELP_ARGV_MAX);
+        if (JB_ASSERT(r != XELP_S_OK || argc != 2, "B2A hash argc"))
+            return XELP_E_ERR;
+    }
+
+    /* 13. Too many args: maxargs=2 with 3 args -> XELP_E_ERR */
+    {
+        char buf[] = "a b c";
+        r = XelpBuf2Argv(&x, buf, XelpStrLen(buf), &argc, argv, 2);
+        if (JB_ASSERT(r != XELP_E_ERR, "B2A too many"))
+            return XELP_E_ERR;
+    }
+
+    /* 14. Input too long: len >= XELP_CMDBUFSZ -> XELP_E_ERR */
+    {
+        r = XelpBuf2Argv(&x, "x", XELP_CMDBUFSZ, &argc, argv, XELP_ARGV_MAX);
+        if (JB_ASSERT(r != XELP_E_ERR, "B2A too long"))
+            return XELP_E_ERR;
+    }
+
+    /* 15. Single arg (command only): "help" -> argc=1 */
+    {
+        char buf[] = "help";
+        r = XelpBuf2Argv(&x, buf, XelpStrLen(buf), &argc, argv, XELP_ARGV_MAX);
+        if (JB_ASSERT(r != XELP_S_OK || argc != 1, "B2A single"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(XelpStrEq(argv[0], XelpStrLen(argv[0]), "help") != XELP_S_OK, "B2A single val"))
+            return XELP_E_ERR;
+    }
+
+    /* 16. Tab as whitespace: "echo\thello" -> argc=2 */
+    {
+        char buf[] = "echo\thello";
+        r = XelpBuf2Argv(&x, buf, XelpStrLen(buf), &argc, argv, XELP_ARGV_MAX);
+        if (JB_ASSERT(r != XELP_S_OK || argc != 2, "B2A tab ws"))
+            return XELP_E_ERR;
+    }
+
+    /* 17. Script mode: args NOT in mCmdMsgBuf (external buffer) */
+    {
+        XELP x2;
+        XelpInit(&x2, "script");
+        {
+            char ext[] = "set mode 1";
+            r = XelpBuf2Argv(&x2, ext, XelpStrLen(ext), &argc, argv, XELP_ARGV_MAX);
+            if (JB_ASSERT(r != XELP_S_OK || argc != 3, "B2A script argc"))
+                return XELP_E_ERR;
+            if (JB_ASSERT(XelpStrEq(argv[0], XelpStrLen(argv[0]), "set") != XELP_S_OK, "B2A script a0"))
+                return XELP_E_ERR;
+            if (JB_ASSERT(XelpStrEq(argv[2], XelpStrLen(argv[2]), "1") != XELP_S_OK, "B2A script a2"))
+                return XELP_E_ERR;
+        }
+    }
+
+    /* 18. XelpArgvInt basic: argv[1]="42" -> val=42 */
+    {
+        char buf[] = "cmd 42";
+        r = XelpBuf2Argv(&x, buf, XelpStrLen(buf), &argc, argv, XELP_ARGV_MAX);
+        if (JB_ASSERT(r != XELP_S_OK, "B2A ArgvInt setup"))
+            return XELP_E_ERR;
+        r = XelpArgvInt(argv, argc, 1, &val);
+        if (JB_ASSERT(r != XELP_S_OK || val != 42, "B2A ArgvInt val"))
+            return XELP_E_ERR;
+    }
+
+    /* 19. XelpArgvInt out of range: n >= argc -> XELP_E_ERR */
+    {
+        char buf[] = "cmd";
+        r = XelpBuf2Argv(&x, buf, XelpStrLen(buf), &argc, argv, XELP_ARGV_MAX);
+        if (JB_ASSERT(r != XELP_S_OK, "B2A ArgvInt oor setup"))
+            return XELP_E_ERR;
+        r = XelpArgvInt(argv, argc, 1, &val);
+        if (JB_ASSERT(r != XELP_E_ERR, "B2A ArgvInt oor"))
+            return XELP_E_ERR;
+    }
+
+    /* 20. XelpArgvStr basic: argv[1]="hello" -> s="hello", slen=5 */
+    {
+        char buf[] = "cmd hello";
+        r = XelpBuf2Argv(&x, buf, XelpStrLen(buf), &argc, argv, XELP_ARGV_MAX);
+        if (JB_ASSERT(r != XELP_S_OK, "B2A ArgvStr setup"))
+            return XELP_E_ERR;
+        r = XelpArgvStr(argv, argc, 1, &s, &slen);
+        if (JB_ASSERT(r != XELP_S_OK || slen != 5, "B2A ArgvStr len"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(XelpStrEq(s, slen, "hello") != XELP_S_OK, "B2A ArgvStr val"))
+            return XELP_E_ERR;
+    }
+
+    /* 21. CLI mode: args already in mCmdMsgBuf (in-place tokenize) */
+    {
+        XELP x2;
+        int i;
+        char *src = "set val 7";
+        int slen2 = XelpStrLen(src);
+        XelpInit(&x2, "cli");
+        for (i = 0; i < slen2; i++)
+            x2.mCmdMsgBuf[i] = src[i];
+        r = XelpBuf2Argv(&x2, x2.mCmdMsgBuf, slen2, &argc, argv, XELP_ARGV_MAX);
+        if (JB_ASSERT(r != XELP_S_OK || argc != 3, "B2A cli-mode argc"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(XelpStrEq(argv[0], XelpStrLen(argv[0]), "set") != XELP_S_OK, "B2A cli-mode a0"))
+            return XELP_E_ERR;
+    }
+
+    /* 22. Unknown escape in quotes: \x -> literal x */
+    {
+        char buf[] = "echo \"a\\xb\"";
+        r = XelpBuf2Argv(&x, buf, XelpStrLen(buf), &argc, argv, XELP_ARGV_MAX);
+        if (JB_ASSERT(r != XELP_S_OK || argc != 2, "B2A unk-esc argc"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(argv[1][1] != 'x', "B2A unk-esc char"))
+            return XELP_E_ERR;
+    }
+
+    return XELP_S_OK;
+}
+
+/* ================================================================
+   test_XelpBuf2Argv_overflow -- overflow, boundary, and stress tests
+   ================================================================ */
+XELPRESULT test_XelpBuf2Argv_overflow() {
+    XELP x;
+    char *argv[XELP_ARGV_MAX];
+    int argc;
+    XELPRESULT r;
+    int val;
+    const char *s;
+    int slen;
+    int i;
+
+    XelpInit(&x, "ovf");
+
+    /* ---- A. Buffer size boundaries ---- */
+
+    /* A1. Input len = XELP_CMDBUFSZ-1 (63) -> success, argc=1 */
+    {
+        char buf[XELP_CMDBUFSZ];
+        for (i = 0; i < XELP_CMDBUFSZ - 2; i++) buf[i] = 'A';
+        buf[XELP_CMDBUFSZ - 2] = '\0';
+        r = XelpBuf2Argv(&x, buf, XELP_CMDBUFSZ - 1, &argc, argv, XELP_ARGV_MAX);
+        if (JB_ASSERT(r != XELP_S_OK || argc != 1, "OVF A1 len=bufsz-1"))
+            return XELP_E_ERR;
+    }
+
+    /* A2. Input len = XELP_CMDBUFSZ (64) -> XELP_E_ERR */
+    {
+        char buf[XELP_CMDBUFSZ + 1];
+        for (i = 0; i < XELP_CMDBUFSZ; i++) buf[i] = 'B';
+        buf[XELP_CMDBUFSZ] = '\0';
+        r = XelpBuf2Argv(&x, buf, XELP_CMDBUFSZ, &argc, argv, XELP_ARGV_MAX);
+        if (JB_ASSERT(r != XELP_E_ERR, "OVF A2 len=bufsz"))
+            return XELP_E_ERR;
+    }
+
+    /* A3. Input len = XELP_CMDBUFSZ+1 (65) -> XELP_E_ERR */
+    {
+        char buf[XELP_CMDBUFSZ + 2];
+        for (i = 0; i < XELP_CMDBUFSZ + 1; i++) buf[i] = 'C';
+        buf[XELP_CMDBUFSZ + 1] = '\0';
+        r = XelpBuf2Argv(&x, buf, XELP_CMDBUFSZ + 1, &argc, argv, XELP_ARGV_MAX);
+        if (JB_ASSERT(r != XELP_E_ERR, "OVF A3 len=bufsz+1"))
+            return XELP_E_ERR;
+    }
+
+    /* A4. Single token filling XELP_CMDBUFSZ-2 chars -> success */
+    {
+        char buf[XELP_CMDBUFSZ];
+        for (i = 0; i < XELP_CMDBUFSZ - 2; i++) buf[i] = 'D';
+        buf[XELP_CMDBUFSZ - 2] = '\0';
+        r = XelpBuf2Argv(&x, buf, XELP_CMDBUFSZ - 2, &argc, argv, XELP_ARGV_MAX);
+        if (JB_ASSERT(r != XELP_S_OK || argc != 1, "OVF A4 token fill"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(XelpStrLen(argv[0]) != XELP_CMDBUFSZ - 2, "OVF A4 token len"))
+            return XELP_E_ERR;
+    }
+
+    /* A5. Token with leading space at exact boundary (XELP_CMDBUFSZ-1) */
+    {
+        char buf[XELP_CMDBUFSZ];
+        buf[0] = ' ';
+        for (i = 1; i < XELP_CMDBUFSZ - 1; i++) buf[i] = 'E';
+        r = XelpBuf2Argv(&x, buf, XELP_CMDBUFSZ - 1, &argc, argv, XELP_ARGV_MAX);
+        if (JB_ASSERT(r != XELP_S_OK || argc != 1, "OVF A5 lead space"))
+            return XELP_E_ERR;
+    }
+
+    /* ---- B. maxargs boundary ---- */
+
+    /* B6. Exactly XELP_ARGV_MAX tokens -> success */
+    {
+        char buf[XELP_CMDBUFSZ];
+        int pos = 0;
+        for (i = 0; i < XELP_ARGV_MAX && pos < XELP_CMDBUFSZ - 2; i++) {
+            if (i > 0) buf[pos++] = ' ';
+            buf[pos++] = (char)('a' + i);
+        }
+        buf[pos] = '\0';
+        r = XelpBuf2Argv(&x, buf, pos, &argc, argv, XELP_ARGV_MAX);
+        if (JB_ASSERT(r != XELP_S_OK || argc != XELP_ARGV_MAX, "OVF B6 exact maxargs"))
+            return XELP_E_ERR;
+    }
+
+    /* B7. XELP_ARGV_MAX+1 tokens -> XELP_E_ERR */
+    {
+        char buf[XELP_CMDBUFSZ];
+        int pos = 0;
+        for (i = 0; i < XELP_ARGV_MAX + 1 && pos < XELP_CMDBUFSZ - 2; i++) {
+            if (i > 0) buf[pos++] = ' ';
+            buf[pos++] = (char)('a' + (i % 26));
+        }
+        buf[pos] = '\0';
+        r = XelpBuf2Argv(&x, buf, pos, &argc, argv, XELP_ARGV_MAX);
+        if (JB_ASSERT(r != XELP_E_ERR, "OVF B7 maxargs+1"))
+            return XELP_E_ERR;
+    }
+
+    /* B8. maxargs=1 with 2 tokens -> XELP_E_ERR */
+    {
+        char buf[] = "one two";
+        r = XelpBuf2Argv(&x, buf, XelpStrLen(buf), &argc, argv, 1);
+        if (JB_ASSERT(r != XELP_E_ERR, "OVF B8 maxargs=1"))
+            return XELP_E_ERR;
+    }
+
+    /* B9. maxargs=0 with any input -> XELP_E_ERR */
+    {
+        char buf[] = "hello";
+        r = XelpBuf2Argv(&x, buf, XelpStrLen(buf), &argc, argv, 0);
+        if (JB_ASSERT(r != XELP_E_ERR, "OVF B9 maxargs=0"))
+            return XELP_E_ERR;
+    }
+
+    /* B10. Verify each of 8 single-char tokens has correct content */
+    {
+        char buf[] = "a b c d e f g h";
+        r = XelpBuf2Argv(&x, buf, XelpStrLen(buf), &argc, argv, XELP_ARGV_MAX);
+        if (JB_ASSERT(r != XELP_S_OK || argc != 8, "OVF B10 argc"))
+            return XELP_E_ERR;
+        for (i = 0; i < 8; i++) {
+            if (JB_ASSERT(argv[i][0] != ('a' + i) || argv[i][1] != '\0', "OVF B10 content"))
+                return XELP_E_ERR;
+        }
+    }
+
+    /* ---- C. Quoted strings at boundaries ---- */
+
+    /* C11. Quoted string filling buffer to XELP_CMDBUFSZ-1 */
+    {
+        char buf[XELP_CMDBUFSZ];
+        buf[0] = '"';
+        for (i = 1; i < XELP_CMDBUFSZ - 2; i++) buf[i] = 'Q';
+        buf[XELP_CMDBUFSZ - 2] = '"';
+        r = XelpBuf2Argv(&x, buf, XELP_CMDBUFSZ - 1, &argc, argv, XELP_ARGV_MAX);
+        if (JB_ASSERT(r != XELP_S_OK || argc != 1, "OVF C11 quoted fill"))
+            return XELP_E_ERR;
+    }
+
+    /* C12. Unclosed quote at buffer end (still produces token) */
+    {
+        char buf[XELP_CMDBUFSZ];
+        buf[0] = '"';
+        for (i = 1; i < XELP_CMDBUFSZ - 2; i++) buf[i] = 'U';
+        /* no closing quote */
+        r = XelpBuf2Argv(&x, buf, XELP_CMDBUFSZ - 1, &argc, argv, XELP_ARGV_MAX);
+        if (JB_ASSERT(r != XELP_S_OK || argc != 1, "OVF C12 unclosed"))
+            return XELP_E_ERR;
+    }
+
+    /* C13. Empty quoted string "" -> argc=1, argv[0]="" */
+    {
+        char buf[] = "\"\"";
+        r = XelpBuf2Argv(&x, buf, XelpStrLen(buf), &argc, argv, XELP_ARGV_MAX);
+        if (JB_ASSERT(r != XELP_S_OK || argc != 1, "OVF C13 empty quoted argc"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(XelpStrLen(argv[0]) != 0, "OVF C13 empty quoted len"))
+            return XELP_E_ERR;
+    }
+
+    /* C14. Nested escapes near buffer end */
+    {
+        char buf[XELP_CMDBUFSZ];
+        int pos = 0;
+        buf[pos++] = '"';
+        while (pos < XELP_CMDBUFSZ - 5) buf[pos++] = 'N';
+        buf[pos++] = '\\'; buf[pos++] = 'n';  /* \n escape */
+        buf[pos++] = '"';
+        buf[pos] = '\0';
+        r = XelpBuf2Argv(&x, buf, pos, &argc, argv, XELP_ARGV_MAX);
+        if (JB_ASSERT(r != XELP_S_OK || argc != 1, "OVF C14 nested esc"))
+            return XELP_E_ERR;
+    }
+
+    /* ---- D. Pathological inputs ---- */
+
+    /* D15. CLI escape pairs filling near buffer limit */
+    {
+        char buf[XELP_CMDBUFSZ];
+        int pos = 0;
+        while (pos < XELP_CMDBUFSZ - 3) {
+            buf[pos++] = '`'; /* CLI escape */
+            buf[pos++] = 'X';
+        }
+        buf[pos] = '\0';
+        r = XelpBuf2Argv(&x, buf, pos, &argc, argv, XELP_ARGV_MAX);
+        if (JB_ASSERT(r != XELP_S_OK || argc != 1, "OVF D15 cli esc pairs"))
+            return XELP_E_ERR;
+    }
+
+    /* D16. Many \\ pairs inside quotes */
+    {
+        char buf[XELP_CMDBUFSZ];
+        int pos = 0;
+        buf[pos++] = '"';
+        while (pos < XELP_CMDBUFSZ - 4) {
+            buf[pos++] = '\\';
+            buf[pos++] = '\\';
+        }
+        buf[pos++] = '"';
+        buf[pos] = '\0';
+        r = XelpBuf2Argv(&x, buf, pos, &argc, argv, XELP_ARGV_MAX);
+        if (JB_ASSERT(r != XELP_S_OK || argc != 1, "OVF D16 bs pairs"))
+            return XELP_E_ERR;
+    }
+
+    /* D17. Trailing backtick at buffer end */
+    {
+        char buf[] = "cmd`";
+        r = XelpBuf2Argv(&x, buf, XelpStrLen(buf), &argc, argv, XELP_ARGV_MAX);
+        if (JB_ASSERT(r != XELP_S_OK || argc != 1, "OVF D17 trailing bt"))
+            return XELP_E_ERR;
+    }
+
+    /* D18. All-spaces input at max length -> argc=0 */
+    {
+        char buf[XELP_CMDBUFSZ];
+        for (i = 0; i < XELP_CMDBUFSZ - 1; i++) buf[i] = ' ';
+        buf[XELP_CMDBUFSZ - 1] = '\0';
+        r = XelpBuf2Argv(&x, buf, XELP_CMDBUFSZ - 1, &argc, argv, XELP_ARGV_MAX);
+        if (JB_ASSERT(r != XELP_S_OK || argc != 0, "OVF D18 all spaces"))
+            return XELP_E_ERR;
+    }
+
+    /* ---- E. XelpArgvInt / XelpArgvStr invalid indices ---- */
+
+    /* E19. XelpArgvInt with n=-1 -> XELP_E_ERR */
+    {
+        char buf[] = "cmd 42";
+        r = XelpBuf2Argv(&x, buf, XelpStrLen(buf), &argc, argv, XELP_ARGV_MAX);
+        if (JB_ASSERT(r != XELP_S_OK, "OVF E19 setup"))
+            return XELP_E_ERR;
+        r = XelpArgvInt(argv, argc, -1, &val);
+        if (JB_ASSERT(r != XELP_E_ERR, "OVF E19 neg idx"))
+            return XELP_E_ERR;
+    }
+
+    /* E20. XelpArgvStr with n=-1 -> XELP_E_ERR */
+    {
+        char buf[] = "cmd hello";
+        r = XelpBuf2Argv(&x, buf, XelpStrLen(buf), &argc, argv, XELP_ARGV_MAX);
+        if (JB_ASSERT(r != XELP_S_OK, "OVF E20 setup"))
+            return XELP_E_ERR;
+        r = XelpArgvStr(argv, argc, -1, &s, &slen);
+        if (JB_ASSERT(r != XELP_E_ERR, "OVF E20 neg idx"))
+            return XELP_E_ERR;
+    }
+
+    /* E21. XelpArgvInt with n=argc -> XELP_E_ERR */
+    {
+        char buf[] = "cmd 42";
+        r = XelpBuf2Argv(&x, buf, XelpStrLen(buf), &argc, argv, XELP_ARGV_MAX);
+        if (JB_ASSERT(r != XELP_S_OK, "OVF E21 setup"))
+            return XELP_E_ERR;
+        r = XelpArgvInt(argv, argc, argc, &val);
+        if (JB_ASSERT(r != XELP_E_ERR, "OVF E21 n=argc"))
+            return XELP_E_ERR;
+    }
+
+    /* E22. XelpArgvStr with n=argc -> XELP_E_ERR */
+    {
+        char buf[] = "cmd hello";
+        r = XelpBuf2Argv(&x, buf, XelpStrLen(buf), &argc, argv, XELP_ARGV_MAX);
+        if (JB_ASSERT(r != XELP_S_OK, "OVF E22 setup"))
+            return XELP_E_ERR;
+        r = XelpArgvStr(argv, argc, argc, &s, &slen);
+        if (JB_ASSERT(r != XELP_E_ERR, "OVF E22 n=argc"))
+            return XELP_E_ERR;
+    }
+
+    return XELP_S_OK;
+}
+
 /* 	************************************************
 	Xelp Simple Unit Test suite.
 */
@@ -4864,6 +5386,8 @@ int run_tests() {
     JumpBug_RunUnit(test_MultiInstance,"MultiInstance");
     JumpBug_RunUnit(test_XelpArgs,"XelpArgs");
     JumpBug_RunUnit(test_XelpArgIntStr,"XelpArgIntStr");
+    JumpBug_RunUnit(test_XelpBuf2Argv,"XelpBuf2Argv");
+    JumpBug_RunUnit(test_XelpBuf2Argv_overflow,"Buf2ArgvOverflow");
 #ifdef XELP_ENABLE_LINE_EDIT
     JumpBug_RunUnit(test_CursorWithEcho,"CursorWithEcho");
 #endif

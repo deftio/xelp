@@ -1,0 +1,1 @@
+echo `; `# "path\\file" "\t\n\\"

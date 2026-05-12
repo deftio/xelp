@@ -864,7 +864,121 @@ XELPRESULT XelpArgStr (const char *args, int len, int n,
     *slen = (int)(tok.p - tok.s);
     return XELP_S_OK;
 }
+
 #endif /* XELP_ENABLE_CLI */
+
+#ifdef XELP_ENABLE_ARGV
+/********************************************************
+ XelpBuf2Argv() - tokenize args into argc/argv using mArgvBuf as scratch.
+ Strips quotes, processes escape sequences, null-terminates each token.
+ argv[0] = command name per argc/argv convention.
+ Returns XELP_E_ERR if input exceeds scratch buffer or too many args.
+ */
+XELPRESULT XelpBuf2Argv(XELP *ths, const char *args, int len,
+                         int *argc, char **argv, int maxargs)
+{
+    char *buf, *r, *w, *end;
+    int ac = 0;
+    int i;
+
+    *argc = 0;
+    if (len <= 0) return XELP_S_OK;
+    if (len >= XELP_CMDBUFSZ) return XELP_E_ERR;
+
+    buf = ths->mArgvBuf;
+
+    /* Always copy into dedicated scratch buffer */
+    for (i = 0; i < len; i++)
+        buf[i] = args[i];
+
+    r = buf;
+    end = r + len;
+    w = r;
+
+    while (r < end) {
+        char stopped; /* delimiter char that ended the token */
+
+        /* skip whitespace */
+        while (r < end && (*r == ' ' || *r == '\t'))
+            r++;
+        /* check for terminator or end */
+        if (r >= end || *r == ';' || *r == '\n' || *r == '#')
+            break;
+        /* record token start */
+        if (ac >= maxargs) return XELP_E_ERR;
+        argv[ac] = w;
+
+        if (*r == '"') {
+            /* quoted token */
+            r++; /* skip opening quote */
+            while (r < end && *r != '"') {
+                if (*r == XELP_QUO_ESC) {
+                    r++;
+                    if (r < end) {
+                        switch (*r) {
+                            case 'n':  *w++ = 0x0A; break;
+                            case 't':  *w++ = 0x09; break;
+                            case '\\': *w++ = 0x5C; break;
+                            case '"':  *w++ = 0x22; break;
+                            default:   *w++ = *r;   break;
+                        }
+                        r++;
+                    }
+                } else {
+                    *w++ = *r++;
+                }
+            }
+            if (r < end && *r == '"') r++; /* skip closing quote */
+        } else {
+            /* unquoted token */
+            while (r < end && *r != ' ' && *r != '\t' &&
+                   *r != ';' && *r != '\n' && *r != '#') {
+                if (*r == XELP_CLI_ESC) {
+                    r++;
+                    if (r < end) *w++ = *r++;
+                } else {
+                    *w++ = *r++;
+                }
+            }
+        }
+        /* save the delimiter before the null terminator overwrites it */
+        stopped = (r < end) ? *r : '\0';
+        *w++ = '\0'; /* null-terminate this token */
+        ac++;
+        /* if the token ended at a line terminator, stop now */
+        if (stopped == ';' || stopped == '\n' || stopped == '#')
+            break;
+        /* advance r past the delimiter if the null overwrote it */
+        if (r < end && w > r)
+            r = w;
+    }
+
+    *argc = ac;
+    return XELP_S_OK;
+}
+
+/********************************************************
+ XelpArgvInt() - get argv[n] as an integer.
+ Returns XELP_E_ERR if n is out of range or not a valid number.
+ */
+XELPRESULT XelpArgvInt(char **argv, int argc, int n, int *val)
+{
+    if (n < 0 || n >= argc) return XELP_E_ERR;
+    return XelpParseNum(argv[n], XelpStrLen(argv[n]), val);
+}
+
+/********************************************************
+ XelpArgvStr() - get argv[n] as a string pointer and length.
+ Returns XELP_E_ERR if n is out of range.
+ */
+XELPRESULT XelpArgvStr(char **argv, int argc, int n, const char **s, int *slen)
+{
+    if (n < 0 || n >= argc) return XELP_E_ERR;
+    *s = argv[n];
+    *slen = XelpStrLen(argv[n]);
+    return XELP_S_OK;
+}
+#endif /* XELP_ENABLE_ARGV */
 
 /********************************************************
 	XelpParseKey() 

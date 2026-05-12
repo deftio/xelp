@@ -90,6 +90,21 @@
 #define XELP_ENABLE_HISTORY 1
 #endif
 
+/****************************************************************************************************
+ Enable structured argument parsing (argc/argv).
+ When defined, adds XelpBuf2Argv, XelpArgvInt, and XelpArgvStr functions and a
+ dedicated scratch buffer (XELP_CMDBUFSZ bytes) to each XELP instance.  Provides
+ null-terminated tokens with quote and escape processing, and random access by
+ index -- the standard argc/argv convention for command handlers.
+ Does not require XELP_ENABLE_CLI; can be used standalone.
+ RAM cost: XELP_CMDBUFSZ bytes per instance (separate from the CLI line buffer).
+ Code cost: ~530 bytes (x86-64 -Os), ~700 bytes (ARM Thumb -Os).
+ Leaving undefined saves both the code and the per-instance RAM.
+ */
+#ifndef XELP_ENABLE_ARGV
+#define XELP_ENABLE_ARGV    1
+#endif
+
 
 /****************************************************************************************************
  Enable KEY Mode.
@@ -167,6 +182,24 @@
 
 #ifndef XELPREG
 #define XELPREG int    /* can change this to a valid C type for your plaform. eg. short, long, _int64 */
+#endif
+
+/****************************************************************************************************
+  XELP_CMDBUFSZ is the CLI input buffer size in bytes.
+  Must be at least 16. The default of 64 is suitable for most embedded targets.
+  Override with -DXELP_CMDBUFSZ=128 on the compiler command line, or in xelp_ovr.h.
+  RAM cost: XELP_CMDBUFSZ bytes per instance (plus history if enabled).
+ */
+#ifndef XELP_CMDBUFSZ
+#define XELP_CMDBUFSZ       (64)
+#endif
+
+/****************************************************************************************************
+  XELP_ARGV_MAX is the default maximum number of arguments for XelpBuf2Argv.
+  Override with -DXELP_ARGV_MAX=16 on the compiler command line, or in xelp_ovr.h.
+ */
+#ifndef XELP_ARGV_MAX
+#define XELP_ARGV_MAX       8
 #endif
 
 

@@ -47,6 +47,24 @@ Not starting until dev experience and examples are solid.
 - [ ] Control flow: `_if`/`_else`/`_endif`, `_while`/`_endwhile`, `_goto`
 - [ ] Arithmetic and comparison builtins: `_add`, `_sub`, `_mul`, `_eq`, `_lt`
 - [ ] Return values via `$?` / `r0`
+- [ ] **Parenthesized sub-expressions** -- `command (subcommand arg) arg`
+      evaluates the inner expression first and substitutes the result.
+      Two parts: (1) PSM paren recognition + depth counter, (2) expansion
+      buffer + recursive eval. Integer-only substitution as MVP. See
+      conversation notes on buffer cost (~64 bytes) and stack depth risk
+      on 8-bit targets.
+- [ ] **Tagged strings** -- explore post-tag syntax `"string"f` where
+      a single character after the closing quote annotates the token.
+      `_PS_QEND` is the natural intercept point (already fires once after
+      closing `"`). Currently the tag char is silently swallowed by the
+      default `_PS_QEND` -> `_PS_SEOL` transition. Implementation needs:
+      (a) new `_PS_QEND` rule to capture alphanumeric tag chars,
+      (b) plumbing the tag out of the tokenizer (XelpBuf has no tag field
+      today -- either extend XelpBuf or use a side channel).
+      Pre-tag syntax `f"string"` is harder (requires look-ahead from
+      `_PS_TOK0` into `_PS_QUOT`). Post-tag is architecturally cleaner.
+      Use cases: format specifiers, string type hints for the scripting
+      engine, user-defined token annotations.
 
 Design doc: [dev/xelp_script.md](xelp_script.md)
 

@@ -144,7 +144,9 @@ typedef unsigned long XELPKEYCODE;
 #define XELP_HIST_DEPTH		(4)  /* history ring depth (overridable)     */
 #endif
 
+#ifndef XELP_CMDBUFSZ
 #define XELP_CMDBUFSZ 		(64)
+#endif
 
 /**
  used by tokenizer funciton
@@ -294,6 +296,9 @@ typedef struct XELP_tag
     XelpBuf                 mCmdXB;          /* buffer ptrs for parsing                     */
 #endif
 
+#ifdef XELP_ENABLE_ARGV						 /* if structured argv parsing enabled          */
+	char					mArgvBuf[XELP_CMDBUFSZ]; /* scratch buffer for XelpBuf2Argv     */
+#endif
 
 #ifdef XELP_CLI_PROMPT 						 /* prompt for CLI enabled                      */
 	const char*				mpPrompt;		 /* prompt at beginning of CLI e.g. xelp>		*/
@@ -425,6 +430,21 @@ XELPRESULT XelpArgCount  (XelpArgs *a, int *n);
 XELPRESULT XelpArgInt (const char *args, int len, int n, int *val);
 XELPRESULT XelpArgStr (const char *args, int len, int n,
                        const char **s, int *slen);
+
+#ifdef XELP_ENABLE_ARGV
+/* Tokenize args into argc/argv using ths->mArgvBuf as scratch buffer.
+   Strips quotes, processes escape sequences, null-terminates each token.
+   argv[0] = command name per argc/argv convention.
+   Returns XELP_E_ERR if input exceeds scratch buffer or too many args. */
+XELPRESULT XelpBuf2Argv(XELP *ths, const char *args, int len,
+                         int *argc, char **argv, int maxargs);
+
+/* Get argv[n] as an integer.  Returns XELP_E_ERR if out of range or not numeric. */
+XELPRESULT XelpArgvInt(char **argv, int argc, int n, int *val);
+
+/* Get argv[n] as a string pointer and length. */
+XELPRESULT XelpArgvStr(char **argv, int argc, int n, const char **s, int *slen);
+#endif
 
 /* XELPNEXTTOK get next token in a string buffer.  This is just a macro call to XelpTokLine             */
 /* #define    XELPNEXTTOK(buf,blen,tok_s,tok_e)    (XelpTokLine(buf, buf+blen, tok_s, tok_e, 0, XELP_TOK_ONLY)) */

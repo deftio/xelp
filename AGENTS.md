@@ -261,6 +261,33 @@ XELPRESULT cmd_set(XELP *ths, const char *args, int len) {
 
 Arg 0 is the command name (per argc/argv convention).
 
+### XelpBuf2Argv -- opt-in argc/argv tokenizer
+
+Tokenizes args into a standard argc/argv array, using
+`ths->mCmdMsgBuf` as scratch (zero extra RAM). Strips quotes,
+processes escape sequences, null-terminates each token.
+
+```c
+XELPRESULT cmd_set(XELP *ths, const char *args, int len) {
+    char *argv[XELP_ARGV_MAX];
+    int argc;
+    if (XelpBuf2Argv(ths, args, len, &argc, argv, XELP_ARGV_MAX) != XELP_S_OK)
+        return XELP_E_ERR;
+    /* argv[0] = "set", argv[1] = key, argv[2] = value, etc. */
+    return XELP_S_OK;
+}
+```
+
+| Function | Purpose |
+|----------|---------|
+| `XelpBuf2Argv(ths, args, len, &argc, argv, maxargs)` | Tokenize into argc/argv (uses mCmdMsgBuf as scratch) |
+| `XelpArgvInt(argv, argc, n, &val)` | Get argv[n] as int |
+| `XelpArgvStr(argv, argc, n, &s, &slen)` | Get argv[n] as string pointer + length |
+
+`XELP_ARGV_MAX` (default 8) is a convenience constant for sizing the
+argv array. Tokens are null-terminated (unlike XelpArgs/XelpTokN).
+Returns `XELP_E_ERR` if input exceeds `XELP_CMDBUFSZ` or too many args.
+
 ### Random-access alternative (XelpTokN)
 
 For random-access by index, use `XelpTokN`. Note the `(char*)` cast
@@ -425,13 +452,18 @@ Edit `src/xelpcfg.h` to enable/disable features:
 | `XELP_ENABLE_KEY` | Single keypress mode | ~200-500 bytes |
 | `XELP_ENABLE_THR` | Pass-through mode | ~50-125 bytes |
 | `XELP_ENABLE_HELP` | Built-in help command | ~180-350 bytes |
+| `XELP_ENABLE_ARGV` | Structured argc/argv parsing (XelpBuf2Argv) | ~530-700 bytes + XELP_CMDBUFSZ RAM |
 | `XELP_ENABLE_FULL` | All of the above (except history) | All combined |
 
 ### Buffer and register sizes
 
+All of these are defined in `xelpcfg.h` and are overridable via compiler
+flag (`-DXELP_CMDBUFSZ=128`) or `xelp_ovr.h`.
+
 | Setting | Default | Purpose |
 |---------|---------|---------|
-| `XELP_CMDBUFSZ` | 64 | CLI input buffer size (bytes) |
+| `XELP_CMDBUFSZ` | 64 | CLI input buffer size (bytes). In `xelpcfg.h`, `#ifndef`-guarded. |
+| `XELP_ARGV_MAX` | 8 | Default max arguments for `XelpBuf2Argv`. In `xelpcfg.h`, `#ifndef`-guarded. |
 | `XELP_REGS_SZ` | 4 | Return registers per instance (minimum 4) |
 | `XELPREG` | `int` | Register element type |
 | `XELP_HIST_DEPTH` | 4 | History ring buffer depth |
@@ -776,8 +808,9 @@ JumpBug_RunUnit(&jb, &test_my_feature, "my feature");
 Harnesses in `tests/fuzz/`:
 - `fuzz_parse.c` -- fuzzes `XelpParse` (script buffer)
 - `fuzz_parsekey.c` -- fuzzes `XelpParseKey` (byte-by-byte input)
+- `fuzz_buf2argv.c` -- fuzzes `XelpBuf2Argv` + `XelpArgvInt`/`XelpArgvStr`
 
-Seed corpus in `tests/fuzz/corpus_parse/`.
+Seed corpora in `tests/fuzz/corpus_parse/`, `tests/fuzz/corpus_buf2argv/`.
 
 ---
 
@@ -885,6 +918,7 @@ xelp/
 | `posix-simple/` | Linux/macOS | Full interactive CLI with ncurses |
 | `posix-simple-cpp/` | Linux/macOS | Same as above with C++ wrapper |
 | `scripting/` | Linux/macOS | Script execution vs interactive mode |
+| `posix-argv/` | Linux/macOS | XelpBuf2Argv argc/argv vs XelpArgs comparison |
 | `arduino/` | Arduino | Raw C API with LED control |
 | `arduino-cpp/` | Arduino | C++ `XelpCLI` wrapper |
 | `arduino-live-cli/` | Arduino | Full hardware CLI: GPIO, ADC, PWM, tone, pulse, pin scan |
@@ -932,6 +966,9 @@ Full size tables for 20+ architectures in [README.md](README.md).
 | `XelpArgCount(&a, &n)` | Count tokens (non-destructive) |
 | `XelpArgInt(args, len, n, &val)` | Get arg N as int (one-shot) |
 | `XelpArgStr(args, len, n, &s, &slen)` | Get arg N as string span |
+| `XelpBuf2Argv(ths, args, len, &argc, argv, max)` | Tokenize into argc/argv (null-terminated tokens) |
+| `XelpArgvInt(argv, argc, n, &val)` | Get argv[n] as int |
+| `XelpArgvStr(argv, argc, n, &s, &slen)` | Get argv[n] as string + length |
 | `XelpStrLen(s)` | String length |
 | `XelpStrEq(buf, len, cmd)` | Compare buffer to string |
 | `XelpStrEq2(buf, end, cmd)` | Compare pointer-pair to string |

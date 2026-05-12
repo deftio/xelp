@@ -38,7 +38,7 @@
 #define XELP_MAX_KEY_CMDS 8
 #endif
 #ifndef XELP_MAX_EASY_ARGV
-#define XELP_MAX_EASY_ARGV 8
+#define XELP_MAX_EASY_ARGV XELP_ARGV_MAX
 #endif
 
 class XelpCLI;
@@ -346,33 +346,37 @@ private:
     /**
      * Shared dispatcher for all Tier 3 easy CLI commands.
      * Finds the matching entry by name, parses argv, and calls the easy fn.
-     * Tokens are null-terminated in place (the command buffer is writable).
      */
     static XELPRESULT _easyCliDispatch(XELP* ths, const char* args, int len)
     {
         XelpCLI& cli = _fromRaw(ths);
+        const char *argv[XELP_MAX_EASY_ARGV];
+        int argc = 0;
 
-        /* Identify the command name (token 0). */
-        XelpBuf b, tok;
-        XELP_XB_INIT(b, (char*)args, len);
-        if (XelpTokN(&b, 0, &tok) != XELP_S_OK)
+#ifdef XELP_ENABLE_ARGV
+        char *argv_w[XELP_MAX_EASY_ARGV];
+        int j;
+        if (XelpBuf2Argv(ths, args, len, &argc, argv_w, XELP_MAX_EASY_ARGV) != XELP_S_OK)
             return XELP_E_ERR;
-        int cmdLen = (int)(tok.p - tok.s);
+        if (argc < 1) return XELP_E_ERR;
+        for (j = 0; j < argc; j++) argv[j] = argv_w[j];
+#else
+        {
+            XelpBuf b, t;
+            XELP_XB_INIT(b, (char*)args, len);
+            while (argc < XELP_MAX_EASY_ARGV &&
+                   XelpTokN(&b, argc, &t) == XELP_S_OK) {
+                *t.p = '\0';
+                argv[argc++] = t.s;
+            }
+        }
+        if (argc < 1) return XELP_E_ERR;
+#endif
 
-        /* Find which table entry matches. */
         for (int i = 0; i < cli.m_nCli; i++) {
             if (cli.m_cliTable[i].mFunPtr == &_easyCliDispatch &&
-                XelpStrEq(tok.s, cmdLen, cli.m_cliTable[i].mpCmd) == XELP_S_OK) {
-                /* Parse argv and null-terminate each token. */
-                const char* argv[XELP_MAX_EASY_ARGV];
-                int argc = 0;
-                XELP_XB_TOP(b);
-                XelpBuf t;
-                while (argc < XELP_MAX_EASY_ARGV &&
-                       XelpTokN(&b, argc, &t) == XELP_S_OK) {
-                    *t.p = '\0';  /* null-terminate in the writable cmd buffer */
-                    argv[argc++] = t.s;
-                }
+                XelpStrEq(argv[0], XelpStrLen(argv[0]),
+                          cli.m_cliTable[i].mpCmd) == XELP_S_OK) {
                 cli.m_easyCliFns[i](cli, argc, argv);
                 return XELP_S_OK;
             }
@@ -384,16 +388,28 @@ private:
     {
         if (!s_unknownFn) return XELP_S_OK;
         XelpCLI& cli = _fromRaw(ths);
-        const char* argv[XELP_MAX_EASY_ARGV];
+        const char *argv[XELP_MAX_EASY_ARGV];
         int argc = 0;
-        XelpBuf b;
-        XELP_XB_INIT(b, (char*)args, len);
-        XelpBuf t;
-        while (argc < XELP_MAX_EASY_ARGV &&
-               XelpTokN(&b, argc, &t) == XELP_S_OK) {
-            *t.p = '\0';
-            argv[argc++] = t.s;
+
+#ifdef XELP_ENABLE_ARGV
+        {
+            char *argv_w[XELP_MAX_EASY_ARGV];
+            int j;
+            if (XelpBuf2Argv(ths, args, len, &argc, argv_w, XELP_MAX_EASY_ARGV) != XELP_S_OK)
+                return XELP_E_ERR;
+            for (j = 0; j < argc; j++) argv[j] = argv_w[j];
         }
+#else
+        {
+            XelpBuf b, t;
+            XELP_XB_INIT(b, (char*)args, len);
+            while (argc < XELP_MAX_EASY_ARGV &&
+                   XelpTokN(&b, argc, &t) == XELP_S_OK) {
+                *t.p = '\0';
+                argv[argc++] = t.s;
+            }
+        }
+#endif
         s_unknownFn(cli, argc, argv);
         return XELP_S_OK;
     }
