@@ -55,6 +55,18 @@
 #define XELP_QUO_ESC		('\\')		/* character used  for escaping inside quoted strings        */
 #endif
 
+/****************************************************************************************************
+ Quoted-string escape map: packed key-value pairs for escape expansion inside
+ double-quoted arguments (XelpBuf2Argv).  Each entry is two adjacent chars:
+ the first is the character after XELP_QUO_ESC, the second is the replacement
+ byte.  A lone '\0' terminates the list.  Characters not in this table pass
+ through unchanged (so \\ -> \ and \" -> " work without entries).
+ Override to add \r, \0, \a, etc. or set to "" to disable escape expansion.
+ */
+#ifndef XELP_ESC_MAP
+#define XELP_ESC_MAP  "n\x0A" "t\x09"  ""
+#endif
+
 
 
 /****************************************************************************************************

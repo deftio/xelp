@@ -877,82 +877,52 @@ XELPRESULT XelpArgStr (const char *args, int len, int n,
 XELPRESULT XelpBuf2Argv(XELP *ths, const char *args, int len,
                          int *argc, char **argv, int maxargs)
 {
-    char *buf, *r, *w, *end;
-    int ac = 0;
-    int i;
+    char *r, *w, *end, c;
+    int ac = 0, i, q;
 
     *argc = 0;
     if (len <= 0) return XELP_S_OK;
     if (len >= XELP_CMDBUFSZ) return XELP_E_ERR;
 
-    buf = ths->mArgvBuf;
-
-    /* Always copy into dedicated scratch buffer */
-    for (i = 0; i < len; i++)
-        buf[i] = args[i];
-
-    r = buf;
+    r = ths->mArgvBuf;
+    for (i = 0; i < len; i++) r[i] = args[i];
     end = r + len;
     w = r;
 
     while (r < end) {
-        char stopped; /* delimiter char that ended the token */
-
-        /* skip whitespace */
-        while (r < end && (*r == ' ' || *r == '\t'))
-            r++;
-        /* check for terminator or end */
-        if (r >= end || *r == ';' || *r == '\n' || *r == '#')
-            break;
-        /* record token start */
+        while (r < end && (*r == ' ' || *r == '\t')) r++;
+        if (r >= end || *r == ';' || *r == '\n' || *r == '#') break;
         if (ac >= maxargs) return XELP_E_ERR;
         argv[ac] = w;
+        q = (*r == '"');
+        if (q) r++;
 
-        if (*r == '"') {
-            /* quoted token */
-            r++; /* skip opening quote */
-            while (r < end && *r != '"') {
-                if (*r == XELP_QUO_ESC) {
-                    r++;
-                    if (r < end) {
-                        switch (*r) {
-                            case 'n':  *w++ = 0x0A; break;
-                            case 't':  *w++ = 0x09; break;
-                            case '\\': *w++ = 0x5C; break;
-                            case '"':  *w++ = 0x22; break;
-                            default:   *w++ = *r;   break;
-                        }
-                        r++;
-                    }
-                } else {
-                    *w++ = *r++;
+        while (r < end) {
+            c = *r;
+            if (q) {
+                if (c == '"')  { r++; break; }
+                if (c == XELP_QUO_ESC && r + 1 < end) {
+                    const char *m = XELP_ESC_MAP;
+                    c = *++r;
+                    while (*m) { if (c == m[0]) { c = m[1]; break; } m += 2; }
                 }
+            } else {
+                if (c == ' ' || c == '\t' ||
+                    c == ';' || c == '\n' || c == '#') break;
+                if (c == XELP_CLI_ESC) { if (++r >= end) break; c = *r; }
             }
-            if (r < end && *r == '"') r++; /* skip closing quote */
-        } else {
-            /* unquoted token */
-            while (r < end && *r != ' ' && *r != '\t' &&
-                   *r != ';' && *r != '\n' && *r != '#') {
-                if (*r == XELP_CLI_ESC) {
-                    r++;
-                    if (r < end) *w++ = *r++;
-                } else {
-                    *w++ = *r++;
-                }
-            }
+            *w++ = c;
+            r++;
         }
-        /* save the delimiter before the null terminator overwrites it */
-        stopped = (r < end) ? *r : '\0';
-        *w++ = '\0'; /* null-terminate this token */
-        ac++;
-        /* if the token ended at a line terminator, stop now */
-        if (stopped == ';' || stopped == '\n' || stopped == '#')
-            break;
-        /* advance r past the delimiter if the null overwrote it */
-        if (r < end && w > r)
-            r = w;
+        {   /* check stop char before null-write can overwrite it */
+            int stop = !q && r < end &&
+                       (*r == ';' || *r == '\n' || *r == '#');
+            *w++ = '\0';
+            ac++;
+            if (stop) break;
+        }
+        if (w > r) r = w;
     }
-
     *argc = ac;
     return XELP_S_OK;
 }

@@ -482,6 +482,7 @@ flag (`-DXELP_CMDBUFSZ=128`) or `xelp_ovr.h`.
 |---------|---------|---------|
 | `XELP_CLI_ESC` | `` ` `` (backtick) | Escape next char in CLI/scripts |
 | `XELP_QUO_ESC` | `\` (backslash) | Escape next char inside quoted strings |
+| `XELP_ESC_MAP` | `"n\x0A" "t\x09" ""` | Packed key-value pairs for escape expansion in quoted strings (XelpBuf2Argv). Each 2-byte entry maps the char after `XELP_QUO_ESC` to a replacement byte. Terminated by `'\0'`. Unmapped escapes pass through as identity. Set to `""` to disable. |
 
 ### ENTER key detection
 
