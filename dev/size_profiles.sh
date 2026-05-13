@@ -32,14 +32,16 @@ build() {
     mkdir -p "$ovrdir"
     local ovr="$ovrdir/$OVR_NAME"
 
+    # Undef all feature flags so #ifndef guards in xelpcfg.h don't shadow
+    # the selective re-enables below.
     cat > "$ovr" << 'HEADER'
-#define XELPKEY_CLI  (XELPKEY_CTP)
-#define XELPKEY_KEY  (XELPKEY_ESC)
-#define XELPKEY_THR  (XELPKEY_CTT)
-#define XELP_CLI_ESC ('`')
-#define XELP_QUO_ESC ('\\')
-#define XELP_REGS_SZ 4
-#define XELPREG int
+#undef XELP_ENABLE_CLI
+#undef XELP_ENABLE_LINE_EDIT
+#undef XELP_ENABLE_HISTORY
+#undef XELP_ENABLE_KEY
+#undef XELP_ENABLE_THR
+#undef XELP_ENABLE_HELP
+#undef XELP_ENABLE_ARGV
 HEADER
 
     local has_help=0 has_cli=0
@@ -48,18 +50,6 @@ HEADER
         [ "$flag" = "XELP_ENABLE_HELP" ] && has_help=1
         [ "$flag" = "XELP_ENABLE_CLI" ]  && has_cli=1
     done
-
-    if [ $has_help -eq 1 ]; then
-        cat >> "$ovr" << 'HELPSTRS'
-#define XELP_HELP_KEY_STR "\nKey functions\n"
-#define XELP_HELP_CLI_STR "\nCLI functions\n"
-#define XELP_HELP_ABT_STR (ths->mpAboutMsg)
-HELPSTRS
-    fi
-
-    if [ $has_cli -eq 1 ]; then
-        echo '#define XELP_CLI_PROMPT "xelp>"' >> "$ovr"
-    fi
 
     local sz_arm="" sz_host=""
     local obj="/tmp/xelp_size_$$.o"
@@ -107,15 +97,18 @@ else
     printf "%6s  %s\n" "------" "-------"
 fi
 
-build "1. CLI only"                  XELP_ENABLE_CLI
-build "2. CLI + help"                XELP_ENABLE_CLI XELP_ENABLE_HELP
-build "3. CLI + key"                 XELP_ENABLE_CLI XELP_ENABLE_KEY
-build "4. CLI + help + key"          XELP_ENABLE_CLI XELP_ENABLE_HELP XELP_ENABLE_KEY
-build "5. CLI + help + key + thru"   XELP_ENABLE_CLI XELP_ENABLE_HELP XELP_ENABLE_KEY XELP_ENABLE_THR
-build "6. CLI + line edit"           XELP_ENABLE_CLI XELP_ENABLE_LINE_EDIT
-build "7. CLI + line edit + help"    XELP_ENABLE_CLI XELP_ENABLE_LINE_EDIT XELP_ENABLE_HELP
-build "8. CLI + LE + help + key"     XELP_ENABLE_CLI XELP_ENABLE_LINE_EDIT XELP_ENABLE_HELP XELP_ENABLE_KEY
-build "9. Full (all features)"       XELP_ENABLE_CLI XELP_ENABLE_LINE_EDIT XELP_ENABLE_HELP XELP_ENABLE_KEY XELP_ENABLE_THR
-build "10. Full + history"           XELP_ENABLE_CLI XELP_ENABLE_LINE_EDIT XELP_ENABLE_HELP XELP_ENABLE_KEY XELP_ENABLE_THR XELP_ENABLE_HISTORY
+build "1.  KEY only"                  XELP_ENABLE_KEY
+build "2.  CLI only"                  XELP_ENABLE_CLI
+build "3.  CLI + help"                XELP_ENABLE_CLI XELP_ENABLE_HELP
+build "4.  CLI + key"                 XELP_ENABLE_CLI XELP_ENABLE_KEY
+build "5.  CLI + help + key"          XELP_ENABLE_CLI XELP_ENABLE_HELP XELP_ENABLE_KEY
+build "6.  CLI + help + key + thru"   XELP_ENABLE_CLI XELP_ENABLE_HELP XELP_ENABLE_KEY XELP_ENABLE_THR
+build "7.  CLI + line edit"           XELP_ENABLE_CLI XELP_ENABLE_LINE_EDIT
+build "8.  CLI + LE + help"           XELP_ENABLE_CLI XELP_ENABLE_LINE_EDIT XELP_ENABLE_HELP
+build "9.  CLI + LE + help + key"     XELP_ENABLE_CLI XELP_ENABLE_LINE_EDIT XELP_ENABLE_HELP XELP_ENABLE_KEY
+build "10. Full"                      XELP_ENABLE_CLI XELP_ENABLE_LINE_EDIT XELP_ENABLE_HELP XELP_ENABLE_KEY XELP_ENABLE_THR
+build "11. Full + argv"               XELP_ENABLE_CLI XELP_ENABLE_LINE_EDIT XELP_ENABLE_HELP XELP_ENABLE_KEY XELP_ENABLE_THR XELP_ENABLE_ARGV
+build "12. Full + history"            XELP_ENABLE_CLI XELP_ENABLE_LINE_EDIT XELP_ENABLE_HELP XELP_ENABLE_KEY XELP_ENABLE_THR XELP_ENABLE_HISTORY
+build "13. Full + argv + history"     XELP_ENABLE_CLI XELP_ENABLE_LINE_EDIT XELP_ENABLE_HELP XELP_ENABLE_KEY XELP_ENABLE_THR XELP_ENABLE_ARGV XELP_ENABLE_HISTORY
 
 echo ""

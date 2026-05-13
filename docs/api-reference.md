@@ -243,6 +243,75 @@ XELPRESULT cmd_set(XELP *ths, const char *args, int len) {
 }
 ```
 
+## XelpBuf2Argv -- Structured argc/argv Parsing
+
+Requires `XELP_ENABLE_ARGV`. Tokenizes a command line into a standard
+argc/argv array using `ths->mArgvBuf` as scratch. Strips quotes, processes
+escape sequences (via `XELP_ESC_MAP`), and null-terminates each token.
+
+### `XelpBuf2Argv`
+
+```c
+XELPRESULT XelpBuf2Argv(XELP *ths, const char *args, int len,
+                         int *argc, const char **argv, int maxargs);
+```
+
+Tokenize `args` into `argv[0]..argv[argc-1]`. `argv[0]` is the command
+name (per argc/argv convention). Returns `XELP_E_ERR` if input exceeds
+`XELP_ARGVBUFSZ` or there are more than `maxargs` tokens.
+
+### `XELP_PARSE_ARGV`
+
+```c
+XELP_PARSE_ARGV(ths, args, len);
+```
+
+Convenience macro (C99+ / C++). Declares `const char *argv[XELP_ARGV_MAX]`
+and `int argc`, calls `XelpBuf2Argv`, and returns `XELP_E_ERR` on failure.
+Place at the top of a command handler body, before other statements.
+
+### `XelpArgvInt`
+
+```c
+XELPRESULT XelpArgvInt(const char **argv, int argc, int n, int *val);
+```
+
+Get `argv[n]` as an integer. Returns `XELP_E_ERR` if out of range or
+not a valid number.
+
+### `XelpArgvStr`
+
+```c
+XELPRESULT XelpArgvStr(const char **argv, int argc, int n,
+                        const char **s, int *slen);
+```
+
+Get `argv[n]` as a string pointer and length. Returns `XELP_E_ERR` if
+out of range.
+
+### Example
+
+```c
+XELPRESULT cmd_set(XELP *ths, const char *args, int len) {
+    XELP_PARSE_ARGV(ths, args, len);
+    /* argv[0] = "set", argv[1] = key, argv[2] = value */
+    int val;
+    if (XelpArgvInt(argv, argc, 2, &val) != XELP_S_OK)
+        return XELP_E_ERR;
+    /* ... use argv[1] and val ... */
+    return XELP_S_OK;
+}
+```
+
+### Which argument API to use
+
+| Situation | Recommended |
+|-----------|-------------|
+| C handler, multiple args | `XELP_PARSE_ARGV` + `XelpArgvInt`/`XelpArgvStr` |
+| C++ Easy API lambda | Auto-argv built-in + `XelpCLI::argInt`/`argStr` |
+| Minimal code size, left-to-right | `XelpArgs` iterator |
+| Quick single-arg access | `XelpArgInt`/`XelpArgStr` |
+
 ## String Utilities
 
 ### `XelpStrLen`
@@ -380,7 +449,12 @@ natural value (e.g. `'a'` == 0x61). Multi-byte keys are >= 0x100.
 | `XELP_VER_MAJOR(v)` | | Extract major version byte |
 | `XELP_VER_MINOR(v)` | | Extract minor version byte |
 | `XELP_VER_PATCH(v)` | | Extract patch version byte |
-| `XELP_CMDBUFSZ` | 64 | Default command buffer size |
+| `XELP_CMDBUFSZ` | 64 | CLI input buffer size |
+| `XELP_ARGVBUFSZ` | `XELP_CMDBUFSZ` | Scratch buffer size for `XelpBuf2Argv` |
+| `XELP_ARGV_MAX` | 8 | Default max arguments for `XelpBuf2Argv` / `XELP_PARSE_ARGV` |
+| `XELP_ENTER_LF` | 1 | Accept `\n` (0x0A) as ENTER in interactive input |
+| `XELP_ENTER_CR` | 1 | Accept `\r` (0x0D) as ENTER in interactive input |
+| `XELP_ESC_MAP` | `"n\x0A" "t\x09" ""` | Escape expansion table for quoted strings in `XelpBuf2Argv` |
 | `XELP_MODE_CLI` | 0x00 | CLI mode identifier |
 | `XELP_MODE_KEY` | 0x01 | KEY mode identifier |
 | `XELP_MODE_THR` | 0x02 | THRU mode identifier |
@@ -394,16 +468,19 @@ Cortex-M0 (Thumb, `-Os`):
 
 | Profile | .text (bytes) | Flags |
 |---------|------------:|-------|
-| CLI only | 1508 | `XELP_ENABLE_CLI` |
-| CLI + help | 1608 | + `XELP_ENABLE_HELP` |
-| CLI + key | 1612 | + `XELP_ENABLE_KEY` |
-| CLI + help + key | 1986 | + both |
-| CLI + help + key + thru | 2026 | + `XELP_ENABLE_THR` |
-| CLI + line edit | 1952 | + `XELP_ENABLE_LINE_EDIT` |
-| CLI + line edit + help | 2048 | + both |
-| CLI + LE + help + key | 2466 | + all three |
-| Full (all features) | 2506 | all flags |
-| Full + history | 2922 | all flags + `XELP_ENABLE_HISTORY` |
+| KEY only | 532 | `XELP_ENABLE_KEY` |
+| CLI only | 1512 | `XELP_ENABLE_CLI` |
+| CLI + help | 1612 | + `XELP_ENABLE_HELP` |
+| CLI + key | 1616 | + `XELP_ENABLE_KEY` |
+| CLI + help + key | 1990 | + both |
+| CLI + help + key + thru | 2030 | + `XELP_ENABLE_THR` |
+| CLI + line edit | 1956 | + `XELP_ENABLE_LINE_EDIT` |
+| CLI + LE + help | 2052 | + `XELP_ENABLE_HELP` |
+| CLI + LE + help + key | 2470 | + `XELP_ENABLE_KEY` |
+| Full | 2510 | + `XELP_ENABLE_THR` |
+| Full + argv | 2855 | + `XELP_ENABLE_ARGV` |
+| Full + history | 2926 | + `XELP_ENABLE_HISTORY` |
+| Full + argv + history | 3275 | + both |
 
 Use `dev/size_profiles.sh` to regenerate this table for your toolchain.
 

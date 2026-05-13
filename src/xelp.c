@@ -875,14 +875,14 @@ XELPRESULT XelpArgStr (const char *args, int len, int n,
  Returns XELP_E_ERR if input exceeds scratch buffer or too many args.
  */
 XELPRESULT XelpBuf2Argv(XELP *ths, const char *args, int len,
-                         int *argc, char **argv, int maxargs)
+                         int *argc, const char **argv, int maxargs)
 {
     char *r, *w, *end, c;
     int ac = 0, i, q;
 
     *argc = 0;
     if (len <= 0) return XELP_S_OK;
-    if (len >= XELP_CMDBUFSZ) return XELP_E_ERR;
+    if (len >= XELP_ARGVBUFSZ) return XELP_E_ERR;
 
     r = ths->mArgvBuf;
     for (i = 0; i < len; i++) r[i] = args[i];
@@ -931,7 +931,7 @@ XELPRESULT XelpBuf2Argv(XELP *ths, const char *args, int len,
  XelpArgvInt() - get argv[n] as an integer.
  Returns XELP_E_ERR if n is out of range or not a valid number.
  */
-XELPRESULT XelpArgvInt(char **argv, int argc, int n, int *val)
+XELPRESULT XelpArgvInt(const char **argv, int argc, int n, int *val)
 {
     if (n < 0 || n >= argc) return XELP_E_ERR;
     return XelpParseNum(argv[n], XelpStrLen(argv[n]), val);
@@ -941,7 +941,7 @@ XELPRESULT XelpArgvInt(char **argv, int argc, int n, int *val)
  XelpArgvStr() - get argv[n] as a string pointer and length.
  Returns XELP_E_ERR if n is out of range.
  */
-XELPRESULT XelpArgvStr(char **argv, int argc, int n, const char **s, int *slen)
+XELPRESULT XelpArgvStr(const char **argv, int argc, int n, const char **s, int *slen)
 {
     if (n < 0 || n >= argc) return XELP_E_ERR;
     *s = argv[n];

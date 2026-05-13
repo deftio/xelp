@@ -120,6 +120,31 @@ tokenizer to extract individual arguments:</p>
 </tbody>
 </table>
 
+<h3>argc/argv style (alternative)</h3>
+
+<p>If you prefer standard C argc/argv conventions, enable
+<code>XELP_ENABLE_ARGV</code> in <code>xelpcfg.h</code> and use
+<code>XELP_PARSE_ARGV</code>. This tokenizes the command line, strips
+quotes, processes escape sequences (<code>\n</code>, <code>\t</code>),
+and null-terminates each token:</p>
+
+<pre><code>XELPRESULT cmd_add(XELP *ths, const char *args, int len) {
+    XELP_PARSE_ARGV(ths, args, len);
+    /* argv[0]="add", argv[1]=first arg, argv[2]=second arg */
+    int x, y;
+    if (XelpArgvInt(argv, argc, 1, &amp;x) != XELP_S_OK) return XELP_E_ERR;
+    if (XelpArgvInt(argv, argc, 2, &amp;y) != XELP_S_OK) return XELP_E_ERR;
+    /* ... x + y ... */
+    return XELP_S_OK;
+}
+</code></pre>
+
+<p><code>XELP_PARSE_ARGV</code> declares <code>argc</code> and
+<code>argv</code> for you and returns <code>XELP_E_ERR</code> if
+tokenization fails. Tokens are null-terminated (unlike
+<code>XelpTokN</code> which returns pointer spans). For new code this is
+the recommended approach when you need multiple arguments.</p>
+
 <h2>3. Counting and iterating tokens</h2>
 
 <pre><code>XELPRESULT cmd_args(XELP *ths, const char *args, int len) {

@@ -48,6 +48,7 @@ coverage/
 # Build directories
 build/
 dist/
+tmp/
 
 # Test logs
 xelp-test-log.yaml

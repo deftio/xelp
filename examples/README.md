@@ -47,18 +47,18 @@ cd scripting && make
 
 ## arduino
 
-Basic xelp example using the raw C API. Works on any Arduino board
-with a Serial port -- LED control, token listing, and built-in help.
-No external library dependencies.
+Raw C API with XelpBuf2Argv for argc/argv-style argument parsing.
+Demonstrates echo (argv iteration), LED control (`XelpArgvInt`), and
+divmod with register returns (R1/R2). Includes a startup script via
+`XelpParse`. Works on any Arduino board with a Serial port.
 
 ## arduino-cpp
 
-Same idea as the `arduino` example but uses the `XelpCLI` C++ wrapper
-class from `src/XelpArduino.h`. Eliminates boilerplate: no manual
-`XELP_SET_FN_*` macros, no `Serial.available()` loop -- just `begin()`,
-`setCommands()`, and `poll(Serial)`. Also demonstrates `run()` for
-executing a startup script, and the `r0()`-`r3()` register accessors
-for reading command return values (divmod example).
+C++ Easy API with inline lambda commands (`commands({...})`). Uses
+`XelpCLI::argInt()` for const-correct argv parsing, `r1()`/`r2()`
+register accessors for reading command return values, and `run()` for
+startup scripts. No static function tables, no raw `XELP*` pointers
+-- just `begin()`, `commands({...})`, and `poll(Serial)`.
 
 ## esp32-wifi
 

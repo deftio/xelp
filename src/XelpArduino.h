@@ -269,6 +269,23 @@ public:
     XELPREG& r2()       { return m_x.mR[2]; }
     XELPREG& r3()       { return m_x.mR[3]; }
 
+    /* ---- argv helpers ----------------------------------------------- */
+
+#ifdef XELP_ENABLE_ARGV
+    /** Get argv[n] as int. */
+    static XELPRESULT argInt(const char** argv, int argc, int n, int* val)
+    {
+        return XelpArgvInt(argv, argc, n, val);
+    }
+
+    /** Get argv[n] as string + length. */
+    static XELPRESULT argStr(const char** argv, int argc, int n,
+                             const char** s, int* slen)
+    {
+        return XelpArgvStr(argv, argc, n, s, slen);
+    }
+#endif
+
     /* ---- Escape hatch --------------------------------------------- */
 
     /** Access the underlying C struct for anything the wrapper doesn't expose. */
@@ -354,12 +371,9 @@ private:
         int argc = 0;
 
 #ifdef XELP_ENABLE_ARGV
-        char *argv_w[XELP_MAX_EASY_ARGV];
-        int j;
-        if (XelpBuf2Argv(ths, args, len, &argc, argv_w, XELP_MAX_EASY_ARGV) != XELP_S_OK)
+        if (XelpBuf2Argv(ths, args, len, &argc, argv, XELP_MAX_EASY_ARGV) != XELP_S_OK)
             return XELP_E_ERR;
         if (argc < 1) return XELP_E_ERR;
-        for (j = 0; j < argc; j++) argv[j] = argv_w[j];
 #else
         {
             XelpBuf b, t;
@@ -392,13 +406,8 @@ private:
         int argc = 0;
 
 #ifdef XELP_ENABLE_ARGV
-        {
-            char *argv_w[XELP_MAX_EASY_ARGV];
-            int j;
-            if (XelpBuf2Argv(ths, args, len, &argc, argv_w, XELP_MAX_EASY_ARGV) != XELP_S_OK)
-                return XELP_E_ERR;
-            for (j = 0; j < argc; j++) argv[j] = argv_w[j];
-        }
+        if (XelpBuf2Argv(ths, args, len, &argc, argv, XELP_MAX_EASY_ARGV) != XELP_S_OK)
+            return XELP_E_ERR;
 #else
         {
             XelpBuf b, t;

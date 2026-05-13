@@ -37,7 +37,7 @@ static XELPCLIFuncMapEntry fuzz_cli_cmds[] = {
 
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     XELP x;
-    char *argv[XELP_ARGV_MAX];
+    const char *argv[XELP_ARGV_MAX];
     int argc, val, slen;
     const char *s;
     signed char idx;

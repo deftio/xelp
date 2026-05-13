@@ -31,7 +31,7 @@ static XELP cli;
  */
 static XELPRESULT cmd_echo(XELP *ths, const char *args, int len)
 {
-    char *argv[XELP_ARGV_MAX];
+    const char *argv[XELP_ARGV_MAX];
     int argc, i;
 
     if (XelpBuf2Argv(ths, args, len, &argc, argv, XELP_ARGV_MAX) != XELP_S_OK)
@@ -52,7 +52,7 @@ static XELPRESULT cmd_echo(XELP *ths, const char *args, int len)
  */
 static XELPRESULT cmd_divmod(XELP *ths, const char *args, int len)
 {
-    char *argv[XELP_ARGV_MAX];
+    const char *argv[XELP_ARGV_MAX];
     int argc, a, b;
 
     if (XelpBuf2Argv(ths, args, len, &argc, argv, XELP_ARGV_MAX) != XELP_S_OK)
@@ -102,7 +102,7 @@ static XELPRESULT cmd_divmod_old(XELP *ths, const char *args, int len)
  */
 static XELPRESULT cmd_set(XELP *ths, const char *args, int len)
 {
-    char *argv[XELP_ARGV_MAX];
+    const char *argv[XELP_ARGV_MAX];
     int argc;
     const char *key, *val;
     int klen, vlen;
@@ -197,7 +197,7 @@ int main(void)
 
     {
         const char *input = "set \"config file\" \"/etc/xelp.conf\"";
-        char *argv[XELP_ARGV_MAX];
+        const char *argv[XELP_ARGV_MAX];
         int argc, i;
 
         if (XelpBuf2Argv(&cli, input, XelpStrLen(input),

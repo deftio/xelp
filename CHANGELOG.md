@@ -10,7 +10,36 @@ Versions always use three-component semver (e.g. `0.3.0`, never `0.3`).
 
 ## [Unreleased]
 
+## [0.3.3] - 2026-05-12
+
 ### Added
+- **Structured argc/argv parsing** (`XELP_ENABLE_ARGV`): new `XelpBuf2Argv`
+  function tokenizes a command line into a null-terminated `argv[]` array with
+  quote stripping, escape processing, and configurable max arguments
+  (`XELP_ARGV_MAX`, default 8). Uses a per-instance scratch buffer
+  (`mArgvBuf`). ~530–700 bytes on ARM Thumb.
+- `XELP_PARSE_ARGV(ths, args, len)` convenience macro: declares `argc` and
+  `argv` locals and calls `XelpBuf2Argv` in one line. Returns `XELP_E_ERR`
+  on tokenization failure. Recommended for new command handlers that need
+  multiple arguments.
+- `XelpArgvInt(argv, argc, n, &val)` — get argument N as an integer from an
+  argv array. Wraps `XelpParseNum`. Returns `XELP_E_ERR` if index is out of
+  range or parse fails.
+- `XelpArgvStr(argv, argc, n, &s, &slen)` — get argument N as a
+  null-terminated string pointer and length from an argv array.
+- `XELP_ARGVBUFSZ` compile-time define: decouples the argv scratch buffer
+  size from `XELP_CMDBUFSZ`. Defaults to `XELP_CMDBUFSZ` (zero binary
+  change for existing users). Override to a larger value when variable
+  expansion or long script lines may produce arguments longer than the CLI
+  input buffer.
+- `XELP_ESC_MAP` compile-time define: packed key-value pairs for escape
+  expansion inside double-quoted arguments (`XelpBuf2Argv`). Default maps
+  `\n` → newline (0x0A) and `\t` → tab (0x09). Set to `""` to disable.
+- `XELP_ENTER_CR` / `XELP_ENTER_LF` compile-time defines: independently
+  enable `\r` and `\n` as ENTER keys in interactive input
+  (`XelpParseKey`). Both enabled by default. Script parsing always uses
+  `\n`.
+- Fuzz harness for `XelpBuf2Argv` (`tests/fuzz/fuzz_buf2argv.c`).
 - **ESP32 BLE CLI example** (`examples/esp32-ble-cli/`): dual-instance xelp
   demo with one CLI on USB Serial and one on BLE (Nordic UART Service).
   Both instances share the same command table. Includes Web Bluetooth
@@ -26,14 +55,24 @@ Versions always use three-component semver (e.g. `0.3.0`, never `0.3`).
 - Deferred serial banner (press Enter to show) to avoid USB CDC boot
   truncation on ESP32-S3.
 
-### Fixed
-- `\r` stripping in Web Bluetooth terminals (`esp32-ble-cli` and
-  `esp32c6-wifi`) to prevent line overwrite in browsers.
-
 ### Changed
 - Updated READMEs for arduino, arduino-cpp, esp32-wifi, pico-cli, and
   pico-cli-arduino examples with arduino-cli compile/upload/monitor
   commands.
+- `xelpcfg.h` refactored from `#ifdef / #else` pattern to `#ifndef` guards
+  with `xelp_ovr.h` included after defaults. Allows selective override
+  without supplying every define. Existing `XELP_CONFIG_OVERRIDE` usage
+  works unchanged.
+- `XelpBuf2Argv`, `XelpArgvInt`, `XelpArgvStr` signatures use
+  `const char **argv` (was `char **argv`) for const-correctness.
+- Test suite expanded to 49 units, 678 test cases (from 47/598).
+
+### Fixed
+- `\r` stripping in Web Bluetooth terminals (`esp32-ble-cli` and
+  `esp32c6-wifi`) to prevent line overwrite in browsers.
+- `dev/size_profiles.sh`: all profiles reported identical sizes because the
+  `#define`-only override header was ignored by `#ifndef` guards. Fixed by
+  emitting `#undef` for all 7 feature flags before each profile's defines.
 
 ## [0.3.2] - 2026-04-26
 

@@ -72,6 +72,7 @@ without KEY, or KEY without HELP.
 | `XELP_ENABLE_CLI` | Command line prompt, backspace, command dispatch, scripting, tokenizer | -- | Core (~2 KB) |
 | `XELP_ENABLE_LINE_EDIT` | Cursor movement (left/right, Home/End), insert-at-cursor, Delete, multi-byte ANSI key recognition | `XELP_ENABLE_CLI` | ~800-1000 bytes |
 | `XELP_ENABLE_HISTORY` | Command history (UP/DOWN arrow recall of previous commands) | `XELP_ENABLE_CLI` + `XELP_ENABLE_LINE_EDIT` | ~420 bytes |
+| `XELP_ENABLE_ARGV` | Structured argc/argv parsing (`XelpBuf2Argv`, `XELP_PARSE_ARGV`). Adds a per-instance scratch buffer. | -- | ~530-700 bytes + `XELP_ARGVBUFSZ` RAM |
 | `XELP_ENABLE_THR` | Pass-through mode -- redirect all keys to another peripheral | -- | ~50-125 bytes |
 | `XELP_ENABLE_HELP` | Built-in help command listing all registered commands | -- | ~180-350 bytes |
 | `XELP_ENABLE_FULL` | Shorthand: enables KEY, CLI, THR, and HELP | -- | All combined |
@@ -111,7 +112,10 @@ Override in `xelpcfg.h`:
 
 | Define | Default | Purpose |
 |--------|---------|---------|
-| `XELP_CMDBUFSZ` | 64 | Command line buffer size in bytes |
+| `XELP_CMDBUFSZ` | 64 | CLI input buffer size in bytes |
+| `XELP_ARGVBUFSZ` | `XELP_CMDBUFSZ` | Scratch buffer size for `XelpBuf2Argv` (bytes per instance, only when `XELP_ENABLE_ARGV`). Override for variable expansion. |
+| `XELP_ARGV_MAX` | 8 | Default max arguments for `XelpBuf2Argv` / `XELP_PARSE_ARGV`. |
+| `XELP_HIST_DEPTH` | 4 | Number of commands stored in history ring (requires `XELP_ENABLE_HISTORY`). |
 | `XELP_REGS_SZ` | 4 | Number of callee-clobbers-all return registers (minimum 4). R0 is command status, R1-R3 are command-specific. |
 | `XELPREG` | `int` | Register type (change for platforms where `int` is not ideal) |
 
@@ -225,10 +229,21 @@ XELP_SET_VAL_CLI_PROMPT(myXelp, "ser1>");
 
 ## Config Override for Multi-Target Builds
 
-If `XELP_CONFIG_OVERRIDE` is defined before including `xelpcfg.h`, the
-file includes `xelp_ovr.h` instead of using its built-in defaults. This
-lets you keep a project-specific configuration without modifying the
-library's `xelpcfg.h`.
+Define `XELP_CONFIG_OVERRIDE` in your compiler flags and create
+`xelp_ovr.h` in your include path. The file is included *after* the
+defaults in `xelpcfg.h`, so use `#undef` then `#define` to change values.
+Anything you don't touch keeps its default.
+
+```c
+/* xelp_ovr.h example -- lean build for ATtiny */
+#undef  XELP_ENABLE_CLI
+#undef  XELP_ENABLE_LINE_EDIT
+#undef  XELP_ENABLE_HISTORY
+#undef  XELP_ENABLE_THR
+#undef  XELP_ENABLE_HELP
+#undef  XELP_ENABLE_ARGV
+/* leaves only XELP_ENABLE_KEY */
+```
 
 Use cases:
 

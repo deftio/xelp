@@ -1,12 +1,15 @@
 /*
  * arduino-example.ino -- Basic xelp example using the raw C API.
  *
- * Works on any Arduino board with a Serial port. Provides an
- * interactive CLI over Serial with help, echo, and LED control.
+ * Demonstrates XelpBuf2Argv for argc/argv-style argument parsing:
+ *   - echo: argv iteration
+ *   - led:  XelpArgvInt for a single integer arg
+ *   - divmod: XelpArgvInt + register returns (R1/R2)
  *
+ * Works on any Arduino board with a Serial port.
  * Open the Serial Monitor at 115200 baud and type "help".
  *
- * For the simpler C++ wrapper approach, see arduino-cpp-example.
+ * For the C++ Easy API approach, see arduino-cpp-example.
  */
 
 #include "xelp.h"
@@ -22,50 +25,57 @@ void writeChar(char c) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Command handlers                                                    */
+/* Command handlers (all use XelpBuf2Argv)                             */
 /* ------------------------------------------------------------------ */
 
-XELPRESULT cmdHelp(XELP *ths, const char* args_str, int maxlen) {
-    (void)args_str; (void)maxlen;
+XELPRESULT cmdHelp(XELP *ths, const char* args, int len) {
+    (void)args; (void)len;
     return XelpHelp(ths);
 }
 
-XELPRESULT cmdBanner(XELP *ths, const char* args_str, int maxlen) {
-    (void)ths; (void)args_str; (void)maxlen;
+XELPRESULT cmdBanner(XELP *ths, const char* args, int len) {
+    (void)ths; (void)args; (void)len;
     Serial.println(XELP_BANNER_STR);
     return XELP_S_OK;
 }
 
-XELPRESULT cmdLed(XELP *ths, const char* args_str, int maxlen) {
-    XelpBuf b, tok;
-    int val;
-    XELP_XB_INIT(b, (char*)args_str, maxlen);
-    if (XelpTokN(&b, 1, &tok) == XELP_S_OK) {
-        XelpParseNum(tok.s, (int)(tok.p - tok.s), &val);
-        digitalWrite(LED_BUILTIN, val ? HIGH : LOW);
-        XelpOut(ths, val ? "LED ON\n" : "LED OFF\n", 0);
+XELPRESULT cmdEcho(XELP *ths, const char* args, int len) {
+    int i;
+    XELP_PARSE_ARGV(ths, args, len);
+    for (i = 1; i < argc; i++) {
+        if (i > 1) XelpOut(ths, " ", 0);
+        XelpOut(ths, argv[i], 0);
     }
+    XelpOut(ths, "\n", 0);
     return XELP_S_OK;
 }
 
-XELPRESULT cmdListToks(XELP *ths, const char* args_str, int maxlen) {
-    XelpBuf b, tok;
-    int n, i;
-    XELP_XB_INIT(b, (char*)args_str, maxlen);
-    XelpNumToks(&b, &n);
-    Serial.print("[");
-    Serial.print(n);
-    Serial.print("]");
-    for (i = 0; i < n; i++) {
-        XELP_XB_TOP(b);
-        XelpTokN(&b, i, &tok);
-        XelpOut(ths, "<", -1);
-        Serial.print(i);
-        XelpOut(ths, ":", -1);
-        XelpOut(ths, tok.s, tok.p - tok.s);
-        XelpOut(ths, "> ", -1);
+XELPRESULT cmdLed(XELP *ths, const char* args, int len) {
+    int val;
+    XELP_PARSE_ARGV(ths, args, len);
+    if (XelpArgvInt(argv, argc, 1, &val) != XELP_S_OK) {
+        XelpOut(ths, "usage: led <0|1>\n", 0);
+        return XELP_E_ERR;
     }
-    Serial.print("\n");
+    digitalWrite(LED_BUILTIN, val ? HIGH : LOW);
+    XelpOut(ths, val ? "LED ON\n" : "LED OFF\n", 0);
+    return XELP_S_OK;
+}
+
+XELPRESULT cmdDivmod(XELP *ths, const char* args, int len) {
+    int a, d;
+    XELP_PARSE_ARGV(ths, args, len);
+    if (XelpArgvInt(argv, argc, 1, &a) != XELP_S_OK ||
+        XelpArgvInt(argv, argc, 2, &d) != XELP_S_OK) {
+        XelpOut(ths, "usage: divmod <a> <b>\n", 0);
+        return XELP_E_ERR;
+    }
+    if (d == 0) {
+        XelpOut(ths, "division by zero\n", 0);
+        return XELP_E_ERR;
+    }
+    ths->mR[1] = a / d;
+    ths->mR[2] = a % d;
     return XELP_S_OK;
 }
 
@@ -74,10 +84,11 @@ XELPRESULT cmdListToks(XELP *ths, const char* args_str, int maxlen) {
 /* ------------------------------------------------------------------ */
 
 XELPCLIFuncMapEntry gMyCLICommands[] = {
-    { &cmdHelp,     "help",   "show help"            },
-    { &cmdBanner,   "banner", "print banner"         },
-    { &cmdLed,      "led",    "led <0|1> -- set LED" },
-    { &cmdListToks, "lt",     "list tokens"          },
+    { &cmdHelp,   "help",   "show help"                        },
+    { &cmdBanner, "banner", "print banner"                     },
+    { &cmdEcho,   "echo",   "echo <args...>"                   },
+    { &cmdLed,    "led",    "led <0|1> -- set LED"             },
+    { &cmdDivmod, "divmod", "divmod <a> <b> -- R1=a/b R2=a%%b" },
     XELP_FUNC_ENTRY_LAST
 };
 
@@ -96,6 +107,10 @@ void setup() {
     XELP_SET_FN_CLI(cli, gMyCLICommands);
 
     Serial.println(XELP_BANNER_STR);
+
+    /* Run a startup script to demonstrate XelpParse + registers */
+    XelpParse(&cli, "echo Hello from xelp; divmod 17 5",
+              XelpStrLen("echo Hello from xelp; divmod 17 5"));
 }
 
 /* ------------------------------------------------------------------ */

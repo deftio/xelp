@@ -464,6 +464,7 @@ flag (`-DXELP_CMDBUFSZ=128`) or `xelp_ovr.h`.
 |---------|---------|---------|
 | `XELP_CMDBUFSZ` | 64 | CLI input buffer size (bytes). In `xelpcfg.h`, `#ifndef`-guarded. |
 | `XELP_ARGV_MAX` | 8 | Default max arguments for `XelpBuf2Argv`. In `xelpcfg.h`, `#ifndef`-guarded. |
+| `XELP_ARGVBUFSZ` | `XELP_CMDBUFSZ` | Scratch buffer size for XelpBuf2Argv (bytes per instance). Override for variable expansion. |
 | `XELP_REGS_SZ` | 4 | Return registers per instance (minimum 4) |
 | `XELPREG` | `int` | Register element type |
 | `XELP_HIST_DEPTH` | 4 | History ring buffer depth |

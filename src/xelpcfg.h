@@ -214,6 +214,16 @@
 #define XELP_ARGV_MAX       8
 #endif
 
+/*
+  XELP_ARGVBUFSZ is the scratch buffer size for XelpBuf2Argv tokenization.
+  Defaults to XELP_CMDBUFSZ.  Override to a larger value if variable expansion
+  or long script lines may produce arguments longer than the CLI input buffer.
+  RAM cost: XELP_ARGVBUFSZ bytes per instance (only when XELP_ENABLE_ARGV).
+ */
+#ifndef XELP_ARGVBUFSZ
+#define XELP_ARGVBUFSZ      XELP_CMDBUFSZ
+#endif
+
 
 /**
  Enables all features, and modes. at the expense of library size. See docs for compile sizes on tested platorms.

@@ -4809,7 +4809,7 @@ XELPRESULT test_HistoryAndEcho() {
  */
 XELPRESULT test_XelpBuf2Argv() {
     XELP x;
-    char *argv[XELP_ARGV_MAX];
+    const char *argv[XELP_ARGV_MAX];
     int argc;
     XELPRESULT r;
     int val;
@@ -5057,7 +5057,7 @@ XELPRESULT test_XelpBuf2Argv() {
    ================================================================ */
 XELPRESULT test_XelpBuf2Argv_overflow() {
     XELP x;
-    char *argv[XELP_ARGV_MAX];
+    const char *argv[XELP_ARGV_MAX];
     int argc;
     XELPRESULT r;
     int val;

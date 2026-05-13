@@ -297,7 +297,7 @@ typedef struct XELP_tag
 #endif
 
 #ifdef XELP_ENABLE_ARGV						 /* if structured argv parsing enabled          */
-	char					mArgvBuf[XELP_CMDBUFSZ]; /* scratch buffer for XelpBuf2Argv     */
+	char					mArgvBuf[XELP_ARGVBUFSZ]; /* scratch buffer for XelpBuf2Argv    */
 #endif
 
 #ifdef XELP_CLI_PROMPT 						 /* prompt for CLI enabled                      */
@@ -437,13 +437,24 @@ XELPRESULT XelpArgStr (const char *args, int len, int n,
    argv[0] = command name per argc/argv convention.
    Returns XELP_E_ERR if input exceeds scratch buffer or too many args. */
 XELPRESULT XelpBuf2Argv(XELP *ths, const char *args, int len,
-                         int *argc, char **argv, int maxargs);
+                         int *argc, const char **argv, int maxargs);
 
 /* Get argv[n] as an integer.  Returns XELP_E_ERR if out of range or not numeric. */
-XELPRESULT XelpArgvInt(char **argv, int argc, int n, int *val);
+XELPRESULT XelpArgvInt(const char **argv, int argc, int n, int *val);
 
 /* Get argv[n] as a string pointer and length. */
-XELPRESULT XelpArgvStr(char **argv, int argc, int n, const char **s, int *slen);
+XELPRESULT XelpArgvStr(const char **argv, int argc, int n, const char **s, int *slen);
+
+/* Convenience macro for command handlers (C99+ / C++).
+   Declares local 'int argc' and 'const char *argv[XELP_ARGV_MAX]',
+   tokenizes args, returns XELP_E_ERR on failure.
+   Place at the top of a handler body, before other statements. */
+#define XELP_PARSE_ARGV(ths, args, len) \
+    const char *argv[XELP_ARGV_MAX]; \
+    int argc = 0; \
+    if (XelpBuf2Argv((ths), (args), (len), &argc, argv, XELP_ARGV_MAX) \
+        != XELP_S_OK) \
+        return XELP_E_ERR
 #endif
 
 /* XELPNEXTTOK get next token in a string buffer.  This is just a macro call to XelpTokLine             */
