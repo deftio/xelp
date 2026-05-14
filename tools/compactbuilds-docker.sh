@@ -44,53 +44,50 @@ mkdir -p "$CFG_DIR/key" "$CFG_DIR/cli" "$CFG_DIR/full"
 
 cat > "$CFG_DIR/key/xelp_ovr.h" << 'EOF'
 /* KEY-only config: minimal single-key dispatch, no CLI, no THR */
+#undef XELP_ENABLE_CLI
+#undef XELP_ENABLE_LINE_EDIT
+#undef XELP_ENABLE_HISTORY
+#undef XELP_ENABLE_ARGV
+#undef XELP_ENABLE_KEY
+#undef XELP_ENABLE_THR
+#undef XELP_ENABLE_HELP
+
 #define XELP_ENABLE_KEY       1
-#define XELPKEY_CLI            (XELPKEY_CTP)
-#define XELPKEY_KEY            (XELPKEY_ESC)
-#define XELPKEY_THR            (XELPKEY_CTT)
-#define XELP_CLI_ESC           ('`')
-#define XELP_QUO_ESC           ('\\')
-#define XELP_REGS_SZ           4
-#define XELPREG int
 EOF
 
 cat > "$CFG_DIR/cli/xelp_ovr.h" << 'EOF'
 /* CLI config: interactive command line with line editing and help */
+#undef XELP_ENABLE_CLI
+#undef XELP_ENABLE_LINE_EDIT
+#undef XELP_ENABLE_HISTORY
+#undef XELP_ENABLE_ARGV
+#undef XELP_ENABLE_KEY
+#undef XELP_ENABLE_THR
+#undef XELP_ENABLE_HELP
+
 #define XELP_ENABLE_KEY       1
 #define XELP_ENABLE_CLI       1
 #define XELP_ENABLE_LINE_EDIT 1
 #define XELP_ENABLE_HELP      1
-#define XELPKEY_CLI            (XELPKEY_CTP)
-#define XELPKEY_KEY            (XELPKEY_ESC)
-#define XELPKEY_THR            (XELPKEY_CTT)
-#define XELP_CLI_ESC           ('`')
-#define XELP_QUO_ESC           ('\\')
-#define XELP_CLI_PROMPT        "xelp>"
-#define XELP_HELP_KEY_STR      "\nKey functions\n"
-#define XELP_HELP_CLI_STR      "\nCLI functions\n"
-#define XELP_HELP_ABT_STR      (ths->mpAboutMsg)
-#define XELP_REGS_SZ           4
-#define XELPREG int
 EOF
 
 cat > "$CFG_DIR/full/xelp_ovr.h" << 'EOF'
 /* FULL config: all features enabled */
+#undef XELP_ENABLE_CLI
+#undef XELP_ENABLE_LINE_EDIT
+#undef XELP_ENABLE_HISTORY
+#undef XELP_ENABLE_ARGV
+#undef XELP_ENABLE_KEY
+#undef XELP_ENABLE_THR
+#undef XELP_ENABLE_HELP
+
 #define XELP_ENABLE_KEY       1
 #define XELP_ENABLE_CLI       1
 #define XELP_ENABLE_LINE_EDIT 1
+#define XELP_ENABLE_HISTORY   1
+#define XELP_ENABLE_ARGV      1
 #define XELP_ENABLE_HELP      1
 #define XELP_ENABLE_THR       1
-#define XELPKEY_CLI            (XELPKEY_CTP)
-#define XELPKEY_KEY            (XELPKEY_ESC)
-#define XELPKEY_THR            (XELPKEY_CTT)
-#define XELP_CLI_ESC           ('`')
-#define XELP_QUO_ESC           ('\\')
-#define XELP_CLI_PROMPT        "xelp>"
-#define XELP_HELP_KEY_STR      "\nKey functions\n"
-#define XELP_HELP_CLI_STR      "\nCLI functions\n"
-#define XELP_HELP_ABT_STR      (ths->mpAboutMsg)
-#define XELP_REGS_SZ           4
-#define XELPREG int
 EOF
 
 # --- Helper: compile and return .text size ---------------------------------

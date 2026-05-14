@@ -207,10 +207,12 @@ do_validate() {
   Fix the build/test errors above and re-run."
     pass "Tests passed, all examples built, zero warnings (-Werror)."
 
-    local cov_line pct
-    cov_line=$(gcov -o build/ src/xelp.c 2>/dev/null | grep "Lines executed" | head -1)
-    pct=$(echo "$cov_line" | grep -o '[0-9]*\.[0-9]*%' | head -1)
-    echo "  Coverage: $pct"
+    local cov_output line_pct branch_pct
+    cov_output=$(gcov -b -o build/ src/xelp.c 2>/dev/null)
+    line_pct=$(echo "$cov_output" | grep "Lines executed" | head -1 | grep -o '[0-9]*\.[0-9]*%' | head -1)
+    branch_pct=$(echo "$cov_output" | grep "Taken at least once" | head -1 | grep -o '[0-9]*\.[0-9]*%' | head -1)
+    echo "  Line coverage:   $line_pct"
+    echo "  Branch coverage: $branch_pct (taken at least once)"
 
     safe_clean
 }

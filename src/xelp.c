@@ -1014,7 +1014,6 @@ XELPRESULT XelpParseKey (XELP *ths, char key)
 		if (is_single) {
 			char ch = (char)keycode;
 			int i = ths->mCurMode;
-			int modeChangeAttempt = 1;
 
 			switch (ch) {
 #ifdef XELP_ENABLE_CLI
@@ -1033,11 +1032,10 @@ XELPRESULT XelpParseKey (XELP *ths, char key)
 					break;
 #endif
 				default:
-					modeChangeAttempt = 0;
 					break;
 			}
 
-			if ((ths->mCurMode != i) && (modeChangeAttempt)) {
+			if (ths->mCurMode != i) {
 				if (ths->mpfEditModeChg)
 					ths->mpfEditModeChg(ths->mCurMode);
 				continue; /* if reprocess is set, loop; else done */

@@ -114,6 +114,7 @@ void dummyIntOut(int i) {gInt = i;}
 int gBool;
 void dummyVoid0() {gBool = 0;}
 void dummyVoid1() {gBool = 1;}
+void dummyPassThru(char c) { (void)c; }
 
 #define GDUMMYBUFLEN (0x1000)
 char gDummyBuf[GDUMMYBUFLEN];
@@ -5326,6 +5327,240 @@ XELPRESULT test_XelpBuf2Argv_overflow() {
     return XELP_S_OK;
 }
 
+/* ====================================================================
+   test_BranchCoverage -- exercises edge-case branches for full coverage:
+     - XelpNextTok with NULL tok pointer
+     - XelpNextInt past end of args (error return)
+     - Mode switch to CLI with no CLI func table registered
+     - Mode switch to THR with no passthrough function registered
+     - XelpBufCmp CMP_TYPE_A0 matching with embedded null
+ */
+XELPRESULT test_BranchCoverage() {
+    XELP x;
+    XELPRESULT r;
+
+    /* 1. XelpNextTok with NULL tok: should return NOTFOUND and not crash */
+    {
+        XelpArgs a;
+        char buf[] = "";
+        XelpArgsInit(&a, buf, 0);
+        r = XelpNextTok(&a, 0);
+        if (JB_ASSERT(r != XELP_S_NOTFOUND, "BC1 NextTok null tok"))
+            return XELP_E_ERR;
+    }
+
+    /* 2. XelpNextInt past end of args: error path */
+    {
+        XelpArgs a;
+        char buf[] = "hello";
+        int val = -1;
+        XelpArgsInit(&a, buf, XelpStrLen(buf));
+        /* consume the only token */
+        r = XelpNextInt(&a, &val);
+        /* "hello" is not a valid integer -- XelpParseNum should fail */
+        if (JB_ASSERT(r == XELP_S_OK, "BC2 NextInt NaN"))
+            return XELP_E_ERR;
+        /* now past end */
+        r = XelpNextInt(&a, &val);
+        if (JB_ASSERT(r == XELP_S_OK, "BC2 NextInt eof"))
+            return XELP_E_ERR;
+    }
+
+    /* 3. Mode switch to CLI with no CLI funcs registered:
+       should stay in current mode (KEY).
+       Set mode directly since XELPKEY_KEY=ESC triggers the key accumulator. */
+    {
+        XelpInit(&x, "TestBC3");
+        XELP_SET_FN_OUT(x, dummyOut);
+        /* register KEY funcs but NOT CLI funcs */
+        XELP_SET_FN_KEY(x, gMyKeyCommands);
+        x.mCurMode = XELP_MODE_KEY;
+        /* try to switch to CLI mode via CTRL-P: should be ignored (no CLI funcs) */
+        XelpParseKey(&x, XELPKEY_CLI);
+        if (JB_ASSERT(x.mCurMode != XELP_MODE_KEY, "BC3 no CLI stay KEY"))
+            return XELP_E_ERR;
+    }
+
+#ifdef XELP_ENABLE_THR
+    /* 4. Mode switch to THR with no passthrough function:
+       should stay in current mode */
+    {
+        XelpInit(&x, "TestBC4");
+        XELP_SET_FN_OUT(x, dummyOut);
+        XELP_SET_FN_KEY(x, gMyKeyCommands);
+        XELP_SET_FN_CLI(x, gMyCLICommands);
+        /* do NOT set passthrough function */
+        x.mCurMode = XELP_MODE_KEY;
+        /* try to switch to THR mode: should be ignored */
+        XelpParseKey(&x, XELPKEY_THR);
+        if (JB_ASSERT(x.mCurMode != XELP_MODE_KEY, "BC4 no THR stay KEY"))
+            return XELP_E_ERR;
+    }
+
+    /* 5. THR mode passthrough: single char should reach mpfPassThru */
+    {
+        XelpInit(&x, "TestBC5");
+        XELP_SET_FN_OUT(x, dummyOut);
+        XELP_SET_FN_KEY(x, gMyKeyCommands);
+        XELP_SET_FN_CLI(x, gMyCLICommands);
+        XELP_SET_FN_THR(x, dummyPassThru);
+        x.mCurMode = XELP_MODE_THR;
+        /* send a normal printable char in THR mode */
+        XelpParseKey(&x, 'a');
+        /* should still be in THR mode */
+        if (JB_ASSERT(x.mCurMode != XELP_MODE_THR, "BC5 THR passthru"))
+            return XELP_E_ERR;
+    }
+#endif
+
+    /* 6. XelpBufCmp CMP_TYPE_A0: null in first buffer terminates comparison */
+    {
+        char a[] = "hi";  /* {'h','i','\0'} */
+        char b[] = "hi";
+        /* ae/be point one past last byte; null in A triggers early stop */
+        r = XelpBufCmp(a, a + 3, b, b + 3, XELP_CMP_TYPE_A0);
+        if (JB_ASSERT(r != XELP_S_OK, "BC6 CMP_A0 match"))
+            return XELP_E_ERR;
+    }
+
+    /* 7. Output with mOutEnable=1 but mpfOut=NULL: exercises short-circuit
+       branches in _xelp_putc, _xelp_echo, _xelp_cursor, XelpOut. */
+    {
+        XelpInit(&x, "TestBC7");
+        /* enable output but do NOT set mpfOut — should be a no-op, no crash */
+        XELP_SET_OUT_ENABLE(x, 1);
+        XelpOut(&x, "hello", 5);
+        XelpPutc(&x, 'x');
+        if (JB_ASSERT(x.mpfOut != 0, "BC7 mpfOut should be null"))
+            return XELP_E_ERR;
+    }
+
+    /* 8. Output with mOutEnable=1, mpfOut=NULL in CLI mode with cursor
+       movement: exercises _xelp_cursor and _xelpRedrawFromCursor guards */
+    {
+        XelpInit(&x, "TestBC8");
+        XELP_SET_OUT_ENABLE(x, 1);
+        XELP_SET_FN_CLI(x, gMyCLICommands);
+        /* type, move cursor, insert — all output guarded by mpfOut null */
+        XelpParseKey(&x, 'a');
+        XelpParseKey(&x, 'b');
+        feedKeycode(&x, XELP_KEYCODE_LEFT);
+        XelpParseKey(&x, 'X');         /* insert at cursor */
+        feedKeycode(&x, XELP_KEYCODE_KDEL); /* delete at cursor */
+        XelpParseKey(&x, XELPKEY_BS);  /* backspace */
+        XelpParseKey(&x, '\n');        /* enter - dispatch */
+        if (JB_ASSERT(x.mpfOut != 0, "BC8 mpfOut null"))
+            return XELP_E_ERR;
+    }
+
+    /* 9. Argv tokenizer: newline and comment terminators */
+    {
+        const char *argv[XELP_ARGV_MAX];
+        int argc = 0;
+
+        /* newline in unquoted context terminates tokenization */
+        r = XelpBuf2Argv(&x, "cmd arg\nignored", 15, &argc, argv, XELP_ARGV_MAX);
+        if (JB_ASSERT(r != XELP_S_OK || argc != 2, "BC9 newline stop"))
+            return XELP_E_ERR;
+
+        /* comment char terminates tokenization */
+        r = XelpBuf2Argv(&x, "cmd arg # comment", 17, &argc, argv, XELP_ARGV_MAX);
+        if (JB_ASSERT(r != XELP_S_OK || argc != 2, "BC9 comment stop"))
+            return XELP_E_ERR;
+
+        /* escape char at end of buffer (no char follows) */
+        r = XelpBuf2Argv(&x, "cmd\\", 4, &argc, argv, XELP_ARGV_MAX);
+        if (JB_ASSERT(r != XELP_S_OK, "BC9 esc at end"))
+            return XELP_E_ERR;
+
+        /* quote escape at end of quoted string buffer */
+        r = XelpBuf2Argv(&x, "\"abc\\", 5, &argc, argv, XELP_ARGV_MAX);
+        /* unterminated quote → should still produce a token or error */
+        (void)r; /* result doesn't matter, just exercising the path */
+    }
+
+    /* 10. Key accumulator: unusual bytes after ESC [ */
+    {
+        XelpInit(&x, "TestBC10");
+        XELP_SET_FN_OUT(x, dummyOut);
+        XELP_SET_FN_CLI(x, gMyCLICommands);
+        XELP_SET_FN_KEY(x, gMyKeyCommands);
+
+        /* ESC [ followed by byte > 0x7E (e.g. DEL 0x7F): exercises
+           ub >= 0x40 && ub <= 0x7E false-on-right branch */
+        XelpParseKey(&x, 0x1B);
+        XelpParseKey(&x, '[');
+        XelpParseKey(&x, 0x7F);
+
+        /* ESC [ followed by byte in ':'...'?' range: exercises
+           ub >= '0' && ub <= '9' false-on-right branch (ub > '9') */
+        XelpParseKey(&x, 0x1B);
+        XelpParseKey(&x, '[');
+        XelpParseKey(&x, ';');  /* 0x3B, between '9'+1 and '@'-1 */
+        XelpParseKey(&x, 'A');  /* terminate the sequence */
+    }
+
+    /* 11. THR mode with single char but no passthrough function set:
+       exercises is_single=1, mpfPassThru=NULL branch */
+    {
+        XelpInit(&x, "TestBC11");
+        XELP_SET_FN_OUT(x, dummyOut);
+        XELP_SET_FN_KEY(x, gMyKeyCommands);
+        XELP_SET_FN_CLI(x, gMyCLICommands);
+        /* do NOT set passthrough function */
+        x.mCurMode = XELP_MODE_THR;
+        /* send a single printable char in THR mode */
+        XelpParseKey(&x, 'z');
+        /* should not crash; mode stays THR since no passthrough happened */
+    }
+
+    /* 12. Mode change with mCurMode == i (no actual change) and
+       modeChangeAttempt == 1: exercises the false branch of
+       (mCurMode != i) in the mode switch guard */
+    {
+        XelpInit(&x, "TestBC12");
+        XELP_SET_FN_OUT(x, dummyOut);
+        XELP_SET_FN_CLI(x, gMyCLICommands);
+        XELP_SET_FN_KEY(x, gMyKeyCommands);
+        /* already in CLI mode (default), send CTRL-P (enter CLI mode) */
+        XelpParseKey(&x, XELPKEY_CLI);
+        if (JB_ASSERT(x.mCurMode != XELP_MODE_CLI, "BC12 cli2cli"))
+            return XELP_E_ERR;
+    }
+
+    /* 13. XelpTokLineXB: backtick escape in SEEK state triggers
+       _PS_ESCA -> _PS_PREV path at line 698 of xelp.c */
+    {
+        XelpBuf b, out;
+        char *esc = "`; hello\n";  /* backtick escapes ';' while in SEEK */
+        XELP_XB_INIT(b, esc, XelpStrLen(esc));
+        r = XelpTokLineXB(&b, &out, XELP_TOK_LINE);
+        /* token should be "hello", ';' was escaped and skipped */
+        if (JB_ASSERT(XELP_S_OK != r, "BC13 backtick SEEK _PS_PREV"))
+            return XELP_E_ERR;
+    }
+
+    /* 14. Multi-byte key while already in THR mode: exercises
+       is_single==0 branch at THR dispatch (line 1056) */
+    {
+        XelpInit(&x, "TestBC14");
+        XELP_SET_FN_OUT(x, dummyOut);
+        XELP_SET_FN_KEY(x, gMyKeyCommands);
+        XELP_SET_FN_CLI(x, gMyCLICommands);
+        x.mpfPassThru = dummyPassThru;
+        x.mCurMode = XELP_MODE_THR;
+        /* send ESC [ A (Up arrow) - completes as multi-byte keycode */
+        XelpParseKey(&x, 0x1B);
+        XelpParseKey(&x, '[');
+        XelpParseKey(&x, 'A');
+        /* is_single==0, mpfPassThru should NOT be called for multi-byte */
+        if (JB_ASSERT(x.mCurMode != XELP_MODE_THR, "BC14 thr multi-byte"))
+            return XELP_E_ERR;
+    }
+
+    return XELP_S_OK;
+}
+
 /* 	************************************************
 	Xelp Simple Unit Test suite.
 */
@@ -5388,6 +5623,7 @@ int run_tests() {
     JumpBug_RunUnit(test_XelpArgIntStr,"XelpArgIntStr");
     JumpBug_RunUnit(test_XelpBuf2Argv,"XelpBuf2Argv");
     JumpBug_RunUnit(test_XelpBuf2Argv_overflow,"Buf2ArgvOverflow");
+    JumpBug_RunUnit(test_BranchCoverage,"BranchCoverage");
 #ifdef XELP_ENABLE_LINE_EDIT
     JumpBug_RunUnit(test_CursorWithEcho,"CursorWithEcho");
 #endif

@@ -243,31 +243,32 @@ development uses `make validate` which takes seconds.
 
 Compiled `.text` section sizes with `-Os`. Three configurations: KEY
 (single-key dispatch only), CLI (typical interactive use), FULL (all
-features). Even the largest full build is under 7 KB.
+features including history, argv, and THR). Even the largest full build
+is under 12 KB.
 
 <!-- Build Size Table -->
 | CPU | Width | Compiler | KEY (bytes) | CLI (bytes) | FULL (bytes) |
 |-----|------:|----------|------------:|------------:|-------------:|
-| AVR (ATtiny85) | 8 | avr-gcc | 5174 | 5174 | 5174 |
-| AVR (ATmega328P) | 8 | avr-gcc | 5284 | 5284 | 5284 |
-| Z80 | 8 | SDCC | 8386 | 8386 | 8386 |
-| 6800 (HC08) | 8 | SDCC | 10078 | 10078 | 10078 |
-| MSP430 | 16 | msp430-gcc | 4272 | 4272 | 4272 |
-| 68HC11 | 16 | m68hc11-gcc | 8701 | 8701 | 8701 |
-| Xtensa LX7 (ESP32-S3) | 32 | xtensa-esp-elf-gcc | 3060 | 3060 | 3060 |
-| ARM Thumb | 32 | arm-none-eabi-gcc | 3074 | 3074 | 3074 |
-| Xtensa LX106 (ESP8266) | 32 | xtensa-lx106-elf-gcc | 3447 | 3447 | 3447 |
-| RISC-V (rv32) | 32 | riscv64-unknown-elf-gcc | 3654 | 3654 | 3654 |
-| m68k | 32 | m68k-linux-gnu-gcc | 4044 | 4044 | 4044 |
-| ARM32 | 32 | arm-none-eabi-gcc | 4638 | 4638 | 4638 |
-| x86-32 | 32 | GCC | 5628 | 5628 | 5628 |
-| MIPS32 | 32 | mipsel-linux-gnu-gcc | 6056 | 6056 | 6056 |
-| PowerPC | 32 | powerpc-linux-gnu-gcc | 6842 | 6842 | 6842 |
-| RISC-V (rv64) | 64 | riscv64-linux-gnu-gcc | 4136 | 4136 | 4136 |
-| x86-64 | 64 | GCC | 5935 | 5935 | 5935 |
-| AArch64 (ARM64) | 64 | aarch64-linux-gnu-gcc | 6282 | 6282 | 6282 |
-| x86-64 | 64 | Clang | 6495 | 6495 | 6495 |
-| MIPS64 | 64 | mips64el-linux-gnuabi64-gcc | 6904 | 6904 | 6904 |
+| AVR (ATtiny85) | 8 | avr-gcc | 1046 | 4274 | 5661 |
+| AVR (ATmega328P) | 8 | avr-gcc | 1054 | 4374 | 5777 |
+| Z80 | 8 | SDCC | 1868 | 7294 | 9282 |
+| 6800 (HC08) | 8 | SDCC | 2080 | 8608 | 11140 |
+| MSP430 | 16 | msp430-gcc | 770 | 3500 | 4694 |
+| 68HC11 | 16 | m68hc11-gcc | 2187 | 6908 | 9872 |
+| Xtensa LX7 (ESP32-S3) | 32 | xtensa-esp-elf-gcc | 576 | 2612 | 3521 |
+| ARM Thumb | 32 | arm-none-eabi-gcc | 580 | 2602 | 3435 |
+| RISC-V (rv32) | 32 | riscv64-unknown-elf-gcc | 722 | 3102 | 4144 |
+| Xtensa LX106 (ESP8266) | 32 | xtensa-lx106-elf-gcc | 723 | 2967 | 3932 |
+| m68k | 32 | m68k-linux-gnu-gcc | 728 | 3344 | 4515 |
+| ARM32 | 32 | arm-none-eabi-gcc | 980 | 3938 | 5259 |
+| x86-32 | 32 | GCC | 1081 | 4923 | 6281 |
+| MIPS32 | 32 | mipsel-linux-gnu-gcc | 1296 | 5224 | 6768 |
+| PowerPC | 32 | powerpc-linux-gnu-gcc | 1504 | 6070 | 7727 |
+| RISC-V (rv64) | 64 | riscv64-linux-gnu-gcc | 756 | 3556 | 4646 |
+| x86-64 | 64 | GCC | 1063 | 5144 | 6503 |
+| x86-64 | 64 | Clang | 1039 | 5278 | 7135 |
+| AArch64 (ARM64) | 64 | aarch64-linux-gnu-gcc | 1320 | 5578 | 6943 |
+| MIPS64 | 64 | mips64el-linux-gnuabi64-gcc | 1360 | 5864 | 7696 |
 <!-- Build Size Table -->
 
 x86-64 GCC row is measured directly; others from cross-compilation via

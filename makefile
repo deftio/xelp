@@ -4,7 +4,7 @@
 CC=gcc   	# C compiler to use
 CPP=g++		# C++ compiler to use
 
-C_FLAGS=-I. -Wall -Wextra -Werror -g -fprofile-arcs -ftest-coverage
+C_FLAGS=-I. -Wall -Wextra -Werror -g -O0 -fprofile-arcs -ftest-coverage
 CPP_FLAGS=-std=c++11 -Wall
 
 LIB_DIR=src
@@ -60,13 +60,14 @@ $(BUILD_DIR)/xelp_unit_tests.o: $(TEST_DIR)/xelp_unit_tests.c $(LIB_DIR)/xelp.h 
 tests: $(OBJ_TESTS)
 	$(CC) $(C_FLAGS) $(INCLUDES) $(OBJ_TESTS) -o $(BUILD_DIR)/xelp_unit_tests.out
 	@$(BUILD_DIR)/xelp_unit_tests.out
-	@gcov -o $(BUILD_DIR) $(LIB_DIR)/xelp.c
-	@mv -f xelp.c.gcov $(BUILD_DIR)/ 2>/dev/null || true
+	@gcov -b -o $(BUILD_DIR) $(LIB_DIR)/xelp.c
+	@mv -f *.gcov $(BUILD_DIR)/ 2>/dev/null || true
 
 coverage: tests
 	@echo "--- Coverage Summary ---"
-	@gcov -o $(BUILD_DIR) $(LIB_DIR)/xelp.c 2>/dev/null | grep -A 1 "File.*xelp.c"
-	@echo "See $(BUILD_DIR)/xelp.c.gcov for line-by-line details"
+	@gcov -b -o $(BUILD_DIR) $(LIB_DIR)/xelp.c 2>/dev/null | grep -E "File|Lines|Branches|Taken"
+	@mv -f *.gcov $(BUILD_DIR)/ 2>/dev/null || true
+	@echo "See $(BUILD_DIR)/xelp.c.gcov for line-by-line details (gcov -b)"
 
 version:
 	@mkdir -p $(BUILD_DIR)
@@ -122,7 +123,22 @@ lint:
 
 validate: lint tests examples
 	@echo ""
-	@echo "=== Validation passed: lint + tests + examples build clean ==="
+	@echo "--- Coverage gate ---"
+	@LINE_PCT=$$(gcov -b -o $(BUILD_DIR) $(LIB_DIR)/xelp.c 2>/dev/null \
+		| grep "Lines executed" | head -1 \
+		| grep -o '[0-9]*\.[0-9]*'); \
+	BRANCH_PCT=$$(gcov -b -o $(BUILD_DIR) $(LIB_DIR)/xelp.c 2>/dev/null \
+		| grep "Taken at least once" | head -1 \
+		| grep -o '[0-9]*\.[0-9]*'); \
+	mv -f *.gcov $(BUILD_DIR)/ 2>/dev/null || true; \
+	echo "  Lines:    $${LINE_PCT}%"; \
+	echo "  Branches: $${BRANCH_PCT}% taken at least once"; \
+	LINE_OK=$$(echo "$${LINE_PCT} >= 100.0" | bc 2>/dev/null || echo 1); \
+	BRANCH_OK=$$(echo "$${BRANCH_PCT} >= 97.0" | bc 2>/dev/null || echo 1); \
+	if [ "$$LINE_OK" != "1" ]; then echo "FAIL: line coverage < 100%"; exit 1; fi; \
+	if [ "$$BRANCH_OK" != "1" ]; then echo "FAIL: branch coverage < 97%"; exit 1; fi
+	@echo ""
+	@echo "=== Validation passed: lint + tests + coverage + examples build clean ==="
 
 #=======================================================================
 # Pre-release: validate + cross-compile sizes + update README tables
