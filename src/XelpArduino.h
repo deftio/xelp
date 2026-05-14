@@ -25,6 +25,13 @@
 #include <stddef.h>           /* offsetof */
 #include <initializer_list>   /* std::initializer_list */
 
+/* The Easy API (commands({...})) requires XELP_ENABLE_ARGV for safe
+   tokenization.  Without it, the fallback tokenizer would write NUL
+   through token pointers, corrupting ROM or const script strings. */
+#if defined(XELP_ENABLE_CLI) && !defined(XELP_ENABLE_ARGV)
+#error "XelpArduino.h Easy API requires XELP_ENABLE_ARGV. Enable it in xelpcfg.h or xelp_ovr.h."
+#endif
+
 #ifdef ARDUINO
 #include <Arduino.h>
 #endif
@@ -370,22 +377,9 @@ private:
         const char *argv[XELP_MAX_EASY_ARGV];
         int argc = 0;
 
-#ifdef XELP_ENABLE_ARGV
         if (XelpBuf2Argv(ths, args, len, &argc, argv, XELP_MAX_EASY_ARGV) != XELP_S_OK)
             return XELP_E_ERR;
         if (argc < 1) return XELP_E_ERR;
-#else
-        {
-            XelpBuf b, t;
-            XELP_XB_INIT(b, (char*)args, len);
-            while (argc < XELP_MAX_EASY_ARGV &&
-                   XelpTokN(&b, argc, &t) == XELP_S_OK) {
-                *t.p = '\0';
-                argv[argc++] = t.s;
-            }
-        }
-        if (argc < 1) return XELP_E_ERR;
-#endif
 
         for (int i = 0; i < cli.m_nCli; i++) {
             if (cli.m_cliTable[i].mFunPtr == &_easyCliDispatch &&
@@ -405,20 +399,8 @@ private:
         const char *argv[XELP_MAX_EASY_ARGV];
         int argc = 0;
 
-#ifdef XELP_ENABLE_ARGV
         if (XelpBuf2Argv(ths, args, len, &argc, argv, XELP_MAX_EASY_ARGV) != XELP_S_OK)
             return XELP_E_ERR;
-#else
-        {
-            XelpBuf b, t;
-            XELP_XB_INIT(b, (char*)args, len);
-            while (argc < XELP_MAX_EASY_ARGV &&
-                   XelpTokN(&b, argc, &t) == XELP_S_OK) {
-                *t.p = '\0';
-                argv[argc++] = t.s;
-            }
-        }
-#endif
         s_unknownFn(cli, argc, argv);
         return XELP_S_OK;
     }

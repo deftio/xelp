@@ -5,7 +5,7 @@
   @copy Copyright (C) <2011>  <M. A. Chatterjee>
   @author M A Chatterjee <deftio [at] deftio [dot] com>
   
-  This file contains header defintions for the xelp simple embedded command interpreter.
+  This file contains header definitions for the xelp simple embedded command interpreter.
 
   @license: 
 	Copyright (c) 2011, M. A. Chatterjee <deftio at deftio dot com>
@@ -58,7 +58,7 @@ extern "C"
 #ifdef XELP_ENABLE_FULL 			/* see xelpcfg.h */
 #define XELP_ENABLE_KEY 		1   /* enable direct key press mode                            */
 #define XELP_ENABLE_CLI         1   /* enable command line prompt, scripting abilities         */
-#define XELP_ENABLE_THR 		1   /* enable THRU mode (redirect to other perphierals)        */
+#define XELP_ENABLE_THR 		1   /* enable THRU mode (redirect to other peripherals)        */
 #define XELP_ENABLE_HELP		1   /* compile in built-in help function.               	   */
 #endif
 
@@ -149,7 +149,7 @@ typedef unsigned long XELPKEYCODE;
 #endif
 
 /**
- used by tokenizer funciton
+ used by tokenizer function
  */
 #define XELP_TOK_ONLY 		(0x0)
 #define XELP_TOK_LINE		(0x1)
@@ -159,7 +159,7 @@ typedef unsigned long XELPKEYCODE;
 
  when manually setting the params make sure the following relations
  are true as they are required for proper parsing:
- s <= p < e
+ s <= p <= e
 
  */
 typedef struct {
@@ -252,9 +252,9 @@ typedef struct
 
 /*****************************************************************************
  Live command modes:
- XELP_MODE_CLI   // each key is stored in buffer until <ENTER> pressed. (default)
- XELP_MODE_KEY   // each single key press is evaluated as a command
- XELP_MODE_THR   // each key is passed to the mpfThru() function.  (see docs)
+ XELP_MODE_CLI   -- each key is stored in buffer until ENTER pressed. (default)
+ XELP_MODE_KEY   -- each single key press is evaluated as a command
+ XELP_MODE_THR   -- each key is passed to the mpfThru() function.  (see docs)
 
  See also xelpcfg.h  which has compilation control directives if some modes are not needed.
 
@@ -308,6 +308,10 @@ typedef struct XELP_tag
 	XELPKEYCODE				mKeyAccum;		 /* packed key being assembled                  */
 	char					mKeyLen;		 /* bytes accumulated (0 = idle)                */
 
+#if defined(XELP_ENTER_CR) && defined(XELP_ENTER_LF)
+	char					mLastWasCR;		 /* 1 after CR, swallow next LF to coalesce CRLF */
+#endif
+
 #if defined(XELP_ENABLE_CLI) && defined(XELP_ENABLE_LINE_EDIT)
 	char*					mCur;			 /* cursor position in [mCmdXB.s .. mCmdXB.p]  */
 #endif
@@ -322,7 +326,7 @@ typedef struct XELP_tag
 #endif
 
 	/****
-	platform dependant dispatch functions  (light-weight hardware abstraction layer)
+	platform-dependent dispatch functions  (light-weight hardware abstraction layer)
 	note that if any are left unset (zero) this is OK as system will not call null ptrs.
 	*/
 	void (*mpfOut)(char); 		  /* function to emit chars to console                       */
@@ -333,7 +337,7 @@ typedef struct XELP_tag
 	void (*mpfPassThru)(char);    /* function to pass keys in thru mode                      */
 #endif 	
 #ifdef XELP_ENABLE_CLI	
-	void (*mpfBksp)();			  /* function to handle destructive backspace at CLI prompt  */
+	void (*mpfBksp)(void);		  /* function to handle destructive backspace at CLI prompt  */
 #endif
 
 }XELP;

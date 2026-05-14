@@ -105,11 +105,11 @@
 /****************************************************************************************************
  Enable structured argument parsing (argc/argv).
  When defined, adds XelpBuf2Argv, XelpArgvInt, and XelpArgvStr functions and a
- dedicated scratch buffer (XELP_CMDBUFSZ bytes) to each XELP instance.  Provides
+ dedicated scratch buffer (XELP_ARGVBUFSZ bytes) to each XELP instance.  Provides
  null-terminated tokens with quote and escape processing, and random access by
  index -- the standard argc/argv convention for command handlers.
  Does not require XELP_ENABLE_CLI; can be used standalone.
- RAM cost: XELP_CMDBUFSZ bytes per instance (separate from the CLI line buffer).
+ RAM cost: XELP_ARGVBUFSZ bytes per instance (separate from the CLI line buffer).
  Code cost: ~530 bytes (x86-64 -Os), ~700 bytes (ARM Thumb -Os).
  Leaving undefined saves both the code and the per-instance RAM.
  */
@@ -122,7 +122,7 @@
  Enable KEY Mode.
  definining this flag includes support for key mode (each immediate press is used as a command such as in a menu systems) without pressing ENTER.
 
- leaving undefined saves btw 200-500 bytes (target dependant)
+ leaving undefined saves btw 200-500 bytes (target dependent)
  */
 #ifndef XELP_ENABLE_KEY
 #define XELP_ENABLE_KEY 	  1
@@ -134,7 +134,7 @@
  definining this flag includes support for redirecting key commands to the mpfThru function.
  Thru mode is useful for redirecting all key strokes to another peripheral such as a modem or other serial console based embedded system.
 
- leaving undefined saves btw 50-125 bytes (target dependant)
+ leaving undefined saves btw 50-125 bytes (target dependent)
  */
 #ifndef XELP_ENABLE_THR
 #define XELP_ENABLE_THR 	  1
@@ -142,7 +142,7 @@
 
 /****************************************************************************************************
  Compile built-in help function.
- Leaving undefined saves ~180-350 bytes. (target dependant)
+ Leaving undefined saves ~180-350 bytes. (target dependent)
  XELP_HELP_XXX_STR  are the strings used to prefix sections in the online help.  See examples or docs
  */
 #ifndef XELP_ENABLE_HELP
@@ -174,7 +174,7 @@
   #define XELP_CLI_PROMPT   (ths->mpPrompt)
 
   Then use the macros in Xelp.h
-  XELP_SET_VAL_CLI_PROMPT(myXelp,"yourPrompt")   //myXelp is the instance variable, message will be only for that instance.
+  XELP_SET_VAL_CLI_PROMPT(myXelp,"yourPrompt")   (myXelp is the instance variable, message will be only for that instance.)
 
 */
 #ifndef XELP_CLI_PROMPT
@@ -257,5 +257,17 @@
 #include "xelp_ovr.h"
 #endif
 
+/* Auto-disable dependent features when their base is missing.
+   LINE_EDIT and HISTORY require CLI; HISTORY requires LINE_EDIT.
+   This prevents compile errors from invalid override combinations. */
+#if defined(XELP_ENABLE_LINE_EDIT) && !defined(XELP_ENABLE_CLI)
+#undef XELP_ENABLE_LINE_EDIT
+#endif
+#if defined(XELP_ENABLE_HISTORY) && !defined(XELP_ENABLE_CLI)
+#undef XELP_ENABLE_HISTORY
+#endif
+#if defined(XELP_ENABLE_HISTORY) && !defined(XELP_ENABLE_LINE_EDIT)
+#undef XELP_ENABLE_HISTORY
+#endif
 
 #endif  /* __XELP_CONFIG_H__ */

@@ -5558,6 +5558,30 @@ XELPRESULT test_BranchCoverage() {
             return XELP_E_ERR;
     }
 
+    /* 15. CRLF coalescing: CR+LF should not double-submit */
+    {
+        XelpInit(&x, "TestBC15");
+        XELP_SET_FN_OUT(x, dummyOut);
+        XELP_SET_FN_CLI(x, gMyCLICommands);
+        /* type 'a' then CRLF then 'b' then LF -- two commands total */
+        XelpParseKey(&x, 'a');
+        XelpParseKey(&x, '\r');   /* CR submits "a" */
+        XelpParseKey(&x, '\n');   /* LF swallowed (coalesce) */
+        XelpParseKey(&x, 'b');
+        XelpParseKey(&x, '\n');   /* LF submits "b" (no preceding CR) */
+    }
+
+    /* 16. XelpHelp with empty tables (only sentinels): no bogus rows */
+    {
+        XELPCLIFuncMapEntry emptyCli[] = { XELP_FUNC_ENTRY_LAST };
+        XELPKeyFuncMapEntry emptyKey[] = { XELP_FUNC_ENTRY_LAST };
+        XelpInit(&x, "TestBC16");
+        XELP_SET_FN_OUT(x, dummyOut);
+        XELP_SET_FN_CLI(x, emptyCli);
+        XELP_SET_FN_KEY(x, emptyKey);
+        XelpHelp(&x);  /* should not crash or print bogus rows */
+    }
+
     return XELP_S_OK;
 }
 

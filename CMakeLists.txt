@@ -62,7 +62,7 @@ endif()
 # ---- Plain CMake library ----
 cmake_minimum_required(VERSION 3.10)
 project(xelp
-    VERSION 0.3.2
+    VERSION 0.3.3
     LANGUAGES C
     DESCRIPTION "Embedded CLI/script interpreter -- no malloc, multi-instance"
 )
@@ -80,8 +80,12 @@ target_include_directories(xelp PUBLIC
     $<INSTALL_INTERFACE:include>
 )
 
-# xelp is pure C (C99 sufficient) with no external dependencies.
-target_compile_features(xelp PUBLIC c_std_99)
+# xelp is pure C89/C90 with no external dependencies.
+set_target_properties(xelp PROPERTIES
+    C_STANDARD 90
+    C_STANDARD_REQUIRED ON
+    C_EXTENSIONS OFF
+)
 
 # ---------------------------------------------------------------------------
 # Optional: unit tests (host builds only -- requires POSIX)

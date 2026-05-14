@@ -4,7 +4,7 @@
 > system for embedded systems. Pure C, zero dynamic memory, no OS, no
 > standard library dependencies. Under 1 KB (key dispatch only) to ~5 KB
 > (full CLI with line editing) compiled. Works on 8-bit (AVR, 8051)
-> through 64-bit (ARM64, x86-64) targets. Version 0.3.2.
+> through 64-bit (ARM64, x86-64) targets. Version 0.3.3.
 
 xelp gives bare-metal firmware a real interactive CLI with scriptable
 commands, single-key menus, and pass-through mode. Three source files
