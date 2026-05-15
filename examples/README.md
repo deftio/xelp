@@ -47,7 +47,7 @@ cd scripting && make
 
 ## arduino
 
-Raw C API with XelpBuf2Argv for argc/argv-style argument parsing.
+Raw C API with native argc/argv dispatch for argument parsing.
 Demonstrates echo (argv iteration), LED control (`XelpArgvInt`), and
 divmod with register returns (R1/R2). Includes a startup script via
 `XelpParse`. Works on any Arduino board with a Serial port.

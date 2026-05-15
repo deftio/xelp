@@ -67,22 +67,26 @@ XELPKeyFuncMapEntry key_commands[] = {
 /* CLI mode commands (type command, press ENTER)                        */
 /* ------------------------------------------------------------------ */
 
-static XELPRESULT cmd_help(XELP *ths, const char *args, int len)
+static XELPRESULT cmd_help(XELP *ths, int argc, const char **argv)
 {
-    (void)args; (void)len;
+    (void)argc; (void)argv;
     return XelpHelp(ths);
 }
 
-static XELPRESULT cmd_echo(XELP *ths, const char *args, int len)
+static XELPRESULT cmd_echo(XELP *ths, int argc, const char **argv)
 {
-    XelpOut(ths, args, len);
+    int i;
+    for (i = 1; i < argc; i++) {
+        if (i > 1) XelpOut(ths, " ", 0);
+        XelpOut(ths, argv[i], 0);
+    }
     XelpOut(ths, "\n", 0);
     return XELP_S_OK;
 }
 
-static XELPRESULT cmd_info(XELP *ths, const char *args, int len)
+static XELPRESULT cmd_info(XELP *ths, int argc, const char **argv)
 {
-    (void)args; (void)len;
+    (void)argc; (void)argv;
     XelpOut(ths, "XELP size: ", 0);
     /* On a real target you'd format sizeof(XELP) here */
     XelpOut(ths, " bytes\n", 0);

@@ -32,15 +32,15 @@ static void uart1_bksp(void) { uart1_putc('\b'); uart1_putc(' '); uart1_putc('\b
 XELP cli_a;
 XELP cli_b;
 
-static XELPRESULT cmd_help(XELP *ths, const char *args, int len)
+static XELPRESULT cmd_help(XELP *ths, int argc, const char **argv)
 {
-    (void)args; (void)len;
+    (void)argc; (void)argv;
     return XelpHelp(ths);
 }
 
-static XELPRESULT cmd_status(XELP *ths, const char *args, int len)
+static XELPRESULT cmd_status(XELP *ths, int argc, const char **argv)
 {
-    (void)args; (void)len;
+    (void)argc; (void)argv;
     /* ths points to whichever instance called this command,
      * so output goes to the correct UART automatically. */
     XelpOut(ths, "System OK\n", 0);

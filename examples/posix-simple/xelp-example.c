@@ -106,61 +106,58 @@ XELPKeyFuncMapEntry gMyKeyCommands[] =
 	//{0         , 0 , ""              }
 };
 
-XELPRESULT cmdCLS (XELP *ths, const char* args, int maxlen)
+XELPRESULT cmdCLS (XELP *ths, int argc, const char **argv)
 {
-	(void)ths; (void)args; (void)maxlen;
+	(void)ths; (void)argc; (void)argv;
 	clear();
 	refresh();
 	return XELP_S_OK;
 }
 
-XELPRESULT banner (XELP *ths, const char* args, int maxlen)
+XELPRESULT banner (XELP *ths, int argc, const char **argv)
 {
-	(void)args; (void)maxlen;
+	(void)argc; (void)argv;
 	printBanner(ths, 'b');
 	return XELP_S_OK;
 }
-XELPRESULT cmdHome (XELP *ths, const char* args, int maxlen)
+XELPRESULT cmdHome (XELP *ths, int argc, const char **argv)
 {
-	(void)ths; (void)args; (void)maxlen;
+	(void)ths; (void)argc; (void)argv;
 	move(0, 0);
 	refresh();
 	return XELP_S_OK;
 }
-XELPRESULT cmdEcho (XELP *ths, const char* args, int maxlen)
+XELPRESULT cmdEcho (XELP *ths, int argc, const char **argv)
 {
+	int i;
 	XelpOut(ths, "<<", 0);
-	XelpOut(ths, args, maxlen);
+	for (i = 1; i < argc; i++) {
+		if (i > 1) XelpOut(ths, " ", 0);
+		XelpOut(ths, argv[i], 0);
+	}
 	XelpOut(ths, ">>\n", 0);
 	return XELP_S_OK;
 }
 
-XELPRESULT cmdNumToks (XELP *ths, const char* args, int maxlen)
+XELPRESULT cmdNumToks (XELP *ths, int argc, const char **argv)
 {
-    XelpBuf b;
-
-    int n;
-    (void)ths;
-    XELP_XB_INIT(b,(char*)args,maxlen);
-    XelpNumToks(&b,&n);
-	printw(" XelpNumToks %d\n",n);
+    (void)ths; (void)argv;
+	printw(" argc=%d\n",argc);
 
     return XELP_S_OK;
 };
-XELPRESULT cmdPrintR (XELP *ths, const char* args, int maxlen){
-	(void)args; (void)maxlen;
+XELPRESULT cmdPrintR (XELP *ths, int argc, const char **argv){
+	(void)argc; (void)argv;
 	printw("R0=%d R1=%d R2=%d R3=%d\n",
 	       XELP_R0(*ths), XELP_R1(*ths), XELP_R2(*ths), XELP_R3(*ths));
 	return XELP_R0(*ths);
 }
 
-XELPRESULT cmdDivmod (XELP *ths, const char* args, int maxlen){
-	XelpArgs a;
+XELPRESULT cmdDivmod (XELP *ths, int argc, const char **argv){
 	int dividend, divisor;
-	XelpArgsInit(&a, args, maxlen);
-	XelpNextTok(&a, 0);              /* skip command name */
-	XelpNextInt(&a, &dividend);
-	XelpNextInt(&a, &divisor);
+	(void)argc;
+	XelpParseNum(argv[1], XelpStrLen(argv[1]), &dividend);
+	XelpParseNum(argv[2], XelpStrLen(argv[2]), &divisor);
 
 	if (divisor == 0) {
 		printw("divmod: division by zero\n");
@@ -173,22 +170,16 @@ XELPRESULT cmdDivmod (XELP *ths, const char* args, int maxlen){
 }
 
 
-XELPRESULT cmdListToks (XELP *ths, const char* args, int maxlen)
+XELPRESULT cmdListToks (XELP *ths, int argc, const char **argv)
 {
 
 #ifdef XELP_ENABLE_CLI
-    XelpBuf b,tok;
-    int n,i;
-    XELP_XB_INIT(b,(char*)args,maxlen);
-    XelpNumToks(&b,&n);
-    XELP_XB_TOP(b);
-    printw("[%d]",n);
-	for (i=0; i< n; i++) {
-        XELP_XB_TOP(b);
-        XelpTokN( &b,i,&tok);
+    int i;
+    printw("[%d]",argc);
+	for (i=0; i< argc; i++) {
         printw("<");
         printw("%d:",i);
-		XelpOut(ths,tok.s,tok.p-tok.s);
+		XelpOut(ths,argv[i],0);
 		printw(">");
 	}
 #endif
@@ -197,46 +188,33 @@ XELPRESULT cmdListToks (XELP *ths, const char* args, int maxlen)
 	return XELP_S_OK;
 };
 
-XELPRESULT cmdHelp (XELP *ths, const char* args, int maxlen)
+XELPRESULT cmdHelp (XELP *ths, int argc, const char **argv)
 {
-	(void)args; (void)maxlen;
+	(void)argc; (void)argv;
 	return XelpHelp(ths);
 }
 
-XELPRESULT cmdExit (XELP *ths, const char* args, int maxlen) {
-	(void)ths; (void)args; (void)maxlen;
+XELPRESULT cmdExit (XELP *ths, int argc, const char **argv) {
+	(void)ths; (void)argc; (void)argv;
 	gExit = 1;
 	return XELP_S_OK;
 }
-XELPRESULT cmdPrintNum (XELP *ths, const char *args, int maxlen) {
-	XelpBuf b,tok;
+XELPRESULT cmdPrintNum (XELP *ths, int argc, const char **argv) {
     (void)ths;
-
-    XELP_XB_INIT(b,(char*)args,maxlen);
-    XelpTokN(&b,1,&tok),
-
-	printw("[%d]\n",XelpStr2Int(tok.s,tok.p-tok.s));
+    if (argc < 2) return XELP_E_ERR;
+	printw("[%d]\n",XelpStr2Int(argv[1],XelpStrLen(argv[1])));
 	return XELP_S_OK;
 }
 
-XELPRESULT cmdMath (XELP *ths, const char* args, int maxlen) {
-	XelpBuf b,tok;
+XELPRESULT cmdMath (XELP *ths, int argc, const char **argv) {
     int i,j,k;
     int op;
+    (void)argc;
 
-    XELP_XB_INIT(b,(char*)args,maxlen);
-    XelpTokN(&b,0,&tok),
+	op = argv[0][0];
 
-
-	op = *b.s;
-
-    XELP_XB_TOP(b);
-    XelpTokN(&b,1,&tok);
-    i = XelpStr2Int(tok.s,tok.p-tok.s);
-
-    XELP_XB_TOP(b);
-    XelpTokN(&b,2,&tok);
-	j =XelpStr2Int(tok.s,tok.p-tok.s);
+    i = XelpStr2Int(argv[1],XelpStrLen(argv[1]));
+	j = XelpStr2Int(argv[2],XelpStrLen(argv[2]));
 
 	switch(op) {
 		case '+':

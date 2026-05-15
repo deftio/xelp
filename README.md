@@ -1,6 +1,6 @@
 <a href="https://deftio.github.io/xelp/pages/"><img src="https://deftio.github.io/xelp/img/xelp-prompt-med.png" width="30%"></img></a>
 
-![Version](https://img.shields.io/badge/version-0.3.3-blue.svg)
+![Version](https://img.shields.io/badge/version-0.4.0-blue.svg)
 [![License](https://img.shields.io/badge/License-BSD%202--Clause-blue.svg)](https://opensource.org/licenses/BSD-2-Clause)
 [![CI](https://github.com/deftio/xelp/actions/workflows/ci.yml/badge.svg)](https://github.com/deftio/xelp/actions/workflows/ci.yml)
 ![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen.svg)  
@@ -108,17 +108,16 @@ void uart_putc(char c) { UART_TX = c; }
 void uart_bksp(void)   { uart_putc('\b'); uart_putc(' '); uart_putc('\b'); }
 
 /* Commands -- any C function with this signature */
-XELPRESULT cmd_hello(XELP *ths, const char *args, int len) {
+XELPRESULT cmd_hello(XELP *ths, int argc, const char **argv) {
+    (void)argc; (void)argv;
     XelpOut(ths, "Hello!\n", 0);
     return XELP_S_OK;
 }
 
-XELPRESULT cmd_led(XELP *ths, const char *args, int len) {
-    XelpArgs a;
+XELPRESULT cmd_led(XELP *ths, int argc, const char **argv) {
     int val;
-    XelpArgsInit(&a, args, len);
-    XelpNextTok(&a, 0);                      /* skip command name */
-    XelpNextInt(&a, &val);
+    (void)argc;
+    XelpArgvInt(argv, argc, 1, &val);
     LED_PORT = val;
     return XELP_S_OK;
 }
@@ -249,26 +248,26 @@ is under 12 KB.
 <!-- Build Size Table -->
 | CPU | Width | Compiler | KEY (bytes) | CLI (bytes) | FULL (bytes) |
 |-----|------:|----------|------------:|------------:|-------------:|
-| AVR (ATtiny85) | 8 | avr-gcc | 990 | 4302 | 5697 |
-| AVR (ATmega328P) | 8 | avr-gcc | 998 | 4402 | 5811 |
-| Z80 | 8 | SDCC | 1969 | 7378 | 9354 |
-| 6800 (HC08) | 8 | SDCC | 2095 | 8648 | 11170 |
-| MSP430 | 16 | msp430-gcc | 782 | 3532 | 4726 |
-| 68HC11 | 16 | m68hc11-gcc | 2169 | 6918 | 9902 |
-| ARM Thumb | 32 | arm-none-eabi-gcc | 600 | 2630 | 3463 |
-| Xtensa LX7 (ESP32-S3) | 32 | xtensa-esp-elf-gcc | 620 | 2652 | 3553 |
-| m68k | 32 | m68k-linux-gnu-gcc | 746 | 3372 | 4543 |
-| RISC-V (rv32) | 32 | riscv64-unknown-elf-gcc | 746 | 3140 | 4182 |
-| Xtensa LX106 (ESP8266) | 32 | xtensa-lx106-elf-gcc | 747 | 3003 | 3968 |
-| ARM32 | 32 | arm-none-eabi-gcc | 1008 | 4006 | 5327 |
-| x86-32 | 32 | GCC | 1099 | 4985 | 6349 |
-| MIPS32 | 32 | mipsel-linux-gnu-gcc | 1312 | 5288 | 6832 |
-| PowerPC | 32 | powerpc-linux-gnu-gcc | 1536 | 6146 | 7799 |
-| RISC-V (rv64) | 64 | riscv64-linux-gnu-gcc | 780 | 3594 | 4684 |
-| x86-64 | 64 | Clang | 1069 | 5355 | 7212 |
-| x86-64 | 64 | GCC | 1084 | 5183 | 6544 |
-| AArch64 (ARM64) | 64 | aarch64-linux-gnu-gcc | 1336 | 5626 | 6987 |
-| MIPS64 | 64 | mips64el-linux-gnuabi64-gcc | 1376 | 5928 | 7744 |
+| AVR (ATtiny85) | 8 | avr-gcc | 990 | 4123 | 5031 |
+| AVR (ATmega328P) | 8 | avr-gcc | 998 | 4213 | 5129 |
+| Z80 | 8 | SDCC | 1969 | 7318 | 8398 |
+| 6800 (HC08) | 8 | SDCC | 2096 | 8411 | 9888 |
+| MSP430 | 16 | msp430-gcc | 782 | 3374 | 4146 |
+| 68HC11 | 16 | m68hc11-gcc | 2169 | 6880 | 8693 |
+| ARM Thumb | 32 | arm-none-eabi-gcc | 600 | 2611 | 3079 |
+| Xtensa LX7 (ESP32-S3) | 32 | xtensa-esp-elf-gcc | 620 | 2741 | 3177 |
+| m68k | 32 | m68k-linux-gnu-gcc | 746 | 3243 | 3943 |
+| RISC-V (rv32) | 32 | riscv64-unknown-elf-gcc | 746 | 3130 | 3680 |
+| Xtensa LX106 (ESP8266) | 32 | xtensa-lx106-elf-gcc | 747 | 3020 | 3492 |
+| ARM32 | 32 | arm-none-eabi-gcc | 1008 | 3999 | 4699 |
+| x86-32 | 32 | GCC | 1099 | 4652 | 5359 |
+| MIPS32 | 32 | mipsel-linux-gnu-gcc | 1312 | 4960 | 5792 |
+| PowerPC | 32 | powerpc-linux-gnu-gcc | 1536 | 5943 | 6711 |
+| RISC-V (rv64) | 64 | riscv64-linux-gnu-gcc | 780 | 3356 | 3934 |
+| x86-64 | 64 | Clang | 1069 | 5088 | 6305 |
+| x86-64 | 64 | GCC | 1084 | 4647 | 5432 |
+| AArch64 (ARM64) | 64 | aarch64-linux-gnu-gcc | 1336 | 5051 | 5751 |
+| MIPS64 | 64 | mips64el-linux-gnuabi64-gcc | 1376 | 5536 | 6576 |
 <!-- Build Size Table -->
 
 x86-64 GCC row is measured directly; others from cross-compilation via

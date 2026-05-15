@@ -1,6 +1,6 @@
 # API Reference
 
-All public types, functions, and macros defined in `xelp.h`. Version 0.3.3.
+All public types, functions, and macros defined in `xelp.h`. Version 0.4.0.
 
 ## Types
 
@@ -12,7 +12,7 @@ All public types, functions, and macros defined in `xelp.h`. Version 0.3.3.
 | `XELPKEYCODE` | Key code type (`unsigned long`). Single-char keys are their natural value; multi-byte ANSI sequences are packed little-endian. |
 | `XelpBuf` | Buffer wrapper with start, position, and end pointers. |
 | `XELPKeyFuncMapEntry` | Single-key command entry: `XELPRESULT fn(XELP *ths, XELPKEYCODE key)`, key code, help string. |
-| `XELPCLIFuncMapEntry` | CLI command entry: `XELPRESULT fn(XELP *ths, const char *args, int len)`, command name, help string. |
+| `XELPCLIFuncMapEntry` | CLI command entry: `XELPRESULT fn(XELP *ths, int argc, const char **argv)`, command name, help string. |
 
 ## Return Codes
 
@@ -131,144 +131,11 @@ XELPRESULT XelpTokLineXB(XelpBuf *buf, XelpBuf *tok, int srchType);
 Get the next token or line from a buffer. `srchType` is `XELP_TOK_ONLY`
 (token) or `XELP_TOK_LINE` (full line).
 
-### `XelpTokN`
+## Argument Helpers
 
-```c
-XELPRESULT XelpTokN(XelpBuf *buf, int n, XelpBuf *tok);
-```
-
-Get the Nth token (0-indexed) from a buffer.
-
-### `XelpNumToks`
-
-```c
-XELPRESULT XelpNumToks(XelpBuf *buf, int *n);
-```
-
-Count the number of tokens in a buffer.
-
-## XelpArgs -- Sequential Argument Iterator
-
-A left-to-right token iterator for CLI command handlers. Preferred over
-`XelpTokN` when arguments are processed sequentially (O(1) per token
-instead of O(n) re-scan).
-
-### `XelpArgsInit`
-
-```c
-XELPRESULT XelpArgsInit(XelpArgs *a, const char *args, int len);
-```
-
-Initialize an argument iterator. `args` and `len` come directly from
-the CLI command callback parameters.
-
-### `XelpNextTok`
-
-```c
-XELPRESULT XelpNextTok(XelpArgs *a, XelpBuf *tok);
-```
-
-Get the next token. On success, `tok->s` points to the first character
-and `tok->p` points one past the last. Pass `NULL` for `tok` to skip a
-token (useful for skipping the command name).
-
-Returns `XELP_S_OK` on success, non-OK when no more tokens remain.
-
-### `XelpNextInt`
-
-```c
-XELPRESULT XelpNextInt(XelpArgs *a, int *val);
-```
-
-Get the next token and parse it as an integer (decimal or hex).
-
-### `XelpArgCount`
-
-```c
-XELPRESULT XelpArgCount(XelpArgs *a, int *n);
-```
-
-Count the total number of tokens without consuming them. The iteration
-position is preserved.
-
-### Example
-
-```c
-XELPRESULT cmd_divmod(XELP *ths, const char *args, int len) {
-    XelpArgs a;
-    int dividend, divisor;
-    XelpArgsInit(&a, args, len);
-    XelpNextTok(&a, 0);              /* skip command name */
-    XelpNextInt(&a, &dividend);
-    XelpNextInt(&a, &divisor);
-    if (divisor == 0) return XELP_E_ERR;
-    ths->mR[1] = dividend / divisor;
-    ths->mR[2] = dividend % divisor;
-    return XELP_S_OK;
-}
-```
-
-### `XelpArgInt`
-
-```c
-XELPRESULT XelpArgInt(const char *args, int len, int n, int *val);
-```
-
-Get argument `n` (0-indexed) and parse it as an integer in a single call.
-Wraps `XelpTokN` + `XelpParseNum`. Returns `XELP_S_OK` on success,
-`XELP_E_ERR` if the token does not exist or is not a valid number.
-
-### `XelpArgStr`
-
-```c
-XELPRESULT XelpArgStr(const char *args, int len, int n,
-                      const char **s, int *slen);
-```
-
-Get argument `n` (0-indexed) as a string span. On success, `*s` points to
-the first character of the token and `*slen` is its length. The token is
-NOT null-terminated. Returns `XELP_S_OK` on success, `XELP_E_ERR` if the
-token does not exist.
-
-### Example
-
-```c
-XELPRESULT cmd_set(XELP *ths, const char *args, int len) {
-    const char *key;
-    int klen, value;
-    XelpArgStr(args, len, 1, &key, &klen);  /* arg 1 = key name */
-    XelpArgInt(args, len, 2, &value);        /* arg 2 = int value */
-    /* ... use key/klen and value ... */
-    return XELP_S_OK;
-}
-```
-
-## XelpBuf2Argv -- Structured argc/argv Parsing
-
-Requires `XELP_ENABLE_ARGV`. Tokenizes a command line into a standard
-argc/argv array using `ths->mArgvBuf` as scratch. Strips quotes, processes
-escape sequences (via `XELP_ESC_MAP`), and null-terminates each token.
-
-### `XelpBuf2Argv`
-
-```c
-XELPRESULT XelpBuf2Argv(XELP *ths, const char *args, int len,
-                         int *argc, const char **argv, int maxargs);
-```
-
-Tokenize `args` into `argv[0]..argv[argc-1]`. `argv[0]` is the command
-name (per argc/argv convention). Returns `XELP_E_ERR` if input exceeds
-`XELP_ARGVBUFSZ` or there are more than `maxargs` tokens.
-
-### `XELP_PARSE_ARGV`
-
-```c
-XELP_PARSE_ARGV(ths, args, len);
-```
-
-Convenience macro (C99+ / C++). Declares `const char *argv[XELP_ARGV_MAX]`
-and `int argc`, calls `XelpBuf2Argv`, and returns `XELP_E_ERR` on failure.
-Place at the top of a command handler body, before other statements.
+The CLI dispatch engine automatically tokenizes the command line into
+`argc`/`argv` before calling the handler. The following helpers provide
+convenient access to individual arguments.
 
 ### `XelpArgvInt`
 
@@ -292,8 +159,7 @@ out of range.
 ### Example
 
 ```c
-XELPRESULT cmd_set(XELP *ths, const char *args, int len) {
-    XELP_PARSE_ARGV(ths, args, len);
+XELPRESULT cmd_set(XELP *ths, int argc, const char **argv) {
     /* argv[0] = "set", argv[1] = key, argv[2] = value */
     int val;
     if (XelpArgvInt(argv, argc, 2, &val) != XELP_S_OK)
@@ -302,15 +168,6 @@ XELPRESULT cmd_set(XELP *ths, const char *args, int len) {
     return XELP_S_OK;
 }
 ```
-
-### Which argument API to use
-
-| Situation | Recommended |
-|-----------|-------------|
-| C handler, multiple args | `XELP_PARSE_ARGV` + `XelpArgvInt`/`XelpArgvStr` |
-| C++ Easy API lambda | Auto-argv built-in + `XelpCLI::argInt`/`argStr` |
-| Minimal code size, left-to-right | `XelpArgs` iterator |
-| Quick single-arg access | `XelpArgInt`/`XelpArgStr` |
 
 ## String Utilities
 
@@ -400,7 +257,7 @@ handlers, use `ths->mR[1]` directly.
 ### Example: command returning multiple values
 
 ```c
-XELPRESULT cmd_divmod(XELP *ths, const char *args, int len) {
+XELPRESULT cmd_divmod(XELP *ths, int argc, const char **argv) {
     int a = 17, b = 5;
     ths->mR[1] = a / b;  /* quotient  -> R1 */
     ths->mR[2] = a % b;  /* remainder -> R2 */
@@ -445,16 +302,16 @@ natural value (e.g. `'a'` == 0x61). Multi-byte keys are >= 0x100.
 
 | Constant | Value | Description |
 |----------|-------|-------------|
-| `XELP_VERSION` | 0x00000302 | Library version (32-bit hex: `0x00MMmmpp`) |
+| `XELP_VERSION` | 0x00000400 | Library version (32-bit hex: `0x00MMmmpp`) |
 | `XELP_VER_MAJOR(v)` | | Extract major version byte |
 | `XELP_VER_MINOR(v)` | | Extract minor version byte |
 | `XELP_VER_PATCH(v)` | | Extract patch version byte |
 | `XELP_CMDBUFSZ` | 64 | CLI input buffer size |
-| `XELP_ARGVBUFSZ` | `XELP_CMDBUFSZ` | Scratch buffer size for `XelpBuf2Argv` |
-| `XELP_ARGV_MAX` | 8 | Default max arguments for `XelpBuf2Argv` / `XELP_PARSE_ARGV` |
+| `XELP_ARGVBUFSZ` | `XELP_CMDBUFSZ` | Scratch buffer size for CLI argv tokenization |
+| `XELP_ARGV_MAX` | 8 | Maximum number of arguments for CLI dispatch |
 | `XELP_ENTER_LF` | 1 | Accept `\n` (0x0A) as ENTER in interactive input |
 | `XELP_ENTER_CR` | 1 | Accept `\r` (0x0D) as ENTER in interactive input |
-| `XELP_ESC_MAP` | `"n\x0A" "t\x09" ""` | Escape expansion table for quoted strings in `XelpBuf2Argv` |
+| `XELP_ESC_MAP` | `"n\x0A" "t\x09" ""` | Escape expansion table for quoted strings during CLI argv tokenization |
 | `XELP_MODE_CLI` | 0x00 | CLI mode identifier |
 | `XELP_MODE_KEY` | 0x01 | KEY mode identifier |
 | `XELP_MODE_THR` | 0x02 | THRU mode identifier |
@@ -478,9 +335,7 @@ Cortex-M0 (Thumb, `-Os`):
 | CLI + LE + help | 2052 | + `XELP_ENABLE_HELP` |
 | CLI + LE + help + key | 2470 | + `XELP_ENABLE_KEY` |
 | Full | 2510 | + `XELP_ENABLE_THR` |
-| Full + argv | 2855 | + `XELP_ENABLE_ARGV` |
 | Full + history | 2926 | + `XELP_ENABLE_HISTORY` |
-| Full + argv + history | 3275 | + both |
 
 Use `dev/size_profiles.sh` to regenerate this table for your toolchain.
 
@@ -522,7 +377,7 @@ Default after `XelpInit`: `XELP_ECHO_NORMAL`.
 ### Password Entry Example
 
 ```c
-XELPRESULT cmd_pass(XELP *ths, const char *args, int len) {
+XELPRESULT cmd_pass(XELP *ths, int argc, const char **argv) {
     XELP_SET_ECHO(*ths, '*');       /* mask input */
     /* ... user types password, sees ****** ... */
     /* on ENTER, read buffer, then: */

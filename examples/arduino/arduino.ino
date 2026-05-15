@@ -1,7 +1,7 @@
 /*
  * arduino-example.ino -- Basic xelp example using the raw C API.
  *
- * Demonstrates XelpBuf2Argv for argc/argv-style argument parsing:
+ * Demonstrates native argc/argv dispatch:
  *   - echo: argv iteration
  *   - led:  XelpArgvInt for a single integer arg
  *   - divmod: XelpArgvInt + register returns (R1/R2)
@@ -25,23 +25,22 @@ void writeChar(char c) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Command handlers (all use XelpBuf2Argv)                             */
+/* Command handlers (native argc/argv dispatch)                             */
 /* ------------------------------------------------------------------ */
 
-XELPRESULT cmdHelp(XELP *ths, const char* args, int len) {
-    (void)args; (void)len;
+XELPRESULT cmdHelp(XELP *ths, int argc, const char **argv) {
+    (void)argc; (void)argv;
     return XelpHelp(ths);
 }
 
-XELPRESULT cmdBanner(XELP *ths, const char* args, int len) {
-    (void)ths; (void)args; (void)len;
+XELPRESULT cmdBanner(XELP *ths, int argc, const char **argv) {
+    (void)ths; (void)argc; (void)argv;
     Serial.println(XELP_BANNER_STR);
     return XELP_S_OK;
 }
 
-XELPRESULT cmdEcho(XELP *ths, const char* args, int len) {
+XELPRESULT cmdEcho(XELP *ths, int argc, const char **argv) {
     int i;
-    XELP_PARSE_ARGV(ths, args, len);
     for (i = 1; i < argc; i++) {
         if (i > 1) XelpOut(ths, " ", 0);
         XelpOut(ths, argv[i], 0);
@@ -50,9 +49,8 @@ XELPRESULT cmdEcho(XELP *ths, const char* args, int len) {
     return XELP_S_OK;
 }
 
-XELPRESULT cmdLed(XELP *ths, const char* args, int len) {
+XELPRESULT cmdLed(XELP *ths, int argc, const char **argv) {
     int val;
-    XELP_PARSE_ARGV(ths, args, len);
     if (XelpArgvInt(argv, argc, 1, &val) != XELP_S_OK) {
         XelpOut(ths, "usage: led <0|1>\n", 0);
         return XELP_E_ERR;
@@ -62,9 +60,8 @@ XELPRESULT cmdLed(XELP *ths, const char* args, int len) {
     return XELP_S_OK;
 }
 
-XELPRESULT cmdDivmod(XELP *ths, const char* args, int len) {
+XELPRESULT cmdDivmod(XELP *ths, int argc, const char **argv) {
     int a, d;
-    XELP_PARSE_ARGV(ths, args, len);
     if (XelpArgvInt(argv, argc, 1, &a) != XELP_S_OK ||
         XelpArgvInt(argv, argc, 2, &d) != XELP_S_OK) {
         XelpOut(ths, "usage: divmod <a> <b>\n", 0);

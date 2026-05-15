@@ -4,7 +4,7 @@
 > system for embedded systems. Pure C, zero dynamic memory, no OS, no
 > standard library dependencies. Under 1 KB (key dispatch only) to ~5 KB
 > (full CLI with line editing) compiled. Works on 8-bit (AVR, 8051)
-> through 64-bit (ARM64, x86-64) targets. Version 0.3.3.
+> through 64-bit (ARM64, x86-64) targets. Version 0.4.0.
 
 xelp gives bare-metal firmware a real interactive CLI with scriptable
 commands, single-key menus, and pass-through mode. Three source files
@@ -108,18 +108,12 @@ Core functions:
 - `XelpPutc(XELP *ths, char c)` -- output single character
 - `XelpHelp(XELP *ths)` -- print help listing
 
-Argument parsing:
-- `XelpArgsInit(XelpArgs *a, const char *args, int len)` -- init iterator
-- `XelpNextTok(XelpArgs *a, XelpBuf *tok)` -- get next token
-- `XelpNextInt(XelpArgs *a, int *val)` -- get next token as int
-- `XelpArgCount(XelpArgs *a, int *n)` -- count tokens (non-destructive)
-- `XelpArgInt(const char *args, int len, int n, int *val)` -- random access int
-- `XelpArgStr(const char *args, int len, int n, const char **s, int *slen)` -- random access string
+Argument helpers (used inside handlers with native argc/argv):
+- `XelpArgvInt(const char **argv, int argc, int n, int *val)` -- get argv[n] as int
+- `XelpArgvStr(const char **argv, int argc, int n, const char **s, int *slen)` -- get argv[n] as string + length
 
 Tokenizer:
 - `XelpTokLineXB(XelpBuf *buf, XelpBuf *tok, int type)` -- get next token or line
-- `XelpTokN(XelpBuf *buf, int n, XelpBuf *tok)` -- get Nth token
-- `XelpNumToks(XelpBuf *buf, int *n)` -- count tokens
 
 String utilities:
 - `XelpStrLen(const char *s)` -- string length
@@ -131,7 +125,7 @@ String utilities:
 - `XelpFindTok(XelpBuf *x, const char *t0s, const char *t0e, int type)` -- find token
 
 Command function signatures:
-- CLI: `XELPRESULT fn(XELP *ths, const char *args, int len)`
+- CLI: `XELPRESULT fn(XELP *ths, int argc, const char **argv)`
 - KEY: `XELPRESULT fn(XELP *ths, XELPKEYCODE key)`
 
 Return codes: XELP_S_OK (0), XELP_W_WARN (1), XELP_S_NOTFOUND (2),

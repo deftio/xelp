@@ -149,72 +149,34 @@ static void bleOut(char c) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Helpers                                                             */
-/* ------------------------------------------------------------------ */
-
-/* Extract token N as a null-terminated string into buf (returns buf). */
-static char* tokStr(const char* args, int len, int n, char* buf, int bsz) {
-    XelpBuf b, t;
-    XELP_XB_INIT(b, (char*)args, len);
-    if (XelpTokN(&b, n, &t) == XELP_S_OK) {
-        int tl = (int)(t.p - t.s);
-        if (tl >= bsz) tl = bsz - 1;
-        memcpy(buf, t.s, tl);
-        buf[tl] = '\0';
-    } else {
-        buf[0] = '\0';
-    }
-    return buf;
-}
-
-/* Extract token N as an integer. */
-static int tokInt(const char* args, int len, int n) {
-    char buf[16];
-    tokStr(args, len, n, buf, sizeof(buf));
-    return atoi(buf);
-}
-
-/* Count tokens. */
-static int tokCount(const char* args, int len) {
-    XelpBuf b;
-    int n;
-    XELP_XB_INIT(b, (char*)args, len);
-    XelpNumToks(&b, &n);
-    return n;
-}
-
-/* ------------------------------------------------------------------ */
 /* Command handlers                                                    */
 /* ------------------------------------------------------------------ */
 
-XELPRESULT cmdHelp(XELP *x, const char* a, int l) {
-    (void)a; (void)l;
+XELPRESULT cmdHelp(XELP *x, int argc, const char **argv) {
+    (void)argc; (void)argv;
     XelpOut(x, XELP_BANNER_STR, 0);
     return XelpHelp(x);
 }
 
-XELPRESULT cmdBanner(XELP *x, const char* a, int l) {
-    (void)a; (void)l;
+XELPRESULT cmdBanner(XELP *x, int argc, const char **argv) {
+    (void)argc; (void)argv;
     XelpOut(x, XELP_BANNER_STR, 0);
     XelpOut(x, "ESP32 BLE CLI demo.\n", 0);
     XelpOut(x, "Type help to see commands. (also accepts ?)\n", 0);
     return XELP_S_OK;
 }
 
-XELPRESULT cmdEcho(XELP *x, const char* args, int len) {
-    int n = tokCount(args, len);
-    char buf[32];
-    for (int i = 1; i < n; i++) {
+XELPRESULT cmdEcho(XELP *x, int argc, const char **argv) {
+    for (int i = 1; i < argc; i++) {
         if (i > 1) XelpOut(x, " ", 1);
-        tokStr(args, len, i, buf, sizeof(buf));
-        XelpOut(x, buf, 0);
+        XelpOut(x, argv[i], 0);
     }
     XelpOut(x, "\n", 0);
     return XELP_S_OK;
 }
 
-XELPRESULT cmdInfo(XELP *x, const char* a, int l) {
-    (void)a; (void)l;
+XELPRESULT cmdInfo(XELP *x, int argc, const char **argv) {
+    (void)argc; (void)argv;
     char buf[64];
     snprintf(buf, sizeof(buf), "App:    esp32-ble-cli v%s\n", APP_VERSION);
     XelpOut(x, buf, 0);
@@ -231,35 +193,34 @@ XELPRESULT cmdInfo(XELP *x, const char* a, int l) {
     return XELP_S_OK;
 }
 
-XELPRESULT cmdSetpin(XELP *x, const char* args, int len) {
-    if (tokCount(args, len) < 3) {
+XELPRESULT cmdSetpin(XELP *x, int argc, const char **argv) {
+    if (argc < 3) {
         XelpOut(x, "usage: setpin <pin> <0|1>\n", 0);
         return XELP_E_ERR;
     }
-    int pin = tokInt(args, len, 1);
-    digitalWrite(pin, tokInt(args, len, 2) ? HIGH : LOW);
+    int pin = atoi(argv[1]);
+    digitalWrite(pin, atoi(argv[2]) ? HIGH : LOW);
     return XELP_S_OK;
 }
 
-XELPRESULT cmdGetpin(XELP *x, const char* args, int len) {
-    if (tokCount(args, len) < 2) {
+XELPRESULT cmdGetpin(XELP *x, int argc, const char **argv) {
+    if (argc < 2) {
         XelpOut(x, "usage: getpin <pin>\n", 0);
         return XELP_E_ERR;
     }
     char buf[8];
-    snprintf(buf, sizeof(buf), "%d\n", digitalRead(tokInt(args, len, 1)));
+    snprintf(buf, sizeof(buf), "%d\n", digitalRead(atoi(argv[1])));
     XelpOut(x, buf, 0);
     return XELP_S_OK;
 }
 
-XELPRESULT cmdPinmode(XELP *x, const char* args, int len) {
-    if (tokCount(args, len) < 3) {
+XELPRESULT cmdPinmode(XELP *x, int argc, const char **argv) {
+    if (argc < 3) {
         XelpOut(x, "usage: pinmode <pin> <in|out|pullup>\n", 0);
         return XELP_E_ERR;
     }
-    int pin = tokInt(args, len, 1);
-    char mode[8];
-    tokStr(args, len, 2, mode, sizeof(mode));
+    int pin = atoi(argv[1]);
+    const char *mode = argv[2];
     if      (strcmp(mode, "out") == 0)    pinMode(pin, OUTPUT);
     else if (strcmp(mode, "in") == 0)     pinMode(pin, INPUT);
     else if (strcmp(mode, "pullup") == 0) pinMode(pin, INPUT_PULLUP);
@@ -267,50 +228,49 @@ XELPRESULT cmdPinmode(XELP *x, const char* args, int len) {
     return XELP_S_OK;
 }
 
-XELPRESULT cmdSetpwm(XELP *x, const char* args, int len) {
-    if (tokCount(args, len) < 3) {
+XELPRESULT cmdSetpwm(XELP *x, int argc, const char **argv) {
+    if (argc < 3) {
         XelpOut(x, "usage: setpwm <pin> <0-255>\n", 0);
         return XELP_E_ERR;
     }
-    int pin = tokInt(args, len, 1);
-    analogWrite(pin, tokInt(args, len, 2));
+    int pin = atoi(argv[1]);
+    analogWrite(pin, atoi(argv[2]));
     return XELP_S_OK;
 }
 
-XELPRESULT cmdReadadc(XELP *x, const char* args, int len) {
-    if (tokCount(args, len) < 2) {
+XELPRESULT cmdReadadc(XELP *x, int argc, const char **argv) {
+    if (argc < 2) {
         XelpOut(x, "usage: readadc <pin>\n", 0);
         return XELP_E_ERR;
     }
     char buf[8];
-    snprintf(buf, sizeof(buf), "%d\n", analogRead(tokInt(args, len, 1)));
+    snprintf(buf, sizeof(buf), "%d\n", analogRead(atoi(argv[1])));
     XelpOut(x, buf, 0);
     return XELP_S_OK;
 }
 
-XELPRESULT cmdDelay(XELP *x, const char* args, int len) {
+XELPRESULT cmdDelay(XELP *x, int argc, const char **argv) {
     (void)x;
-    if (tokCount(args, len) >= 2) {
-        char buf[16];
-        delay((unsigned long)atol(tokStr(args, len, 1, buf, sizeof(buf))));
+    if (argc >= 2) {
+        delay((unsigned long)atol(argv[1]));
     }
     return XELP_S_OK;
 }
 
-XELPRESULT cmdMillis(XELP *x, const char* args, int len) {
-    (void)args; (void)len;
+XELPRESULT cmdMillis(XELP *x, int argc, const char **argv) {
+    (void)argc; (void)argv;
     char buf[16];
     snprintf(buf, sizeof(buf), "%lu\n", millis());
     XelpOut(x, buf, 0);
     return XELP_S_OK;
 }
 
-XELPRESULT cmdLed(XELP *x, const char* args, int len) {
-    if (tokCount(args, len) < 2) {
+XELPRESULT cmdLed(XELP *x, int argc, const char **argv) {
+    if (argc < 2) {
         XelpOut(x, "usage: led <0|1>\n", 0);
         return XELP_E_ERR;
     }
-    int val = tokInt(args, len, 1);
+    int val = atoi(argv[1]);
 #if HAS_RGB_LED
     rgbLedWrite(RGB_BUILTIN, val ? 32 : 0, val ? 32 : 0, val ? 32 : 0);
 #else
@@ -320,29 +280,28 @@ XELPRESULT cmdLed(XELP *x, const char* args, int len) {
     return XELP_S_OK;
 }
 
-XELPRESULT cmdRgb(XELP *x, const char* args, int len) {
+XELPRESULT cmdRgb(XELP *x, int argc, const char **argv) {
 #if HAS_RGB_LED
-    int n = tokCount(args, len);
-    if (n < 4) {
+    if (argc < 4) {
         XelpOut(x, "usage: rgb <r> <g> <b>  (0-255 each)\n", 0);
         return XELP_E_ERR;
     }
-    int r = tokInt(args, len, 1);
-    int g = tokInt(args, len, 2);
-    int b = tokInt(args, len, 3);
+    int r = atoi(argv[1]);
+    int g = atoi(argv[2]);
+    int b = atoi(argv[3]);
     rgbLedWrite(RGB_BUILTIN, r, g, b);
     char buf[32];
     snprintf(buf, sizeof(buf), "RGB(%d,%d,%d)\n", r, g, b);
     XelpOut(x, buf, 0);
 #else
-    (void)args; (void)len;
+    (void)argc; (void)argv;
     XelpOut(x, "no RGB LED on this board\n", 0);
 #endif
     return XELP_S_OK;
 }
 
-XELPRESULT cmdStatus(XELP *x, const char* args, int len) {
-    (void)args; (void)len;
+XELPRESULT cmdStatus(XELP *x, int argc, const char **argv) {
+    (void)argc; (void)argv;
     char buf[64];
     XelpOut(x, "Serial: connected\n", 0);
     XelpOut(x, bleConnected ? "BLE:    connected\n" : "BLE:    advertising\n", 0);
@@ -362,16 +321,14 @@ XELPRESULT cmdStatus(XELP *x, const char* args, int len) {
    All tokens after the target are concatenated and queued for delivery
    in loop().  This avoids threading issues when BLE callbacks and the
    Arduino loop task both write to Serial simultaneously. */
-XELPRESULT cmdSendmsg(XELP *x, const char* args, int len) {
-    int n = tokCount(args, len);
-    if (n < 3) {
+XELPRESULT cmdSendmsg(XELP *x, int argc, const char **argv) {
+    if (argc < 3) {
         XelpOut(x, "usage: sendmsg <serial|ble> <message...>\n", 0);
         return XELP_E_ERR;
     }
 
     /* Determine target instance */
-    char target[8];
-    tokStr(args, len, 1, target, sizeof(target));
+    const char *target = argv[1];
     XELP *dest = nullptr;
     if (strcmp(target, "serial") == 0 || strcmp(target, "ser") == 0)
         dest = cliSerial.raw();
@@ -385,12 +342,10 @@ XELPRESULT cmdSendmsg(XELP *x, const char* args, int len) {
     /* Build message into crossMsg buffer for loop() to deliver */
     int pos = 0;
     pos += snprintf(crossMsg + pos, sizeof(crossMsg) - pos, "[msg] ");
-    char buf[32];
-    for (int i = 2; i < n; i++) {
+    for (int i = 2; i < argc; i++) {
         if (i > 2 && pos < (int)sizeof(crossMsg) - 1)
             crossMsg[pos++] = ' ';
-        tokStr(args, len, i, buf, sizeof(buf));
-        pos += snprintf(crossMsg + pos, sizeof(crossMsg) - pos, "%s", buf);
+        pos += snprintf(crossMsg + pos, sizeof(crossMsg) - pos, "%s", argv[i]);
     }
     if (pos < (int)sizeof(crossMsg) - 1)
         crossMsg[pos++] = '\n';
@@ -402,8 +357,8 @@ XELPRESULT cmdSendmsg(XELP *x, const char* args, int len) {
     return XELP_S_OK;
 }
 
-XELPRESULT cmdReboot(XELP *x, const char* a, int l) {
-    (void)a; (void)l;
+XELPRESULT cmdReboot(XELP *x, int argc, const char **argv) {
+    (void)argc; (void)argv;
     XelpOut(x, "Rebooting...\n", 0);
     delay(100);
     ESP.restart();
@@ -411,10 +366,9 @@ XELPRESULT cmdReboot(XELP *x, const char* a, int l) {
 }
 
 /* Default handler for unrecognized commands. */
-XELPRESULT cmdNotFound(XELP *x, const char* args, int len) {
-    char buf[16];
-    tokStr(args, len, 0, buf, sizeof(buf));
-    XelpOut(x, buf, 0);
+XELPRESULT cmdNotFound(XELP *x, int argc, const char **argv) {
+    (void)argc;
+    XelpOut(x, argv[0], 0);
     XelpOut(x, ": unknown command\n", 0);
     return XELP_E_CMDNOTFOUND;
 }

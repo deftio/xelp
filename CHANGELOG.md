@@ -10,6 +10,44 @@ Versions always use three-component semver (e.g. `0.3.0`, never `0.3`).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-05-14
+
+### Changed (BREAKING)
+- **Native argc/argv dispatch**: CLI command handler signature changed from
+  `XELPRESULT fn(XELP *ths, const char *args, int len)` to
+  `XELPRESULT fn(XELP *ths, int argc, const char **argv)`. The dispatch
+  engine now tokenizes the command line into argc/argv before calling the
+  handler. All existing handlers must be updated to the new signature.
+- `mpfDefCLI` (default command handler) signature changed to match.
+- `XelpBuf2Argv` is now internal (`_xelpBuf2Argv`) -- no longer a public API.
+- `XELP_ENABLE_ARGV` compile flag removed. argv tokenization is always
+  enabled when `XELP_ENABLE_CLI` is defined. `XELP_ARGV_MAX` and
+  `XELP_ARGVBUFSZ` remain as tuning knobs.
+- `mArgvBuf` moved from `XELP_ENABLE_ARGV` guard to `XELP_ENABLE_CLI`.
+  No RAM change for builds that already had `XELP_ENABLE_ARGV` (the default).
+
+### Removed
+- `XelpArgs` struct and iterator API: `XelpArgsInit`, `XelpNextTok`,
+  `XelpNextInt`, `XelpArgCount`.
+- Random-access helpers: `XelpArgInt`, `XelpArgStr` (handlers use argv[]
+  directly or `XelpArgvInt`/`XelpArgvStr`).
+- `XelpTokN`, `XelpNumToks` (handlers use argc and argv[] directly).
+- `XELP_PARSE_ARGV` macro (no longer needed -- dispatch provides argc/argv).
+
+### Kept
+- `XelpArgvInt(argv, argc, n, &val)` -- bounds-checked integer access.
+- `XelpArgvStr(argv, argc, n, &s, &slen)` -- bounds-checked string access.
+- `XelpTokLineXB` -- core tokenizer (used by dispatch for line splitting).
+- KEY and THR mode dispatch -- unchanged.
+
+### Migration from 0.3.x
+1. Change all CLI handler signatures to `(XELP *ths, int argc, const char **argv)`.
+2. Replace `XelpArgsInit`/`XelpNextTok`/`XelpNextInt` with `argv[n]` access.
+3. Replace `XelpTokN(&b, n, &tok)` with `argv[n]`.
+4. Replace `XelpNumToks(&b, &n)` with `argc`.
+5. Replace `XELP_PARSE_ARGV(ths, args, len)` -- remove (argc/argv are now parameters).
+6. Remove `XELP_ENABLE_ARGV` from any override headers.
+
 ## [0.3.3] - 2026-05-12
 
 ### Added

@@ -112,18 +112,19 @@ static bool jsonNum(const char *key, char *dest, int maxlen)
 /* CLI commands                                                        */
 /* ------------------------------------------------------------------ */
 
-XELPRESULT cmdHelp(XELP *ths, const char *args, int len)
+XELPRESULT cmdHelp(XELP *ths, int argc, const char **argv)
 {
-    (void)args; (void)len;
+    (void)argc; (void)argv;
     return XelpHelp(ths);
 }
 
-XELPRESULT cmdSsid(XELP *ths, const char *args, int len)
+XELPRESULT cmdSsid(XELP *ths, int argc, const char **argv)
 {
-    XelpBuf b, tok;
-    XELP_XB_INIT(b, (char *)args, len);
-    if (XelpTokN(&b, 1, &tok) == XELP_S_OK) {
-        tokCopy(gSsid, sizeof(gSsid), tok.s, tok.p);
+    if (argc > 1) {
+        int slen = XelpStrLen(argv[1]);
+        if (slen >= (int)sizeof(gSsid)) slen = sizeof(gSsid) - 1;
+        memcpy(gSsid, argv[1], slen);
+        gSsid[slen] = '\0';
         XelpOut(ths, "SSID set: ", 0);
         XelpOut(ths, gSsid, 0);
         XelpOut(ths, "\n", 0);
@@ -133,12 +134,13 @@ XELPRESULT cmdSsid(XELP *ths, const char *args, int len)
     return XELP_S_OK;
 }
 
-XELPRESULT cmdPass(XELP *ths, const char *args, int len)
+XELPRESULT cmdPass(XELP *ths, int argc, const char **argv)
 {
-    XelpBuf b, tok;
-    XELP_XB_INIT(b, (char *)args, len);
-    if (XelpTokN(&b, 1, &tok) == XELP_S_OK) {
-        tokCopy(gPass, sizeof(gPass), tok.s, tok.p);
+    if (argc > 1) {
+        int plen = XelpStrLen(argv[1]);
+        if (plen >= (int)sizeof(gPass)) plen = sizeof(gPass) - 1;
+        memcpy(gPass, argv[1], plen);
+        gPass[plen] = '\0';
         XelpOut(ths, "Password set\n", 0);
     } else {
         XelpOut(ths, "usage: pass <password>\n", 0);
@@ -146,9 +148,9 @@ XELPRESULT cmdPass(XELP *ths, const char *args, int len)
     return XELP_S_OK;
 }
 
-XELPRESULT cmdConnect(XELP *ths, const char *args, int len)
+XELPRESULT cmdConnect(XELP *ths, int argc, const char **argv)
 {
-    (void)args; (void)len;
+    (void)argc; (void)argv;
     if (gSsid[0] == '\0') {
         XelpOut(ths, "Set SSID first: ssid <name>\n", 0);
         return XELP_E_ERR;
@@ -177,18 +179,18 @@ XELPRESULT cmdConnect(XELP *ths, const char *args, int len)
     return XELP_S_OK;
 }
 
-XELPRESULT cmdDisconnect(XELP *ths, const char *args, int len)
+XELPRESULT cmdDisconnect(XELP *ths, int argc, const char **argv)
 {
-    (void)args; (void)len;
+    (void)argc; (void)argv;
     WiFi.disconnect();
     XelpOut(ths, "Disconnected\n", 0);
     cli.setPrompt("esp32>");
     return XELP_S_OK;
 }
 
-XELPRESULT cmdStatus(XELP *ths, const char *args, int len)
+XELPRESULT cmdStatus(XELP *ths, int argc, const char **argv)
 {
-    (void)args; (void)len;
+    (void)argc; (void)argv;
     if (WiFi.status() == WL_CONNECTED) {
         XelpOut(ths, "WiFi: connected\nSSID: ", 0);
         XelpOut(ths, gSsid, 0);
@@ -208,9 +210,9 @@ XELPRESULT cmdStatus(XELP *ths, const char *args, int len)
     return XELP_S_OK;
 }
 
-XELPRESULT cmdTime(XELP *ths, const char *args, int len)
+XELPRESULT cmdTime(XELP *ths, int argc, const char **argv)
 {
-    (void)args; (void)len;
+    (void)argc; (void)argv;
     if (WiFi.status() != WL_CONNECTED) {
         XelpOut(ths, "Not connected. Use: connect\n", 0);
         return XELP_E_ERR;
@@ -235,31 +237,23 @@ XELPRESULT cmdTime(XELP *ths, const char *args, int len)
     return XELP_S_OK;
 }
 
-XELPRESULT cmdWeather(XELP *ths, const char *args, int len)
+XELPRESULT cmdWeather(XELP *ths, int argc, const char **argv)
 {
     if (WiFi.status() != WL_CONNECTED) {
         XelpOut(ths, "Not connected. Use: connect\n", 0);
         return XELP_E_ERR;
     }
 
-    XelpBuf b, tok1, tok2;
-    XELP_XB_INIT(b, (char *)args, len);
-    XELP_XB_TOP(b);
-    if (XelpTokN(&b, 1, &tok1) != XELP_S_OK ||
-        (XELP_XB_TOP(b), XelpTokN(&b, 2, &tok2) != XELP_S_OK)) {
+    if (argc < 3) {
         XelpOut(ths, "usage: weather <lat> <lon>\n", 0);
         XelpOut(ths, "  e.g. weather 37.77 -122.42\n", 0);
         return XELP_E_ERR;
     }
 
-    char lat[16], lon[16];
-    tokCopy(lat, sizeof(lat), tok1.s, tok1.p);
-    tokCopy(lon, sizeof(lon), tok2.s, tok2.p);
-
     char url[160];
     snprintf(url, sizeof(url),
         "http://api.open-meteo.com/v1/forecast?"
-        "latitude=%s&longitude=%s&current_weather=true", lat, lon);
+        "latitude=%s&longitude=%s&current_weather=true", argv[1], argv[2]);
 
     XelpOut(ths, "Fetching weather...\n", 0);
     if (httpGet(url) < 0) {
@@ -292,13 +286,11 @@ XELPRESULT cmdWeather(XELP *ths, const char *args, int len)
     return XELP_S_OK;
 }
 
-XELPRESULT cmdLed(XELP *ths, const char *args, int len)
+XELPRESULT cmdLed(XELP *ths, int argc, const char **argv)
 {
-    XelpBuf b, tok;
-    int val;
-    XELP_XB_INIT(b, (char *)args, len);
-    if (XelpTokN(&b, 1, &tok) == XELP_S_OK) {
-        XelpParseNum(tok.s, (int)(tok.p - tok.s), &val);
+    if (argc > 1) {
+        int val;
+        XelpParseNum(argv[1], XelpStrLen(argv[1]), &val);
         digitalWrite(LED_BUILTIN, val ? HIGH : LOW);
         XelpOut(ths, val ? "LED ON\n" : "LED OFF\n", 0);
     }
@@ -306,20 +298,16 @@ XELPRESULT cmdLed(XELP *ths, const char *args, int len)
 }
 
 /* Integer division: quotient -> R1, remainder -> R2 */
-XELPRESULT cmdDivmod(XELP *ths, const char *args, int len)
+XELPRESULT cmdDivmod(XELP *ths, int argc, const char **argv)
 {
-    XelpBuf b, tok;
-    int a, d;
+    if (argc < 3) {
+        XelpOut(ths, "usage: divmod <a> <b>\n", 0);
+        return XELP_E_ERR;
+    }
+
+    int a = XelpStr2Int(argv[1], XelpStrLen(argv[1]));
+    int d = XelpStr2Int(argv[2], XelpStrLen(argv[2]));
     char buf[48];
-    XELP_XB_INIT(b, (char *)args, len);
-
-    XELP_XB_TOP(b);
-    if (XelpTokN(&b, 1, &tok) != XELP_S_OK) goto usage;
-    a = XelpStr2Int(tok.s, (int)(tok.p - tok.s));
-
-    XELP_XB_TOP(b);
-    if (XelpTokN(&b, 2, &tok) != XELP_S_OK) goto usage;
-    d = XelpStr2Int(tok.s, (int)(tok.p - tok.s));
 
     if (d == 0) {
         XelpOut(ths, "division by zero\n", 0);
@@ -332,17 +320,13 @@ XELPRESULT cmdDivmod(XELP *ths, const char *args, int len)
              a, d, ths->mR[1], ths->mR[2]);
     XelpOut(ths, buf, 0);
     return XELP_S_OK;
-
-usage:
-    XelpOut(ths, "usage: divmod <a> <b>\n", 0);
-    return XELP_E_ERR;
 }
 
 /* Print all 4 registers */
-XELPRESULT cmdPrintR(XELP *ths, const char *args, int len)
+XELPRESULT cmdPrintR(XELP *ths, int argc, const char **argv)
 {
     char buf[64];
-    (void)args; (void)len;
+    (void)argc; (void)argv;
     snprintf(buf, sizeof(buf), "R0=%d R1=%d R2=%d R3=%d\n",
              XELP_R0(*ths), XELP_R1(*ths), XELP_R2(*ths), XELP_R3(*ths));
     XelpOut(ths, buf, 0);

@@ -25,13 +25,6 @@
 #include <stddef.h>           /* offsetof */
 #include <initializer_list>   /* std::initializer_list */
 
-/* The Easy API (commands({...})) requires XELP_ENABLE_ARGV for safe
-   tokenization.  Without it, the fallback tokenizer would write NUL
-   through token pointers, corrupting ROM or const script strings. */
-#if defined(XELP_ENABLE_CLI) && !defined(XELP_ENABLE_ARGV)
-#error "XelpArduino.h Easy API requires XELP_ENABLE_ARGV. Enable it in xelpcfg.h or xelp_ovr.h."
-#endif
-
 #ifdef ARDUINO
 #include <Arduino.h>
 #endif
@@ -159,7 +152,7 @@ public:
     }
 
     /** Set the default handler for unrecognized CLI commands (raw C signature). */
-    void setDefaultCommandHandler(XELPRESULT (*fn)(XELP*, const char*, int))
+    void setDefaultCommandHandler(XELPRESULT (*fn)(XELP*, int, const char**))
     {
         XELP_SET_FN_DEF_CLI(m_x, fn);
     }
@@ -278,7 +271,7 @@ public:
 
     /* ---- argv helpers ----------------------------------------------- */
 
-#ifdef XELP_ENABLE_ARGV
+#ifdef XELP_ENABLE_CLI
     /** Get argv[n] as int. */
     static XELPRESULT argInt(const char** argv, int argc, int n, int* val)
     {
@@ -369,16 +362,11 @@ private:
 
     /**
      * Shared dispatcher for all Tier 3 easy CLI commands.
-     * Finds the matching entry by name, parses argv, and calls the easy fn.
+     * argc/argv are already tokenized by the dispatch engine.
      */
-    static XELPRESULT _easyCliDispatch(XELP* ths, const char* args, int len)
+    static XELPRESULT _easyCliDispatch(XELP* ths, int argc, const char** argv)
     {
         XelpCLI& cli = _fromRaw(ths);
-        const char *argv[XELP_MAX_EASY_ARGV];
-        int argc = 0;
-
-        if (XelpBuf2Argv(ths, args, len, &argc, argv, XELP_MAX_EASY_ARGV) != XELP_S_OK)
-            return XELP_E_ERR;
         if (argc < 1) return XELP_E_ERR;
 
         for (int i = 0; i < cli.m_nCli; i++) {
@@ -392,15 +380,10 @@ private:
         return XELP_E_CMDNOTFOUND;
     }
 
-    static XELPRESULT _unknownDispatch(XELP* ths, const char* args, int len)
+    static XELPRESULT _unknownDispatch(XELP* ths, int argc, const char** argv)
     {
         if (!s_unknownFn) return XELP_S_OK;
         XelpCLI& cli = _fromRaw(ths);
-        const char *argv[XELP_MAX_EASY_ARGV];
-        int argc = 0;
-
-        if (XelpBuf2Argv(ths, args, len, &argc, argv, XELP_MAX_EASY_ARGV) != XELP_S_OK)
-            return XELP_E_ERR;
         s_unknownFn(cli, argc, argv);
         return XELP_S_OK;
     }

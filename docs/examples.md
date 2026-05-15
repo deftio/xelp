@@ -317,26 +317,29 @@ gcc -Wall -Isrc examples/scripting/scripting-example.c src/xelp.c -o scripting-e
 
 ## Writing your own commands
 
-All CLI commands have the same signature:
+All CLI commands have the same signature (since v0.4.0):
 
 ```c
-XELPRESULT my_command(XELP *ths, const char *args, int maxlen);
+XELPRESULT my_command(XELP *ths, int argc, const char **argv);
 ```
 
 - `ths` is a pointer to the XELP instance that dispatched the command
-- `args` points to the full command line (including the command name)
-- `maxlen` is the number of valid bytes in `args`
+- `argc` is the number of tokens (including the command name)
+- `argv` is an array of null-terminated token strings (`argv[0]` is the
+  command name, `argv[1]` through `argv[argc-1]` are the arguments)
 - Return `XELP_S_OK` (0) for success, negative for error, positive for warning
 
-### Pattern: argc/argv with XELP_PARSE_ARGV (recommended)
+The dispatch engine tokenizes the command line, strips quotes, expands
+escape sequences, and null-terminates each token before calling your
+handler. No manual tokenization is needed.
 
-Enable `XELP_ENABLE_ARGV` in `xelpcfg.h`. The `XELP_PARSE_ARGV` macro
-declares `argc`/`argv`, tokenizes the command line, strips quotes,
-expands escape sequences, and null-terminates each token:
+### Pattern: native argc/argv (standard)
+
+Handlers receive `argc` and `argv` directly -- just like C `main()`.
+Use `argv[n]` to access any argument by index:
 
 ```c
-XELPRESULT cmd_set(XELP *ths, const char *args, int len) {
-    XELP_PARSE_ARGV(ths, args, len);
+XELPRESULT cmd_set(XELP *ths, int argc, const char **argv) {
     /* argv[0]="set", argv[1]=key, argv[2]=value (null-terminated) */
     int val;
     if (XelpArgvInt(argv, argc, 2, &val) != XELP_S_OK)
@@ -346,38 +349,37 @@ XELPRESULT cmd_set(XELP *ths, const char *args, int len) {
 }
 ```
 
-### Pattern: sequential iterator with XelpArgs (minimal code size)
+### Pattern: bounds-checked access with XelpArgvInt / XelpArgvStr
 
-`XelpArgs` iterates tokens left-to-right in O(1) per token. Tokens are
-pointer spans (not null-terminated), so use `tok.s`..`tok.p` for length.
-No extra scratch buffer -- good when code size is critical:
+`XelpArgvInt` and `XelpArgvStr` are convenience helpers that perform
+bounds checking on the index and type conversion. They return
+`XELP_E_ERR` if the index is out of range or the value is not numeric:
 
 ```c
-XELPRESULT cmd_set(XELP *ths, const char *args, int len) {
-    XelpArgs a;
-    XelpBuf key;
-    int value;
+XELPRESULT cmd_set(XELP *ths, int argc, const char **argv) {
+    const char *key;
+    int keylen, value;
 
-    XelpArgsInit(&a, args, len);
-    XelpNextTok(&a, 0);              /* skip command name ("set") */
-    XelpNextTok(&a, &key);           /* key: use key.s .. key.p */
-    XelpNextInt(&a, &value);
+    if (XelpArgvStr(argv, argc, 1, &key, &keylen) != XELP_S_OK)
+        return XELP_E_ERR;     /* missing key argument */
+    if (XelpArgvInt(argv, argc, 2, &value) != XELP_S_OK)
+        return XELP_E_ERR;     /* missing or non-numeric value */
 
-    /* do something with key and value */
+    /* do something with key (length keylen) and value */
     return XELP_S_OK;
 }
 ```
 
-### Pattern: random-access by index (XelpTokN)
+### Pattern: random-access by index with argv[]
 
-For random access to any token by index:
+For random access to any token, use `argv[n]` directly. Each entry is a
+null-terminated C string:
 
 ```c
-XELPRESULT cmd_get(XELP *ths, const char *args, int len) {
-    XelpBuf b, tok;
-    XELP_XB_INIT(b, (char*)args, len);  /* cast: XELP_XB_INIT takes char* */
-    XelpTokN(&b, 1, &tok);              /* 0-indexed: token 1 = first arg */
-    /* use tok.s .. tok.p */
+XELPRESULT cmd_get(XELP *ths, int argc, const char **argv) {
+    if (argc < 2) return XELP_E_ERR;     /* need at least one argument */
+    const char *arg = argv[1];            /* first argument after command name */
+    /* use arg as a standard null-terminated string */
     return XELP_S_OK;
 }
 ```

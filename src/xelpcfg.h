@@ -57,7 +57,7 @@
 
 /****************************************************************************************************
  Quoted-string escape map: packed key-value pairs for escape expansion inside
- double-quoted arguments (XelpBuf2Argv).  Each entry is two adjacent chars:
+ double-quoted arguments (_xelpBuf2Argv).  Each entry is two adjacent chars:
  the first is the character after XELP_QUO_ESC, the second is the replacement
  byte.  A lone '\0' terminates the list.  Characters not in this table pass
  through unchanged (so \\ -> \ and \" -> " work without entries).
@@ -101,22 +101,6 @@
 #ifndef XELP_ENABLE_HISTORY
 #define XELP_ENABLE_HISTORY 1
 #endif
-
-/****************************************************************************************************
- Enable structured argument parsing (argc/argv).
- When defined, adds XelpBuf2Argv, XelpArgvInt, and XelpArgvStr functions and a
- dedicated scratch buffer (XELP_ARGVBUFSZ bytes) to each XELP instance.  Provides
- null-terminated tokens with quote and escape processing, and random access by
- index -- the standard argc/argv convention for command handlers.
- Does not require XELP_ENABLE_CLI; can be used standalone.
- RAM cost: XELP_ARGVBUFSZ bytes per instance (separate from the CLI line buffer).
- Code cost: ~530 bytes (x86-64 -Os), ~700 bytes (ARM Thumb -Os).
- Leaving undefined saves both the code and the per-instance RAM.
- */
-#ifndef XELP_ENABLE_ARGV
-#define XELP_ENABLE_ARGV    1
-#endif
-
 
 /****************************************************************************************************
  Enable KEY Mode.
@@ -207,7 +191,7 @@
 #endif
 
 /****************************************************************************************************
-  XELP_ARGV_MAX is the default maximum number of arguments for XelpBuf2Argv.
+  XELP_ARGV_MAX is the maximum number of arguments for CLI dispatch.
   Override with -DXELP_ARGV_MAX=16 on the compiler command line, or in xelp_ovr.h.
  */
 #ifndef XELP_ARGV_MAX
@@ -215,10 +199,10 @@
 #endif
 
 /*
-  XELP_ARGVBUFSZ is the scratch buffer size for XelpBuf2Argv tokenization.
+  XELP_ARGVBUFSZ is the scratch buffer size for argv tokenization.
   Defaults to XELP_CMDBUFSZ.  Override to a larger value if variable expansion
   or long script lines may produce arguments longer than the CLI input buffer.
-  RAM cost: XELP_ARGVBUFSZ bytes per instance (only when XELP_ENABLE_ARGV).
+  RAM cost: XELP_ARGVBUFSZ bytes per instance (when XELP_ENABLE_CLI).
  */
 #ifndef XELP_ARGVBUFSZ
 #define XELP_ARGVBUFSZ      XELP_CMDBUFSZ

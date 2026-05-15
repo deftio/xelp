@@ -48,7 +48,7 @@ arduino-cli monitor -p /dev/ttyACM0 -c baudrate=115200
 - Direct use of `XelpInit()`, `XELP_SET_FN_OUT()`, `XELP_SET_FN_CLI()`
 - Static `XELPCLIFuncMapEntry[]` command table with sentinel
 - Manual `Serial.available()` / `XelpParseKey()` loop
-- Token parsing with `XelpTokN()` and `XelpNumToks()`
+- Native `argc`/`argv` argument handling in command handlers
 
 For the C++ wrapper approach, see [arduino-cpp](../arduino-cpp/).
 For the Easy API with lambdas, see [pico-cli-arduino](../pico-cli-arduino/).

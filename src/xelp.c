@@ -671,29 +671,87 @@ XELPRESULT XelpTokLineXB (XelpBuf *buf, XelpBuf *tok, int srchType) {
 }
 
 /********************************************************
- XelpParseXB() parse buffer and execute commands 
+ _xelpBuf2Argv() - tokenize args into argc/argv using mArgvBuf as scratch.
+ Strips quotes, processes escape sequences, null-terminates each token.
+ argv[0] = command name per argc/argv convention.
+ Returns XELP_E_ERR if input exceeds scratch buffer or too many args.
+ Reads directly from the source buffer (ROM-safe) and writes tokens into
+ mArgvBuf — no upfront copy needed since escape expansion only shrinks.
+ */
+static XELPRESULT _xelpBuf2Argv(XELP *ths, const char *r, int len,
+                         int *argc, const char **argv, int maxargs)
+{
+    const char *end = r + len;
+    char *w = ths->mArgvBuf, c;
+    int ac = 0;
+
+    *argc = 0;
+    if (len <= 0) return XELP_S_OK;
+    if (len >= XELP_ARGVBUFSZ) return XELP_E_ERR;
+
+    while (r < end) {
+        while (r < end && (*r == ' ' || *r == '\t')) r++;
+        if (r >= end) break;
+        if (ac >= maxargs) return XELP_E_ERR;
+        argv[ac++] = w;
+        if (*r == '"') {
+            r++;                                       /* skip open quote  */
+            while (r < end && *r != '"') {
+                c = *r++;
+                if (c == XELP_QUO_ESC && r < end) {
+                    const char *m = XELP_ESC_MAP;
+                    c = *r++;
+                    while (*m) { if (c == m[0]) { c = m[1]; break; } m += 2; }
+                }
+                *w++ = c;
+            }
+            if (r < end) r++;                          /* skip close quote */
+        } else {
+            while (r < end && *r != ' ' && *r != '\t') {
+                c = *r++;
+                if (c == XELP_CLI_ESC && r < end) c = *r++;
+                *w++ = c;
+            }
+        }
+        *w++ = '\0';
+    }
+    *argc = ac;
+    return XELP_S_OK;
+}
+
+/********************************************************
+ XelpParseXB() parse buffer and execute commands.
+ Tokenizes each command line into argc/argv before calling the handler.
  */
 
 XELPRESULT XelpParseXB (XELP* ths, XelpBuf *args) {
 	XelpBuf line;
 	XELPCLIFuncMapEntry   *f;
+	const char *argv[XELP_ARGV_MAX];
+	int argc;
 
 	while (XELP_S_OK ==  XelpTokLineXB(args,&line,XELP_TOK_LINE) ) { /* for each logical line */
-        
+
         f=ths->mpCLIModeFuncs;
         if (f) { /* make sure fn dispatch table exists */
         	ths->mR[0] = XELP_E_CMDNOTFOUND;
-            while(f->mpCmd) {    
+            while(f->mpCmd) {
                 if (XELP_S_OK == XelpStrEq2(line.s,line.p,f->mpCmd)){
-                    
-                    ths->mR[0] = (f->mFunPtr)(ths, line.s,(int)(line.e-line.s));
+                    argc = 0;
+                    _xelpBuf2Argv(ths, line.s, (int)(line.e-line.s),
+                                  &argc, argv, XELP_ARGV_MAX);
+                    ths->mR[0] = (f->mFunPtr)(ths, argc, argv);
                     break;
                 }
                 f++;
             }
             if (ths->mR[0] == XELP_E_CMDNOTFOUND) {
-            	if (ths->mpfDefCLI)
-            		ths->mR[0] = ths->mpfDefCLI(ths, line.s,(int)(line.e-line.s));
+            	if (ths->mpfDefCLI) {
+                    argc = 0;
+                    _xelpBuf2Argv(ths, line.s, (int)(line.e-line.s),
+                                  &argc, argv, XELP_ARGV_MAX);
+            		ths->mR[0] = ths->mpfDefCLI(ths, argc, argv);
+                }
             }
         }
 	}
@@ -705,178 +763,9 @@ XELPRESULT XelpParse 		(XELP *ths, const char *buf, int blen)
     XELP_XB_INIT(args,(char*)buf,blen); /* const discard is safe: tokenizer only reads */
     return XelpParseXB(ths,&args);
 }
-/********************************************************
- XelpTokN() find the nth token (if it exists) - useful for parsing arguments
-
- XelpTokN finds the nth token (starting from the current buffer position buf->p);
- note: tok has last successfully found token regardless of result (check return value == XELP_S_OK)
- buf.p is pointing to position just after nth token.
-
- */
-XELPRESULT XelpTokN (XelpBuf *buf, int n, XelpBuf *tok)
-{
-    XELPRESULT r;
-    buf->p = buf->s;
-    do {
-        r = XelpTokLineXB(buf,tok,XELP_TOK_ONLY);
-        if (XELP_S_OK != r) {
-            tok->p = tok->s;
-            tok->e = tok->s;
-            break;
-        }
-    }while (n--);
-    
-    return r;
-}
-
-/********************************************************
- XelpNumToks() find the number of tokens in a buffer.
-
- */
-
-XELPRESULT XelpNumToks (XelpBuf *b, int *n)
-{
-    XelpBuf t;
-    *n=0;
-    while (XELP_S_OK == XelpTokLineXB(b,&t,XELP_TOK_ONLY))
-        (*n)++;
-
-    return XELP_S_OK;
-}
-
-/********************************************************
- XelpArgs -- sequential argument iterator.
- See xelp.h for API documentation.
- */
-
-XELPRESULT XelpArgsInit (XelpArgs *a, const char *args, int len)
-{
-    XELP_XB_INIT(a->buf, (char*)args, len);
-    return XELP_S_OK;
-}
-
-XELPRESULT XelpNextTok (XelpArgs *a, XelpBuf *tok)
-{
-    XelpBuf t;
-    XELPRESULT r = XelpTokLineXB(&a->buf, &t, XELP_TOK_ONLY);
-    if (r != XELP_S_OK) {
-        if (tok) { tok->s = 0; tok->p = 0; }
-        return r;
-    }
-    if (tok) *tok = t;
-    return XELP_S_OK;
-}
-
-XELPRESULT XelpNextInt (XelpArgs *a, int *val)
-{
-    XelpBuf tok;
-    XELPRESULT r = XelpNextTok(a, &tok);
-    if (r != XELP_S_OK) return r;
-    return XelpParseNum(tok.s, (int)(tok.p - tok.s), val);
-}
-
-XELPRESULT XelpArgCount (XelpArgs *a, int *n)
-{
-    XelpBuf save;
-    XELP_XB_COPY(a->buf, save);
-    XELP_XB_TOP(a->buf);
-    XelpNumToks(&a->buf, n);
-    XELP_XB_COPY(save, a->buf);
-    return XELP_S_OK;
-}
-
-/********************************************************
- XelpArgInt() - get the Nth argument as an integer (random access).
- Arg 0 is the command name. Returns XELP_E_ERR if arg N doesn't exist
- or is not a valid number.
- */
-XELPRESULT XelpArgInt (const char *args, int len, int n, int *val)
-{
-    XelpBuf b, tok;
-    XELP_XB_INIT(b, (char*)args, len);
-    if (XelpTokN(&b, n, &tok) != XELP_S_OK) return XELP_E_ERR;
-    return XelpParseNum(tok.s, (int)(tok.p - tok.s), val);
-}
-
-/********************************************************
- XelpArgStr() - get the Nth argument as a string span (random access).
- Sets *s to start of token and *slen to its length.
- Token is NOT null-terminated (buffer is not modified).
- Returns XELP_E_ERR if arg N doesn't exist.
- */
-XELPRESULT XelpArgStr (const char *args, int len, int n,
-                       const char **s, int *slen)
-{
-    XelpBuf b, tok;
-    XELP_XB_INIT(b, (char*)args, len);
-    if (XelpTokN(&b, n, &tok) != XELP_S_OK) return XELP_E_ERR;
-    *s = tok.s;
-    *slen = (int)(tok.p - tok.s);
-    return XELP_S_OK;
-}
-
 #endif /* XELP_ENABLE_CLI */
 
-#ifdef XELP_ENABLE_ARGV
-/********************************************************
- XelpBuf2Argv() - tokenize args into argc/argv using mArgvBuf as scratch.
- Strips quotes, processes escape sequences, null-terminates each token.
- argv[0] = command name per argc/argv convention.
- Returns XELP_E_ERR if input exceeds scratch buffer or too many args.
- */
-XELPRESULT XelpBuf2Argv(XELP *ths, const char *args, int len,
-                         int *argc, const char **argv, int maxargs)
-{
-    char *r, *w, *end, c;
-    int ac = 0, i, q;
-
-    *argc = 0;
-    if (len <= 0) return XELP_S_OK;
-    if (len >= XELP_ARGVBUFSZ) return XELP_E_ERR;
-
-    r = ths->mArgvBuf;
-    for (i = 0; i < len; i++) r[i] = args[i];
-    end = r + len;
-    w = r;
-
-    while (r < end) {
-        while (r < end && (*r == ' ' || *r == '\t')) r++;
-        if (r >= end || *r == ';' || *r == '\n' || *r == '#') break;
-        if (ac >= maxargs) return XELP_E_ERR;
-        argv[ac] = w;
-        q = (*r == '"');
-        if (q) r++;
-
-        while (r < end) {
-            c = *r;
-            if (q) {
-                if (c == '"')  { r++; break; }
-                if (c == XELP_QUO_ESC && r + 1 < end) {
-                    const char *m = XELP_ESC_MAP;
-                    c = *++r;
-                    while (*m) { if (c == m[0]) { c = m[1]; break; } m += 2; }
-                }
-            } else {
-                if (c == ' ' || c == '\t' ||
-                    c == ';' || c == '\n' || c == '#') break;
-                if (c == XELP_CLI_ESC) { if (++r >= end) break; c = *r; }
-            }
-            *w++ = c;
-            r++;
-        }
-        {   /* check stop char before null-write can overwrite it */
-            int stop = !q && r < end &&
-                       (*r == ';' || *r == '\n' || *r == '#');
-            *w++ = '\0';
-            ac++;
-            if (stop) break;
-        }
-        if (w > r) r = w;
-    }
-    *argc = ac;
-    return XELP_S_OK;
-}
-
+#ifdef XELP_ENABLE_CLI
 /********************************************************
  XelpArgvInt() - get argv[n] as an integer.
  Returns XELP_E_ERR if n is out of range or not a valid number.
@@ -898,7 +787,7 @@ XELPRESULT XelpArgvStr(const char **argv, int argc, int n, const char **s, int *
     *slen = XelpStrLen(argv[n]);
     return XELP_S_OK;
 }
-#endif /* XELP_ENABLE_ARGV */
+#endif /* XELP_ENABLE_CLI */
 
 /********************************************************
 	XelpParseKey() 

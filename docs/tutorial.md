@@ -1,7 +1,8 @@
 # Tutorial
 
-A step-by-step introduction to xelp. By the end you will have a working
-CLI with custom commands, KEY mode shortcuts, scripting, and token parsing.
+A step-by-step introduction to xelp (v0.4.0). By the end you will have a
+working CLI with custom commands, KEY mode shortcuts, scripting, and
+argc/argv argument handling.
 
 ## Prerequisites
 
@@ -20,7 +21,8 @@ void my_putc(char c) { putchar(c); }
 void my_bksp(void)   { my_putc('\b'); my_putc(' '); my_putc('\b'); }
 
 /* Your first command */
-XELPRESULT cmd_hello(XELP *ths, const char *args, int len) {
+XELPRESULT cmd_hello(XELP *ths, int argc, const char **argv) {
+    (void)argc; (void)argv;
     XelpOut(ths, "Hello, world!\n", 0);
     return XELP_S_OK;
 }
@@ -63,24 +65,22 @@ Type `hello` and press ENTER. You should see `Hello, world!`.
 3. `XELP_SET_FN_BKSP` tells xelp how to handle destructive backspace.
 4. `XELP_SET_FN_CLI` registers your command table.
 5. `XelpParseKey` feeds one character at a time into xelp's state machine.
-   When ENTER is received, xelp tokenizes the line and dispatches to the
-   matching command function.
+   When ENTER is received, xelp tokenizes the line into argc/argv and
+   dispatches to the matching command function.
 
 ## 2. Commands with arguments
 
-Command functions receive the raw argument string and its length. Use
-`XelpArgs` to iterate tokens left-to-right:
+Command handlers receive their arguments as standard C `argc`/`argv`.
+The dispatch engine tokenizes the command line automatically -- quotes are
+stripped, escape sequences (`\n`, `\t`, `\\`) are processed, and each
+token is null-terminated. No manual tokenization is needed.
 
 ```c
-XELPRESULT cmd_add(XELP *ths, const char *args, int len) {
-    XelpArgs a;
+XELPRESULT cmd_add(XELP *ths, int argc, const char **argv) {
+    /* argv[0] = "add", argv[1] = first arg, argv[2] = second arg */
     int x, y;
-
-    (void)ths;
-    XelpArgsInit(&a, args, len);
-    XelpNextTok(&a, 0);              /* skip command name ("add") */
-    XelpNextInt(&a, &x);
-    XelpNextInt(&a, &y);
+    if (XelpArgvInt(argv, argc, 1, &x) != XELP_S_OK) return XELP_E_ERR;
+    if (XelpArgvInt(argv, argc, 2, &y) != XELP_S_OK) return XELP_E_ERR;
 
     /* Output the result (xelp has no printf -- format manually or
        use your platform's sprintf into a buffer, then XelpOut) */
@@ -106,62 +106,47 @@ Usage: `add 10 25`
 - Backtick (`` ` ``) escapes the next character at the CLI
 - Backslash (`\`) escapes inside quoted strings
 
-### argc/argv style (alternative)
+### argc/argv helper functions
 
-If you prefer standard C argc/argv conventions, enable `XELP_ENABLE_ARGV`
-in `xelpcfg.h` and use `XELP_PARSE_ARGV`. This tokenizes the command
-line, strips quotes, processes escape sequences (`\n`, `\t`), and
-null-terminates each token:
+`XelpArgvInt` and `XelpArgvStr` provide bounds-checked access to
+individual arguments:
 
 ```c
-XELPRESULT cmd_add(XELP *ths, const char *args, int len) {
-    XELP_PARSE_ARGV(ths, args, len);
-    /* argv[0] = "add", argv[1] = first arg, argv[2] = second arg */
-    int x, y;
-    if (XelpArgvInt(argv, argc, 1, &x) != XELP_S_OK) return XELP_E_ERR;
-    if (XelpArgvInt(argv, argc, 2, &y) != XELP_S_OK) return XELP_E_ERR;
-    /* ... x + y ... */
+XELPRESULT cmd_greet(XELP *ths, int argc, const char **argv) {
+    const char *name;
+    int namelen;
+
+    if (XelpArgvStr(argv, argc, 1, &name, &namelen) != XELP_S_OK) {
+        XelpOut(ths, "usage: greet <name>\n", 0);
+        return XELP_E_ERR;
+    }
+    XelpOut(ths, "Hello, ", 0);
+    XelpOut(ths, name, namelen);
+    XelpOut(ths, "!\n", 0);
     return XELP_S_OK;
 }
 ```
 
-`XELP_PARSE_ARGV` is a convenience macro that declares `argc` and `argv`
-for you and returns `XELP_E_ERR` if tokenization fails. Tokens are
-null-terminated (unlike `XelpArgs` / `XelpTokN` which return pointer
-spans).
+## 3. Iterating and inspecting arguments
 
-For new code, `XELP_PARSE_ARGV` is the recommended approach when you need
-multiple arguments. Use `XelpArgs` when code size is critical or you only
-need a left-to-right single pass.
-
-## 3. Counting and iterating tokens
-
-Using `XelpArgs` to walk all tokens sequentially:
+Since handlers receive `argc` and `argv` directly, iterating over
+arguments is straightforward C:
 
 ```c
-XELPRESULT cmd_args(XELP *ths, const char *args, int len) {
-    XelpArgs a;
-    XelpBuf tok;
-    int n;
-
-    XelpArgsInit(&a, args, len);
-    XelpArgCount(&a, &n);            /* n includes the command name */
-
-    while (XelpNextTok(&a, &tok) == XELP_S_OK) {
-        XelpOut(ths, tok.s, tok.p - tok.s);
+XELPRESULT cmd_args(XELP *ths, int argc, const char **argv) {
+    int i;
+    for (i = 0; i < argc; i++) {
+        XelpOut(ths, argv[i], 0);
         XelpOut(ths, "\n", 0);
     }
     return XELP_S_OK;
 }
 ```
 
-For random access by index (e.g. "get the 3rd argument"), use `XelpTokN`:
-
-```c
-XelpBuf b, tok;
-XELP_XB_INIT(b, (char*)args, len);  /* cast required: XELP_XB_INIT takes char* */
-XelpTokN(&b, 2, &tok);              /* 0-indexed: token 2 = third token */
-```
+`argc` includes the command name (`argv[0]`), so user-supplied arguments
+start at `argv[1]`. Random access is just `argv[n]` -- no helper needed
+for simple string access. Use `XelpArgvStr` or `XelpArgvInt` when you
+want bounds checking and type conversion.
 
 ## 4. KEY mode -- single keypress actions
 
@@ -371,8 +356,10 @@ if (XELP_R0(cli) == XELP_S_OK) {
 ### Writing R1-R3 in a command handler
 
 ```c
-XELPRESULT cmd_divmod(XELP *ths, const char *args, int len) {
-    int a = 17, b = 5;
+XELPRESULT cmd_divmod(XELP *ths, int argc, const char **argv) {
+    int a, b;
+    if (XelpArgvInt(argv, argc, 1, &a) != XELP_S_OK) return XELP_E_ERR;
+    if (XelpArgvInt(argv, argc, 2, &b) != XELP_S_OK) return XELP_E_ERR;
     ths->mR[1] = a / b;  /* quotient  -> R1 */
     ths->mR[2] = a % b;  /* remainder -> R2 */
     return XELP_S_OK;    /* engine writes R0 */

@@ -1,9 +1,8 @@
 /*
- * posix-argv-example.c -- Demonstrates XelpBuf2Argv-based argument parsing.
+ * posix-argv-example.c -- Demonstrates native argc/argv argument parsing.
  *
- * Non-interactive, printf-based (no ncurses). Shows both the new
- * XelpBuf2Argv argc/argv style and the traditional XelpArgs style
- * side by side for comparison.
+ * Non-interactive, printf-based (no ncurses). Shows the native
+ * argc/argv dispatch with XelpArgvInt/XelpArgvStr helpers.
  *
  * Build (from repo root):
  *   gcc -Wall -Isrc examples/posix-argv/posix-argv-example.c src/xelp.c \
@@ -20,22 +19,18 @@
 static void out_putc(char c) { putchar(c); }
 
 /* ------------------------------------------------------------------ */
-/* Command handlers (XelpBuf2Argv style)                               */
+/* Command handlers                                                    */
 /* ------------------------------------------------------------------ */
 
 static XELP cli;
 
 /*
  * echo -- print argv[1..n-1] separated by spaces.
- * Demonstrates XelpBuf2Argv for simple multi-arg handling.
+ * Demonstrates native argc/argv for simple multi-arg handling.
  */
-static XELPRESULT cmd_echo(XELP *ths, const char *args, int len)
+static XELPRESULT cmd_echo(XELP *ths, int argc, const char **argv)
 {
-    const char *argv[XELP_ARGV_MAX];
-    int argc, i;
-
-    if (XelpBuf2Argv(ths, args, len, &argc, argv, XELP_ARGV_MAX) != XELP_S_OK)
-        return XELP_E_ERR;
+    int i;
 
     for (i = 1; i < argc; i++) {
         if (i > 1) XelpOut(ths, " ", 0);
@@ -46,17 +41,14 @@ static XELPRESULT cmd_echo(XELP *ths, const char *args, int len)
 }
 
 /*
- * divmod -- compute quotient and remainder using XelpBuf2Argv + XelpArgvInt.
+ * divmod -- compute quotient and remainder using native argc/argv + XelpArgvInt.
  * Usage: divmod <a> <b>
  * Sets R1 = a / b, R2 = a % b.
  */
-static XELPRESULT cmd_divmod(XELP *ths, const char *args, int len)
+static XELPRESULT cmd_divmod(XELP *ths, int argc, const char **argv)
 {
-    const char *argv[XELP_ARGV_MAX];
-    int argc, a, b;
+    int a, b;
 
-    if (XelpBuf2Argv(ths, args, len, &argc, argv, XELP_ARGV_MAX) != XELP_S_OK)
-        return XELP_E_ERR;
     if (argc < 3) {
         XelpOut(ths, "usage: divmod <a> <b>\n", 0);
         return XELP_E_ERR;
@@ -77,15 +69,17 @@ static XELPRESULT cmd_divmod(XELP *ths, const char *args, int len)
  * divmod_old -- same as divmod but using XelpArgs (for comparison).
  * Demonstrates the traditional XelpArgs sequential iterator approach.
  */
-static XELPRESULT cmd_divmod_old(XELP *ths, const char *args, int len)
+static XELPRESULT cmd_divmod_old(XELP *ths, int argc, const char **argv)
 {
-    XelpArgs it;
     int a, b;
 
-    XelpArgsInit(&it, args, len);
-    XelpNextTok(&it, 0);  /* skip command name */
-    if (XelpNextInt(&it, &a) != XELP_S_OK ||
-        XelpNextInt(&it, &b) != XELP_S_OK || b == 0) {
+    if (argc < 3) {
+        XelpOut(ths, "usage: divmod_old <a> <b>\n", 0);
+        return XELP_E_ERR;
+    }
+    XelpParseNum(argv[1], XelpStrLen(argv[1]), &a);
+    XelpParseNum(argv[2], XelpStrLen(argv[2]), &b);
+    if (b == 0) {
         XelpOut(ths, "usage: divmod_old <a> <b>\n", 0);
         return XELP_E_ERR;
     }
@@ -97,18 +91,14 @@ static XELPRESULT cmd_divmod_old(XELP *ths, const char *args, int len)
 }
 
 /*
- * set -- multi-arg "set key value" using XelpBuf2Argv + XelpArgvStr.
+ * set -- multi-arg "set key value" using native argc/argv + XelpArgvStr.
  * Demonstrates string access via argv.
  */
-static XELPRESULT cmd_set(XELP *ths, const char *args, int len)
+static XELPRESULT cmd_set(XELP *ths, int argc, const char **argv)
 {
-    const char *argv[XELP_ARGV_MAX];
-    int argc;
     const char *key, *val;
     int klen, vlen;
 
-    if (XelpBuf2Argv(ths, args, len, &argc, argv, XELP_ARGV_MAX) != XELP_S_OK)
-        return XELP_E_ERR;
     if (argc < 3) {
         XelpOut(ths, "usage: set <key> <value>\n", 0);
         return XELP_E_ERR;
@@ -122,9 +112,9 @@ static XELPRESULT cmd_set(XELP *ths, const char *args, int len)
 /*
  * help -- wraps XelpHelp.
  */
-static XELPRESULT cmd_help(XELP *ths, const char *args, int len)
+static XELPRESULT cmd_help(XELP *ths, int argc, const char **argv)
 {
-    (void)args; (void)len;
+    (void)argc; (void)argv;
     return XelpHelp(ths);
 }
 
@@ -134,7 +124,7 @@ static XELPRESULT cmd_help(XELP *ths, const char *args, int len)
 
 XELPCLIFuncMapEntry commands[] = {
     { &cmd_help,       "help",       "show help"                          },
-    { &cmd_echo,       "echo",       "echo args (XelpBuf2Argv style)"    },
+    { &cmd_echo,       "echo",       "echo args (native argc/argv style)"    },
     { &cmd_divmod,     "divmod",     "divmod <a> <b> (Buf2Argv + ArgvInt)" },
     { &cmd_divmod_old, "divmod_old", "divmod <a> <b> (XelpArgs style)"   },
     { &cmd_set,        "set",        "set <key> <value> (ArgvStr)"       },
@@ -163,7 +153,7 @@ int main(void)
 
     {
         const char *script =
-            "# Startup script using XelpBuf2Argv commands\n"
+            "# Startup script using native argc/argv commands\n"
             "echo Initializing device...\n"
             "divmod 17 5\n"
             "divmod_old 17 5\n"
@@ -190,30 +180,18 @@ int main(void)
     }
 
     /* =============================================================== */
-    /* PART 3: Direct XelpBuf2Argv call outside command dispatch        */
+    /* PART 3: Direct argv helpers                                      */
+    /*                                                                  */
+    /* XelpArgvInt / XelpArgvStr provide bounds-checked access to the   */
+    /* argv array that the dispatch engine provides to every handler.   */
     /* =============================================================== */
-
-    printf("\n--- Part 3: Direct XelpBuf2Argv usage ---\n\n");
-
-    {
-        const char *input = "set \"config file\" \"/etc/xelp.conf\"";
-        const char *argv[XELP_ARGV_MAX];
-        int argc, i;
-
-        if (XelpBuf2Argv(&cli, input, XelpStrLen(input),
-                          &argc, argv, XELP_ARGV_MAX) == XELP_S_OK) {
-            printf("  argc = %d\n", argc);
-            for (i = 0; i < argc; i++)
-                printf("  argv[%d] = \"%s\"\n", i, argv[i]);
-        }
-    }
 
     /* =============================================================== */
     /* SUMMARY                                                         */
     /*                                                                  */
-    /* XelpBuf2Argv gives you standard argc/argv with null-terminated  */
-    /* tokens. XelpArgs gives you streaming iteration without copy.    */
-    /* Both approaches work in the same command handlers.              */
+    /* Command handlers receive argc/argv directly from the dispatch   */
+    /* engine. XelpArgvInt and XelpArgvStr provide bounds-checked      */
+    /* access to individual arguments.                                 */
     /* =============================================================== */
 
     printf("\n--- Done ---\n");

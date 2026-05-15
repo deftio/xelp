@@ -74,23 +74,23 @@ XELPKeyFuncMapEntry gMyKeyCommands[] =
 	XELP_FUNC_ENTRY_LAST
 };
 
-XELPRESULT cli0 (XELP *ths, const char *c, int max) {
-    (void)ths; (void)c; (void)max;
+XELPRESULT cli0 (XELP *ths, int argc, const char **argv) {
+    (void)ths; (void)argc; (void)argv;
     gGlobalCallbackData.c0 = 0;
     return XELP_S_OK;
 }
-XELPRESULT cli1 (XELP *ths, const char *c, int max) {
-    (void)ths; (void)c; (void)max;
+XELPRESULT cli1 (XELP *ths, int argc, const char **argv) {
+    (void)ths; (void)argc; (void)argv;
     gGlobalCallbackData.c1 = 1;
     return XELP_S_OK;
 }
-XELPRESULT cli2 (XELP *ths, const char *c, int max) {
-    (void)ths; (void)c; (void)max;
+XELPRESULT cli2 (XELP *ths, int argc, const char **argv) {
+    (void)ths; (void)argc; (void)argv;
     gGlobalCallbackData.c2 = 2;
     return XELP_S_OK;
 }
-XELPRESULT cli3 (XELP *ths, const char *c, int max) {
-    (void)ths; (void)c; (void)max;
+XELPRESULT cli3 (XELP *ths, int argc, const char **argv) {
+    (void)ths; (void)argc; (void)argv;
     gGlobalCallbackData.c0 = 0;
     gGlobalCallbackData.c1 = 0;
     gGlobalCallbackData.c2 = 0;
@@ -353,6 +353,11 @@ XELPRESULT test_XelpParseNum() {
     /* uppercase hex with h suffix */
     r = XelpParseNum("ABCh",4, &n);
     if (JB_ASSERT( (n != 0xABC) || ( r != XELP_S_OK) ,"XelpParseNum ABCh uppercase"))
+        return XELP_E_ERR;
+
+    /* starts with '0' but second char is not 'x': treated as decimal */
+    r = XelpParseNum("012",3, &n);
+    if (JB_ASSERT( (n != 12) || ( r != XELP_S_OK) ,"XelpParseNum 012 decimal"))
         return XELP_E_ERR;
 
     return XELP_S_OK;
@@ -1050,142 +1055,6 @@ XELPRESULT test_XelpParseKey() {
 
 
 /* ====================================================================
- test_XelpTokN()
-
- Bug fix: line 669-670 had XelpTokN called on x (init'd with c2)
- then XELP_XB_INIT re-inits x with c2 using XelpStrLen(c3) as length.
- Fixed to use correct length.
- */
-
-XELPRESULT test_XelpTokN() {
-    XelpBuf x, tok;
-    XELPRESULT r;
-    char *c1 =   "tok0 tok1 tok2    \t tok3   tok4\n tok5";
-    char *c2 = "\ttok0 tok1 tok2    \t # tok3   tok4\n tok5 ";
-    char *c3 = " tok0 tok1 tok2    \t # tok3   tok4;\n tok5; tok6 ";
-    char *c4 = " tok0 tok1 tok2    \t #tok3   tok4;\n tok5; tok6 ";
-
-    XELP_XB_INIT(x,c1,XelpStrLen(c1));
-    r = XelpTokN(&x,0,&tok);
-    if (JB_ASSERT( ((r!=XELP_S_OK) || (XELP_S_OK != XelpStrEq2(tok.s, tok.p,"tok0") )),"XelpTokN get 0th token"))
-        return XELP_E_ERR;
-
-    r = XelpTokN(&x,3,&tok);
-    if (JB_ASSERT( ((r!=XELP_S_OK) || (XELP_S_OK != XelpStrEq2(tok.s, tok.p,"tok3") )),"XelpTokN get 3rd token"))
-        return XELP_E_ERR;
-
-
-    XELP_XB_INIT(x,c2,XelpStrLen(c2));
-    r = XelpTokN(&x,3,&tok);
-    if (JB_ASSERT( ((r!=XELP_S_OK) || (XELP_S_OK != XelpStrEq2(tok.s, tok.p,"tok5") )),"XelpTokN get 3rd token w commented line"))
-        return XELP_E_ERR;
-
-    /* Bug fix: use c2 with XelpStrLen(c2) instead of c3 length */
-    XELP_XB_INIT(x,c2,XelpStrLen(c2));
-    r = XelpTokN(&x,3,&tok);
-    if (JB_ASSERT( ((r!=XELP_S_OK) || (XELP_S_OK != XelpStrEq2(tok.s, tok.p,"tok5") )),"XelpTokN get 3rd token w comment (fixed)"))
-        return XELP_E_ERR;
-
-
-    XELP_XB_INIT(x,c4,XelpStrLen(c4));
-    r = XelpTokN(&x,3,&tok);
-    if (JB_ASSERT( ((r != XELP_S_OK) || (XELP_S_OK != XelpStrEq2(tok.s, tok.p,"tok5") )),"XelpTokN get 3rd token w commented line w space"))
-        return XELP_E_ERR;
-
-    XELP_XB_INIT(x,c4,XelpStrLen(c4));
-    r = XelpTokN(&x,23,&tok);
-    if (JB_ASSERT( ((r == XELP_S_OK) || (XELP_S_NOTFOUND != XelpStrEq2(tok.s, tok.p,"tok5") )),"XelpTokN get token past buffer"))
-        return XELP_E_ERR;
-
-    /* quoted token */
-    {
-        char *q = "\"tok0\" tok1 tok2";
-        XELP_XB_INIT(x,q,XelpStrLen(q));
-        r = XelpTokN(&x,1,&tok);
-        if (JB_ASSERT(r != XELP_S_OK, "XelpTokN quoted tok"))
-            return XELP_E_ERR;
-    }
-
-    /* n=0 edge - get very first token */
-    {
-        char *s1 = "first second";
-        XELP_XB_INIT(x,s1,XelpStrLen(s1));
-        r = XelpTokN(&x,0,&tok);
-        if (JB_ASSERT((r!=XELP_S_OK) || (XELP_S_OK != XelpStrEq2(tok.s,tok.p,"first")), "XelpTokN n=0"))
-            return XELP_E_ERR;
-    }
-
-    /* test using c3 with correct length */
-    XELP_XB_INIT(x,c3,XelpStrLen(c3));
-    r = XelpTokN(&x,0,&tok);
-    if (JB_ASSERT((r != XELP_S_OK) || (XELP_S_OK != XelpStrEq2(tok.s,tok.p,"tok0")), "XelpTokN c3 first"))
-        return XELP_E_ERR;
-
-    return XELP_S_OK;
-}
-/* ====================================================================
- test_XelpNumToks()
- */
-
-XELPRESULT test_XelpNumToks() {
-    XelpBuf x;
-    XELPRESULT r;
-    int n=0;
-    char *c0 = "";
-    char *c1 = "tok1 tok2    \t tok3   tok4\n t0k5";
-    char *c2 = "\t tok1 tok2    \t# tok3   tok4\n t0k5; tok6";
-    char *c3 = "\t tok1 tok2    \t#tok3   tok4\n t0k5; tok6";
-
-    XELP_XB_INIT(x,c0,XelpStrLen(c0));
-    r = XelpNumToks(&x,&n);
-    if (JB_ASSERT(((r!=XELP_S_OK) || (n !=0)),"XelpNumToks empty"))
-        return XELP_E_ERR;
-
-    XELP_XB_INIT(x,c1,XelpStrLen(c1));
-    r = XelpNumToks(&x,&n);
-    if (JB_ASSERT(((r!=XELP_S_OK) || (n !=5)),"XelpNumToks tabs and newlines"))
-        return XELP_E_ERR;
-
-    XELP_XB_INIT(x,c2,XelpStrLen(c2));
-    r = XelpNumToks(&x,&n);
-    if (JB_ASSERT(((r!=XELP_S_OK) || (n !=4)),"XelpNumToks comment on second line"))
-        return XELP_E_ERR;
-
-    XELP_XB_INIT(x,c3,XelpStrLen(c3));
-    r = XelpNumToks(&x,&n);
-    if (JB_ASSERT(((r!=XELP_S_OK) || (n !=4)),"XelpNumToks comment hugging"))
-        return XELP_E_ERR;
-
-    /* single token */
-    {
-        char *s1 = "only";
-        XELP_XB_INIT(x,s1,XelpStrLen(s1));
-        r = XelpNumToks(&x,&n);
-        if (JB_ASSERT(((r!=XELP_S_OK) || (n !=1)),"XelpNumToks single"))
-            return XELP_E_ERR;
-    }
-
-    /* all whitespace -- tokenizer returns 1 empty token for non-empty whitespace buffers */
-    {
-        char *ws = "   \t  \n  ";
-        XELP_XB_INIT(x,ws,XelpStrLen(ws));
-        r = XelpNumToks(&x,&n);
-        if (JB_ASSERT(r!=XELP_S_OK,"XelpNumToks all whitespace"))
-            return XELP_E_ERR;
-    }
-
-    /* all comments -- tokenizer returns 1 token for comment-only buffers */
-    {
-        char *cm = "# all comment\n";
-        XELP_XB_INIT(x,cm,XelpStrLen(cm));
-        r = XelpNumToks(&x,&n);
-        if (JB_ASSERT(r!=XELP_S_OK,"XelpNumToks all comments"))
-            return XELP_E_ERR;
-    }
-
-    return XELP_S_OK;
-}
-/* ====================================================================
  test_XelpParseXB() - actual command dispatch verification
 
  Bug fix: was a stub that just inited and returned OK.
@@ -1462,8 +1331,8 @@ XELPRESULT test_XelpBufMacros() {
 
 /* default handler callback globals */
 static int gDefKeyVal;
-static const char *gDefCLIArgs;
-static int gDefCLILen;
+static int gDefCLIArgc;
+static const char **gDefCLIArgv;
 
 XELPRESULT defKeyHandler(XELP *ths, XELPKEYCODE key) {
     (void)ths;
@@ -1471,10 +1340,10 @@ XELPRESULT defKeyHandler(XELP *ths, XELPKEYCODE key) {
     return XELP_W_WARN;
 }
 
-XELPRESULT defCLIHandler(XELP *ths, const char *args, int len) {
+XELPRESULT defCLIHandler(XELP *ths, int argc, const char **argv) {
     (void)ths;
-    gDefCLIArgs = args;
-    gDefCLILen = len;
+    gDefCLIArgc = argc;
+    gDefCLIArgv = argv;
     return XELP_W_WARN;
 }
 
@@ -1563,8 +1432,8 @@ XELPRESULT test_default_handlers() {
 
     /* set default CLI handler -- unknown command should call it */
     XELP_SET_FN_DEF_CLI(x,defCLIHandler);
-    gDefCLIArgs = 0;
-    gDefCLILen = 0;
+    gDefCLIArgc = 0;
+    gDefCLIArgv = 0;
     s = "unknowncmd arg1\n";
     XELP_XB_INIT(script,s,XelpStrLen(s));
     r = XelpParseXB(&x,&script);
@@ -1572,25 +1441,25 @@ XELPRESULT test_default_handlers() {
         return XELP_E_ERR;
     if (JB_ASSERT(XELP_R0(x) != XELP_W_WARN, "DefCLI handler mR[0]"))
         return XELP_E_ERR;
-    if (JB_ASSERT(gDefCLIArgs == 0, "DefCLI handler received args"))
+    if (JB_ASSERT(gDefCLIArgc != 2, "DefCLI handler received argc"))
         return XELP_E_ERR;
-    if (JB_ASSERT(gDefCLILen == 0, "DefCLI handler received len"))
+    if (JB_ASSERT(gDefCLIArgv == 0, "DefCLI handler received argv"))
         return XELP_E_ERR;
 
     /* known command should NOT call default CLI handler */
-    gDefCLIArgs = 0;
-    gDefCLILen = 0;
+    gDefCLIArgv = 0;
+    gDefCLIArgc = 0;
     gGlobalCallbackData.c1 = 0;
     s = "foo arg\n";
     XELP_XB_INIT(script,s,XelpStrLen(s));
     r = XelpParseXB(&x,&script);
     if (JB_ASSERT(gGlobalCallbackData.c1 != 1, "DefCLI known cmd dispatched"))
         return XELP_E_ERR;
-    if (JB_ASSERT(gDefCLIArgs != 0, "DefCLI handler NOT called for known cmd"))
+    if (JB_ASSERT(gDefCLIArgv != 0, "DefCLI handler NOT called for known cmd"))
         return XELP_E_ERR;
 
     /* multiple commands: one known, one unknown -- default handler called for unknown only */
-    gDefCLIArgs = 0;
+    gDefCLIArgv = 0;
     gGlobalCallbackData.c1 = 0;
     s = "foo; badcmd\n";
     XELP_XB_INIT(script,s,XelpStrLen(s));
@@ -1607,7 +1476,7 @@ XELPRESULT test_default_handlers() {
         XELP_SET_FN_OUT(x4,dummyOut);
         XELP_SET_FN_DEF_CLI(x4,defCLIHandler);
         /* no CLI table set -- command should NOT dispatch (no table to search) */
-        gDefCLIArgs = 0;
+        gDefCLIArgv = 0;
         s = "anything\n";
         XELP_XB_INIT(script,s,XelpStrLen(s));
         r = XelpParseXB(&x4,&script);
@@ -1625,7 +1494,7 @@ XELPRESULT test_default_handlers() {
         XELP_SET_FN_CLI(x5,gMyCLICommands);
         XELP_SET_FN_OUT(x5,dummyOut);
         XELP_SET_FN_DEF_CLI(x5,defCLIHandler);
-        gDefCLIArgs = 0;
+        gDefCLIArgv = 0;
         for (i = 0; i < XelpStrLen(cmd); i++)
             XelpParseKey(&x5,cmd[i]);
         XelpParseKey(&x5,XELPKEY_ENTER);
@@ -1646,15 +1515,15 @@ XELPRESULT test_default_handlers() {
  - Tokenizer never reads past buffer end
  */
 
-/* handler that records received buffer pointer and length for boundary checks */
-static const char *gBndArgs;
-static int gBndLen;
+/* handler that records received argc/argv for boundary checks */
+static int gBndArgc;
+static const char **gBndArgv;
 static int gBndCallCount;
 
-XELPRESULT bndHandler(XELP *ths, const char *args, int len) {
+XELPRESULT bndHandler(XELP *ths, int argc, const char **argv) {
     (void)ths;
-    gBndArgs = args;
-    gBndLen = len;
+    gBndArgc = argc;
+    gBndArgv = argv;
     gBndCallCount++;
     return XELP_S_OK;
 }
@@ -1755,16 +1624,16 @@ XELPRESULT test_buffer_boundaries() {
         XelpParseKey(&x,XELPKEY_ENTER);
     }
 
-    /* === Command handler receives correctly bounded length === */
+    /* === Command handler receives correct argc/argv === */
 
-    /* 6. handler len matches actual token+args length */
+    /* 6. handler argc matches token count (cmd + 2 args = 3) */
     {
         XelpInit(&x,"BndTest6");
         XELP_SET_FN_CLI(x,bndCmds);
         XELP_SET_FN_OUT(x,dummyOut);
 
-        gBndArgs = 0;
-        gBndLen = 0;
+        gBndArgv = 0;
+        gBndArgc = 0;
         gBndCallCount = 0;
         {
             char *s = "cmd arg1 arg2\n";
@@ -1773,42 +1642,40 @@ XELPRESULT test_buffer_boundaries() {
         }
         if (JB_ASSERT(gBndCallCount != 1, "bnd handler called once"))
             return XELP_E_ERR;
-        /* len should be distance from line start to line end (before \n) */
-        if (JB_ASSERT(gBndLen != 13, "bnd handler len=13"))
+        if (JB_ASSERT(gBndArgc != 3, "bnd handler argc=3"))
             return XELP_E_ERR;
-        /* args ptr should point into the input buffer */
-        if (JB_ASSERT(gBndArgs == 0, "bnd handler got args ptr"))
+        if (JB_ASSERT(gBndArgv == 0, "bnd handler got argv ptr"))
             return XELP_E_ERR;
     }
 
-    /* 7. handler len for command with no args */
+    /* 7. handler argc for command with no args */
     {
-        gBndLen = -1;
+        gBndArgc = -1;
         {
             char *s = "cmd\n";
             XELP_XB_INIT(script,s,XelpStrLen(s));
             r = XelpParseXB(&x,&script);
         }
-        if (JB_ASSERT(gBndLen != 3, "bnd handler cmd-only len=3"))
+        if (JB_ASSERT(gBndArgc != 1, "bnd handler cmd-only argc=1"))
             return XELP_E_ERR;
     }
 
-    /* 8. handler len for single-char line (no newline, just "cmd") */
+    /* 8. handler argc for single-char line (no newline, just "cmd") */
     {
-        gBndLen = -1;
+        gBndArgc = -1;
         {
             char *s = "cmd";
             XELP_XB_INIT(script,s,XelpStrLen(s));
             r = XelpParseXB(&x,&script);
         }
-        if (JB_ASSERT(gBndLen != 3, "bnd handler no-newline len=3"))
+        if (JB_ASSERT(gBndArgc != 1, "bnd handler no-newline argc=1"))
             return XELP_E_ERR;
     }
 
-    /* 9. handler len with semicolons -- each command gets its own length */
+    /* 9. handler argc with semicolons -- each command gets its own argc */
     {
         gBndCallCount = 0;
-        gBndLen = -1;
+        gBndArgc = -1;
         {
             char *s = "cmd a; cmd bb\n";
             XELP_XB_INIT(script,s,XelpStrLen(s));
@@ -1816,8 +1683,8 @@ XELPRESULT test_buffer_boundaries() {
         }
         if (JB_ASSERT(gBndCallCount != 2, "bnd semicolon 2 calls"))
             return XELP_E_ERR;
-        /* last call should have been for "cmd bb" */
-        if (JB_ASSERT(gBndLen != 6, "bnd semicolon second len=6"))
+        /* last call should have been for "cmd bb" -> argc=2 */
+        if (JB_ASSERT(gBndArgc != 2, "bnd semicolon second argc=2"))
             return XELP_E_ERR;
     }
 
@@ -1826,11 +1693,11 @@ XELPRESULT test_buffer_boundaries() {
     /* 10. XelpParse with exact length */
     {
         gBndCallCount = 0;
-        gBndLen = -1;
+        gBndArgc = -1;
         r = XelpParse(&x,"cmd x\n",6);
         if (JB_ASSERT(gBndCallCount != 1, "bnd Parse exact len"))
             return XELP_E_ERR;
-        if (JB_ASSERT(gBndLen != 5, "bnd Parse handler len=5"))
+        if (JB_ASSERT(gBndArgc != 2, "bnd Parse handler argc=2"))
             return XELP_E_ERR;
     }
 
@@ -1840,7 +1707,7 @@ XELPRESULT test_buffer_boundaries() {
         r = XelpParse(&x,"cmd xyz extra\n",3);  /* only "cmd" visible */
         if (JB_ASSERT(gBndCallCount != 1, "bnd Parse truncated calls"))
             return XELP_E_ERR;
-        if (JB_ASSERT(gBndLen != 3, "bnd Parse truncated len=3"))
+        if (JB_ASSERT(gBndArgc != 1, "bnd Parse truncated argc=1"))
             return XELP_E_ERR;
     }
 
@@ -1972,9 +1839,9 @@ XELPRESULT test_buffer_boundaries() {
     /* 20. XelpParse: verify handler cannot see beyond supplied length */
     {
         char mixed[] = "cmd SECRET";  /* 10 chars total */
-        gBndLen = -1;
+        gBndArgc = 0;
         r = XelpParse(&x, mixed, 3);  /* only "cmd" visible */
-        if (JB_ASSERT(gBndLen != 3, "bnd Parse hides trailing data"))
+        if (JB_ASSERT(gBndArgc != 1, "bnd Parse hides trailing data"))
             return XELP_E_ERR;
     }
 
@@ -2342,22 +2209,10 @@ XELPRESULT test_stress_malformed() {
  */
 
 /* helper CLI command that writes R1-R3 from parsed args */
-XELPRESULT cmd_set_regs(XELP *ths, const char *args, int len) {
-    XelpBuf b, tok;
-    XELP_XB_INIT(b, (char*)args, len);
-
-    XELP_XB_TOP(b);
-    XelpTokN(&b, 1, &tok);
-    ths->mR[1] = XelpStr2Int(tok.s, tok.p - tok.s);
-
-    XELP_XB_TOP(b);
-    XelpTokN(&b, 2, &tok);
-    ths->mR[2] = XelpStr2Int(tok.s, tok.p - tok.s);
-
-    XELP_XB_TOP(b);
-    XelpTokN(&b, 3, &tok);
-    ths->mR[3] = XelpStr2Int(tok.s, tok.p - tok.s);
-
+XELPRESULT cmd_set_regs(XELP *ths, int argc, const char **argv) {
+    if (argc > 1) ths->mR[1] = XelpStr2Int(argv[1], XelpStrLen(argv[1]));
+    if (argc > 2) ths->mR[2] = XelpStr2Int(argv[2], XelpStrLen(argv[2]));
+    if (argc > 3) ths->mR[3] = XelpStr2Int(argv[3], XelpStrLen(argv[3]));
     return XELP_S_OK;
 }
 
@@ -3325,235 +3180,6 @@ XELPRESULT test_MultiInstance() {
     return XELP_S_OK;
 }
 
-/* ====================================================================
- test_XelpArgs() - sequential argument iterator
- */
-XELPRESULT test_XelpArgs() {
-    XelpBuf tok;
-    int val, n;
-    XelpArgs a;
-    XELPRESULT r;
-
-    /* --- basic iteration: "divmod 17 5" --- */
-    {
-        char buf[] = "divmod 17 5";
-        XelpArgsInit(&a, buf, XelpStrLen(buf));
-
-        r = XelpNextTok(&a, &tok);
-        if (JB_ASSERT(r != XELP_S_OK, "Args tok0 ok"))
-            return XELP_E_ERR;
-        if (JB_ASSERT((int)(tok.p - tok.s) != 6, "Args tok0 len"))
-            return XELP_E_ERR;
-
-        r = XelpNextInt(&a, &val);
-        if (JB_ASSERT(r != XELP_S_OK || val != 17, "Args int 17"))
-            return XELP_E_ERR;
-
-        r = XelpNextInt(&a, &val);
-        if (JB_ASSERT(r != XELP_S_OK || val != 5, "Args int 5"))
-            return XELP_E_ERR;
-
-        /* past end */
-        r = XelpNextTok(&a, &tok);
-        if (JB_ASSERT(r == XELP_S_OK, "Args past end"))
-            return XELP_E_ERR;
-        if (JB_ASSERT(tok.s != 0, "Args past end tok null"))
-            return XELP_E_ERR;
-    }
-
-    /* --- XelpArgCount --- */
-    {
-        char buf2[] = "echo hello world";
-        XelpArgsInit(&a, buf2, XelpStrLen(buf2));
-        r = XelpArgCount(&a, &n);
-        if (JB_ASSERT(r != XELP_S_OK || n != 3, "ArgCount 3"))
-            return XELP_E_ERR;
-
-        /* count should not disturb iteration position */
-        r = XelpNextTok(&a, &tok);
-        if (JB_ASSERT(r != XELP_S_OK || (int)(tok.p - tok.s) != 4, "ArgCount preserves pos"))
-            return XELP_E_ERR;
-    }
-
-    /* --- empty buffer --- */
-    {
-        char buf3[] = "";
-        XelpArgsInit(&a, buf3, 0);
-        r = XelpNextTok(&a, &tok);
-        if (JB_ASSERT(r == XELP_S_OK, "Args empty"))
-            return XELP_E_ERR;
-
-        r = XelpArgCount(&a, &n);
-        if (JB_ASSERT(n != 0, "ArgCount empty"))
-            return XELP_E_ERR;
-    }
-
-    /* --- single token --- */
-    {
-        char buf4[] = "help";
-        XelpArgsInit(&a, buf4, XelpStrLen(buf4));
-        r = XelpNextTok(&a, &tok);
-        if (JB_ASSERT(r != XELP_S_OK || (int)(tok.p - tok.s) != 4, "Args single tok"))
-            return XELP_E_ERR;
-        if (JB_ASSERT(tok.s[0] != 'h' || tok.s[3] != 'p', "Args single content"))
-            return XELP_E_ERR;
-    }
-
-    /* --- XelpNextInt with hex --- */
-    {
-        char buf5[] = "cmd 0xFF ABh";
-        XelpArgsInit(&a, buf5, XelpStrLen(buf5));
-        XelpNextTok(&a, 0); /* skip "cmd" */
-
-        r = XelpNextInt(&a, &val);
-        if (JB_ASSERT(r != XELP_S_OK || val != 0xFF, "Args hex 0xFF"))
-            return XELP_E_ERR;
-
-        r = XelpNextInt(&a, &val);
-        if (JB_ASSERT(r != XELP_S_OK || val != 0xAB, "Args hex ABh"))
-            return XELP_E_ERR;
-    }
-
-    /* --- XelpNextInt on non-numeric token --- */
-    {
-        char buf6[] = "cmd abc";
-        XelpArgsInit(&a, buf6, XelpStrLen(buf6));
-        XelpNextTok(&a, 0); /* skip "cmd" */
-        r = XelpNextInt(&a, &val);
-        if (JB_ASSERT(r != XELP_E_ERR, "Args non-numeric"))
-            return XELP_E_ERR;
-    }
-
-    /* --- NULL tok pointer (skip pattern) --- */
-    {
-        char buf7[] = "skip me keep";
-        XelpArgsInit(&a, buf7, XelpStrLen(buf7));
-        r = XelpNextTok(&a, 0); /* skip with NULL */
-        if (JB_ASSERT(r != XELP_S_OK, "Args skip NULL ptr"))
-            return XELP_E_ERR;
-        r = XelpNextTok(&a, 0);
-        if (JB_ASSERT(r != XELP_S_OK, "Args skip NULL ptr 2"))
-            return XELP_E_ERR;
-        r = XelpNextTok(&a, &tok);
-        if (JB_ASSERT(r != XELP_S_OK || (int)(tok.p - tok.s) != 4, "Args after skips"))
-            return XELP_E_ERR;
-    }
-
-    /* --- negative integer --- */
-    {
-        char buf8[] = "cmd -42";
-        XelpArgsInit(&a, buf8, XelpStrLen(buf8));
-        XelpNextTok(&a, 0);
-        r = XelpNextInt(&a, &val);
-        if (JB_ASSERT(r != XELP_S_OK || val != -42, "Args negative int"))
-            return XELP_E_ERR;
-    }
-
-    return XELP_S_OK;
-}
-
-/* ====================================================================
- test_XelpArgIntStr() - direct-access argument helpers
- */
-XELPRESULT test_XelpArgIntStr() {
-    XELPRESULT r;
-    int val;
-    const char *s;
-    int slen;
-
-    /* 1. XelpArgInt: get arg 1 as int */
-    {
-        char buf[] = "led 42";
-        r = XelpArgInt(buf, XelpStrLen(buf), 1, &val);
-        if (JB_ASSERT(r != XELP_S_OK || val != 42, "ArgInt basic"))
-            return XELP_E_ERR;
-    }
-
-    /* 2. XelpArgInt: arg 0 is the command name */
-    {
-        char buf[] = "divmod 10 3";
-        r = XelpArgInt(buf, XelpStrLen(buf), 0, &val);
-        /* "divmod" is not a number */
-        if (JB_ASSERT(r != XELP_E_ERR, "ArgInt arg0 not a number"))
-            return XELP_E_ERR;
-    }
-
-    /* 3. XelpArgInt: multi args */
-    {
-        char buf[] = "divmod 10 3";
-        r = XelpArgInt(buf, XelpStrLen(buf), 1, &val);
-        if (JB_ASSERT(r != XELP_S_OK || val != 10, "ArgInt arg1=10"))
-            return XELP_E_ERR;
-        r = XelpArgInt(buf, XelpStrLen(buf), 2, &val);
-        if (JB_ASSERT(r != XELP_S_OK || val != 3, "ArgInt arg2=3"))
-            return XELP_E_ERR;
-    }
-
-    /* 4. XelpArgInt: hex */
-    {
-        char buf[] = "cmd 0xFF";
-        r = XelpArgInt(buf, XelpStrLen(buf), 1, &val);
-        if (JB_ASSERT(r != XELP_S_OK || val != 255, "ArgInt hex 0xFF"))
-            return XELP_E_ERR;
-    }
-
-    /* 5. XelpArgInt: arg past end */
-    {
-        char buf[] = "cmd 1";
-        val = -1;
-        r = XelpArgInt(buf, XelpStrLen(buf), 5, &val);
-        if (JB_ASSERT(r != XELP_E_ERR, "ArgInt past end"))
-            return XELP_E_ERR;
-        if (JB_ASSERT(val != -1, "ArgInt past end val unchanged"))
-            return XELP_E_ERR;
-    }
-
-    /* 6. XelpArgInt: negative */
-    {
-        char buf[] = "adj -7";
-        r = XelpArgInt(buf, XelpStrLen(buf), 1, &val);
-        if (JB_ASSERT(r != XELP_S_OK || val != -7, "ArgInt negative"))
-            return XELP_E_ERR;
-    }
-
-    /* 7. XelpArgStr: basic */
-    {
-        char buf[] = "ssid MyNetwork";
-        r = XelpArgStr(buf, XelpStrLen(buf), 1, &s, &slen);
-        if (JB_ASSERT(r != XELP_S_OK || slen != 9, "ArgStr basic len"))
-            return XELP_E_ERR;
-        if (JB_ASSERT(s[0] != 'M' || s[8] != 'k', "ArgStr basic content"))
-            return XELP_E_ERR;
-    }
-
-    /* 8. XelpArgStr: arg 0 = command name */
-    {
-        char buf[] = "echo hello";
-        r = XelpArgStr(buf, XelpStrLen(buf), 0, &s, &slen);
-        if (JB_ASSERT(r != XELP_S_OK || slen != 4, "ArgStr arg0 len"))
-            return XELP_E_ERR;
-        if (JB_ASSERT(XELP_S_OK != XelpStrEq(s, slen, "echo"), "ArgStr arg0 echo"))
-            return XELP_E_ERR;
-    }
-
-    /* 9. XelpArgStr: past end */
-    {
-        char buf[] = "help";
-        r = XelpArgStr(buf, XelpStrLen(buf), 1, &s, &slen);
-        if (JB_ASSERT(r != XELP_E_ERR, "ArgStr past end"))
-            return XELP_E_ERR;
-    }
-
-    /* 10. XelpArgStr: empty buffer */
-    {
-        char buf[] = "";
-        r = XelpArgStr(buf, 0, 0, &s, &slen);
-        if (JB_ASSERT(r != XELP_E_ERR, "ArgStr empty buf"))
-            return XELP_E_ERR;
-    }
-
-    return XELP_S_OK;
-}
 
 /* ====================================================================
  test_CursorWithEcho()
@@ -4806,521 +4432,328 @@ XELPRESULT test_HistoryAndEcho() {
 #endif /* XELP_ENABLE_LINE_EDIT && XELP_ENABLE_HISTORY */
 
 /* ====================================================================
- test_XelpBuf2Argv() - opt-in argc/argv tokenizer
+ test_XelpArgvDispatch() - test native argc/argv dispatch path
+ Exercises the internal _xelpBuf2Argv through XelpParseXB dispatch.
+ Also tests XelpArgvInt / XelpArgvStr public helpers.
  */
-XELPRESULT test_XelpBuf2Argv() {
-    XELP x;
-    const char *argv[XELP_ARGV_MAX];
-    int argc;
-    XELPRESULT r;
-    int val;
-    const char *s;
-    int slen;
 
-    XelpInit(&x, "b2a");
+/* handler that records argc/argv for inspection */
+static int gArgvTestArgc;
+static const char **gArgvTestArgv;
+static char gArgvTestCopy[XELP_ARGV_MAX][32]; /* copies of argv values */
 
-    /* 1. Basic: "echo hello" -> argc=2 */
-    {
-        char buf[] = "echo hello";
-        r = XelpBuf2Argv(&x, buf, XelpStrLen(buf), &argc, argv, XELP_ARGV_MAX);
-        if (JB_ASSERT(r != XELP_S_OK || argc != 2, "B2A basic argc"))
-            return XELP_E_ERR;
-        if (JB_ASSERT(XelpStrEq(argv[0], XelpStrLen(argv[0]), "echo") != XELP_S_OK, "B2A argv[0]"))
-            return XELP_E_ERR;
-        if (JB_ASSERT(XelpStrEq(argv[1], XelpStrLen(argv[1]), "hello") != XELP_S_OK, "B2A argv[1]"))
-            return XELP_E_ERR;
+XELPRESULT argvTestHandler(XELP *ths, int argc, const char **argv) {
+    int i;
+    (void)ths;
+    gArgvTestArgc = argc;
+    gArgvTestArgv = argv;
+    for (i = 0; i < argc && i < XELP_ARGV_MAX; i++) {
+        int len = XelpStrLen(argv[i]);
+        if (len > 31) len = 31;
+        for (int j = 0; j < len; j++) gArgvTestCopy[i][j] = argv[i][j];
+        gArgvTestCopy[i][len] = '\0';
     }
-
-    /* 2. Multiple args: "divmod 10 3" -> argc=3 */
-    {
-        char buf[] = "divmod 10 3";
-        r = XelpBuf2Argv(&x, buf, XelpStrLen(buf), &argc, argv, XELP_ARGV_MAX);
-        if (JB_ASSERT(r != XELP_S_OK || argc != 3, "B2A multi argc"))
-            return XELP_E_ERR;
-        if (JB_ASSERT(XelpStrEq(argv[0], XelpStrLen(argv[0]), "divmod") != XELP_S_OK, "B2A multi argv0"))
-            return XELP_E_ERR;
-        if (JB_ASSERT(XelpStrEq(argv[1], XelpStrLen(argv[1]), "10") != XELP_S_OK, "B2A multi argv1"))
-            return XELP_E_ERR;
-        if (JB_ASSERT(XelpStrEq(argv[2], XelpStrLen(argv[2]), "3") != XELP_S_OK, "B2A multi argv2"))
-            return XELP_E_ERR;
-    }
-
-    /* 3. Quoted string: "echo \"hello world\"" -> argv[1]="hello world" */
-    {
-        char buf[] = "echo \"hello world\"";
-        r = XelpBuf2Argv(&x, buf, XelpStrLen(buf), &argc, argv, XELP_ARGV_MAX);
-        if (JB_ASSERT(r != XELP_S_OK || argc != 2, "B2A quoted argc"))
-            return XELP_E_ERR;
-        if (JB_ASSERT(XelpStrEq(argv[1], XelpStrLen(argv[1]), "hello world") != XELP_S_OK, "B2A quoted"))
-            return XELP_E_ERR;
-    }
-
-    /* 4. Escape in quotes: \n -> 0x0A */
-    {
-        char buf[] = "echo \"line1\\nline2\"";
-        r = XelpBuf2Argv(&x, buf, XelpStrLen(buf), &argc, argv, XELP_ARGV_MAX);
-        if (JB_ASSERT(r != XELP_S_OK || argc != 2, "B2A esc-n argc"))
-            return XELP_E_ERR;
-        if (JB_ASSERT(argv[1][5] != 0x0A, "B2A esc-n char"))
-            return XELP_E_ERR;
-    }
-
-    /* 5. Tab escape: \t -> 0x09 */
-    {
-        char buf[] = "echo \"col1\\tcol2\"";
-        r = XelpBuf2Argv(&x, buf, XelpStrLen(buf), &argc, argv, XELP_ARGV_MAX);
-        if (JB_ASSERT(r != XELP_S_OK || argc != 2, "B2A esc-t argc"))
-            return XELP_E_ERR;
-        if (JB_ASSERT(argv[1][4] != 0x09, "B2A esc-t char"))
-            return XELP_E_ERR;
-    }
-
-    /* 6. Backslash escape: \\\\ -> single backslash */
-    {
-        char buf[] = "echo \"path\\\\file\"";
-        r = XelpBuf2Argv(&x, buf, XelpStrLen(buf), &argc, argv, XELP_ARGV_MAX);
-        if (JB_ASSERT(r != XELP_S_OK || argc != 2, "B2A esc-bs argc"))
-            return XELP_E_ERR;
-        if (JB_ASSERT(argv[1][4] != '\\', "B2A esc-bs char"))
-            return XELP_E_ERR;
-        if (JB_ASSERT(XelpStrLen(argv[1]) != 9, "B2A esc-bs len"))
-            return XELP_E_ERR;
-    }
-
-    /* 7. Quote escape: say \"hi\" */
-    {
-        char buf[] = "echo \"say \\\"hi\\\"\"";
-        r = XelpBuf2Argv(&x, buf, XelpStrLen(buf), &argc, argv, XELP_ARGV_MAX);
-        if (JB_ASSERT(r != XELP_S_OK || argc != 2, "B2A esc-q argc"))
-            return XELP_E_ERR;
-        if (JB_ASSERT(argv[1][4] != '"' || argv[1][7] != '"', "B2A esc-q chars"))
-            return XELP_E_ERR;
-    }
-
-    /* 8. CLI escape (backtick): echo `; -> argv[1]=";" */
-    {
-        char buf[] = "echo `;";
-        r = XelpBuf2Argv(&x, buf, XelpStrLen(buf), &argc, argv, XELP_ARGV_MAX);
-        if (JB_ASSERT(r != XELP_S_OK || argc != 2, "B2A cli-esc argc"))
-            return XELP_E_ERR;
-        if (JB_ASSERT(argv[1][0] != ';', "B2A cli-esc char"))
-            return XELP_E_ERR;
-    }
-
-    /* 9. Empty input -> argc=0 */
-    {
-        r = XelpBuf2Argv(&x, "", 0, &argc, argv, XELP_ARGV_MAX);
-        if (JB_ASSERT(r != XELP_S_OK || argc != 0, "B2A empty"))
-            return XELP_E_ERR;
-    }
-
-    /* 10. Whitespace only -> argc=0 */
-    {
-        char buf[] = "   ";
-        r = XelpBuf2Argv(&x, buf, XelpStrLen(buf), &argc, argv, XELP_ARGV_MAX);
-        if (JB_ASSERT(r != XELP_S_OK || argc != 0, "B2A whitespace"))
-            return XELP_E_ERR;
-    }
-
-    /* 11. Semicolon terminator: stops at ; */
-    {
-        char buf[] = "echo hi; echo bye";
-        r = XelpBuf2Argv(&x, buf, XelpStrLen(buf), &argc, argv, XELP_ARGV_MAX);
-        if (JB_ASSERT(r != XELP_S_OK || argc != 2, "B2A semi argc"))
-            return XELP_E_ERR;
-        if (JB_ASSERT(XelpStrEq(argv[1], XelpStrLen(argv[1]), "hi") != XELP_S_OK, "B2A semi stops"))
-            return XELP_E_ERR;
-    }
-
-    /* 12. Comment terminator: stops at # */
-    {
-        char buf[] = "echo hi # comment";
-        r = XelpBuf2Argv(&x, buf, XelpStrLen(buf), &argc, argv, XELP_ARGV_MAX);
-        if (JB_ASSERT(r != XELP_S_OK || argc != 2, "B2A hash argc"))
-            return XELP_E_ERR;
-    }
-
-    /* 13. Too many args: maxargs=2 with 3 args -> XELP_E_ERR */
-    {
-        char buf[] = "a b c";
-        r = XelpBuf2Argv(&x, buf, XelpStrLen(buf), &argc, argv, 2);
-        if (JB_ASSERT(r != XELP_E_ERR, "B2A too many"))
-            return XELP_E_ERR;
-    }
-
-    /* 14. Input too long: len >= XELP_CMDBUFSZ -> XELP_E_ERR */
-    {
-        r = XelpBuf2Argv(&x, "x", XELP_CMDBUFSZ, &argc, argv, XELP_ARGV_MAX);
-        if (JB_ASSERT(r != XELP_E_ERR, "B2A too long"))
-            return XELP_E_ERR;
-    }
-
-    /* 15. Single arg (command only): "help" -> argc=1 */
-    {
-        char buf[] = "help";
-        r = XelpBuf2Argv(&x, buf, XelpStrLen(buf), &argc, argv, XELP_ARGV_MAX);
-        if (JB_ASSERT(r != XELP_S_OK || argc != 1, "B2A single"))
-            return XELP_E_ERR;
-        if (JB_ASSERT(XelpStrEq(argv[0], XelpStrLen(argv[0]), "help") != XELP_S_OK, "B2A single val"))
-            return XELP_E_ERR;
-    }
-
-    /* 16. Tab as whitespace: "echo\thello" -> argc=2 */
-    {
-        char buf[] = "echo\thello";
-        r = XelpBuf2Argv(&x, buf, XelpStrLen(buf), &argc, argv, XELP_ARGV_MAX);
-        if (JB_ASSERT(r != XELP_S_OK || argc != 2, "B2A tab ws"))
-            return XELP_E_ERR;
-    }
-
-    /* 17. Script mode: args NOT in mCmdMsgBuf (external buffer) */
-    {
-        XELP x2;
-        XelpInit(&x2, "script");
-        {
-            char ext[] = "set mode 1";
-            r = XelpBuf2Argv(&x2, ext, XelpStrLen(ext), &argc, argv, XELP_ARGV_MAX);
-            if (JB_ASSERT(r != XELP_S_OK || argc != 3, "B2A script argc"))
-                return XELP_E_ERR;
-            if (JB_ASSERT(XelpStrEq(argv[0], XelpStrLen(argv[0]), "set") != XELP_S_OK, "B2A script a0"))
-                return XELP_E_ERR;
-            if (JB_ASSERT(XelpStrEq(argv[2], XelpStrLen(argv[2]), "1") != XELP_S_OK, "B2A script a2"))
-                return XELP_E_ERR;
-        }
-    }
-
-    /* 18. XelpArgvInt basic: argv[1]="42" -> val=42 */
-    {
-        char buf[] = "cmd 42";
-        r = XelpBuf2Argv(&x, buf, XelpStrLen(buf), &argc, argv, XELP_ARGV_MAX);
-        if (JB_ASSERT(r != XELP_S_OK, "B2A ArgvInt setup"))
-            return XELP_E_ERR;
-        r = XelpArgvInt(argv, argc, 1, &val);
-        if (JB_ASSERT(r != XELP_S_OK || val != 42, "B2A ArgvInt val"))
-            return XELP_E_ERR;
-    }
-
-    /* 19. XelpArgvInt out of range: n >= argc -> XELP_E_ERR */
-    {
-        char buf[] = "cmd";
-        r = XelpBuf2Argv(&x, buf, XelpStrLen(buf), &argc, argv, XELP_ARGV_MAX);
-        if (JB_ASSERT(r != XELP_S_OK, "B2A ArgvInt oor setup"))
-            return XELP_E_ERR;
-        r = XelpArgvInt(argv, argc, 1, &val);
-        if (JB_ASSERT(r != XELP_E_ERR, "B2A ArgvInt oor"))
-            return XELP_E_ERR;
-    }
-
-    /* 20. XelpArgvStr basic: argv[1]="hello" -> s="hello", slen=5 */
-    {
-        char buf[] = "cmd hello";
-        r = XelpBuf2Argv(&x, buf, XelpStrLen(buf), &argc, argv, XELP_ARGV_MAX);
-        if (JB_ASSERT(r != XELP_S_OK, "B2A ArgvStr setup"))
-            return XELP_E_ERR;
-        r = XelpArgvStr(argv, argc, 1, &s, &slen);
-        if (JB_ASSERT(r != XELP_S_OK || slen != 5, "B2A ArgvStr len"))
-            return XELP_E_ERR;
-        if (JB_ASSERT(XelpStrEq(s, slen, "hello") != XELP_S_OK, "B2A ArgvStr val"))
-            return XELP_E_ERR;
-    }
-
-    /* 21. CLI mode: args already in mCmdMsgBuf (in-place tokenize) */
-    {
-        XELP x2;
-        int i;
-        char *src = "set val 7";
-        int slen2 = XelpStrLen(src);
-        XelpInit(&x2, "cli");
-        for (i = 0; i < slen2; i++)
-            x2.mCmdMsgBuf[i] = src[i];
-        r = XelpBuf2Argv(&x2, x2.mCmdMsgBuf, slen2, &argc, argv, XELP_ARGV_MAX);
-        if (JB_ASSERT(r != XELP_S_OK || argc != 3, "B2A cli-mode argc"))
-            return XELP_E_ERR;
-        if (JB_ASSERT(XelpStrEq(argv[0], XelpStrLen(argv[0]), "set") != XELP_S_OK, "B2A cli-mode a0"))
-            return XELP_E_ERR;
-    }
-
-    /* 22. Unknown escape in quotes: \x -> literal x */
-    {
-        char buf[] = "echo \"a\\xb\"";
-        r = XelpBuf2Argv(&x, buf, XelpStrLen(buf), &argc, argv, XELP_ARGV_MAX);
-        if (JB_ASSERT(r != XELP_S_OK || argc != 2, "B2A unk-esc argc"))
-            return XELP_E_ERR;
-        if (JB_ASSERT(argv[1][1] != 'x', "B2A unk-esc char"))
-            return XELP_E_ERR;
-    }
-
     return XELP_S_OK;
 }
 
-/* ================================================================
-   test_XelpBuf2Argv_overflow -- overflow, boundary, and stress tests
-   ================================================================ */
-XELPRESULT test_XelpBuf2Argv_overflow() {
+XELPRESULT test_XelpArgvDispatch() {
     XELP x;
-    const char *argv[XELP_ARGV_MAX];
-    int argc;
+    XelpBuf script;
     XELPRESULT r;
     int val;
     const char *s;
     int slen;
-    int i;
 
-    XelpInit(&x, "ovf");
+    XELPCLIFuncMapEntry argvCmds[] = {
+        {&argvTestHandler, "cmd", "test cmd"},
+        {&argvTestHandler, "echo", "test echo"},
+        XELP_FUNC_ENTRY_LAST
+    };
 
-    /* ---- A. Buffer size boundaries ---- */
+    XelpInit(&x, "argvtest");
+    XELP_SET_FN_CLI(x, argvCmds);
+    XELP_SET_FN_OUT(x, dummyOut);
 
-    /* A1. Input len = XELP_CMDBUFSZ-1 (63) -> success, argc=1 */
+    /* 1. Basic: "cmd hello" -> argc=2 */
     {
-        char buf[XELP_CMDBUFSZ];
-        for (i = 0; i < XELP_CMDBUFSZ - 2; i++) buf[i] = 'A';
-        buf[XELP_CMDBUFSZ - 2] = '\0';
-        r = XelpBuf2Argv(&x, buf, XELP_CMDBUFSZ - 1, &argc, argv, XELP_ARGV_MAX);
-        if (JB_ASSERT(r != XELP_S_OK || argc != 1, "OVF A1 len=bufsz-1"))
+        char *buf = "cmd hello\n";
+        gArgvTestArgc = 0;
+        XELP_XB_INIT(script, buf, XelpStrLen(buf));
+        r = XelpParseXB(&x, &script);
+        if (JB_ASSERT(r != XELP_S_OK || gArgvTestArgc != 2, "Argv basic argc"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(XelpStrEq(gArgvTestCopy[0], XelpStrLen(gArgvTestCopy[0]), "cmd") != XELP_S_OK, "Argv argv[0]"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(XelpStrEq(gArgvTestCopy[1], XelpStrLen(gArgvTestCopy[1]), "hello") != XELP_S_OK, "Argv argv[1]"))
             return XELP_E_ERR;
     }
 
-    /* A2. Input len = XELP_CMDBUFSZ (64) -> XELP_E_ERR */
+    /* 2. Multiple args: "cmd 10 3" -> argc=3 */
     {
-        char buf[XELP_CMDBUFSZ + 1];
-        for (i = 0; i < XELP_CMDBUFSZ; i++) buf[i] = 'B';
-        buf[XELP_CMDBUFSZ] = '\0';
-        r = XelpBuf2Argv(&x, buf, XELP_CMDBUFSZ, &argc, argv, XELP_ARGV_MAX);
-        if (JB_ASSERT(r != XELP_E_ERR, "OVF A2 len=bufsz"))
+        char *buf = "cmd 10 3\n";
+        gArgvTestArgc = 0;
+        XELP_XB_INIT(script, buf, XelpStrLen(buf));
+        r = XelpParseXB(&x, &script);
+        if (JB_ASSERT(r != XELP_S_OK || gArgvTestArgc != 3, "Argv multi argc"))
             return XELP_E_ERR;
     }
 
-    /* A3. Input len = XELP_CMDBUFSZ+1 (65) -> XELP_E_ERR */
+    /* 3. Quoted string: cmd "hello world" -> argv[1]="hello world" */
     {
-        char buf[XELP_CMDBUFSZ + 2];
-        for (i = 0; i < XELP_CMDBUFSZ + 1; i++) buf[i] = 'C';
-        buf[XELP_CMDBUFSZ + 1] = '\0';
-        r = XelpBuf2Argv(&x, buf, XELP_CMDBUFSZ + 1, &argc, argv, XELP_ARGV_MAX);
-        if (JB_ASSERT(r != XELP_E_ERR, "OVF A3 len=bufsz+1"))
+        char *buf = "cmd \"hello world\"\n";
+        gArgvTestArgc = 0;
+        XELP_XB_INIT(script, buf, XelpStrLen(buf));
+        r = XelpParseXB(&x, &script);
+        if (JB_ASSERT(r != XELP_S_OK || gArgvTestArgc != 2, "Argv quoted argc"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(XelpStrEq(gArgvTestCopy[1], XelpStrLen(gArgvTestCopy[1]), "hello world") != XELP_S_OK, "Argv quoted"))
             return XELP_E_ERR;
     }
 
-    /* A4. Single token filling XELP_CMDBUFSZ-2 chars -> success */
+    /* 4. Command-only "cmd" -> argc=1 */
     {
-        char buf[XELP_CMDBUFSZ];
-        for (i = 0; i < XELP_CMDBUFSZ - 2; i++) buf[i] = 'D';
-        buf[XELP_CMDBUFSZ - 2] = '\0';
-        r = XelpBuf2Argv(&x, buf, XELP_CMDBUFSZ - 2, &argc, argv, XELP_ARGV_MAX);
-        if (JB_ASSERT(r != XELP_S_OK || argc != 1, "OVF A4 token fill"))
-            return XELP_E_ERR;
-        if (JB_ASSERT(XelpStrLen(argv[0]) != XELP_CMDBUFSZ - 2, "OVF A4 token len"))
+        char *buf = "cmd\n";
+        gArgvTestArgc = 0;
+        XELP_XB_INIT(script, buf, XelpStrLen(buf));
+        r = XelpParseXB(&x, &script);
+        if (JB_ASSERT(r != XELP_S_OK || gArgvTestArgc != 1, "Argv single argc"))
             return XELP_E_ERR;
     }
 
-    /* A5. Token with leading space at exact boundary (XELP_CMDBUFSZ-1) */
+    /* 5. Semicolon-separated commands: each gets own argc */
     {
-        char buf[XELP_CMDBUFSZ];
-        buf[0] = ' ';
-        for (i = 1; i < XELP_CMDBUFSZ - 1; i++) buf[i] = 'E';
-        r = XelpBuf2Argv(&x, buf, XELP_CMDBUFSZ - 1, &argc, argv, XELP_ARGV_MAX);
-        if (JB_ASSERT(r != XELP_S_OK || argc != 1, "OVF A5 lead space"))
+        char *buf = "cmd a; cmd b c\n";
+        gArgvTestArgc = 0;
+        XELP_XB_INIT(script, buf, XelpStrLen(buf));
+        r = XelpParseXB(&x, &script);
+        /* last call was "cmd b c" -> argc=3 */
+        if (JB_ASSERT(gArgvTestArgc != 3, "Argv semi argc"))
             return XELP_E_ERR;
     }
 
-    /* ---- B. maxargs boundary ---- */
-
-    /* B6. Exactly XELP_ARGV_MAX tokens -> success */
+    /* 6. Tab as whitespace: "cmd\thello" -> argc=2 */
     {
-        char buf[XELP_CMDBUFSZ];
-        int pos = 0;
-        for (i = 0; i < XELP_ARGV_MAX && pos < XELP_CMDBUFSZ - 2; i++) {
-            if (i > 0) buf[pos++] = ' ';
-            buf[pos++] = (char)('a' + i);
-        }
-        buf[pos] = '\0';
-        r = XelpBuf2Argv(&x, buf, pos, &argc, argv, XELP_ARGV_MAX);
-        if (JB_ASSERT(r != XELP_S_OK || argc != XELP_ARGV_MAX, "OVF B6 exact maxargs"))
+        char *buf = "cmd\thello\n";
+        gArgvTestArgc = 0;
+        XELP_XB_INIT(script, buf, XelpStrLen(buf));
+        r = XelpParseXB(&x, &script);
+        if (JB_ASSERT(r != XELP_S_OK || gArgvTestArgc != 2, "Argv tab ws"))
             return XELP_E_ERR;
     }
 
-    /* B7. XELP_ARGV_MAX+1 tokens -> XELP_E_ERR */
+    /* 7. CLI escape (backtick): echo `; -> argv[1]=";" */
     {
-        char buf[XELP_CMDBUFSZ];
-        int pos = 0;
-        for (i = 0; i < XELP_ARGV_MAX + 1 && pos < XELP_CMDBUFSZ - 2; i++) {
-            if (i > 0) buf[pos++] = ' ';
-            buf[pos++] = (char)('a' + (i % 26));
-        }
-        buf[pos] = '\0';
-        r = XelpBuf2Argv(&x, buf, pos, &argc, argv, XELP_ARGV_MAX);
-        if (JB_ASSERT(r != XELP_E_ERR, "OVF B7 maxargs+1"))
+        char *buf = "echo `;\n";
+        gArgvTestArgc = 0;
+        XELP_XB_INIT(script, buf, XelpStrLen(buf));
+        r = XelpParseXB(&x, &script);
+        if (JB_ASSERT(r != XELP_S_OK || gArgvTestArgc != 2, "Argv cli-esc argc"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(gArgvTestCopy[1][0] != ';', "Argv cli-esc char"))
             return XELP_E_ERR;
     }
 
-    /* B8. maxargs=1 with 2 tokens -> XELP_E_ERR */
+    /* 8. Escape in quotes: \n -> 0x0A */
     {
-        char buf[] = "one two";
-        r = XelpBuf2Argv(&x, buf, XelpStrLen(buf), &argc, argv, 1);
-        if (JB_ASSERT(r != XELP_E_ERR, "OVF B8 maxargs=1"))
+        char *buf = "cmd \"line1\\nline2\"\n";
+        gArgvTestArgc = 0;
+        XELP_XB_INIT(script, buf, XelpStrLen(buf));
+        r = XelpParseXB(&x, &script);
+        if (JB_ASSERT(r != XELP_S_OK || gArgvTestArgc != 2, "Argv esc-n argc"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(gArgvTestCopy[1][5] != 0x0A, "Argv esc-n char"))
             return XELP_E_ERR;
     }
 
-    /* B9. maxargs=0 with any input -> XELP_E_ERR */
+    /* 9. XelpArgvInt basic */
     {
-        char buf[] = "hello";
-        r = XelpBuf2Argv(&x, buf, XelpStrLen(buf), &argc, argv, 0);
-        if (JB_ASSERT(r != XELP_E_ERR, "OVF B9 maxargs=0"))
+        const char *av[] = {"cmd", "42", "-7"};
+        r = XelpArgvInt(av, 3, 1, &val);
+        if (JB_ASSERT(r != XELP_S_OK || val != 42, "ArgvInt val"))
+            return XELP_E_ERR;
+        r = XelpArgvInt(av, 3, 2, &val);
+        if (JB_ASSERT(r != XELP_S_OK || val != -7, "ArgvInt neg"))
             return XELP_E_ERR;
     }
 
-    /* B10. Verify each of 8 single-char tokens has correct content */
+    /* 10. XelpArgvInt out of range */
     {
-        char buf[] = "a b c d e f g h";
-        r = XelpBuf2Argv(&x, buf, XelpStrLen(buf), &argc, argv, XELP_ARGV_MAX);
-        if (JB_ASSERT(r != XELP_S_OK || argc != 8, "OVF B10 argc"))
-            return XELP_E_ERR;
-        for (i = 0; i < 8; i++) {
-            if (JB_ASSERT(argv[i][0] != ('a' + i) || argv[i][1] != '\0', "OVF B10 content"))
-                return XELP_E_ERR;
-        }
-    }
-
-    /* ---- C. Quoted strings at boundaries ---- */
-
-    /* C11. Quoted string filling buffer to XELP_CMDBUFSZ-1 */
-    {
-        char buf[XELP_CMDBUFSZ];
-        buf[0] = '"';
-        for (i = 1; i < XELP_CMDBUFSZ - 2; i++) buf[i] = 'Q';
-        buf[XELP_CMDBUFSZ - 2] = '"';
-        r = XelpBuf2Argv(&x, buf, XELP_CMDBUFSZ - 1, &argc, argv, XELP_ARGV_MAX);
-        if (JB_ASSERT(r != XELP_S_OK || argc != 1, "OVF C11 quoted fill"))
+        const char *av[] = {"cmd"};
+        r = XelpArgvInt(av, 1, 1, &val);
+        if (JB_ASSERT(r != XELP_E_ERR, "ArgvInt oor"))
             return XELP_E_ERR;
     }
 
-    /* C12. Unclosed quote at buffer end (still produces token) */
+    /* 11. XelpArgvInt negative index */
     {
-        char buf[XELP_CMDBUFSZ];
-        buf[0] = '"';
-        for (i = 1; i < XELP_CMDBUFSZ - 2; i++) buf[i] = 'U';
-        /* no closing quote */
-        r = XelpBuf2Argv(&x, buf, XELP_CMDBUFSZ - 1, &argc, argv, XELP_ARGV_MAX);
-        if (JB_ASSERT(r != XELP_S_OK || argc != 1, "OVF C12 unclosed"))
+        const char *av[] = {"cmd", "42"};
+        r = XelpArgvInt(av, 2, -1, &val);
+        if (JB_ASSERT(r != XELP_E_ERR, "ArgvInt neg idx"))
             return XELP_E_ERR;
     }
 
-    /* C13. Empty quoted string "" -> argc=1, argv[0]="" */
+    /* 12. XelpArgvStr basic */
     {
-        char buf[] = "\"\"";
-        r = XelpBuf2Argv(&x, buf, XelpStrLen(buf), &argc, argv, XELP_ARGV_MAX);
-        if (JB_ASSERT(r != XELP_S_OK || argc != 1, "OVF C13 empty quoted argc"))
+        const char *av[] = {"cmd", "hello"};
+        r = XelpArgvStr(av, 2, 1, &s, &slen);
+        if (JB_ASSERT(r != XELP_S_OK || slen != 5, "ArgvStr len"))
             return XELP_E_ERR;
-        if (JB_ASSERT(XelpStrLen(argv[0]) != 0, "OVF C13 empty quoted len"))
+        if (JB_ASSERT(XelpStrEq(s, slen, "hello") != XELP_S_OK, "ArgvStr val"))
             return XELP_E_ERR;
     }
 
-    /* C14. Nested escapes near buffer end */
+    /* 13. XelpArgvStr out of range */
     {
-        char buf[XELP_CMDBUFSZ];
-        int pos = 0;
-        buf[pos++] = '"';
-        while (pos < XELP_CMDBUFSZ - 5) buf[pos++] = 'N';
-        buf[pos++] = '\\'; buf[pos++] = 'n';  /* \n escape */
-        buf[pos++] = '"';
-        buf[pos] = '\0';
-        r = XelpBuf2Argv(&x, buf, pos, &argc, argv, XELP_ARGV_MAX);
-        if (JB_ASSERT(r != XELP_S_OK || argc != 1, "OVF C14 nested esc"))
+        const char *av[] = {"cmd"};
+        r = XelpArgvStr(av, 1, 1, &s, &slen);
+        if (JB_ASSERT(r != XELP_E_ERR, "ArgvStr oor"))
             return XELP_E_ERR;
     }
 
-    /* ---- D. Pathological inputs ---- */
-
-    /* D15. CLI escape pairs filling near buffer limit */
+    /* 14. XelpArgvStr negative index */
     {
-        char buf[XELP_CMDBUFSZ];
-        int pos = 0;
-        while (pos < XELP_CMDBUFSZ - 3) {
-            buf[pos++] = '`'; /* CLI escape */
-            buf[pos++] = 'X';
-        }
-        buf[pos] = '\0';
-        r = XelpBuf2Argv(&x, buf, pos, &argc, argv, XELP_ARGV_MAX);
-        if (JB_ASSERT(r != XELP_S_OK || argc != 1, "OVF D15 cli esc pairs"))
+        const char *av[] = {"cmd", "hello"};
+        r = XelpArgvStr(av, 2, -1, &s, &slen);
+        if (JB_ASSERT(r != XELP_E_ERR, "ArgvStr neg idx"))
             return XELP_E_ERR;
     }
 
-    /* D16. Many \\ pairs inside quotes */
+    /* 15. XelpArgvInt hex */
     {
-        char buf[XELP_CMDBUFSZ];
-        int pos = 0;
-        buf[pos++] = '"';
-        while (pos < XELP_CMDBUFSZ - 4) {
-            buf[pos++] = '\\';
-            buf[pos++] = '\\';
-        }
-        buf[pos++] = '"';
-        buf[pos] = '\0';
-        r = XelpBuf2Argv(&x, buf, pos, &argc, argv, XELP_ARGV_MAX);
-        if (JB_ASSERT(r != XELP_S_OK || argc != 1, "OVF D16 bs pairs"))
+        const char *av[] = {"cmd", "0xFF"};
+        r = XelpArgvInt(av, 2, 1, &val);
+        if (JB_ASSERT(r != XELP_S_OK || val != 255, "ArgvInt hex"))
             return XELP_E_ERR;
     }
 
-    /* D17. Trailing backtick at buffer end */
+    /* 16. Via XelpParse (script mode) */
     {
-        char buf[] = "cmd`";
-        r = XelpBuf2Argv(&x, buf, XelpStrLen(buf), &argc, argv, XELP_ARGV_MAX);
-        if (JB_ASSERT(r != XELP_S_OK || argc != 1, "OVF D17 trailing bt"))
+        gArgvTestArgc = 0;
+        r = XelpParse(&x, "cmd a b c\n", 10);
+        if (JB_ASSERT(r != XELP_S_OK || gArgvTestArgc != 4, "Argv Parse argc"))
             return XELP_E_ERR;
     }
 
-    /* D18. All-spaces input at max length -> argc=0 */
+    /* 17. Via XelpParseKey (interactive mode) */
     {
-        char buf[XELP_CMDBUFSZ];
-        for (i = 0; i < XELP_CMDBUFSZ - 1; i++) buf[i] = ' ';
-        buf[XELP_CMDBUFSZ - 1] = '\0';
-        r = XelpBuf2Argv(&x, buf, XELP_CMDBUFSZ - 1, &argc, argv, XELP_ARGV_MAX);
-        if (JB_ASSERT(r != XELP_S_OK || argc != 0, "OVF D18 all spaces"))
+        int i;
+        char *typed = "cmd hello\n";
+        gArgvTestArgc = 0;
+        for (i = 0; typed[i]; i++)
+            XelpParseKey(&x, typed[i]);
+        if (JB_ASSERT(gArgvTestArgc != 2, "Argv ParseKey argc"))
             return XELP_E_ERR;
     }
 
-    /* ---- E. XelpArgvInt / XelpArgvStr invalid indices ---- */
-
-    /* E19. XelpArgvInt with n=-1 -> XELP_E_ERR */
+    /* 18. Quoted arg followed by space + arg: exercises whitespace-skip loop
+       in _xelpBuf2Argv (space branch) after quoted arg where w < r */
     {
-        char buf[] = "cmd 42";
-        r = XelpBuf2Argv(&x, buf, XelpStrLen(buf), &argc, argv, XELP_ARGV_MAX);
-        if (JB_ASSERT(r != XELP_S_OK, "OVF E19 setup"))
+        char *buf = "cmd \"hi\" bar\n";
+        gArgvTestArgc = 0;
+        XELP_XB_INIT(script, buf, XelpStrLen(buf));
+        r = XelpParseXB(&x, &script);
+        if (JB_ASSERT(r != XELP_S_OK || gArgvTestArgc != 3, "Argv quoted+ws argc"))
             return XELP_E_ERR;
-        r = XelpArgvInt(argv, argc, -1, &val);
-        if (JB_ASSERT(r != XELP_E_ERR, "OVF E19 neg idx"))
+        if (JB_ASSERT(XelpStrEq(gArgvTestCopy[1], XelpStrLen(gArgvTestCopy[1]), "hi") != XELP_S_OK, "Argv q+ws arg1"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(XelpStrEq(gArgvTestCopy[2], XelpStrLen(gArgvTestCopy[2]), "bar") != XELP_S_OK, "Argv q+ws arg2"))
             return XELP_E_ERR;
     }
 
-    /* E20. XelpArgvStr with n=-1 -> XELP_E_ERR */
+    /* 19. Quoted arg followed by tab + arg: exercises tab branch in ws-skip */
     {
-        char buf[] = "cmd hello";
-        r = XelpBuf2Argv(&x, buf, XelpStrLen(buf), &argc, argv, XELP_ARGV_MAX);
-        if (JB_ASSERT(r != XELP_S_OK, "OVF E20 setup"))
-            return XELP_E_ERR;
-        r = XelpArgvStr(argv, argc, -1, &s, &slen);
-        if (JB_ASSERT(r != XELP_E_ERR, "OVF E20 neg idx"))
+        char *buf = "cmd \"hi\"\tbar\n";
+        gArgvTestArgc = 0;
+        XELP_XB_INIT(script, buf, XelpStrLen(buf));
+        r = XelpParseXB(&x, &script);
+        if (JB_ASSERT(r != XELP_S_OK || gArgvTestArgc != 3, "Argv quoted+tab argc"))
             return XELP_E_ERR;
     }
 
-    /* E21. XelpArgvInt with n=argc -> XELP_E_ERR */
+    /* 20. Quoted arg + trailing whitespace only: exercises r>=end in ws-skip
+       and r>=end at stop-char check (line 696) */
     {
-        char buf[] = "cmd 42";
-        r = XelpBuf2Argv(&x, buf, XelpStrLen(buf), &argc, argv, XELP_ARGV_MAX);
-        if (JB_ASSERT(r != XELP_S_OK, "OVF E21 setup"))
-            return XELP_E_ERR;
-        r = XelpArgvInt(argv, argc, argc, &val);
-        if (JB_ASSERT(r != XELP_E_ERR, "OVF E21 n=argc"))
+        char *buf = "cmd \"hi\"   \n";
+        gArgvTestArgc = 0;
+        XELP_XB_INIT(script, buf, XelpStrLen(buf));
+        r = XelpParseXB(&x, &script);
+        if (JB_ASSERT(r != XELP_S_OK || gArgvTestArgc != 2, "Argv q+trail ws argc"))
             return XELP_E_ERR;
     }
 
-    /* E22. XelpArgvStr with n=argc -> XELP_E_ERR */
+    /* 21. Unknown escape in quotes: \z not in escape map, passes through */
     {
-        char buf[] = "cmd hello";
-        r = XelpBuf2Argv(&x, buf, XelpStrLen(buf), &argc, argv, XELP_ARGV_MAX);
-        if (JB_ASSERT(r != XELP_S_OK, "OVF E22 setup"))
+        char *buf = "cmd \"a\\zb\"\n";
+        gArgvTestArgc = 0;
+        XELP_XB_INIT(script, buf, XelpStrLen(buf));
+        r = XelpParseXB(&x, &script);
+        if (JB_ASSERT(r != XELP_S_OK || gArgvTestArgc != 2, "Argv unk esc argc"))
             return XELP_E_ERR;
-        r = XelpArgvStr(argv, argc, argc, &s, &slen);
-        if (JB_ASSERT(r != XELP_E_ERR, "OVF E22 n=argc"))
+        /* \z should pass through as 'z' */
+        if (JB_ASSERT(gArgvTestCopy[1][1] != 'z', "Argv unk esc char"))
+            return XELP_E_ERR;
+    }
+
+    /* 22. Escape at end of quoted string: backslash is the last char
+       before buffer ends; exercises r+1 < end == false in quote-escape check */
+    {
+        char *buf = "cmd \"a\\";
+        gArgvTestArgc = 0;
+        XELP_XB_INIT(script, buf, XelpStrLen(buf));
+        r = XelpParseXB(&x, &script);
+        /* should still parse cmd with partial quoted arg */
+        if (JB_ASSERT(gArgvTestArgc != 2, "Argv esc-at-end argc"))
+            return XELP_E_ERR;
+    }
+
+    /* 23. Too many args: exceeds XELP_ARGV_MAX (default 8).
+       Dispatch should still work for the matched command; overflow returns error
+       from _xelpBuf2Argv but the handler may not be called. */
+    {
+        char *buf = "cmd a b c d e f g h\n"; /* cmd + 8 args = 9 total > XELP_ARGV_MAX */
+        gArgvTestArgc = 0;
+        XELP_XB_INIT(script, buf, XelpStrLen(buf));
+        r = XelpParseXB(&x, &script);
+        /* _xelpBuf2Argv returns error, handler not called */
+        if (JB_ASSERT(gArgvTestArgc != 0, "Argv maxargs overflow"))
+            return XELP_E_ERR;
+    }
+
+    /* 24. Long script line >= XELP_ARGVBUFSZ: exercises len >= ARGVBUFSZ guard */
+    {
+        /* build a line longer than XELP_ARGVBUFSZ (default 64) */
+        char longbuf[80];
+        int i;
+        longbuf[0] = 'c'; longbuf[1] = 'm'; longbuf[2] = 'd'; longbuf[3] = ' ';
+        for (i = 4; i < 70; i++) longbuf[i] = 'x';
+        longbuf[70] = '\n'; longbuf[71] = '\0';
+        gArgvTestArgc = 0;
+        XELP_XB_INIT(script, longbuf, 71);
+        r = XelpParseXB(&x, &script);
+        /* _xelpBuf2Argv returns error (too long), handler not called */
+        if (JB_ASSERT(gArgvTestArgc != 0, "Argv long line"))
+            return XELP_E_ERR;
+    }
+
+    /* 25. Byte > 0x7E via XelpParseKey: exercises ch <= 0x7E false branch */
+    {
+        gArgvTestArgc = 0;
+        XelpParseKey(&x, (char)0x80);  /* non-ASCII byte, should be ignored */
+        XelpParseKey(&x, (char)0xFF);  /* another non-ASCII byte */
+        if (JB_ASSERT(gArgvTestArgc != 0, "Argv non-ascii"))
+            return XELP_E_ERR;
+    }
+
+    /* 26. Backtick at end of unquoted token: CLI buffer "cmd a`" → exercises
+       the ++r >= end break in _xelpBuf2Argv line 714 (CLI escape at EOB) */
+    {
+        int i;
+        char *typed = "cmd a`\n";  /* backtick is last char before ENTER */
+        gArgvTestArgc = 0;
+        for (i = 0; typed[i]; i++)
+            XelpParseKey(&x, typed[i]);
+        /* handler called with "cmd" matched; argv[1] is "a" (backtick at end truncated) */
+        if (JB_ASSERT(gArgvTestArgc != 2, "Argv backtick-at-end argc"))
             return XELP_E_ERR;
     }
 
@@ -5329,8 +4762,6 @@ XELPRESULT test_XelpBuf2Argv_overflow() {
 
 /* ====================================================================
    test_BranchCoverage -- exercises edge-case branches for full coverage:
-     - XelpNextTok with NULL tok pointer
-     - XelpNextInt past end of args (error return)
      - Mode switch to CLI with no CLI func table registered
      - Mode switch to THR with no passthrough function registered
      - XelpBufCmp CMP_TYPE_A0 matching with embedded null
@@ -5339,34 +4770,7 @@ XELPRESULT test_BranchCoverage() {
     XELP x;
     XELPRESULT r;
 
-    /* 1. XelpNextTok with NULL tok: should return NOTFOUND and not crash */
-    {
-        XelpArgs a;
-        char buf[] = "";
-        XelpArgsInit(&a, buf, 0);
-        r = XelpNextTok(&a, 0);
-        if (JB_ASSERT(r != XELP_S_NOTFOUND, "BC1 NextTok null tok"))
-            return XELP_E_ERR;
-    }
-
-    /* 2. XelpNextInt past end of args: error path */
-    {
-        XelpArgs a;
-        char buf[] = "hello";
-        int val = -1;
-        XelpArgsInit(&a, buf, XelpStrLen(buf));
-        /* consume the only token */
-        r = XelpNextInt(&a, &val);
-        /* "hello" is not a valid integer -- XelpParseNum should fail */
-        if (JB_ASSERT(r == XELP_S_OK, "BC2 NextInt NaN"))
-            return XELP_E_ERR;
-        /* now past end */
-        r = XelpNextInt(&a, &val);
-        if (JB_ASSERT(r == XELP_S_OK, "BC2 NextInt eof"))
-            return XELP_E_ERR;
-    }
-
-    /* 3. Mode switch to CLI with no CLI funcs registered:
+    /* 1. Mode switch to CLI with no CLI funcs registered:
        should stay in current mode (KEY).
        Set mode directly since XELPKEY_KEY=ESC triggers the key accumulator. */
     {
@@ -5453,31 +4857,7 @@ XELPRESULT test_BranchCoverage() {
             return XELP_E_ERR;
     }
 
-    /* 9. Argv tokenizer: newline and comment terminators */
-    {
-        const char *argv[XELP_ARGV_MAX];
-        int argc = 0;
-
-        /* newline in unquoted context terminates tokenization */
-        r = XelpBuf2Argv(&x, "cmd arg\nignored", 15, &argc, argv, XELP_ARGV_MAX);
-        if (JB_ASSERT(r != XELP_S_OK || argc != 2, "BC9 newline stop"))
-            return XELP_E_ERR;
-
-        /* comment char terminates tokenization */
-        r = XelpBuf2Argv(&x, "cmd arg # comment", 17, &argc, argv, XELP_ARGV_MAX);
-        if (JB_ASSERT(r != XELP_S_OK || argc != 2, "BC9 comment stop"))
-            return XELP_E_ERR;
-
-        /* escape char at end of buffer (no char follows) */
-        r = XelpBuf2Argv(&x, "cmd\\", 4, &argc, argv, XELP_ARGV_MAX);
-        if (JB_ASSERT(r != XELP_S_OK, "BC9 esc at end"))
-            return XELP_E_ERR;
-
-        /* quote escape at end of quoted string buffer */
-        r = XelpBuf2Argv(&x, "\"abc\\", 5, &argc, argv, XELP_ARGV_MAX);
-        /* unterminated quote → should still produce a token or error */
-        (void)r; /* result doesn't matter, just exercising the path */
-    }
+    /* 9. (removed -- _xelpBuf2Argv is static, exercised through dispatch) */
 
     /* 10. Key accumulator: unusual bytes after ESC [ */
     {
@@ -5582,6 +4962,54 @@ XELPRESULT test_BranchCoverage() {
         XelpHelp(&x);  /* should not crash or print bogus rows */
     }
 
+    /* 17. _xelpPrintKeyName: multi-byte keycode with zero nibble in low byte
+       exercises the (nib == 0 && i < 8) branch at line 303 */
+    {
+        XELPKeyFuncMapEntry hexKeys[] = {
+            {&k0, 0x100, "hex key"},  /* 0x100: low nibbles are 0,0 */
+            XELP_FUNC_ENTRY_LAST
+        };
+        XelpInit(&x, "TestBC17");
+        XELP_SET_FN_OUT(x, dummyOut);
+        XELP_SET_FN_KEY(x, hexKeys);
+        XELP_SET_FN_CLI(x, gMyCLICommands);
+        XelpHelp(&x);  /* prints hex 0x100, exercising zero-nibble branch */
+    }
+
+    /* 18. XelpTokLineXB: buffer ending with backtick only (no char after
+       escape) exercises cs==_PS_ESCA at end-of-buffer in the guard at
+       the bottom of XelpTokLineXB. */
+    {
+        XelpBuf b, out;
+        char *esc = "`";  /* single backtick, buffer ends in _PS_ESCA */
+        XELP_XB_INIT(b, esc, XelpStrLen(esc));
+        r = XelpTokLineXB(&b, &out, XELP_TOK_LINE);
+        if (JB_ASSERT(r != XELP_S_NOTFOUND, "BC17 esca at EOB"))
+            return XELP_E_ERR;
+    }
+
+    /* 18. XelpTokLineXB: backtick at end of a longer buffer where
+       parser was in _PS_SEEK then transitions to _PS_ESCA */
+    {
+        XelpBuf b, out;
+        char *esc = "  `";  /* spaces then backtick, still _PS_ESCA at EOB */
+        XELP_XB_INIT(b, esc, XelpStrLen(esc));
+        r = XelpTokLineXB(&b, &out, XELP_TOK_LINE);
+        if (JB_ASSERT(r != XELP_S_NOTFOUND, "BC18 esca seek EOB"))
+            return XELP_E_ERR;
+    }
+
+    /* 19. XelpParseKey: send bytes in 0x7F-0xFF range in CLI mode to
+       exercise the ch <= 0x7E false branch for non-printable high bytes */
+    {
+        XelpInit(&x, "TestBC19");
+        XELP_SET_FN_OUT(x, dummyOut);
+        XELP_SET_FN_CLI(x, gMyCLICommands);
+        XelpParseKey(&x, (char)0x80);  /* high byte, non-printable */
+        XelpParseKey(&x, (char)0xC0);  /* another high byte */
+        /* should not crash, chars silently ignored */
+    }
+
     return XELP_S_OK;
 }
 
@@ -5611,8 +5039,6 @@ int run_tests() {
     JumpBug_RunUnit(test_XelpFindTok,"XelpFindTok");
     JumpBug_RunUnit(test_XelpTokLineXB,"XelpTokLineXB");
 
-    JumpBug_RunUnit(test_XelpTokN,"XelpTokN");
-    JumpBug_RunUnit(test_XelpNumToks,"XelpNumToks");
     JumpBug_RunUnit(test_XelpInit,"XelpInit");
     JumpBug_RunUnit(test_XelpOut_comprehensive,"XelpOut");
     JumpBug_RunUnit(test_XelpExecKC,"XelpExecKC");
@@ -5643,10 +5069,7 @@ int run_tests() {
     JumpBug_RunUnit(test_AccumOverflow,"AccumOverflow");
     JumpBug_RunUnit(test_CLIMalformedKeys,"CLIMalformedKeys");
     JumpBug_RunUnit(test_MultiInstance,"MultiInstance");
-    JumpBug_RunUnit(test_XelpArgs,"XelpArgs");
-    JumpBug_RunUnit(test_XelpArgIntStr,"XelpArgIntStr");
-    JumpBug_RunUnit(test_XelpBuf2Argv,"XelpBuf2Argv");
-    JumpBug_RunUnit(test_XelpBuf2Argv_overflow,"Buf2ArgvOverflow");
+    JumpBug_RunUnit(test_XelpArgvDispatch,"XelpArgvDispatch");
     JumpBug_RunUnit(test_BranchCoverage,"BranchCoverage");
 #ifdef XELP_ENABLE_LINE_EDIT
     JumpBug_RunUnit(test_CursorWithEcho,"CursorWithEcho");

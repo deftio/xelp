@@ -12,7 +12,7 @@ For the llmstxt.org-format project index, see [llms.txt](llms.txt).
 A command line interpreter, script engine, and single-key menu system
 for embedded systems. Pure C, zero dynamic memory, no OS, no stdlib.
 Three files: `xelp.c`, `xelp.h`, `xelpcfg.h`. Compiles on 8-bit
-through 64-bit targets with any C89+ compiler. Version 0.3.2.
+through 64-bit targets with any C89+ compiler. Version 0.4.0.
 
 ## Critical constraints
 
@@ -69,7 +69,9 @@ through 64-bit targets with any C89+ compiler. Version 0.3.2.
                             |
                             +-- command table linear search
                             |
-                            +-- handler(ths, args, len)
+                            +-- _xelpBuf2Argv()  <-- tokenize into argc/argv
+                            |
+                            +-- handler(ths, argc, argv)
 
   XelpParse(ths, buf, len)       <-- scripting: parse entire buffer at once
         |
@@ -90,15 +92,15 @@ compiled in, its switch key is silently ignored.
 
 ---
 
-## Function signatures (v0.3.2+)
+## Function signatures (v0.4.0+)
 
 ### CLI command functions
 
 ```c
-XELPRESULT my_command(XELP *ths, const char *args, int len) {
+XELPRESULT my_command(XELP *ths, int argc, const char **argv) {
     /* ths  -- the invoking xelp instance (use for XelpOut, registers, etc.)
-       args -- raw argument string including command name (not null-terminated, use len)
-       len  -- length of args in bytes */
+       argc -- number of arguments (including command name)
+       argv -- null-terminated argument strings (argv[0] = command name) */
     XelpOut(ths, "Hello\n", 0);
     return XELP_S_OK;
 }
@@ -141,15 +143,16 @@ XELPKeyFuncMapEntry key_commands[] = {
 };
 ```
 
-**Note:** v0.2.x used different signatures without the `XELP *ths`
-parameter. All current code must use the v0.3.0+ signatures shown above.
+**Note:** v0.3.x used `(XELP *ths, const char *args, int len)` signatures.
+v0.4.0 changed to native `(XELP *ths, int argc, const char **argv)`.
+The dispatch engine now tokenizes the command line before calling handlers.
 
 ### Default handlers
 
 Called when no command/key matches. Optional.
 
 ```c
-XELPRESULT default_cli(XELP *ths, const char *args, int len) {
+XELPRESULT default_cli(XELP *ths, int argc, const char **argv) {
     XelpOut(ths, "Unknown command\n", 0);
     return XELP_E_CMDNOTFOUND;
 }
@@ -209,99 +212,33 @@ void loop(void) {
 
 ---
 
-## Parsing arguments inside commands
+## Using arguments inside commands
 
-### XelpArgs -- sequential iterator (preferred)
-
-For sequential left-to-right argument parsing, use `XelpArgs`.
-O(1) per token. Preferred over `XelpTokN`.
+Since v0.4.0, CLI handlers receive native `argc`/`argv` — the dispatch
+engine tokenizes the command line before calling the handler. Tokens
+are null-terminated strings in `argv[]`. `argv[0]` is the command name.
 
 ```c
-XELPRESULT cmd_set(XELP *ths, const char *args, int len) {
-    XelpArgs a;
-    XelpBuf key;
+XELPRESULT cmd_set(XELP *ths, int argc, const char **argv) {
+    if (argc < 3) { XelpOut(ths, "usage: set key value\n", 0); return XELP_E_ERR; }
+    const char *key = argv[1];
     int value;
-    XelpArgsInit(&a, args, len);
-    XelpNextTok(&a, 0);              /* skip command name ("set") */
-    XelpNextTok(&a, &key);           /* key: use key.s .. key.p */
-    XelpNextInt(&a, &value);
+    XelpArgvInt(argv, argc, 2, &value);
     /* ... use key and value ... */
     return XELP_S_OK;
 }
 ```
 
-| Function | Purpose |
-|----------|---------|
-| `XelpArgsInit(a, args, len)` | Initialize iterator from `const char *args` |
-| `XelpNextTok(a, &tok)` | Get next token as `XelpBuf` (pass `NULL` or `0` to skip) |
-| `XelpNextInt(a, &val)` | Get next token and parse as int |
-| `XelpArgCount(a, &n)` | Count total tokens (does not consume; preserves position) |
-
-Tokens are NOT null-terminated. Use `tok.s`..`tok.p` span or
-`XELP_XB_LEN(tok)` for length.
-
-### Direct argument access (XelpArgInt / XelpArgStr)
-
-For one-shot access to a specific argument by index (O(N) per call):
-
-```c
-XELPRESULT cmd_set(XELP *ths, const char *args, int len) {
-    const char *key;
-    int klen, value;
-    XelpArgStr(args, len, 1, &key, &klen);  /* arg 1 = key name */
-    XelpArgInt(args, len, 2, &value);        /* arg 2 = int value */
-    return XELP_S_OK;
-}
-```
+### Argument helpers
 
 | Function | Purpose |
 |----------|---------|
-| `XelpArgInt(args, len, n, &val)` | Get arg N as int (wraps TokN + ParseNum) |
-| `XelpArgStr(args, len, n, &s, &slen)` | Get arg N as string span (pointer + length) |
+| `XelpArgvInt(argv, argc, n, &val)` | Get argv[n] as int (bounds-checked) |
+| `XelpArgvStr(argv, argc, n, &s, &slen)` | Get argv[n] as string pointer + length (bounds-checked) |
 
-Arg 0 is the command name (per argc/argv convention).
-
-### XelpBuf2Argv -- opt-in argc/argv tokenizer
-
-Tokenizes args into a standard argc/argv array, using
-`ths->mCmdMsgBuf` as scratch (zero extra RAM). Strips quotes,
-processes escape sequences, null-terminates each token.
-
-```c
-XELPRESULT cmd_set(XELP *ths, const char *args, int len) {
-    char *argv[XELP_ARGV_MAX];
-    int argc;
-    if (XelpBuf2Argv(ths, args, len, &argc, argv, XELP_ARGV_MAX) != XELP_S_OK)
-        return XELP_E_ERR;
-    /* argv[0] = "set", argv[1] = key, argv[2] = value, etc. */
-    return XELP_S_OK;
-}
-```
-
-| Function | Purpose |
-|----------|---------|
-| `XelpBuf2Argv(ths, args, len, &argc, argv, maxargs)` | Tokenize into argc/argv (uses mCmdMsgBuf as scratch) |
-| `XelpArgvInt(argv, argc, n, &val)` | Get argv[n] as int |
-| `XelpArgvStr(argv, argc, n, &s, &slen)` | Get argv[n] as string pointer + length |
-
-`XELP_ARGV_MAX` (default 8) is a convenience constant for sizing the
-argv array. Tokens are null-terminated (unlike XelpArgs/XelpTokN).
-Returns `XELP_E_ERR` if input exceeds `XELP_CMDBUFSZ` or too many args.
-
-### Random-access alternative (XelpTokN)
-
-For random-access by index, use `XelpTokN`. Note the `(char*)` cast
-required because `XELP_XB_INIT` takes `char*`:
-
-```c
-XELPRESULT cmd_get(XELP *ths, const char *args, int len) {
-    XelpBuf b, tok;
-    XELP_XB_INIT(b, (char*)args, len);
-    XelpTokN(&b, 1, &tok);
-    /* tok.s .. tok.p is the token */
-    return XELP_S_OK;
-}
-```
+`XELP_ARGV_MAX` (default 16) limits the maximum number of argv entries.
+Tokens are null-terminated. Quoted strings are unquoted and escape
+sequences are processed by the dispatch tokenizer.
 
 ---
 
@@ -387,7 +324,7 @@ XELP_SET_FN_CLI(cli_ble,    commands);
 
 ---
 
-## Registers (v0.3.2+)
+## Registers (v0.4.0+)
 
 Each XELP instance has 4 return registers (`mR[0..3]`), accessed via
 macros. Convention: **callee-clobbers-all** -- any command call may
@@ -401,8 +338,10 @@ XELPREG val2   = XELP_R2(cli);   /* command-specific return value 2 */
 XELPREG val3   = XELP_R3(cli);   /* command-specific return value 3 */
 
 /* Inside a command handler (pointer access) */
-XELPRESULT cmd_divmod(XELP *ths, const char *args, int len) {
-    /* ... parse a and b ... */
+XELPRESULT cmd_divmod(XELP *ths, int argc, const char **argv) {
+    int a, b;
+    XelpArgvInt(argv, argc, 1, &a);
+    XelpArgvInt(argv, argc, 2, &b);
     ths->mR[1] = a / b;  /* quotient  */
     ths->mR[2] = a % b;  /* remainder */
     return XELP_S_OK;
@@ -452,7 +391,6 @@ Edit `src/xelpcfg.h` to enable/disable features:
 | `XELP_ENABLE_KEY` | Single keypress mode | ~200-500 bytes |
 | `XELP_ENABLE_THR` | Pass-through mode | ~50-125 bytes |
 | `XELP_ENABLE_HELP` | Built-in help command | ~180-350 bytes |
-| `XELP_ENABLE_ARGV` | Structured argc/argv parsing (XelpBuf2Argv) | ~530-700 bytes + XELP_CMDBUFSZ RAM |
 | `XELP_ENABLE_FULL` | All of the above (except history) | All combined |
 
 ### Buffer and register sizes
@@ -463,8 +401,8 @@ flag (`-DXELP_CMDBUFSZ=128`) or `xelp_ovr.h`.
 | Setting | Default | Purpose |
 |---------|---------|---------|
 | `XELP_CMDBUFSZ` | 64 | CLI input buffer size (bytes). In `xelpcfg.h`, `#ifndef`-guarded. |
-| `XELP_ARGV_MAX` | 8 | Default max arguments for `XelpBuf2Argv`. In `xelpcfg.h`, `#ifndef`-guarded. |
-| `XELP_ARGVBUFSZ` | `XELP_CMDBUFSZ` | Scratch buffer size for XelpBuf2Argv (bytes per instance). Override for variable expansion. |
+| `XELP_ARGV_MAX` | 16 | Maximum arguments in argc/argv dispatch. In `xelpcfg.h`, `#ifndef`-guarded. |
+| `XELP_ARGVBUFSZ` | `XELP_CMDBUFSZ` | Scratch buffer for argv tokenization (bytes per instance). |
 | `XELP_REGS_SZ` | 4 | Return registers per instance (minimum 4) |
 | `XELPREG` | `int` | Register element type |
 | `XELP_HIST_DEPTH` | 4 | History ring buffer depth |
@@ -483,7 +421,7 @@ flag (`-DXELP_CMDBUFSZ=128`) or `xelp_ovr.h`.
 |---------|---------|---------|
 | `XELP_CLI_ESC` | `` ` `` (backtick) | Escape next char in CLI/scripts |
 | `XELP_QUO_ESC` | `\` (backslash) | Escape next char inside quoted strings |
-| `XELP_ESC_MAP` | `"n\x0A" "t\x09" ""` | Packed key-value pairs for escape expansion in quoted strings (XelpBuf2Argv). Each 2-byte entry maps the char after `XELP_QUO_ESC` to a replacement byte. Terminated by `'\0'`. Unmapped escapes pass through as identity. Set to `""` to disable. |
+| `XELP_ESC_MAP` | `"n\x0A" "t\x09" ""` | Packed key-value pairs for escape expansion in quoted strings (argv tokenizer). Each 2-byte entry maps the char after `XELP_QUO_ESC` to a replacement byte. Terminated by `'\0'`. Unmapped escapes pass through as identity. Set to `""` to disable. |
 
 ### ENTER key detection
 
@@ -587,8 +525,9 @@ Separate from the PSM. Assembles raw bytes into `XELPKEYCODE` values:
 `XelpParseXB()` loop:
 1. Call `XelpTokLineXB()` with `XELP_TOK_LINE` to get next command line
 2. Linear search through `mpCLIModeFuncs` table
-3. First match (via `XelpStrEq2`) calls the handler with the full line
-4. If no match and `mpfDefCLI` is set, call the default handler
+3. First match (via `XelpStrEq2`) tokenizes line into argc/argv via `_xelpBuf2Argv`
+4. Calls handler with `(ths, argc, argv)`
+5. If no match and `mpfDefCLI` is set, call the default handler with argc/argv
 5. Result stored in `ths->mR[0]`
 
 ---
@@ -704,7 +643,7 @@ typedef struct XELP_tag {
 ## Version information
 
 ```c
-#define XELP_VERSION      (0x00000302UL)  /* 0x00MMmmpp */
+#define XELP_VERSION      (0x00000400UL)  /* 0x00MMmmpp */
 #define XELP_VER_MAJOR(v) (((v) >> 16) & 0xFF)
 #define XELP_VER_MINOR(v) (((v) >>  8) & 0xFF)
 #define XELP_VER_PATCH(v) ( (v)        & 0xFF)
@@ -720,14 +659,14 @@ The version in `src/xelp.h` is the single source of truth.
 2. Using `printf` or `puts` instead of `XelpOut(ths, ...)`.
 3. Passing stack-local strings to `XELP_SET_VAL_CLI_PROMPT()`.
 4. Forgetting `XELP_FUNC_ENTRY_LAST` at the end of command tables.
-5. Treating `args` as null-terminated (it is not -- use `len`).
+5. Using old `(XELP*, const char*, int)` handler signatures instead of `(XELP*, int, const char**)`.
 6. Hardcoding `&global_instance` instead of using `ths` in commands.
 7. Calling `malloc` or stdlib functions in embedded contexts.
 8. Using `//` comments in core source files (must use `/* */` for C89).
 9. Mixed declarations and code in core source files.
 10. Assuming `int` is a specific size (varies 16-bit to 64-bit).
 11. Using `XELP_ENABLE_HISTORY` without `XELP_ENABLE_LINE_EDIT`.
-12. Forgetting the `(char*)` cast in `XELP_XB_INIT(b, (char*)args, len)`.
+12. Calling removed functions (XelpArgsInit, XelpNextTok, XelpTokN, XelpNumToks, XelpBuf2Argv) -- use argv[] directly.
 
 ---
 
@@ -810,9 +749,7 @@ JumpBug_RunUnit(&jb, &test_my_feature, "my feature");
 Harnesses in `tests/fuzz/`:
 - `fuzz_parse.c` -- fuzzes `XelpParse` (script buffer)
 - `fuzz_parsekey.c` -- fuzzes `XelpParseKey` (byte-by-byte input)
-- `fuzz_buf2argv.c` -- fuzzes `XelpBuf2Argv` + `XelpArgvInt`/`XelpArgvStr`
-
-Seed corpora in `tests/fuzz/corpus_parse/`, `tests/fuzz/corpus_buf2argv/`.
+Seed corpora in `tests/fuzz/corpus_parse/`.
 
 ---
 
@@ -920,7 +857,7 @@ xelp/
 | `posix-simple/` | Linux/macOS | Full interactive CLI with ncurses |
 | `posix-simple-cpp/` | Linux/macOS | Same as above with C++ wrapper |
 | `scripting/` | Linux/macOS | Script execution vs interactive mode |
-| `posix-argv/` | Linux/macOS | XelpBuf2Argv argc/argv vs XelpArgs comparison |
+| `posix-argv/` | Linux/macOS | Native argc/argv with XelpArgvInt/XelpArgvStr |
 | `arduino/` | Arduino | Raw C API with LED control |
 | `arduino-cpp/` | Arduino | C++ `XelpCLI` wrapper |
 | `arduino-live-cli/` | Arduino | Full hardware CLI: GPIO, ADC, PWM, tone, pulse, pin scan |
@@ -960,15 +897,6 @@ Full size tables for 20+ architectures in [README.md](README.md).
 | `XelpPutc(ths, char)` | Output single character |
 | `XelpHelp(ths)` | Print help listing |
 | `XelpTokLineXB(&buf, &tok, type)` | Tokenize next token or line |
-| `XelpTokN(&buf, n, &tok)` | Get Nth token (random access) |
-| `XelpNumToks(&buf, &n)` | Count tokens |
-| `XelpArgsInit(&a, args, len)` | Init sequential iterator |
-| `XelpNextTok(&a, &tok)` | Get next token |
-| `XelpNextInt(&a, &val)` | Get next token as int |
-| `XelpArgCount(&a, &n)` | Count tokens (non-destructive) |
-| `XelpArgInt(args, len, n, &val)` | Get arg N as int (one-shot) |
-| `XelpArgStr(args, len, n, &s, &slen)` | Get arg N as string span |
-| `XelpBuf2Argv(ths, args, len, &argc, argv, max)` | Tokenize into argc/argv (null-terminated tokens) |
 | `XelpArgvInt(argv, argc, n, &val)` | Get argv[n] as int |
 | `XelpArgvStr(argv, argc, n, &s, &slen)` | Get argv[n] as string + length |
 | `XelpStrLen(s)` | String length |

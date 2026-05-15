@@ -44,7 +44,7 @@ extern "C"
 {
 #endif
 
-#define XELP_VERSION      (0x00000303UL) /* 32-bit version: 0x00MMmmpp (major.minor.patch) */
+#define XELP_VERSION      (0x00000400UL) /* 32-bit version: 0x00MMmmpp (major.minor.patch) */
 #define XELP_VER_MAJOR(v) (((v) >> 16) & 0xFF)
 #define XELP_VER_MINOR(v) (((v) >>  8) & 0xFF)
 #define XELP_VER_PATCH(v) ( (v)        & 0xFF)
@@ -214,18 +214,18 @@ typedef struct
 
 
 /*****************************************************************************
- CLIFuncMap declares functions that are launched in command line mode which take
- a single string as a param.  xelp does no parsing in an argv/argc sense
- instead it just passes the "arguments" as a single string to the function pointer.
- the arguments include the name assigned to the function e.g. 
- myFunction arg1 arg2 : arg3 arg4;  
+ CLIFuncMap declares functions that are launched in command line mode.
+ The dispatch engine tokenizes the command line into argc/argv before calling
+ the handler, following the standard C argc/argv convention:
+   argv[0] = command name, argv[1..argc-1] = arguments.
+ Tokens are null-terminated in a scratch buffer; quotes and escapes are processed.
  */
 typedef struct
 {
-	XELPRESULT (*mFunPtr)(struct XELP_tag *, const char *pArgString, int maxbuflen) REENTRANT_SDCC ;	/* fn ptr to command */
+	XELPRESULT (*mFunPtr)(struct XELP_tag *, int argc, const char **argv) REENTRANT_SDCC ;	/* fn ptr to command */
 	const char* mpCmd;                         /* name of cmd at run-time / in script                    */
 	const char* mpHelpString;                  /* optional help string                                   */
-}XELPCLIFuncMapEntry; 
+}XELPCLIFuncMapEntry;
 /*#define XELP_CLIFUNCENTRY_LAST {0,"",""}			 function list terminator */
 
 #define XELP_FUNC_ENTRY_LAST	{0,0,0}
@@ -291,13 +291,10 @@ typedef struct XELP_tag
 
 #ifdef XELP_ENABLE_CLI						 /* if CLI and script support enabled           */
 	XELPCLIFuncMapEntry		*mpCLIModeFuncs; /* command mode function dispatch              */
-	XELPRESULT (*mpfDefCLI)(struct XELP_tag *, const char *, int) REENTRANT_SDCC; /* default handler for unknown commands */
+	XELPRESULT (*mpfDefCLI)(struct XELP_tag *, int, const char **) REENTRANT_SDCC; /* default handler for unknown commands */
 	char					mCmdMsgBuf[XELP_CMDBUFSZ]; 	/* cli string buffer storage        */
     XelpBuf                 mCmdXB;          /* buffer ptrs for parsing                     */
-#endif
-
-#ifdef XELP_ENABLE_ARGV						 /* if structured argv parsing enabled          */
-	char					mArgvBuf[XELP_ARGVBUFSZ]; /* scratch buffer for XelpBuf2Argv    */
+	char					mArgvBuf[XELP_ARGVBUFSZ]; /* scratch buffer for argv tokenization */
 #endif
 
 #ifdef XELP_CLI_PROMPT 						 /* prompt for CLI enabled                      */
@@ -408,58 +405,12 @@ XELPRESULT XelpParseKey 	(XELP *ths, char key);				     /* handle keypress at CL
 /* XELPRESULT XelpTokLine (const char *buf, int blen, const char **t0s, const char **t0e, const char **eol, int srchType); */
 /* XELPRESULT XelpTokLine ( char *buf, char *bufend, const char **t0s, const char **t0e, const char **eol, int srchType); */
 XELPRESULT XelpTokLineXB (XelpBuf *buf, XelpBuf *tok, int srchType);
-XELPRESULT XelpTokN (XelpBuf *buf, int n, XelpBuf *tok);
-XELPRESULT XelpNumToks (XelpBuf *buf, int *n);
-
-/*****************************************************************************
- XelpArgs -- sequential argument iterator for CLI command handlers.
-
- Provides O(1)-per-token left-to-right iteration.  argv[0] is the command
- name (no auto-skip).  XelpNextTok yields a XelpBuf (tok.s = start,
- tok.p = end); use XELP_XB_PTR/XELP_XB_LEN or pass to XelpStrEq2.
- Tokens are NOT null-terminated (buffer is not modified).
- Token pointers are valid only during the callback.
- */
-typedef struct {
-    XelpBuf buf;    /* tokenizer state (cursor advances as tokens are consumed) */
-} XelpArgs;
-
-XELPRESULT XelpArgsInit  (XelpArgs *a, const char *args, int len);
-XELPRESULT XelpNextTok   (XelpArgs *a, XelpBuf *tok);
-XELPRESULT XelpNextInt   (XelpArgs *a, int *val);
-XELPRESULT XelpArgCount  (XelpArgs *a, int *n);
-
-/* Direct-access argument helpers (random access, O(N) per call).
-   Arg 0 is the command name, arg 1 is the first real argument. */
-XELPRESULT XelpArgInt (const char *args, int len, int n, int *val);
-XELPRESULT XelpArgStr (const char *args, int len, int n,
-                       const char **s, int *slen);
-
-#ifdef XELP_ENABLE_ARGV
-/* Tokenize args into argc/argv using ths->mArgvBuf as scratch buffer.
-   Strips quotes, processes escape sequences, null-terminates each token.
-   argv[0] = command name per argc/argv convention.
-   Returns XELP_E_ERR if input exceeds scratch buffer or too many args. */
-XELPRESULT XelpBuf2Argv(XELP *ths, const char *args, int len,
-                         int *argc, const char **argv, int maxargs);
 
 /* Get argv[n] as an integer.  Returns XELP_E_ERR if out of range or not numeric. */
 XELPRESULT XelpArgvInt(const char **argv, int argc, int n, int *val);
 
 /* Get argv[n] as a string pointer and length. */
 XELPRESULT XelpArgvStr(const char **argv, int argc, int n, const char **s, int *slen);
-
-/* Convenience macro for command handlers (C99+ / C++).
-   Declares local 'int argc' and 'const char *argv[XELP_ARGV_MAX]',
-   tokenizes args, returns XELP_E_ERR on failure.
-   Place at the top of a handler body, before other statements. */
-#define XELP_PARSE_ARGV(ths, args, len) \
-    const char *argv[XELP_ARGV_MAX]; \
-    int argc = 0; \
-    if (XelpBuf2Argv((ths), (args), (len), &argc, argv, XELP_ARGV_MAX) \
-        != XELP_S_OK) \
-        return XELP_E_ERR
-#endif
 
 /* XELPNEXTTOK get next token in a string buffer.  This is just a macro call to XelpTokLine             */
 /* #define    XELPNEXTTOK(buf,blen,tok_s,tok_e)    (XelpTokLine(buf, buf+blen, tok_s, tok_e, 0, XELP_TOK_ONLY)) */

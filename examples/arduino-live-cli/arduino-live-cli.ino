@@ -55,37 +55,6 @@ static int freeMemory() {
 static int freeMemory() { return -1; }
 #endif
 
-/* Extract token N as a null-terminated string into buf (returns buf). */
-static char* tokStr(const char* args, int len, int n, char* buf, int bsz) {
-    XelpBuf b, t;
-    XELP_XB_INIT(b, (char*)args, len);
-    if (XelpTokN(&b, n, &t) == XELP_S_OK) {
-        int tl = (int)(t.p - t.s);
-        if (tl >= bsz) tl = bsz - 1;
-        memcpy(buf, t.s, tl);
-        buf[tl] = '\0';
-    } else {
-        buf[0] = '\0';
-    }
-    return buf;
-}
-
-/* Extract token N as an integer. */
-static int tokInt(const char* args, int len, int n) {
-    char buf[16];
-    tokStr(args, len, n, buf, sizeof(buf));
-    return atoi(buf);
-}
-
-/* Count tokens. */
-static int tokCount(const char* args, int len) {
-    XelpBuf b;
-    int n;
-    XELP_XB_INIT(b, (char*)args, len);
-    XelpNumToks(&b, &n);
-    return n;
-}
-
 /* ------------------------------------------------------------------ */
 /* Demo scripts (full targets only)                                    */
 /* ------------------------------------------------------------------ */
@@ -119,34 +88,32 @@ static void runProgmem(const char* pgm) {
 /* Command handlers                                                    */
 /* ------------------------------------------------------------------ */
 
-XELPRESULT cmdHelp(XELP *x, const char* a, int l) {
-    (void)a; (void)l;
+XELPRESULT cmdHelp(XELP *x, int argc, const char **argv) {
+    (void)argc; (void)argv;
     XelpOut(x, XELP_BANNER_STR, 0);
     return XelpHelp(x);
 }
 
-XELPRESULT cmdBanner(XELP *x, const char* a, int l) {
-    (void)a; (void)l;
+XELPRESULT cmdBanner(XELP *x, int argc, const char **argv) {
+    (void)argc; (void)argv;
     XelpOut(x, XELP_BANNER_STR, 0);
     XelpOut(x, "Welcome to xelp CLI demo.\n", 0);
     XelpOut(x, "Type help to see commands. (also accepts ?)\n", 0);
     return XELP_S_OK;
 }
 
-XELPRESULT cmdEcho(XELP *x, const char* args, int len) {
-    int n = tokCount(args, len);
-    char buf[32];
-    for (int i = 1; i < n; i++) {
+XELPRESULT cmdEcho(XELP *x, int argc, const char **argv) {
+    int i;
+    for (i = 1; i < argc; i++) {
         if (i > 1) XelpOut(x, " ", 1);
-        tokStr(args, len, i, buf, sizeof(buf));
-        XelpOut(x, buf, 0);
+        XelpOut(x, argv[i], 0);
     }
     XelpOut(x, "\n", 0);
     return XELP_S_OK;
 }
 
-XELPRESULT cmdInfo(XELP *x, const char* a, int l) {
-    (void)a; (void)l;
+XELPRESULT cmdInfo(XELP *x, int argc, const char **argv) {
+    (void)argc; (void)argv;
     char buf[64];
 #if defined(ARDUINO_BOARD)
     snprintf(buf, sizeof(buf), "Board:  %s\n", ARDUINO_BOARD);
@@ -166,105 +133,97 @@ XELPRESULT cmdInfo(XELP *x, const char* a, int l) {
     return XELP_S_OK;
 }
 
-XELPRESULT cmdSetpin(XELP *x, const char* args, int len) {
-    if (tokCount(args, len) < 3) {
+XELPRESULT cmdSetpin(XELP *x, int argc, const char **argv) {
+    if (argc < 3) {
         XelpOut(x, "usage: setpin <pin> <0|1>\n", 0);
         return XELP_E_ERR;
     }
-    int pin = tokInt(args, len, 1);
+    int pin = atoi(argv[1]);
     warnSerial(pin);
-    digitalWrite(pin, tokInt(args, len, 2) ? HIGH : LOW);
+    digitalWrite(pin, atoi(argv[2]) ? HIGH : LOW);
     return XELP_S_OK;
 }
 
-XELPRESULT cmdGetpin(XELP *x, const char* args, int len) {
-    if (tokCount(args, len) < 2) {
+XELPRESULT cmdGetpin(XELP *x, int argc, const char **argv) {
+    if (argc < 2) {
         XelpOut(x, "usage: getpin <pin>\n", 0);
         return XELP_E_ERR;
     }
     char buf[8];
-    snprintf(buf, sizeof(buf), "%d\n", digitalRead(tokInt(args, len, 1)));
+    snprintf(buf, sizeof(buf), "%d\n", digitalRead(atoi(argv[1])));
     XelpOut(x, buf, 0);
     return XELP_S_OK;
 }
 
-XELPRESULT cmdPinmode(XELP *x, const char* args, int len) {
-    if (tokCount(args, len) < 3) {
+XELPRESULT cmdPinmode(XELP *x, int argc, const char **argv) {
+    if (argc < 3) {
         XelpOut(x, "usage: pinmode <pin> <in|out|pullup>\n", 0);
         return XELP_E_ERR;
     }
-    int pin = tokInt(args, len, 1);
-    char mode[8];
-    tokStr(args, len, 2, mode, sizeof(mode));
+    int pin = atoi(argv[1]);
     warnSerial(pin);
-    if      (strcmp(mode, "out") == 0)    pinMode(pin, OUTPUT);
-    else if (strcmp(mode, "in") == 0)     pinMode(pin, INPUT);
-    else if (strcmp(mode, "pullup") == 0) pinMode(pin, INPUT_PULLUP);
+    if      (strcmp(argv[2], "out") == 0)    pinMode(pin, OUTPUT);
+    else if (strcmp(argv[2], "in") == 0)     pinMode(pin, INPUT);
+    else if (strcmp(argv[2], "pullup") == 0) pinMode(pin, INPUT_PULLUP);
     else XelpOut(x, "  expected: in, out, or pullup\n", 0);
     return XELP_S_OK;
 }
 
-XELPRESULT cmdSetpwm(XELP *x, const char* args, int len) {
-    if (tokCount(args, len) < 3) {
+XELPRESULT cmdSetpwm(XELP *x, int argc, const char **argv) {
+    if (argc < 3) {
         XelpOut(x, "usage: setpwm <pin> <0-255>\n", 0);
         return XELP_E_ERR;
     }
-    int pin = tokInt(args, len, 1);
+    int pin = atoi(argv[1]);
     warnSerial(pin);
-    analogWrite(pin, tokInt(args, len, 2));
+    analogWrite(pin, atoi(argv[2]));
     return XELP_S_OK;
 }
 
-XELPRESULT cmdReadadc(XELP *x, const char* args, int len) {
-    if (tokCount(args, len) < 2) {
+XELPRESULT cmdReadadc(XELP *x, int argc, const char **argv) {
+    if (argc < 2) {
         XelpOut(x, "usage: readadc <pin>\n", 0);
         return XELP_E_ERR;
     }
     char buf[8];
-    snprintf(buf, sizeof(buf), "%d\n", analogRead(tokInt(args, len, 1)));
+    snprintf(buf, sizeof(buf), "%d\n", analogRead(atoi(argv[1])));
     XelpOut(x, buf, 0);
     return XELP_S_OK;
 }
 
 #ifndef XELP_SMALL_TARGET
-XELPRESULT cmdTone(XELP *x, const char* args, int len) {
-    int n = tokCount(args, len);
-    if (n < 3) {
+XELPRESULT cmdTone(XELP *x, int argc, const char **argv) {
+    if (argc < 3) {
         XelpOut(x, "usage: tone <pin> <hz> [ms]\n", 0);
         return XELP_E_ERR;
     }
-    int pin = tokInt(args, len, 1);
-    unsigned int freq = (unsigned int)tokInt(args, len, 2);
-    if (n >= 4) {
-        char buf[16];
-        tone(pin, freq, (unsigned long)atol(tokStr(args, len, 3, buf, sizeof(buf))));
+    int pin = atoi(argv[1]);
+    unsigned int freq = (unsigned int)atoi(argv[2]);
+    if (argc >= 4) {
+        tone(pin, freq, (unsigned long)atol(argv[3]));
     } else {
         tone(pin, freq);
     }
     return XELP_S_OK;
 }
 
-XELPRESULT cmdNotone(XELP *x, const char* args, int len) {
+XELPRESULT cmdNotone(XELP *x, int argc, const char **argv) {
     (void)x;
-    if (tokCount(args, len) < 2) return XELP_E_ERR;
-    noTone(tokInt(args, len, 1));
+    if (argc < 2) return XELP_E_ERR;
+    noTone(atoi(argv[1]));
     return XELP_S_OK;
 }
 
-XELPRESULT cmdPulsein(XELP *x, const char* args, int len) {
-    int n = tokCount(args, len);
-    if (n < 3) {
+XELPRESULT cmdPulsein(XELP *x, int argc, const char **argv) {
+    if (argc < 3) {
         XelpOut(x, "usage: pulsein <pin> <high|low> [timeout_us]\n", 0);
         return XELP_E_ERR;
     }
-    int pin = tokInt(args, len, 1);
-    char mode[8];
-    tokStr(args, len, 2, mode, sizeof(mode));
-    int level = (strcmp(mode, "high") == 0) ? HIGH : LOW;
+    int pin = atoi(argv[1]);
+    int level = (strcmp(argv[2], "high") == 0) ? HIGH : LOW;
     unsigned long timeout = 1000000UL;
-    if (n >= 4) {
-        char buf[16];
-        timeout = (unsigned long)atol(tokStr(args, len, 3, buf, sizeof(buf)));
+    if (argc >= 4) {
+        timeout = (unsigned long)atol(argv[3]);
     }
     unsigned long dur = pulseIn(pin, level, timeout);
     char out[24];
@@ -273,18 +232,17 @@ XELPRESULT cmdPulsein(XELP *x, const char* args, int len) {
     return XELP_S_OK;
 }
 
-XELPRESULT cmdMicros(XELP *x, const char* args, int len) {
-    (void)args; (void)len;
+XELPRESULT cmdMicros(XELP *x, int argc, const char **argv) {
+    (void)argc; (void)argv;
     char buf[16];
     snprintf(buf, sizeof(buf), "%lu\n", micros());
     XelpOut(x, buf, 0);
     return XELP_S_OK;
 }
 
-XELPRESULT cmdScanpins(XELP *x, const char* args, int len) {
-    int n = tokCount(args, len);
-    int first = (n >= 2) ? tokInt(args, len, 1) : 0;
-    int last  = (n >= 3) ? tokInt(args, len, 2) : NUM_DIGITAL_PINS - 1;
+XELPRESULT cmdScanpins(XELP *x, int argc, const char **argv) {
+    int first = (argc >= 2) ? atoi(argv[1]) : 0;
+    int last  = (argc >= 3) ? atoi(argv[2]) : NUM_DIGITAL_PINS - 1;
     char buf[24];
     XelpOut(x, "pin  value\n", 0);
     XelpOut(x, "---  -----\n", 0);
@@ -295,48 +253,47 @@ XELPRESULT cmdScanpins(XELP *x, const char* args, int len) {
     return XELP_S_OK;
 }
 
-XELPRESULT cmdDemoBlink(XELP *x, const char* a, int l) {
-    (void)a; (void)l;
+XELPRESULT cmdDemoBlink(XELP *x, int argc, const char **argv) {
+    (void)argc; (void)argv;
     XelpOut(x, "xelp can chain commands as scripts using semicolons.\n", 0);
     runProgmem(DEMO_BLINK);
     XelpOut(x, "Done.\n", 0);
     return XELP_S_OK;
 }
 
-XELPRESULT cmdDemoScan(XELP *x, const char* a, int l) {
-    (void)a; (void)l;
+XELPRESULT cmdDemoScan(XELP *x, int argc, const char **argv) {
+    (void)argc; (void)argv;
     XelpOut(x, "Set pins 2-4 as inputs, then scan them:\n", 0);
     runProgmem(DEMO_SCAN);
     return XELP_S_OK;
 }
 
-XELPRESULT cmdDemoInfo(XELP *x, const char* a, int l) {
-    (void)a; (void)l;
+XELPRESULT cmdDemoInfo(XELP *x, int argc, const char **argv) {
+    (void)argc; (void)argv;
     XelpOut(x, "Chain multiple info commands in one line:\n", 0);
     runProgmem(DEMO_INFO);
     return XELP_S_OK;
 }
 #endif /* XELP_SMALL_TARGET */
 
-XELPRESULT cmdDelay(XELP *x, const char* args, int len) {
+XELPRESULT cmdDelay(XELP *x, int argc, const char **argv) {
     (void)x;
-    if (tokCount(args, len) >= 2) {
-        char buf[16];
-        delay((unsigned long)atol(tokStr(args, len, 1, buf, sizeof(buf))));
+    if (argc >= 2) {
+        delay((unsigned long)atol(argv[1]));
     }
     return XELP_S_OK;
 }
 
-XELPRESULT cmdMillis(XELP *x, const char* args, int len) {
-    (void)args; (void)len;
+XELPRESULT cmdMillis(XELP *x, int argc, const char **argv) {
+    (void)argc; (void)argv;
     char buf[16];
     snprintf(buf, sizeof(buf), "%lu\n", millis());
     XelpOut(x, buf, 0);
     return XELP_S_OK;
 }
 
-XELPRESULT cmdReboot(XELP *x, const char* a, int l) {
-    (void)a; (void)l;
+XELPRESULT cmdReboot(XELP *x, int argc, const char **argv) {
+    (void)argc; (void)argv;
     XelpOut(x, "Rebooting...\n", 0);
     delay(100);
 #if defined(__AVR__)
@@ -351,10 +308,8 @@ XELPRESULT cmdReboot(XELP *x, const char* a, int l) {
 }
 
 /* Default handler for unrecognized commands. */
-XELPRESULT cmdNotFound(XELP *x, const char* args, int len) {
-    char buf[16];
-    tokStr(args, len, 0, buf, sizeof(buf));
-    XelpOut(x, buf, 0);
+XELPRESULT cmdNotFound(XELP *x, int argc, const char **argv) {
+    if (argc > 0) XelpOut(x, argv[0], 0);
     XelpOut(x, ": unknown command\n", 0);
     return XELP_E_CMDNOTFOUND;
 }

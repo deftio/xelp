@@ -109,12 +109,10 @@ static void nvsLoad(void)
 /* CLI commands                                                        */
 /* ------------------------------------------------------------------ */
 
-XELPRESULT cmdSsid(XELP *ths, const char *args, int len)
+XELPRESULT cmdSsid(XELP *ths, int argc, const char **argv)
 {
-    XelpBuf b, tok;
-    XELP_XB_INIT(b, (char *)args, len);
-    if (XelpTokN(&b, 1, &tok) == XELP_S_OK) {
-        tokCopy(gSsid, sizeof(gSsid), tok.s, tok.p);
+    if (argc > 1) {
+        tokCopy(gSsid, sizeof(gSsid), argv[1], argv[1] + XelpStrLen(argv[1]));
         nvsSave();
         XelpOut(ths, "SSID set: ", 0);
         XelpOut(ths, gSsid, 0);
@@ -125,12 +123,10 @@ XELPRESULT cmdSsid(XELP *ths, const char *args, int len)
     return XELP_S_OK;
 }
 
-XELPRESULT cmdWifiPass(XELP *ths, const char *args, int len)
+XELPRESULT cmdWifiPass(XELP *ths, int argc, const char **argv)
 {
-    XelpBuf b, tok;
-    XELP_XB_INIT(b, (char *)args, len);
-    if (XelpTokN(&b, 1, &tok) == XELP_S_OK) {
-        tokCopy(gPass, sizeof(gPass), tok.s, tok.p);
+    if (argc > 1) {
+        tokCopy(gPass, sizeof(gPass), argv[1], argv[1] + XelpStrLen(argv[1]));
         nvsSave();
         XelpOut(ths, "Password set (saved)\n", 0);
     } else {
@@ -139,9 +135,9 @@ XELPRESULT cmdWifiPass(XELP *ths, const char *args, int len)
     return XELP_S_OK;
 }
 
-XELPRESULT cmdConnect(XELP *ths, const char *args, int len)
+XELPRESULT cmdConnect(XELP *ths, int argc, const char **argv)
 {
-    (void)args; (void)len;
+    (void)argc; (void)argv;
     if (gSsid[0] == '\0') {
         XelpOut(ths, "Set SSID first: ssid <name>\n", 0);
         return XELP_E_ERR;
@@ -169,17 +165,17 @@ XELPRESULT cmdConnect(XELP *ths, const char *args, int len)
     return XELP_S_OK;
 }
 
-XELPRESULT cmdDisconnect(XELP *ths, const char *args, int len)
+XELPRESULT cmdDisconnect(XELP *ths, int argc, const char **argv)
 {
-    (void)args; (void)len;
+    (void)argc; (void)argv;
     WiFi.disconnect();
     XelpOut(ths, "Disconnected\n", 0);
     return XELP_S_OK;
 }
 
-XELPRESULT cmdStatus(XELP *ths, const char *args, int len)
+XELPRESULT cmdStatus(XELP *ths, int argc, const char **argv)
 {
-    (void)args; (void)len;
+    (void)argc; (void)argv;
     char buf[64];
 
     /* WiFi */
@@ -205,12 +201,10 @@ XELPRESULT cmdStatus(XELP *ths, const char *args, int len)
     return XELP_S_OK;
 }
 
-XELPRESULT cmdLed(XELP *ths, const char *args, int len)
+XELPRESULT cmdLed(XELP *ths, int argc, const char **argv)
 {
-    XelpBuf b, tok;
-    XELP_XB_INIT(b, (char *)args, len);
-    if (XelpTokN(&b, 1, &tok) == XELP_S_OK) {
-        int val = XelpStr2Int(tok.s, (int)(tok.p - tok.s));
+    if (argc > 1) {
+        int val = XelpStr2Int(argv[1], XelpStrLen(argv[1]));
         digitalWrite(LED_BUILTIN, val ? HIGH : LOW);
         XelpOut(ths, val ? "LED ON\n" : "LED OFF\n", 0);
     } else {
@@ -219,9 +213,9 @@ XELPRESULT cmdLed(XELP *ths, const char *args, int len)
     return XELP_S_OK;
 }
 
-XELPRESULT cmdAdc(XELP *ths, const char *args, int len)
+XELPRESULT cmdAdc(XELP *ths, int argc, const char **argv)
 {
-    (void)args; (void)len;
+    (void)argc; (void)argv;
     uint32_t acc = 0;
     for (int i = 0; i < 16; i++) {
         acc += analogReadMilliVolts(A0);
@@ -237,9 +231,9 @@ XELPRESULT cmdAdc(XELP *ths, const char *args, int len)
     return XELP_S_OK;
 }
 
-XELPRESULT cmdHelp(XELP *ths, const char *args, int len)
+XELPRESULT cmdHelp(XELP *ths, int argc, const char **argv)
 {
-    (void)args; (void)len;
+    (void)argc; (void)argv;
     return XelpHelp(ths);
 }
 
