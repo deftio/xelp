@@ -163,9 +163,10 @@ static void _xelpRedrawFromCursor(XELP *ths) {
     if (!ths->mOutEnable || !ths->mpfOut) return;
     if (ths->mEchoChar == XELP_ECHO_OFF) return;
     /* print from cursor to end of content */
-    for (p = ths->mCur; p < ths->mCmdXB.p; p++) {
-        if (ths->mEchoChar != XELP_ECHO_NORMAL) ths->mpfOut(ths->mEchoChar);
-        else ths->mpfOut(*p);
+    {
+        char ec = ths->mEchoChar;
+        for (p = ths->mCur; p < ths->mCmdXB.p; p++)
+            ths->mpfOut(ec != XELP_ECHO_NORMAL ? ec : *p);
     }
     /* erase one trailing char (covers deletion case) */
     ths->mpfOut(' ');
@@ -186,9 +187,10 @@ static void _xelpHistReplaceLine(XELP *ths, const char *src, int slen) {
     int i;
 
     /* move cursor to beginning of line (visual) */
-    while (ths->mCur > ths->mCmdXB.s) {
-        ths->mCur--;
-        _CURSOR('\b');
+    {
+        int back = (int)(ths->mCur - ths->mCmdXB.s);
+        for (i = 0; i < back; i++) _CURSOR('\b');
+        ths->mCur = ths->mCmdXB.s;
     }
     /* overwrite old content with spaces */
     for (i = 0; i < oldlen; i++) _CURSOR(' ');
@@ -226,10 +228,10 @@ static void _xelpHistSave(XELP *ths) {
     /* copy command into ring slot */
     {
         char *dst = ths->mHistBuf[(int)ths->mHistWrite];
-        int i;
-        for (i = 0; i < len && i < XELP_CMDBUFSZ - 1; i++)
-            dst[i] = ths->mCmdXB.s[i];
-        dst[i] = 0;
+        const char *src = ths->mCmdXB.s;
+        int n = (len < XELP_CMDBUFSZ - 1) ? len : XELP_CMDBUFSZ - 1;
+        while (n-- > 0) *dst++ = *src++;
+        *dst = 0;
     }
     ths->mHistWrite = (char)(((int)ths->mHistWrite + 1) % XELP_HIST_DEPTH);
     if (ths->mHistCount < XELP_HIST_DEPTH)
@@ -248,10 +250,11 @@ static void _xelpHistRecall(XELP *ths, int dir) {
         if (ths->mHistBrowse == -1) {
             /* first UP: save in-progress line */
             int len = (int)(ths->mCmdXB.p - ths->mCmdXB.s);
-            int i;
-            for (i = 0; i < len; i++)
-                ths->mHistSaved[i] = ths->mCmdXB.s[i];
-            ths->mHistSaved[len] = 0;
+            const char *src = ths->mCmdXB.s;
+            char *dst = ths->mHistSaved;
+            int n = len;
+            while (n-- > 0) *dst++ = *src++;
+            *dst = 0;
             ths->mHistSavedLen = (char)len;
             /* start at most recent entry */
             ths->mHistBrowse = ths->mHistCount - 1;
@@ -466,13 +469,9 @@ XELPRESULT XelpBufCmp (const char *as, const char *ae, const char *bs, const cha
         if (*as != *bs)
             return XELP_S_NOTFOUND;
 
-        if (cmpType == XELP_CMP_TYPE_A0) {
-            if (*as == 0) {ae = as+1;}
-        }
-
-        if (cmpType == XELP_CMP_TYPE_A0B0) {
-            if (*as == 0) {ae = as+1;}
-            if (*bs == 0) {be = bs+1;}
+        if (cmpType >= XELP_CMP_TYPE_A0) {
+            if (*as == 0) ae = as+1;
+            if (cmpType == XELP_CMP_TYPE_A0B0 && *bs == 0) be = bs+1;
         }
         
         as++;
@@ -736,22 +735,18 @@ XELPRESULT XelpParseXB (XELP* ths, XelpBuf *args) {
         if (f) { /* make sure fn dispatch table exists */
         	ths->mR[0] = XELP_E_CMDNOTFOUND;
             while(f->mpCmd) {
-                if (XELP_S_OK == XelpStrEq2(line.s,line.p,f->mpCmd)){
-                    argc = 0;
-                    _xelpBuf2Argv(ths, line.s, (int)(line.e-line.s),
-                                  &argc, argv, XELP_ARGV_MAX);
-                    ths->mR[0] = (f->mFunPtr)(ths, argc, argv);
+                if (XELP_S_OK == XelpStrEq2(line.s,line.p,f->mpCmd))
                     break;
-                }
                 f++;
             }
-            if (ths->mR[0] == XELP_E_CMDNOTFOUND) {
-            	if (ths->mpfDefCLI) {
-                    argc = 0;
-                    _xelpBuf2Argv(ths, line.s, (int)(line.e-line.s),
-                                  &argc, argv, XELP_ARGV_MAX);
-            		ths->mR[0] = ths->mpfDefCLI(ths, argc, argv);
-                }
+            if (f->mpCmd || ths->mpfDefCLI) {
+                argc = 0;
+                _xelpBuf2Argv(ths, line.s, (int)(line.e-line.s),
+                              &argc, argv, XELP_ARGV_MAX);
+                if (f->mpCmd)
+                    ths->mR[0] = (f->mFunPtr)(ths, argc, argv);
+                else
+                    ths->mR[0] = ths->mpfDefCLI(ths, argc, argv);
             }
         }
 	}
