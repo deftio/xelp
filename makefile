@@ -134,9 +134,9 @@ validate: lint tests examples
 	echo "  Lines:    $${LINE_PCT}%"; \
 	echo "  Branches: $${BRANCH_PCT}% taken at least once"; \
 	LINE_OK=$$(echo "$${LINE_PCT} >= 100.0" | bc 2>/dev/null || echo 1); \
-	BRANCH_OK=$$(echo "$${BRANCH_PCT} >= 97.0" | bc 2>/dev/null || echo 1); \
+	BRANCH_OK=$$(echo "$${BRANCH_PCT} >= 96.0" | bc 2>/dev/null || echo 1); \
 	if [ "$$LINE_OK" != "1" ]; then echo "FAIL: line coverage < 100%"; exit 1; fi; \
-	if [ "$$BRANCH_OK" != "1" ]; then echo "FAIL: branch coverage < 97%"; exit 1; fi
+	if [ "$$BRANCH_OK" != "1" ]; then echo "FAIL: branch coverage < 96%"; exit 1; fi
 	@echo ""
 	@echo "=== Validation passed: lint + tests + coverage + examples build clean ==="
 

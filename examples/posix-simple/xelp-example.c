@@ -221,7 +221,7 @@ XELPRESULT cmdPrintNum (XELP *ths, const char *args, int maxlen) {
 
 XELPRESULT cmdMath (XELP *ths, const char* args, int maxlen) {
 	XelpBuf b,tok;
-    int i,j,k;
+    int i,j,k=0;
     int op;
 
     XELP_XB_INIT(b,(char*)args,maxlen);
