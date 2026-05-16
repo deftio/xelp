@@ -65,7 +65,7 @@ Versions always use three-component semver (e.g. `0.3.0`, never `0.3`).
   works unchanged.
 - `XelpBuf2Argv`, `XelpArgvInt`, `XelpArgvStr` signatures use
   `const char **argv` (was `char **argv`) for const-correctness.
-- Test suite expanded to 49 units, 678 test cases (from 47/598).
+- Test suite expanded to 50 units, 693 test cases (from 47/598).
 
 ### Fixed
 - `\r` stripping in Web Bluetooth terminals (`esp32-ble-cli` and

@@ -15,7 +15,7 @@ compiled out saves code space.
 | `XELP_ENABLE_HELP` | Built-in help function listing all commands | ~180--350 bytes |
 | `XELP_ENABLE_HISTORY` | Command history (UP/DOWN arrow recall). Requires `XELP_ENABLE_CLI` + `XELP_ENABLE_LINE_EDIT`. | ~420 bytes |
 | `XELP_ENABLE_ARGV` | Structured argc/argv parsing (`XelpBuf2Argv`, `XelpArgvInt`, `XelpArgvStr`, `XELP_PARSE_ARGV`). Adds a scratch buffer per instance. | ~530--700 bytes + `XELP_ARGVBUFSZ` RAM |
-| `XELP_ENABLE_FULL` | Enable all of the above | All combined |
+| `XELP_ENABLE_FULL` | Enable KEY, CLI, THR, and HELP. Does **not** enable LINE_EDIT, HISTORY, or ARGV — define those separately. | Core modes combined |
 
 ## Key Mappings
 

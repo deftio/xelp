@@ -445,7 +445,7 @@ natural value (e.g. `'a'` == 0x61). Multi-byte keys are >= 0x100.
 
 | Constant | Value | Description |
 |----------|-------|-------------|
-| `XELP_VERSION` | 0x00000302 | Library version (32-bit hex: `0x00MMmmpp`) |
+| `XELP_VERSION` | 0x00000303 | Library version (32-bit hex: `0x00MMmmpp`) |
 | `XELP_VER_MAJOR(v)` | | Extract major version byte |
 | `XELP_VER_MINOR(v)` | | Extract minor version byte |
 | `XELP_VER_PATCH(v)` | | Extract patch version byte |

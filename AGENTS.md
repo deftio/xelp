@@ -12,7 +12,7 @@ For the llmstxt.org-format project index, see [llms.txt](llms.txt).
 A command line interpreter, script engine, and single-key menu system
 for embedded systems. Pure C, zero dynamic memory, no OS, no stdlib.
 Three files: `xelp.c`, `xelp.h`, `xelpcfg.h`. Compiles on 8-bit
-through 64-bit targets with any C89+ compiler. Version 0.3.2.
+through 64-bit targets with any C89+ compiler. Version 0.3.3.
 
 ## Critical constraints
 
@@ -90,7 +90,7 @@ compiled in, its switch key is silently ignored.
 
 ---
 
-## Function signatures (v0.3.2+)
+## Function signatures (v0.3.3+)
 
 ### CLI command functions
 
@@ -387,7 +387,7 @@ XELP_SET_FN_CLI(cli_ble,    commands);
 
 ---
 
-## Registers (v0.3.2+)
+## Registers (v0.3.3+)
 
 Each XELP instance has 4 return registers (`mR[0..3]`), accessed via
 macros. Convention: **callee-clobbers-all** -- any command call may
@@ -704,7 +704,7 @@ typedef struct XELP_tag {
 ## Version information
 
 ```c
-#define XELP_VERSION      (0x00000302UL)  /* 0x00MMmmpp */
+#define XELP_VERSION      (0x00000303UL)  /* 0x00MMmmpp */
 #define XELP_VER_MAJOR(v) (((v) >> 16) & 0xFF)
 #define XELP_VER_MINOR(v) (((v) >>  8) & 0xFF)
 #define XELP_VER_PATCH(v) ( (v)        & 0xFF)
@@ -764,7 +764,7 @@ Methods: `begin()`, `setCommands()`, `poll()`, `parse()`,
 xelp uses **JumpBug**, a minimal C89-compatible unit test framework with
 no external dependencies. Tests are in `tests/xelp_unit_tests.c`.
 
-**47 test units, 598 test cases, 100% line coverage of xelp.c.**
+**50 test units, 693 test cases, 100% line coverage of xelp.c.**
 
 ### Running tests
 

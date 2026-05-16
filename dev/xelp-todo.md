@@ -32,7 +32,7 @@ link have detailed specifications in `dev/`.
       ~420 bytes ARM Thumb.
 - [x] `XelpArgInt` / `XelpArgStr` convenience functions for direct argument
       access by index.
-- [x] Test suite: 47 units, 598 cases, 100% line coverage
+- [x] Test suite: 50 units, 693 cases, 100% line coverage
 
 ## Scripting Engine (deferred -- clean up core first)
 

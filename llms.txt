@@ -28,7 +28,7 @@ the CLI or from scripts.
 - Output control: mute all output, echo masking (password mode)
 - Quoted strings, escape sequences, comments, semicolon statement separator
 - Hex + decimal number parsing (0xFF, FFh, -123 formats)
-- 47 test units, 598 test cases, 100% line coverage
+- 50 test units, 693 test cases, 100% line coverage
 - Fuzz tested with libFuzzer
 - BSD 2-Clause license
 
@@ -68,7 +68,7 @@ the CLI or from scripts.
 
 ## Tests
 
-- [Unit tests](https://github.com/deftio/xelp/blob/master/tests/xelp_unit_tests.c): 47 test units, 598 test cases (JumpBug framework)
+- [Unit tests](https://github.com/deftio/xelp/blob/master/tests/xelp_unit_tests.c): 50 test units, 693 test cases (JumpBug framework)
 - [JumpBug framework](https://github.com/deftio/xelp/blob/master/tests/jumpbug_unit_test_fw.c): Minimal C89-compatible unit test framework
 - [Fuzz parse](https://github.com/deftio/xelp/blob/master/tests/fuzz/fuzz_parse.c): libFuzzer harness for XelpParse
 - [Fuzz parsekey](https://github.com/deftio/xelp/blob/master/tests/fuzz/fuzz_parsekey.c): libFuzzer harness for XelpParseKey
@@ -145,5 +145,5 @@ XELP_E_ERR (-1), XELP_E_CMDBUFFULL (-2), XELP_E_CMDNOTFOUND (-3).
 - `XELP_ENABLE_KEY` -- single keypress mode (~200-500 bytes)
 - `XELP_ENABLE_THR` -- pass-through mode (~50-125 bytes)
 - `XELP_ENABLE_HELP` -- built-in help listing (~180-350 bytes)
-- `XELP_ENABLE_FULL` -- all of the above (except history)
+- `XELP_ENABLE_FULL` -- enables KEY, CLI, THR, HELP (does not enable LINE_EDIT, HISTORY, or ARGV)
 - `XELP_CONFIG_OVERRIDE` -- use project-specific xelp_ovr.h for config

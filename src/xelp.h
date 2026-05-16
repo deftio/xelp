@@ -214,11 +214,12 @@ typedef struct
 
 
 /*****************************************************************************
- CLIFuncMap declares functions that are launched in command line mode which take
- a single string as a param.  xelp does no parsing in an argv/argc sense
- instead it just passes the "arguments" as a single string to the function pointer.
- the arguments include the name assigned to the function e.g. 
- myFunction arg1 arg2 : arg3 arg4;  
+ CLIFuncMap declares functions that are launched in command line mode.
+ The handler receives the raw command line as (args, len).  When
+ XELP_ENABLE_ARGV is defined, XelpBuf2Argv / XELP_PARSE_ARGV can split
+ the line into argc/argv with quote and escape handling.
+ The arguments include the command name, e.g.
+ myFunction arg1 arg2 : arg3 arg4;
  */
 typedef struct
 {

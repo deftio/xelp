@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>xelp — embedded CLI and script interpreter</title>
-  <meta name="description" content="xelp is a C language command line interpreter and script parser for embedded systems. No dynamic memory, multi-instance, under 1 KB to ~5 KB.">
+  <meta name="description" content="xelp is a C language command line interpreter and script parser for embedded systems. No dynamic memory, multi-instance, under 1 KB to ~5 KB on 32-bit targets.">
   <link rel="stylesheet" href="assets/main.css">
   <link rel="icon" href="../img/favicon-32x32.png" type="image/png">
 </head>
@@ -41,8 +41,8 @@
 
 <p>xelp is an interactive command line interpreter, script engine, and
 single-key menu system for embedded C projects. It compiles to under 5 KB
-with all features enabled and runs on targets from 8-bit microcontrollers
-to 64-bit hosts with code sizes from under 1 KB to ~5 KB. Register your
+with all features on 32-bit targets and runs on 8-bit microcontrollers
+to 64-bit hosts with code sizes from under 1 KB to ~12 KB. Register your
 own C functions as commands and call them from the prompt or from scripts
 stored in ROM. No OS, no dynamic memory, no standard library
 dependencies.</p>
@@ -51,7 +51,7 @@ dependencies.</p>
 
 <ul>
   <li>Pure C (C89 compliant), optional C++ <code>extern "C"</code> support</li>
-  <li>Compiled sizes: <strong>under 1 KB to ~5 KB</strong> depending on features enabled</li>
+  <li>Compiled sizes: <strong>under 1 KB to ~5 KB</strong> on 32-bit targets (larger on 8/16-bit)</li>
   <li>No <code>malloc</code>, no globals &mdash; all state in an instance struct</li>
   <li><strong>Bring your own functions</strong> &mdash; register any C function as a CLI command
       with a one-line table entry, callable interactively or from scripts</li>
@@ -168,7 +168,7 @@ void main(void) {
 <p>Compiled <code>.text</code> section sizes with <code>-Os</code>.
 Three configurations: KEY (single-key dispatch only), CLI (typical
 interactive use), FULL (all features). Even the largest full build is
-under 7 KB.</p>
+under 12 KB.</p>
 
 <!-- Build Size Table -->
 <table>
@@ -212,7 +212,7 @@ make fuzz         # fuzz testing with libFuzzer (requires clang)
 make clean-all    # remove all build artifacts
 </code></pre>
 
-<p>47 test units, 598 test cases, 100% line coverage of <code>xelp.c</code>.</p>
+<p>50 test units, 693 test cases, 100% line coverage of <code>xelp.c</code>.</p>
 
 <h2>Documentation</h2>
 

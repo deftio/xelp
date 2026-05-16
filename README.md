@@ -13,7 +13,7 @@
 A tiny extensible command interpreter with scripting support for embedded systems. 
 Add an interactive serial CLI, single-key menus, or scripted command sequences to any microcontroller --
 from an 8-bit ATtiny85 to a 64-bit ARM Cortex-A. Pure C, no malloc, no OS,
-under 3-5 KB fully featured depending on archicture. 
+under 3-5 KB fully featured on 32-bit targets (larger on 8/16-bit).
 
 Xelp is instance based so it's possible to run distinct copies on different ports and it can be run inside interrupts (pending your own functions are safe).
 
@@ -212,7 +212,7 @@ make clean          # remove test build artifacts
 make clean-all      # clean tests + all examples
 ```
 
-47 test units, 598 test cases, 100% line coverage of `xelp.c`.
+50 test units, 693 test cases, 100% line coverage of `xelp.c`.
 
 Feature profile sizes: `dev/size_profiles.sh` (uses Docker for ARM Cortex-M0, falls back to host GCC).
 
@@ -310,7 +310,7 @@ Docker cross-compilation (`tools/Dockerfile.crossbuild`):
 | MSP430 | msp430-gcc | 16-bit |
 | m68k (68000) | m68k-linux-gnu-gcc | 32-bit |
 | AVR (ATmega, ATtiny) | avr-gcc | 8-bit |
-| 8051 | SDCC | 8-bit |
+| 8051 | SDCC | 8-bit (compiles, not in size table) |
 | 68HC11/12 | m68hc11-gcc | 16-bit |
 | PowerPC | powerpc-linux-gnu-gcc | 32-bit |
 
