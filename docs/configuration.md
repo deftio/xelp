@@ -14,7 +14,8 @@ compiled out saves code space.
 | `XELP_ENABLE_THR` | Pass-through mode (redirect keys to another peripheral) | ~50--125 bytes |
 | `XELP_ENABLE_HELP` | Built-in help function listing all commands | ~180--350 bytes |
 | `XELP_ENABLE_HISTORY` | Command history (UP/DOWN arrow recall). Requires `XELP_ENABLE_CLI` + `XELP_ENABLE_LINE_EDIT`. | ~420 bytes |
-| `XELP_ENABLE_FULL` | Enable all of the above | All combined |
+| `XELP_ENABLE_ARGV` | Structured argc/argv parsing (`XelpBuf2Argv`, `XelpArgvInt`, `XelpArgvStr`, `XELP_PARSE_ARGV`). Adds a scratch buffer per instance. | ~530--700 bytes + `XELP_ARGVBUFSZ` RAM |
+| `XELP_ENABLE_FULL` | Enable KEY, CLI, THR, and HELP. Does **not** enable LINE_EDIT, HISTORY, or ARGV — define those separately. | Core modes combined |
 
 ## Key Mappings
 
@@ -34,15 +35,29 @@ Override by redefining in `xelpcfg.h`, e.g. `#define XELPKEY_CLI ('c')`
 |--------|---------|---------|
 | `XELP_CLI_ESC` | `` ` `` (backtick) | Escape character at command line / in scripts |
 | `XELP_QUO_ESC` | `\` (backslash) | Escape character inside quoted strings |
+| `XELP_ESC_MAP` | `"n\x0A" "t\x09" ""` | Packed key-value pairs for escape expansion inside double-quoted arguments (`XelpBuf2Argv`). Each 2-byte entry maps the char after `XELP_QUO_ESC` to a replacement byte (e.g. `\n` -> newline, `\t` -> tab). Terminated by `'\0'`. Unmapped escapes pass through as identity (`\\` -> `\`, `\"` -> `"`). Set to `""` to disable expansion. |
 
 ## Buffer and Register Sizes
 
 | Define | Default | Purpose |
 |--------|---------|---------|
-| `XELP_CMDBUFSZ` | 64 | Command line buffer size in bytes |
+| `XELP_CMDBUFSZ` | 64 | CLI input buffer size in bytes |
+| `XELP_ARGVBUFSZ` | `XELP_CMDBUFSZ` | Scratch buffer size for `XelpBuf2Argv` (bytes per instance). Override to a larger value if variable expansion or long script lines may produce arguments longer than the CLI input buffer. Only allocated when `XELP_ENABLE_ARGV` is defined. |
+| `XELP_ARGV_MAX` | 8 | Default maximum number of arguments for `XelpBuf2Argv` and `XELP_PARSE_ARGV`. |
 | `XELP_HIST_DEPTH` | 4 | Number of commands stored in history ring (requires `XELP_ENABLE_HISTORY`) |
 | `XELP_REGS_SZ` | 4 | Number of callee-clobbers-all return registers (minimum 4). R0 is command status, R1-R3 are command-specific. |
 | `XELPREG` | `int` | Register type (change for platforms where `int` is not ideal) |
+
+## ENTER Key Detection
+
+| Define | Default | Purpose |
+|--------|---------|---------|
+| `XELP_ENTER_LF` | 1 | Accept `\n` (0x0A) as ENTER |
+| `XELP_ENTER_CR` | 1 | Accept `\r` (0x0D) as ENTER |
+
+Both enabled by default for cross-platform use (some terminals send CR,
+others LF, some send both). Only affects interactive input
+(`XelpParseKey`); script parsing always uses `\n`.
 
 ## Prompt
 
@@ -63,11 +78,21 @@ For per-instance prompts, set to `(ths->mpPrompt)` and use
 
 ## Config Override
 
-If `XELP_CONFIG_OVERRIDE` is defined before including `xelpcfg.h`, the file
-includes `xelp_ovr.h` instead of using its built-in defaults. This allows
-project-specific configuration without modifying the library's `xelpcfg.h`
-directly. The 8.3 filename convention is used for compatibility with legacy
-filesystems.
+Define `XELP_CONFIG_OVERRIDE` in your compiler flags and create
+`xelp_ovr.h` in your include path. The file is included *after* the
+defaults in `xelpcfg.h`, so use `#undef` then `#define` to change values.
+Anything you don't touch keeps its default.
+
+```c
+/* xelp_ovr.h example */
+#undef  XELP_CLI_PROMPT
+#define XELP_CLI_PROMPT   (ths->mpPrompt)
+
+#undef  XELP_ENABLE_THR    /* disable THR mode */
+
+#undef  XELP_CMDBUFSZ
+#define XELP_CMDBUFSZ  128 /* larger input buffer */
+```
 
 ## Example Configurations
 

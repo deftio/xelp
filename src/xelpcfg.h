@@ -55,6 +55,18 @@
 #define XELP_QUO_ESC		('\\')		/* character used  for escaping inside quoted strings        */
 #endif
 
+/****************************************************************************************************
+ Quoted-string escape map: packed key-value pairs for escape expansion inside
+ double-quoted arguments (XelpBuf2Argv).  Each entry is two adjacent chars:
+ the first is the character after XELP_QUO_ESC, the second is the replacement
+ byte.  A lone '\0' terminates the list.  Characters not in this table pass
+ through unchanged (so \\ -> \ and \" -> " work without entries).
+ Override to add \r, \0, \a, etc. or set to "" to disable escape expansion.
+ */
+#ifndef XELP_ESC_MAP
+#define XELP_ESC_MAP  "n\x0A" "t\x09"  ""
+#endif
+
 
 
 /****************************************************************************************************
@@ -90,12 +102,27 @@
 #define XELP_ENABLE_HISTORY 1
 #endif
 
+/****************************************************************************************************
+ Enable structured argument parsing (argc/argv).
+ When defined, adds XelpBuf2Argv, XelpArgvInt, and XelpArgvStr functions and a
+ dedicated scratch buffer (XELP_ARGVBUFSZ bytes) to each XELP instance.  Provides
+ null-terminated tokens with quote and escape processing, and random access by
+ index -- the standard argc/argv convention for command handlers.
+ Does not require XELP_ENABLE_CLI; can be used standalone.
+ RAM cost: XELP_ARGVBUFSZ bytes per instance (separate from the CLI line buffer).
+ Code cost: ~530 bytes (x86-64 -Os), ~700 bytes (ARM Thumb -Os).
+ Leaving undefined saves both the code and the per-instance RAM.
+ */
+#ifndef XELP_ENABLE_ARGV
+#define XELP_ENABLE_ARGV    1
+#endif
+
 
 /****************************************************************************************************
  Enable KEY Mode.
  definining this flag includes support for key mode (each immediate press is used as a command such as in a menu systems) without pressing ENTER.
 
- leaving undefined saves btw 200-500 bytes (target dependant)
+ leaving undefined saves btw 200-500 bytes (target dependent)
  */
 #ifndef XELP_ENABLE_KEY
 #define XELP_ENABLE_KEY 	  1
@@ -107,7 +134,7 @@
  definining this flag includes support for redirecting key commands to the mpfThru function.
  Thru mode is useful for redirecting all key strokes to another peripheral such as a modem or other serial console based embedded system.
 
- leaving undefined saves btw 50-125 bytes (target dependant)
+ leaving undefined saves btw 50-125 bytes (target dependent)
  */
 #ifndef XELP_ENABLE_THR
 #define XELP_ENABLE_THR 	  1
@@ -115,7 +142,7 @@
 
 /****************************************************************************************************
  Compile built-in help function.
- Leaving undefined saves ~180-350 bytes. (target dependant)
+ Leaving undefined saves ~180-350 bytes. (target dependent)
  XELP_HELP_XXX_STR  are the strings used to prefix sections in the online help.  See examples or docs
  */
 #ifndef XELP_ENABLE_HELP
@@ -147,7 +174,7 @@
   #define XELP_CLI_PROMPT   (ths->mpPrompt)
 
   Then use the macros in Xelp.h
-  XELP_SET_VAL_CLI_PROMPT(myXelp,"yourPrompt")   //myXelp is the instance variable, message will be only for that instance.
+  XELP_SET_VAL_CLI_PROMPT(myXelp,"yourPrompt")   (myXelp is the instance variable, message will be only for that instance.)
 
 */
 #ifndef XELP_CLI_PROMPT
@@ -167,6 +194,34 @@
 
 #ifndef XELPREG
 #define XELPREG int    /* can change this to a valid C type for your plaform. eg. short, long, _int64 */
+#endif
+
+/****************************************************************************************************
+  XELP_CMDBUFSZ is the CLI input buffer size in bytes.
+  Must be at least 16. The default of 64 is suitable for most embedded targets.
+  Override with -DXELP_CMDBUFSZ=128 on the compiler command line, or in xelp_ovr.h.
+  RAM cost: XELP_CMDBUFSZ bytes per instance (plus history if enabled).
+ */
+#ifndef XELP_CMDBUFSZ
+#define XELP_CMDBUFSZ       (64)
+#endif
+
+/****************************************************************************************************
+  XELP_ARGV_MAX is the default maximum number of arguments for XelpBuf2Argv.
+  Override with -DXELP_ARGV_MAX=16 on the compiler command line, or in xelp_ovr.h.
+ */
+#ifndef XELP_ARGV_MAX
+#define XELP_ARGV_MAX       8
+#endif
+
+/*
+  XELP_ARGVBUFSZ is the scratch buffer size for XelpBuf2Argv tokenization.
+  Defaults to XELP_CMDBUFSZ.  Override to a larger value if variable expansion
+  or long script lines may produce arguments longer than the CLI input buffer.
+  RAM cost: XELP_ARGVBUFSZ bytes per instance (only when XELP_ENABLE_ARGV).
+ */
+#ifndef XELP_ARGVBUFSZ
+#define XELP_ARGVBUFSZ      XELP_CMDBUFSZ
 #endif
 
 
@@ -202,5 +257,17 @@
 #include "xelp_ovr.h"
 #endif
 
+/* Auto-disable dependent features when their base is missing.
+   LINE_EDIT and HISTORY require CLI; HISTORY requires LINE_EDIT.
+   This prevents compile errors from invalid override combinations. */
+#if defined(XELP_ENABLE_LINE_EDIT) && !defined(XELP_ENABLE_CLI)
+#undef XELP_ENABLE_LINE_EDIT
+#endif
+#if defined(XELP_ENABLE_HISTORY) && !defined(XELP_ENABLE_CLI)
+#undef XELP_ENABLE_HISTORY
+#endif
+#if defined(XELP_ENABLE_HISTORY) && !defined(XELP_ENABLE_LINE_EDIT)
+#undef XELP_ENABLE_HISTORY
+#endif
 
 #endif  /* __XELP_CONFIG_H__ */

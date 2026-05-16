@@ -106,6 +106,34 @@ Usage: `add 10 25`
 - Backtick (`` ` ``) escapes the next character at the CLI
 - Backslash (`\`) escapes inside quoted strings
 
+### argc/argv style (alternative)
+
+If you prefer standard C argc/argv conventions, enable `XELP_ENABLE_ARGV`
+in `xelpcfg.h` and use `XELP_PARSE_ARGV`. This tokenizes the command
+line, strips quotes, processes escape sequences (`\n`, `\t`), and
+null-terminates each token:
+
+```c
+XELPRESULT cmd_add(XELP *ths, const char *args, int len) {
+    XELP_PARSE_ARGV(ths, args, len);
+    /* argv[0] = "add", argv[1] = first arg, argv[2] = second arg */
+    int x, y;
+    if (XelpArgvInt(argv, argc, 1, &x) != XELP_S_OK) return XELP_E_ERR;
+    if (XelpArgvInt(argv, argc, 2, &y) != XELP_S_OK) return XELP_E_ERR;
+    /* ... x + y ... */
+    return XELP_S_OK;
+}
+```
+
+`XELP_PARSE_ARGV` is a convenience macro that declares `argc` and `argv`
+for you and returns `XELP_E_ERR` if tokenization fails. Tokens are
+null-terminated (unlike `XelpArgs` / `XelpTokN` which return pointer
+spans).
+
+For new code, `XELP_PARSE_ARGV` is the recommended approach when you need
+multiple arguments. Use `XelpArgs` when code size is critical or you only
+need a left-to-right single pass.
+
 ## 3. Counting and iterating tokens
 
 Using `XelpArgs` to walk all tokens sequentially:

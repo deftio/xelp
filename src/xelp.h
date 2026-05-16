@@ -5,7 +5,7 @@
   @copy Copyright (C) <2011>  <M. A. Chatterjee>
   @author M A Chatterjee <deftio [at] deftio [dot] com>
   
-  This file contains header defintions for the xelp simple embedded command interpreter.
+  This file contains header definitions for the xelp simple embedded command interpreter.
 
   @license: 
 	Copyright (c) 2011, M. A. Chatterjee <deftio at deftio dot com>
@@ -44,7 +44,7 @@ extern "C"
 {
 #endif
 
-#define XELP_VERSION      (0x00000302UL) /* 32-bit version: 0x00MMmmpp (major.minor.patch) */
+#define XELP_VERSION      (0x00000303UL) /* 32-bit version: 0x00MMmmpp (major.minor.patch) */
 #define XELP_VER_MAJOR(v) (((v) >> 16) & 0xFF)
 #define XELP_VER_MINOR(v) (((v) >>  8) & 0xFF)
 #define XELP_VER_PATCH(v) ( (v)        & 0xFF)
@@ -58,7 +58,7 @@ extern "C"
 #ifdef XELP_ENABLE_FULL 			/* see xelpcfg.h */
 #define XELP_ENABLE_KEY 		1   /* enable direct key press mode                            */
 #define XELP_ENABLE_CLI         1   /* enable command line prompt, scripting abilities         */
-#define XELP_ENABLE_THR 		1   /* enable THRU mode (redirect to other perphierals)        */
+#define XELP_ENABLE_THR 		1   /* enable THRU mode (redirect to other peripherals)        */
 #define XELP_ENABLE_HELP		1   /* compile in built-in help function.               	   */
 #endif
 
@@ -144,10 +144,12 @@ typedef unsigned long XELPKEYCODE;
 #define XELP_HIST_DEPTH		(4)  /* history ring depth (overridable)     */
 #endif
 
+#ifndef XELP_CMDBUFSZ
 #define XELP_CMDBUFSZ 		(64)
+#endif
 
 /**
- used by tokenizer funciton
+ used by tokenizer function
  */
 #define XELP_TOK_ONLY 		(0x0)
 #define XELP_TOK_LINE		(0x1)
@@ -157,7 +159,7 @@ typedef unsigned long XELPKEYCODE;
 
  when manually setting the params make sure the following relations
  are true as they are required for proper parsing:
- s <= p < e
+ s <= p <= e
 
  */
 typedef struct {
@@ -212,11 +214,12 @@ typedef struct
 
 
 /*****************************************************************************
- CLIFuncMap declares functions that are launched in command line mode which take
- a single string as a param.  xelp does no parsing in an argv/argc sense
- instead it just passes the "arguments" as a single string to the function pointer.
- the arguments include the name assigned to the function e.g. 
- myFunction arg1 arg2 : arg3 arg4;  
+ CLIFuncMap declares functions that are launched in command line mode.
+ The handler receives the raw command line as (args, len).  When
+ XELP_ENABLE_ARGV is defined, XelpBuf2Argv / XELP_PARSE_ARGV can split
+ the line into argc/argv with quote and escape handling.
+ The arguments include the command name, e.g.
+ myFunction arg1 arg2 : arg3 arg4;
  */
 typedef struct
 {
@@ -250,9 +253,9 @@ typedef struct
 
 /*****************************************************************************
  Live command modes:
- XELP_MODE_CLI   // each key is stored in buffer until <ENTER> pressed. (default)
- XELP_MODE_KEY   // each single key press is evaluated as a command
- XELP_MODE_THR   // each key is passed to the mpfThru() function.  (see docs)
+ XELP_MODE_CLI   -- each key is stored in buffer until ENTER pressed. (default)
+ XELP_MODE_KEY   -- each single key press is evaluated as a command
+ XELP_MODE_THR   -- each key is passed to the mpfThru() function.  (see docs)
 
  See also xelpcfg.h  which has compilation control directives if some modes are not needed.
 
@@ -294,6 +297,9 @@ typedef struct XELP_tag
     XelpBuf                 mCmdXB;          /* buffer ptrs for parsing                     */
 #endif
 
+#ifdef XELP_ENABLE_ARGV						 /* if structured argv parsing enabled          */
+	char					mArgvBuf[XELP_ARGVBUFSZ]; /* scratch buffer for XelpBuf2Argv    */
+#endif
 
 #ifdef XELP_CLI_PROMPT 						 /* prompt for CLI enabled                      */
 	const char*				mpPrompt;		 /* prompt at beginning of CLI e.g. xelp>		*/
@@ -302,6 +308,10 @@ typedef struct XELP_tag
 	/* Key accumulator for multi-byte sequences (e.g. arrow keys) */
 	XELPKEYCODE				mKeyAccum;		 /* packed key being assembled                  */
 	char					mKeyLen;		 /* bytes accumulated (0 = idle)                */
+
+#if defined(XELP_ENTER_CR) && defined(XELP_ENTER_LF)
+	char					mLastWasCR;		 /* 1 after CR, swallow next LF to coalesce CRLF */
+#endif
 
 #if defined(XELP_ENABLE_CLI) && defined(XELP_ENABLE_LINE_EDIT)
 	char*					mCur;			 /* cursor position in [mCmdXB.s .. mCmdXB.p]  */
@@ -317,7 +327,7 @@ typedef struct XELP_tag
 #endif
 
 	/****
-	platform dependant dispatch functions  (light-weight hardware abstraction layer)
+	platform-dependent dispatch functions  (light-weight hardware abstraction layer)
 	note that if any are left unset (zero) this is OK as system will not call null ptrs.
 	*/
 	void (*mpfOut)(char); 		  /* function to emit chars to console                       */
@@ -328,7 +338,7 @@ typedef struct XELP_tag
 	void (*mpfPassThru)(char);    /* function to pass keys in thru mode                      */
 #endif 	
 #ifdef XELP_ENABLE_CLI	
-	void (*mpfBksp)();			  /* function to handle destructive backspace at CLI prompt  */
+	void (*mpfBksp)(void);		  /* function to handle destructive backspace at CLI prompt  */
 #endif
 
 }XELP;
@@ -425,6 +435,32 @@ XELPRESULT XelpArgCount  (XelpArgs *a, int *n);
 XELPRESULT XelpArgInt (const char *args, int len, int n, int *val);
 XELPRESULT XelpArgStr (const char *args, int len, int n,
                        const char **s, int *slen);
+
+#ifdef XELP_ENABLE_ARGV
+/* Tokenize args into argc/argv using ths->mArgvBuf as scratch buffer.
+   Strips quotes, processes escape sequences, null-terminates each token.
+   argv[0] = command name per argc/argv convention.
+   Returns XELP_E_ERR if input exceeds scratch buffer or too many args. */
+XELPRESULT XelpBuf2Argv(XELP *ths, const char *args, int len,
+                         int *argc, const char **argv, int maxargs);
+
+/* Get argv[n] as an integer.  Returns XELP_E_ERR if out of range or not numeric. */
+XELPRESULT XelpArgvInt(const char **argv, int argc, int n, int *val);
+
+/* Get argv[n] as a string pointer and length. */
+XELPRESULT XelpArgvStr(const char **argv, int argc, int n, const char **s, int *slen);
+
+/* Convenience macro for command handlers (C99+ / C++).
+   Declares local 'int argc' and 'const char *argv[XELP_ARGV_MAX]',
+   tokenizes args, returns XELP_E_ERR on failure.
+   Place at the top of a handler body, before other statements. */
+#define XELP_PARSE_ARGV(ths, args, len) \
+    const char *argv[XELP_ARGV_MAX]; \
+    int argc = 0; \
+    if (XelpBuf2Argv((ths), (args), (len), &argc, argv, XELP_ARGV_MAX) \
+        != XELP_S_OK) \
+        return XELP_E_ERR
+#endif
 
 /* XELPNEXTTOK get next token in a string buffer.  This is just a macro call to XelpTokLine             */
 /* #define    XELPNEXTTOK(buf,blen,tok_s,tok_e)    (XelpTokLine(buf, buf+blen, tok_s, tok_e, 0, XELP_TOK_ONLY)) */

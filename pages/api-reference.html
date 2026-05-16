@@ -27,7 +27,7 @@
 <h1>API Reference</h1>
 
 <p>All public types, functions, and macros defined in <code>xelp.h</code>.
-Version 0.3.2.</p>
+Version 0.3.3.</p>
 
 <h2>Types</h2>
 
@@ -165,6 +165,50 @@ when <code>XELP_ENABLE_HELP</code> is defined.</p>
 </code></pre>
 <p>Count total tokens without consuming them.</p>
 
+<h2>XelpBuf2Argv &mdash; Structured argc/argv Parsing</h2>
+
+<p>Requires <code>XELP_ENABLE_ARGV</code>. Tokenizes a command line into a
+standard argc/argv array using <code>ths-&gt;mArgvBuf</code> as scratch.
+Strips quotes, processes escape sequences (via <code>XELP_ESC_MAP</code>),
+and null-terminates each token.</p>
+
+<h3><code>XelpBuf2Argv</code></h3>
+<pre><code>XELPRESULT XelpBuf2Argv(XELP *ths, const char *args, int len,
+                         int *argc, const char **argv, int maxargs);
+</code></pre>
+<p>Tokenize <code>args</code> into <code>argv[0]..argv[argc-1]</code>.
+<code>argv[0]</code> is the command name. Returns <code>XELP_E_ERR</code>
+if input exceeds <code>XELP_ARGVBUFSZ</code> or too many tokens.</p>
+
+<h3><code>XELP_PARSE_ARGV</code></h3>
+<pre><code>XELP_PARSE_ARGV(ths, args, len);
+</code></pre>
+<p>Convenience macro (C99+ / C++). Declares <code>const char *argv[XELP_ARGV_MAX]</code>
+and <code>int argc</code>, calls <code>XelpBuf2Argv</code>, and returns
+<code>XELP_E_ERR</code> on failure. Place at the top of a handler body.</p>
+
+<h3><code>XelpArgvInt</code></h3>
+<pre><code>XELPRESULT XelpArgvInt(const char **argv, int argc, int n, int *val);
+</code></pre>
+<p>Get <code>argv[n]</code> as an integer.</p>
+
+<h3><code>XelpArgvStr</code></h3>
+<pre><code>XELPRESULT XelpArgvStr(const char **argv, int argc, int n,
+                        const char **s, int *slen);
+</code></pre>
+<p>Get <code>argv[n]</code> as a string pointer and length.</p>
+
+<h3>Example</h3>
+<pre><code>XELPRESULT cmd_set(XELP *ths, const char *args, int len) {
+    XELP_PARSE_ARGV(ths, args, len);
+    /* argv[0]="set", argv[1]=key, argv[2]=value */
+    int val;
+    if (XelpArgvInt(argv, argc, 2, &amp;val) != XELP_S_OK)
+        return XELP_E_ERR;
+    return XELP_S_OK;
+}
+</code></pre>
+
 <h2>Direct Argument Access</h2>
 
 <h3><code>XelpArgInt</code></h3>
@@ -264,11 +308,16 @@ command handlers, use <code>ths-&gt;mR[1]</code> directly.</p>
 <table>
 <thead><tr><th>Constant</th><th>Value</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td><code>XELP_VERSION</code></td><td>0x00000302</td><td>Library version (32-bit hex: <code>0x00MMmmpp</code>)</td></tr>
+<tr><td><code>XELP_VERSION</code></td><td>0x00000303</td><td>Library version (32-bit hex: <code>0x00MMmmpp</code>)</td></tr>
 <tr><td><code>XELP_VER_MAJOR(v)</code></td><td></td><td>Extract major version byte</td></tr>
 <tr><td><code>XELP_VER_MINOR(v)</code></td><td></td><td>Extract minor version byte</td></tr>
 <tr><td><code>XELP_VER_PATCH(v)</code></td><td></td><td>Extract patch version byte</td></tr>
-<tr><td><code>XELP_CMDBUFSZ</code></td><td>64</td><td>Default command buffer size</td></tr>
+<tr><td><code>XELP_CMDBUFSZ</code></td><td>64</td><td>CLI input buffer size</td></tr>
+<tr><td><code>XELP_ARGVBUFSZ</code></td><td><code>XELP_CMDBUFSZ</code></td><td>Scratch buffer size for <code>XelpBuf2Argv</code></td></tr>
+<tr><td><code>XELP_ARGV_MAX</code></td><td>8</td><td>Default max arguments for <code>XelpBuf2Argv</code> / <code>XELP_PARSE_ARGV</code></td></tr>
+<tr><td><code>XELP_ENTER_LF</code></td><td>1</td><td>Accept <code>\n</code> as ENTER in interactive input</td></tr>
+<tr><td><code>XELP_ENTER_CR</code></td><td>1</td><td>Accept <code>\r</code> as ENTER in interactive input</td></tr>
+<tr><td><code>XELP_ESC_MAP</code></td><td><code>"n\x0A" "t\x09" ""</code></td><td>Escape expansion table for quoted strings in <code>XelpBuf2Argv</code></td></tr>
 <tr><td><code>XELP_MODE_CLI</code></td><td>0x00</td><td>CLI mode identifier</td></tr>
 <tr><td><code>XELP_MODE_KEY</code></td><td>0x01</td><td>KEY mode identifier</td></tr>
 <tr><td><code>XELP_MODE_THR</code></td><td>0x02</td><td>THRU mode identifier</td></tr>

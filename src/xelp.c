@@ -82,7 +82,7 @@ static void _xelp_memmove(char *dst, const char *src, int n) {
     if (dst < src) {                   /* shift-left: copy forward  */
         const char *e = src + n;
         while (src < e) *dst++ = *src++;
-    } else if (dst > src) {            /* shift-right: copy backward */
+    } else {                           /* shift-right: copy backward */
         const char *e = src;
         dst += n; src += n;
         while (src > e) *--dst = *--src;
@@ -355,27 +355,27 @@ XELPRESULT XelpHelp(XELP* ths)
 
 	XelpOut(ths,XELP_HELP_ABT_STR,x);
 #ifdef XELP_ENABLE_KEY
-	if (e) { //check and see if first entry is not terminator
+	if (e && e->mFunPtr) {
 		XelpOut(ths,XELP_HELP_KEY_STR,x);
-		do 	{
+		while (e->mFunPtr) {
 			_xelpPrintKeyName(ths, e->mKey);
 			_PUTC('\t');
 			XelpOut(ths,e->mpHelpString,x);
 			_PUTC('\n');
 			e++;
-		} while (e->mFunPtr);
+		}
 	}
 #endif
 #ifdef XELP_ENABLE_CLI
-	if (s) {
+	if (s && s->mFunPtr) {
 		XelpOut(ths,XELP_HELP_CLI_STR,x);
-		do	{
+		while (s->mFunPtr) {
 			XelpOut(ths,s->mpCmd,x);
 			_PUTC('\t');
 			XelpOut(ths,s->mpHelpString,x);
-			_PUTC('\n');	
-			s++;	
-		} while (s->mFunPtr);
+			_PUTC('\n');
+			s++;
+		}
 	}
 #endif
 	return XELP_S_OK;
@@ -606,56 +606,6 @@ static unsigned char const gPSMJumpTable[8]= {
  78,/* _PS_QESC */
  81 /* _PS_QEND */
 };
-#ifdef XTOKLINE_OLD
-XELPRESULT XelpTokLine (const char *bs, const char *be, const char **t0s, const char **t0e, const char **eol, int srchType) {
- 	const char *s;		 /* state ptr */
-	char cs=_PS_SEEK,prev=_PS_SEEK,tmp;   
-	int tm=1; /*  (token mode) allows capture of t0e, t0s only for first token seen */
-
-	while (bs<be) {
-		s = gPSMStates+(int)(gPSMJumpTable[(unsigned int)cs]);//index in to state array quickly
-		/* while (*s != _PS_EOS) { //technically can be while(1) since each state _MUST_ have a default */
-		while (1) { 
-			if ( ( 0 == *s) || (*bs == (*s)) )// default in this state or char is match
-				break;	
-			s+=3; //goto next iteration in this state.  
-		}	/* now we've found the correct state.  do any actions */
-
-		s++; /* advance ptr to exec flags byte */
-		/* if (*s)		// if there are any exec flags.. technically not needed but it can speed things up */
-		{ 
-			if (tm) {
-				if ((*s) & _EF_TS) { *t0s =  bs; };
-				if ((*s) & _EF_TE) { *t0e =  bs;  if (XELP_TOK_ONLY == srchType) return XELP_S_OK; tm=0;};
-			}
-			if ((*s) & _EF_LE) { *eol  = bs; return XELP_S_OK;};
-		}
-		s++; /* advance ptr to next_state byte */
-		tmp = cs;
-		cs = (*s == _PS_PREV) ? prev : (*s);
-		prev = tmp; 
-		/* end of parser state update */
-
-		bs++; /* advance char ptr */
-	}
-    
-	return XELP_S_NOTFOUND;
-}
-#endif
-/*
-XELPRESULT XelpTokLine(char* bs, char* be, const char **t0s, const char **t0e, const char **eol, int srchType) {
-    XelpBuf xc,tok;
-    XELPRESULT r;
-
-    XELP_XB_INIT_PTRS(xc,bs,bs,be);
-
-    r=XelpTokLineXB(&xc,&tok,srchType);
-    *t0s = tok.s;
-    *t0e = tok.p;
-    *eol = tok.e;
-    return r;
-}
-*/
 
 /********************************************************
   XelpTokLineXB(buf, output, srch) - main tokenizer - handles whitespaces, linefeeds, comments, quoted strings
@@ -673,12 +623,12 @@ XELPRESULT XelpTokLineXB (XelpBuf *buf, XelpBuf *tok, int srchType) {
 
 
 	while ((buf->p) < (buf->e)) {
-		s = gPSMStates+(int)(gPSMJumpTable[(unsigned int)cs]);//index in to state array quickly
-		/* while (*(buf->p) != _PS_EOS) { //technically can be while(1) since each state _MUST_ have a default */
-		while (1) { 
-			if ( ( 0 == *s) || (*(buf->p) == (*s)) )// default in this state or char is match
-				break;	
-			s+=3; //goto next iteration in this state.  
+		s = gPSMStates+(int)(gPSMJumpTable[(unsigned int)cs]); /* index in to state array quickly */
+		/* while (*(buf->p) != _PS_EOS) { technically can be while(1) since each state _MUST_ have a default } */
+		while (1) {
+			if ( ( 0 == *s) || (*(buf->p) == (*s)) ) /* default in this state or char is match */
+				break;
+			s+=3; /* goto next iteration in this state */
 		}	/* now we've found the correct state.  do any actions */
 
 		s++; /* advance ptr to exec flags byte */
@@ -864,7 +814,91 @@ XELPRESULT XelpArgStr (const char *args, int len, int n,
     *slen = (int)(tok.p - tok.s);
     return XELP_S_OK;
 }
+
 #endif /* XELP_ENABLE_CLI */
+
+#ifdef XELP_ENABLE_ARGV
+/********************************************************
+ XelpBuf2Argv() - tokenize args into argc/argv using mArgvBuf as scratch.
+ Strips quotes, processes escape sequences, null-terminates each token.
+ argv[0] = command name per argc/argv convention.
+ Returns XELP_E_ERR if input exceeds scratch buffer or too many args.
+ */
+XELPRESULT XelpBuf2Argv(XELP *ths, const char *args, int len,
+                         int *argc, const char **argv, int maxargs)
+{
+    char *r, *w, *end, c;
+    int ac = 0, i, q;
+
+    *argc = 0;
+    if (len <= 0) return XELP_S_OK;
+    if (len >= XELP_ARGVBUFSZ) return XELP_E_ERR;
+
+    r = ths->mArgvBuf;
+    for (i = 0; i < len; i++) r[i] = args[i];
+    end = r + len;
+    w = r;
+
+    while (r < end) {
+        while (r < end && (*r == ' ' || *r == '\t')) r++;
+        if (r >= end || *r == ';' || *r == '\n' || *r == '#') break;
+        if (ac >= maxargs) return XELP_E_ERR;
+        argv[ac] = w;
+        q = (*r == '"');
+        if (q) r++;
+
+        while (r < end) {
+            c = *r;
+            if (q) {
+                if (c == '"')  { r++; break; }
+                if (c == XELP_QUO_ESC && r + 1 < end) {
+                    const char *m = XELP_ESC_MAP;
+                    c = *++r;
+                    while (*m) { if (c == m[0]) { c = m[1]; break; } m += 2; }
+                }
+            } else {
+                if (c == ' ' || c == '\t' ||
+                    c == ';' || c == '\n' || c == '#') break;
+                if (c == XELP_CLI_ESC) { if (++r >= end) break; c = *r; }
+            }
+            *w++ = c;
+            r++;
+        }
+        {   /* check stop char before null-write can overwrite it */
+            int stop = !q && r < end &&
+                       (*r == ';' || *r == '\n' || *r == '#');
+            *w++ = '\0';
+            ac++;
+            if (stop) break;
+        }
+        if (w > r) r = w;
+    }
+    *argc = ac;
+    return XELP_S_OK;
+}
+
+/********************************************************
+ XelpArgvInt() - get argv[n] as an integer.
+ Returns XELP_E_ERR if n is out of range or not a valid number.
+ */
+XELPRESULT XelpArgvInt(const char **argv, int argc, int n, int *val)
+{
+    if (n < 0 || n >= argc) return XELP_E_ERR;
+    return XelpParseNum(argv[n], XelpStrLen(argv[n]), val);
+}
+
+/********************************************************
+ XelpArgvStr() - get argv[n] as a string pointer and length.
+ Returns XELP_E_ERR if n is out of range.
+ */
+XELPRESULT XelpArgvStr(const char **argv, int argc, int n, const char **s, int *slen)
+{
+    if (n < 0 || n >= argc) return XELP_E_ERR;
+    *s = argv[n];
+    *slen = XelpStrLen(argv[n]);
+    return XELP_S_OK;
+}
+#endif /* XELP_ENABLE_ARGV */
 
 /********************************************************
 	XelpParseKey() 
@@ -874,7 +908,7 @@ XELPRESULT XelpArgStr (const char *args, int len, int n,
 	then if in command mode looks for <ENTER> and the attempts to parse current buffer.
 
 */
-#ifdef XELP_ENABLE_LINE_EDIT
+#if defined(XELP_ENABLE_CLI) && defined(XELP_ENABLE_LINE_EDIT)
 /* move cursor left (dir<0) or right (dir>0); all=1 moves to boundary */
 static void _xelpCursorMove(XELP *ths, int dir, int all) {
 	do {
@@ -895,7 +929,7 @@ static void _xelpCursorMove(XELP *ths, int dir, int all) {
 /* handle ENTER: echo newline, save to history, execute buffer, reset, show prompt */
 static void _xelpHandleEnter(XELP *ths) {
 	XelpBuf line;
-#if defined(XELP_ENABLE_LINE_EDIT) && defined(XELP_ENABLE_HISTORY)
+#if defined(XELP_ENABLE_CLI) && defined(XELP_ENABLE_LINE_EDIT) && defined(XELP_ENABLE_HISTORY)
 	_xelpHistSave(ths);
 #endif
 	_PUTC(XELPKEY_ENTER);
@@ -914,6 +948,16 @@ static void _xelpHandleEnter(XELP *ths) {
 XELPRESULT XelpParseKey (XELP *ths, char key)
 {
 	int reprocess;
+
+#if defined(XELP_ENTER_CR) && defined(XELP_ENTER_LF)
+	/* Coalesce CRLF: if last key was CR, swallow the trailing LF. */
+	if (ths->mLastWasCR) {
+		ths->mLastWasCR = 0;
+		if (key == '\n') return XELP_S_OK;
+	}
+	if (key == '\r') ths->mLastWasCR = 1;
+#endif
+
 	do {
 		XELPKEYCODE keycode;
 		int is_single;
@@ -930,7 +974,6 @@ XELPRESULT XelpParseKey (XELP *ths, char key)
 		if (is_single) {
 			char ch = (char)keycode;
 			int i = ths->mCurMode;
-			int modeChangeAttempt = 1;
 
 			switch (ch) {
 #ifdef XELP_ENABLE_CLI
@@ -949,11 +992,10 @@ XELPRESULT XelpParseKey (XELP *ths, char key)
 					break;
 #endif
 				default:
-					modeChangeAttempt = 0;
 					break;
 			}
 
-			if ((ths->mCurMode != i) && (modeChangeAttempt)) {
+			if (ths->mCurMode != i) {
 				if (ths->mpfEditModeChg)
 					ths->mpfEditModeChg(ths->mCurMode);
 				continue; /* if reprocess is set, loop; else done */

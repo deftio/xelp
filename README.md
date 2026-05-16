@@ -1,6 +1,6 @@
 <a href="https://deftio.github.io/xelp/pages/"><img src="https://deftio.github.io/xelp/img/xelp-prompt-med.png" width="30%"></img></a>
 
-![Version](https://img.shields.io/badge/version-0.3.2-blue.svg)
+![Version](https://img.shields.io/badge/version-0.3.3-blue.svg)
 [![License](https://img.shields.io/badge/License-BSD%202--Clause-blue.svg)](https://opensource.org/licenses/BSD-2-Clause)
 [![CI](https://github.com/deftio/xelp/actions/workflows/ci.yml/badge.svg)](https://github.com/deftio/xelp/actions/workflows/ci.yml)
 ![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen.svg)  
@@ -13,7 +13,7 @@
 A tiny extensible command interpreter with scripting support for embedded systems. 
 Add an interactive serial CLI, single-key menus, or scripted command sequences to any microcontroller --
 from an 8-bit ATtiny85 to a 64-bit ARM Cortex-A. Pure C, no malloc, no OS,
-under 3-5 KB fully featured depending on archicture. 
+under 3-5 KB fully featured on 32-bit targets (larger on 8/16-bit).
 
 Xelp is instance based so it's possible to run distinct copies on different ports and it can be run inside interrupts (pending your own functions are safe).
 
@@ -212,7 +212,7 @@ make clean          # remove test build artifacts
 make clean-all      # clean tests + all examples
 ```
 
-47 test units, 598 test cases, 100% line coverage of `xelp.c`.
+50 test units, 693 test cases, 100% line coverage of `xelp.c`.
 
 Feature profile sizes: `dev/size_profiles.sh` (uses Docker for ARM Cortex-M0, falls back to host GCC).
 
@@ -243,31 +243,32 @@ development uses `make validate` which takes seconds.
 
 Compiled `.text` section sizes with `-Os`. Three configurations: KEY
 (single-key dispatch only), CLI (typical interactive use), FULL (all
-features). Even the largest full build is under 7 KB.
+features including history, argv, and THR). Even the largest full build
+is under 12 KB.
 
 <!-- Build Size Table -->
 | CPU | Width | Compiler | KEY (bytes) | CLI (bytes) | FULL (bytes) |
 |-----|------:|----------|------------:|------------:|-------------:|
-| AVR (ATtiny85) | 8 | avr-gcc | 5174 | 5174 | 5174 |
-| AVR (ATmega328P) | 8 | avr-gcc | 5284 | 5284 | 5284 |
-| Z80 | 8 | SDCC | 8386 | 8386 | 8386 |
-| 6800 (HC08) | 8 | SDCC | 10078 | 10078 | 10078 |
-| MSP430 | 16 | msp430-gcc | 4272 | 4272 | 4272 |
-| 68HC11 | 16 | m68hc11-gcc | 8701 | 8701 | 8701 |
-| Xtensa LX7 (ESP32-S3) | 32 | xtensa-esp-elf-gcc | 3060 | 3060 | 3060 |
-| ARM Thumb | 32 | arm-none-eabi-gcc | 3074 | 3074 | 3074 |
-| Xtensa LX106 (ESP8266) | 32 | xtensa-lx106-elf-gcc | 3447 | 3447 | 3447 |
-| RISC-V (rv32) | 32 | riscv64-unknown-elf-gcc | 3654 | 3654 | 3654 |
-| m68k | 32 | m68k-linux-gnu-gcc | 4044 | 4044 | 4044 |
-| ARM32 | 32 | arm-none-eabi-gcc | 4638 | 4638 | 4638 |
-| x86-32 | 32 | GCC | 5628 | 5628 | 5628 |
-| MIPS32 | 32 | mipsel-linux-gnu-gcc | 6056 | 6056 | 6056 |
-| PowerPC | 32 | powerpc-linux-gnu-gcc | 6842 | 6842 | 6842 |
-| RISC-V (rv64) | 64 | riscv64-linux-gnu-gcc | 4136 | 4136 | 4136 |
-| x86-64 | 64 | GCC | 5935 | 5935 | 5935 |
-| AArch64 (ARM64) | 64 | aarch64-linux-gnu-gcc | 6282 | 6282 | 6282 |
-| x86-64 | 64 | Clang | 6495 | 6495 | 6495 |
-| MIPS64 | 64 | mips64el-linux-gnuabi64-gcc | 6904 | 6904 | 6904 |
+| AVR (ATtiny85) | 8 | avr-gcc | 990 | 4302 | 5697 |
+| AVR (ATmega328P) | 8 | avr-gcc | 998 | 4402 | 5811 |
+| Z80 | 8 | SDCC | 1969 | 7378 | 9354 |
+| 6800 (HC08) | 8 | SDCC | 2095 | 8648 | 11170 |
+| MSP430 | 16 | msp430-gcc | 782 | 3532 | 4726 |
+| 68HC11 | 16 | m68hc11-gcc | 2169 | 6918 | 9902 |
+| ARM Thumb | 32 | arm-none-eabi-gcc | 600 | 2630 | 3463 |
+| Xtensa LX7 (ESP32-S3) | 32 | xtensa-esp-elf-gcc | 620 | 2652 | 3553 |
+| m68k | 32 | m68k-linux-gnu-gcc | 746 | 3372 | 4543 |
+| RISC-V (rv32) | 32 | riscv64-unknown-elf-gcc | 746 | 3140 | 4182 |
+| Xtensa LX106 (ESP8266) | 32 | xtensa-lx106-elf-gcc | 747 | 3003 | 3968 |
+| ARM32 | 32 | arm-none-eabi-gcc | 1008 | 4006 | 5327 |
+| x86-32 | 32 | GCC | 1099 | 4985 | 6349 |
+| MIPS32 | 32 | mipsel-linux-gnu-gcc | 1312 | 5288 | 6832 |
+| PowerPC | 32 | powerpc-linux-gnu-gcc | 1536 | 6146 | 7799 |
+| RISC-V (rv64) | 64 | riscv64-linux-gnu-gcc | 780 | 3594 | 4684 |
+| x86-64 | 64 | Clang | 1069 | 5355 | 7212 |
+| x86-64 | 64 | GCC | 1084 | 5183 | 6544 |
+| AArch64 (ARM64) | 64 | aarch64-linux-gnu-gcc | 1336 | 5626 | 6987 |
+| MIPS64 | 64 | mips64el-linux-gnuabi64-gcc | 1376 | 5928 | 7744 |
 <!-- Build Size Table -->
 
 x86-64 GCC row is measured directly; others from cross-compilation via
@@ -309,7 +310,7 @@ Docker cross-compilation (`tools/Dockerfile.crossbuild`):
 | MSP430 | msp430-gcc | 16-bit |
 | m68k (68000) | m68k-linux-gnu-gcc | 32-bit |
 | AVR (ATmega, ATtiny) | avr-gcc | 8-bit |
-| 8051 | SDCC | 8-bit |
+| 8051 | SDCC | 8-bit (compiles, not in size table) |
 | 68HC11/12 | m68hc11-gcc | 16-bit |
 | PowerPC | powerpc-linux-gnu-gcc | 32-bit |
 

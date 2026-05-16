@@ -488,19 +488,34 @@ void loop() { cli.poll(Serial); }
   <li>Return <code>XELP_S_OK</code> (0) for success, negative for error</li>
 </ul>
 
-<h3>Pattern: parsing arguments</h3>
+<h3>Pattern: argc/argv with XELP_PARSE_ARGV (recommended)</h3>
+
+<p>Enable <code>XELP_ENABLE_ARGV</code> in <code>xelpcfg.h</code>. The
+<code>XELP_PARSE_ARGV</code> macro declares <code>argc</code>/<code>argv</code>,
+tokenizes the line, strips quotes, expands escape sequences, and
+null-terminates each token:</p>
+
+<pre><code>XELPRESULT cmd_set(XELP *ths, const char *args, int len) {
+    XELP_PARSE_ARGV(ths, args, len);
+    /* argv[0]="set", argv[1]=key, argv[2]=value (null-terminated) */
+    int val;
+    if (XelpArgvInt(argv, argc, 2, &amp;val) != XELP_S_OK)
+        return XELP_E_ERR;
+    /* ... use argv[1] as key string, val as integer ... */
+    return XELP_S_OK;
+}
+</code></pre>
+
+<h3>Pattern: tokenizer (minimal code size)</h3>
+
+<p>When code size is critical and you don&rsquo;t need null-terminated
+tokens, use the tokenizer directly. Tokens are pointer spans
+(<code>tok.s</code>..<code>tok.p</code>):</p>
 
 <pre><code>XELPRESULT cmd_set(XELP *ths, const char *args, int len) {
     XelpBuf b, tok;
-    int n;
 
-    XELP_XB_INIT(b, args, len);
-    XelpNumToks(&amp;b, &amp;n);
-
-    if (n &lt; 3) {
-        XelpOut(ths, "usage: set &lt;key&gt; &lt;value&gt;\n", 0);
-        return XELP_E_ERR;
-    }
+    XELP_XB_INIT(b, (char*)args, len);
 
     /* Token 0 = "set", Token 1 = key, Token 2 = value */
     XELP_XB_TOP(b);

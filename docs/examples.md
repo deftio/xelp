@@ -328,9 +328,29 @@ XELPRESULT my_command(XELP *ths, const char *args, int maxlen);
 - `maxlen` is the number of valid bytes in `args`
 - Return `XELP_S_OK` (0) for success, negative for error, positive for warning
 
-### Pattern: parsing arguments with XelpArgs (preferred)
+### Pattern: argc/argv with XELP_PARSE_ARGV (recommended)
 
-`XelpArgs` iterates tokens left-to-right in O(1) per token:
+Enable `XELP_ENABLE_ARGV` in `xelpcfg.h`. The `XELP_PARSE_ARGV` macro
+declares `argc`/`argv`, tokenizes the command line, strips quotes,
+expands escape sequences, and null-terminates each token:
+
+```c
+XELPRESULT cmd_set(XELP *ths, const char *args, int len) {
+    XELP_PARSE_ARGV(ths, args, len);
+    /* argv[0]="set", argv[1]=key, argv[2]=value (null-terminated) */
+    int val;
+    if (XelpArgvInt(argv, argc, 2, &val) != XELP_S_OK)
+        return XELP_E_ERR;
+    /* ... use argv[1] as key string, val as integer ... */
+    return XELP_S_OK;
+}
+```
+
+### Pattern: sequential iterator with XelpArgs (minimal code size)
+
+`XelpArgs` iterates tokens left-to-right in O(1) per token. Tokens are
+pointer spans (not null-terminated), so use `tok.s`..`tok.p` for length.
+No extra scratch buffer -- good when code size is critical:
 
 ```c
 XELPRESULT cmd_set(XELP *ths, const char *args, int len) {

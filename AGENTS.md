@@ -12,7 +12,7 @@ For the llmstxt.org-format project index, see [llms.txt](llms.txt).
 A command line interpreter, script engine, and single-key menu system
 for embedded systems. Pure C, zero dynamic memory, no OS, no stdlib.
 Three files: `xelp.c`, `xelp.h`, `xelpcfg.h`. Compiles on 8-bit
-through 64-bit targets with any C89+ compiler. Version 0.3.2.
+through 64-bit targets with any C89+ compiler. Version 0.3.3.
 
 ## Critical constraints
 
@@ -90,7 +90,7 @@ compiled in, its switch key is silently ignored.
 
 ---
 
-## Function signatures (v0.3.2+)
+## Function signatures (v0.3.3+)
 
 ### CLI command functions
 
@@ -261,6 +261,33 @@ XELPRESULT cmd_set(XELP *ths, const char *args, int len) {
 
 Arg 0 is the command name (per argc/argv convention).
 
+### XelpBuf2Argv -- opt-in argc/argv tokenizer
+
+Tokenizes args into a standard argc/argv array, using
+`ths->mCmdMsgBuf` as scratch (zero extra RAM). Strips quotes,
+processes escape sequences, null-terminates each token.
+
+```c
+XELPRESULT cmd_set(XELP *ths, const char *args, int len) {
+    char *argv[XELP_ARGV_MAX];
+    int argc;
+    if (XelpBuf2Argv(ths, args, len, &argc, argv, XELP_ARGV_MAX) != XELP_S_OK)
+        return XELP_E_ERR;
+    /* argv[0] = "set", argv[1] = key, argv[2] = value, etc. */
+    return XELP_S_OK;
+}
+```
+
+| Function | Purpose |
+|----------|---------|
+| `XelpBuf2Argv(ths, args, len, &argc, argv, maxargs)` | Tokenize into argc/argv (uses mCmdMsgBuf as scratch) |
+| `XelpArgvInt(argv, argc, n, &val)` | Get argv[n] as int |
+| `XelpArgvStr(argv, argc, n, &s, &slen)` | Get argv[n] as string pointer + length |
+
+`XELP_ARGV_MAX` (default 8) is a convenience constant for sizing the
+argv array. Tokens are null-terminated (unlike XelpArgs/XelpTokN).
+Returns `XELP_E_ERR` if input exceeds `XELP_CMDBUFSZ` or too many args.
+
 ### Random-access alternative (XelpTokN)
 
 For random-access by index, use `XelpTokN`. Note the `(char*)` cast
@@ -360,7 +387,7 @@ XELP_SET_FN_CLI(cli_ble,    commands);
 
 ---
 
-## Registers (v0.3.2+)
+## Registers (v0.3.3+)
 
 Each XELP instance has 4 return registers (`mR[0..3]`), accessed via
 macros. Convention: **callee-clobbers-all** -- any command call may
@@ -425,13 +452,19 @@ Edit `src/xelpcfg.h` to enable/disable features:
 | `XELP_ENABLE_KEY` | Single keypress mode | ~200-500 bytes |
 | `XELP_ENABLE_THR` | Pass-through mode | ~50-125 bytes |
 | `XELP_ENABLE_HELP` | Built-in help command | ~180-350 bytes |
+| `XELP_ENABLE_ARGV` | Structured argc/argv parsing (XelpBuf2Argv) | ~530-700 bytes + XELP_CMDBUFSZ RAM |
 | `XELP_ENABLE_FULL` | All of the above (except history) | All combined |
 
 ### Buffer and register sizes
 
+All of these are defined in `xelpcfg.h` and are overridable via compiler
+flag (`-DXELP_CMDBUFSZ=128`) or `xelp_ovr.h`.
+
 | Setting | Default | Purpose |
 |---------|---------|---------|
-| `XELP_CMDBUFSZ` | 64 | CLI input buffer size (bytes) |
+| `XELP_CMDBUFSZ` | 64 | CLI input buffer size (bytes). In `xelpcfg.h`, `#ifndef`-guarded. |
+| `XELP_ARGV_MAX` | 8 | Default max arguments for `XelpBuf2Argv`. In `xelpcfg.h`, `#ifndef`-guarded. |
+| `XELP_ARGVBUFSZ` | `XELP_CMDBUFSZ` | Scratch buffer size for XelpBuf2Argv (bytes per instance). Override for variable expansion. |
 | `XELP_REGS_SZ` | 4 | Return registers per instance (minimum 4) |
 | `XELPREG` | `int` | Register element type |
 | `XELP_HIST_DEPTH` | 4 | History ring buffer depth |
@@ -450,6 +483,7 @@ Edit `src/xelpcfg.h` to enable/disable features:
 |---------|---------|---------|
 | `XELP_CLI_ESC` | `` ` `` (backtick) | Escape next char in CLI/scripts |
 | `XELP_QUO_ESC` | `\` (backslash) | Escape next char inside quoted strings |
+| `XELP_ESC_MAP` | `"n\x0A" "t\x09" ""` | Packed key-value pairs for escape expansion in quoted strings (XelpBuf2Argv). Each 2-byte entry maps the char after `XELP_QUO_ESC` to a replacement byte. Terminated by `'\0'`. Unmapped escapes pass through as identity. Set to `""` to disable. |
 
 ### ENTER key detection
 
@@ -670,7 +704,7 @@ typedef struct XELP_tag {
 ## Version information
 
 ```c
-#define XELP_VERSION      (0x00000302UL)  /* 0x00MMmmpp */
+#define XELP_VERSION      (0x00000303UL)  /* 0x00MMmmpp */
 #define XELP_VER_MAJOR(v) (((v) >> 16) & 0xFF)
 #define XELP_VER_MINOR(v) (((v) >>  8) & 0xFF)
 #define XELP_VER_PATCH(v) ( (v)        & 0xFF)
@@ -730,7 +764,7 @@ Methods: `begin()`, `setCommands()`, `poll()`, `parse()`,
 xelp uses **JumpBug**, a minimal C89-compatible unit test framework with
 no external dependencies. Tests are in `tests/xelp_unit_tests.c`.
 
-**47 test units, 598 test cases, 100% line coverage of xelp.c.**
+**50 test units, 693 test cases, 100% line coverage of xelp.c.**
 
 ### Running tests
 
@@ -776,8 +810,9 @@ JumpBug_RunUnit(&jb, &test_my_feature, "my feature");
 Harnesses in `tests/fuzz/`:
 - `fuzz_parse.c` -- fuzzes `XelpParse` (script buffer)
 - `fuzz_parsekey.c` -- fuzzes `XelpParseKey` (byte-by-byte input)
+- `fuzz_buf2argv.c` -- fuzzes `XelpBuf2Argv` + `XelpArgvInt`/`XelpArgvStr`
 
-Seed corpus in `tests/fuzz/corpus_parse/`.
+Seed corpora in `tests/fuzz/corpus_parse/`, `tests/fuzz/corpus_buf2argv/`.
 
 ---
 
@@ -885,6 +920,7 @@ xelp/
 | `posix-simple/` | Linux/macOS | Full interactive CLI with ncurses |
 | `posix-simple-cpp/` | Linux/macOS | Same as above with C++ wrapper |
 | `scripting/` | Linux/macOS | Script execution vs interactive mode |
+| `posix-argv/` | Linux/macOS | XelpBuf2Argv argc/argv vs XelpArgs comparison |
 | `arduino/` | Arduino | Raw C API with LED control |
 | `arduino-cpp/` | Arduino | C++ `XelpCLI` wrapper |
 | `arduino-live-cli/` | Arduino | Full hardware CLI: GPIO, ADC, PWM, tone, pulse, pin scan |
@@ -932,6 +968,9 @@ Full size tables for 20+ architectures in [README.md](README.md).
 | `XelpArgCount(&a, &n)` | Count tokens (non-destructive) |
 | `XelpArgInt(args, len, n, &val)` | Get arg N as int (one-shot) |
 | `XelpArgStr(args, len, n, &s, &slen)` | Get arg N as string span |
+| `XelpBuf2Argv(ths, args, len, &argc, argv, max)` | Tokenize into argc/argv (null-terminated tokens) |
+| `XelpArgvInt(argv, argc, n, &val)` | Get argv[n] as int |
+| `XelpArgvStr(argv, argc, n, &s, &slen)` | Get argv[n] as string + length |
 | `XelpStrLen(s)` | String length |
 | `XelpStrEq(buf, len, cmd)` | Compare buffer to string |
 | `XelpStrEq2(buf, end, cmd)` | Compare pointer-pair to string |

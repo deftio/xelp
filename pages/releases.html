@@ -29,6 +29,43 @@
 <p>See also: <a href="https://github.com/deftio/xelp/blob/master/CHANGELOG.md">CHANGELOG.md</a>
 on GitHub for the full changelog.</p>
 
+<h2>v0.3.3 (2026-05-12)</h2>
+<ul>
+  <li><strong>Structured argc/argv parsing</strong> (<code>XELP_ENABLE_ARGV</code>):
+      new <code>XelpBuf2Argv</code> function tokenizes a command line into a
+      null-terminated <code>argv[]</code> array with quote stripping, escape
+      processing, and configurable max arguments (<code>XELP_ARGV_MAX</code>,
+      default 8). ~530&ndash;700 bytes ARM Thumb.</li>
+  <li><code>XELP_PARSE_ARGV(ths, args, len)</code> convenience macro: declares
+      <code>argc</code>/<code>argv</code> and calls <code>XelpBuf2Argv</code>
+      in one line. Recommended for new command handlers.</li>
+  <li><code>XelpArgvInt</code> / <code>XelpArgvStr</code>: extract the Nth
+      argument as an integer or string from an argv array.</li>
+  <li><code>XELP_ARGVBUFSZ</code>: decouples argv scratch buffer size from
+      <code>XELP_CMDBUFSZ</code>. Defaults to <code>XELP_CMDBUFSZ</code>
+      (zero change for existing users); override for variable expansion.</li>
+  <li><code>XELP_ESC_MAP</code>: configurable escape expansion in
+      double-quoted arguments (<code>\n</code> &rarr; newline,
+      <code>\t</code> &rarr; tab). Set to <code>""</code> to disable.</li>
+  <li><code>XELP_ENTER_CR</code> / <code>XELP_ENTER_LF</code>: independently
+      enable <code>\r</code> and <code>\n</code> as ENTER in interactive
+      input.</li>
+  <li><code>xelpcfg.h</code> refactored to <code>#ifndef</code> guard pattern
+      with <code>xelp_ovr.h</code> override &mdash; selective override without
+      supplying every define.</li>
+  <li><code>const char **argv</code> signatures for const-correctness.</li>
+  <li>Fuzz harness for <code>XelpBuf2Argv</code>.</li>
+  <li><strong>ESP32 BLE CLI example</strong> (<code>examples/esp32-ble-cli/</code>):
+      dual-instance xelp on USB Serial + BLE (Nordic UART Service) with Web
+      Bluetooth terminal, cross-instance messaging, and NeoPixel RGB control.</li>
+  <li>Updated READMEs for arduino, arduino-cpp, esp32-wifi, pico-cli, and
+      pico-cli-arduino examples with arduino-cli commands.</li>
+  <li>Fixed <code>\r</code> stripping in Web Bluetooth terminals.</li>
+  <li>Fixed <code>dev/size_profiles.sh</code> reporting identical sizes for
+      all profiles.</li>
+  <li>Test suite expanded to 50 units, 693 test cases.</li>
+</ul>
+
 <h2>v0.3.2 (2026-04-26)</h2>
 <ul>
   <li><strong>Command history</strong> (<code>XELP_ENABLE_HISTORY</code>):

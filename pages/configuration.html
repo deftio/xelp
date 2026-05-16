@@ -88,6 +88,7 @@ Profiles &amp; Configuration Guide</a> for full details.</p>
 <tr><td><code>XELP_ENABLE_THR</code></td><td>Pass-through mode (redirect keys to another peripheral)</td><td>~50&ndash;125 bytes</td></tr>
 <tr><td><code>XELP_ENABLE_HELP</code></td><td>Built-in help function listing all commands</td><td>~180&ndash;350 bytes</td></tr>
 <tr><td><code>XELP_ENABLE_HISTORY</code></td><td>Command history (UP/DOWN arrow recall). Requires <code>XELP_ENABLE_CLI</code> + <code>XELP_ENABLE_LINE_EDIT</code>.</td><td>~420 bytes</td></tr>
+<tr><td><code>XELP_ENABLE_ARGV</code></td><td>Structured argc/argv parsing (<code>XelpBuf2Argv</code>, <code>XELP_PARSE_ARGV</code>). Adds a per-instance scratch buffer.</td><td>~530&ndash;700 bytes + <code>XELP_ARGVBUFSZ</code> RAM</td></tr>
 <tr><td><code>XELP_ENABLE_FULL</code></td><td>Enable all of the above</td><td>All combined</td></tr>
 </tbody>
 </table>
@@ -115,6 +116,7 @@ Profiles &amp; Configuration Guide</a> for full details.</p>
 <tbody>
 <tr><td><code>XELP_CLI_ESC</code></td><td><code>`</code> (backtick)</td><td>Escape character at command line / in scripts</td></tr>
 <tr><td><code>XELP_QUO_ESC</code></td><td><code>\</code> (backslash)</td><td>Escape character inside quoted strings</td></tr>
+<tr><td><code>XELP_ESC_MAP</code></td><td><code>"n\x0A" "t\x09" ""</code></td><td>Packed key-value pairs for escape expansion inside double-quoted arguments (<code>XelpBuf2Argv</code>). Each 2-byte entry maps the char after <code>XELP_QUO_ESC</code> to a replacement byte (e.g. <code>\n</code> &rarr; newline). Set to <code>""</code> to disable.</td></tr>
 </tbody>
 </table>
 
@@ -123,12 +125,27 @@ Profiles &amp; Configuration Guide</a> for full details.</p>
 <table>
 <thead><tr><th>Define</th><th>Default</th><th>Purpose</th></tr></thead>
 <tbody>
-<tr><td><code>XELP_CMDBUFSZ</code></td><td>64</td><td>Command line buffer size in bytes</td></tr>
+<tr><td><code>XELP_CMDBUFSZ</code></td><td>64</td><td>CLI input buffer size in bytes</td></tr>
+<tr><td><code>XELP_ARGVBUFSZ</code></td><td><code>XELP_CMDBUFSZ</code></td><td>Scratch buffer size for <code>XelpBuf2Argv</code> (bytes per instance, only when <code>XELP_ENABLE_ARGV</code>). Override for variable expansion.</td></tr>
+<tr><td><code>XELP_ARGV_MAX</code></td><td>8</td><td>Default max arguments for <code>XelpBuf2Argv</code> / <code>XELP_PARSE_ARGV</code>.</td></tr>
 <tr><td><code>XELP_HIST_DEPTH</code></td><td>4</td><td>Number of commands stored in history ring (requires <code>XELP_ENABLE_HISTORY</code>)</td></tr>
 <tr><td><code>XELP_REGS_SZ</code></td><td>4</td><td>Number of callee-clobbers-all return registers (minimum 4). R0 is command status, R1&ndash;R3 are command-specific.</td></tr>
 <tr><td><code>XELPREG</code></td><td><code>int</code></td><td>Register type (change for platforms where <code>int</code> is not ideal)</td></tr>
 </tbody>
 </table>
+
+<h2>ENTER key detection</h2>
+
+<table>
+<thead><tr><th>Define</th><th>Default</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr><td><code>XELP_ENTER_LF</code></td><td>1</td><td>Accept <code>\n</code> (0x0A) as ENTER</td></tr>
+<tr><td><code>XELP_ENTER_CR</code></td><td>1</td><td>Accept <code>\r</code> (0x0D) as ENTER</td></tr>
+</tbody>
+</table>
+
+<p>Both enabled by default for cross-platform use. Only affects interactive
+input (<code>XelpParseKey</code>); script parsing always uses <code>\n</code>.</p>
 
 <h2>Prompt</h2>
 
@@ -155,12 +172,21 @@ Profiles &amp; Configuration Guide</a> for full details.</p>
 
 <h2>Config override</h2>
 
-<p>If <code>XELP_CONFIG_OVERRIDE</code> is defined before including
-<code>xelpcfg.h</code>, the file includes <code>xelp_ovr.h</code> instead
-of using its built-in defaults. This allows project-specific configuration
-without modifying the library&rsquo;s <code>xelpcfg.h</code> directly.
-The 8.3 filename convention is used for compatibility with legacy
-filesystems.</p>
+<p>Define <code>XELP_CONFIG_OVERRIDE</code> in your compiler flags and create
+<code>xelp_ovr.h</code> in your include path. The file is included <em>after</em>
+the defaults in <code>xelpcfg.h</code>, so use <code>#undef</code> then
+<code>#define</code> to change values. Anything you don&rsquo;t touch keeps
+its default.</p>
+
+<pre><code>/* xelp_ovr.h example */
+#undef  XELP_CLI_PROMPT
+#define XELP_CLI_PROMPT   (ths-&gt;mpPrompt)
+
+#undef  XELP_ENABLE_THR    /* disable THR mode */
+
+#undef  XELP_CMDBUFSZ
+#define XELP_CMDBUFSZ  128 /* larger input buffer */
+</code></pre>
 
 <h2>Example configurations</h2>
 
