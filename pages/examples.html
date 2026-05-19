@@ -478,25 +478,22 @@ void loop() { cli.poll(Serial); }
 
 <p>All CLI commands have the same signature:</p>
 
-<pre><code>XELPRESULT my_command(XELP *ths, const char *args, int maxlen);
+<pre><code>XELPRESULT my_command(XELP *ths, int argc, const char **argv);
 </code></pre>
 
 <ul>
   <li><code>ths</code> &mdash; pointer to the XELP instance that dispatched the command</li>
-  <li><code>args</code> &mdash; raw argument string (everything after the command name)</li>
-  <li><code>maxlen</code> &mdash; number of valid bytes in <code>args</code></li>
+  <li><code>argc</code> &mdash; number of arguments (including command name in <code>argv[0]</code>)</li>
+  <li><code>argv</code> &mdash; null-terminated argument strings</li>
   <li>Return <code>XELP_S_OK</code> (0) for success, negative for error</li>
 </ul>
 
-<h3>Pattern: argc/argv with XELP_PARSE_ARGV (recommended)</h3>
+<h3>Pattern: argc/argv (default)</h3>
 
-<p>Enable <code>XELP_ENABLE_ARGV</code> in <code>xelpcfg.h</code>. The
-<code>XELP_PARSE_ARGV</code> macro declares <code>argc</code>/<code>argv</code>,
-tokenizes the line, strips quotes, expands escape sequences, and
-null-terminates each token:</p>
+<p>The dispatch engine tokenizes each command line before calling your handler.
+Use <code>XelpArgvInt</code> / <code>XelpArgvStr</code> for bounds-checked access:</p>
 
-<pre><code>XELPRESULT cmd_set(XELP *ths, const char *args, int len) {
-    XELP_PARSE_ARGV(ths, args, len);
+<pre><code>XELPRESULT cmd_set(XELP *ths, int argc, const char **argv) {
     /* argv[0]="set", argv[1]=key, argv[2]=value (null-terminated) */
     int val;
     if (XelpArgvInt(argv, argc, 2, &amp;val) != XELP_S_OK)
@@ -506,26 +503,17 @@ null-terminates each token:</p>
 }
 </code></pre>
 
-<h3>Pattern: tokenizer (minimal code size)</h3>
+<h3>Pattern: direct argv access</h3>
 
-<p>When code size is critical and you don&rsquo;t need null-terminated
-tokens, use the tokenizer directly. Tokens are pointer spans
-(<code>tok.s</code>..<code>tok.p</code>):</p>
+<p>For simple cases, use <code>argv[n]</code> directly (null-terminated strings):</p>
 
-<pre><code>XELPRESULT cmd_set(XELP *ths, const char *args, int len) {
-    XelpBuf b, tok;
-
-    XELP_XB_INIT(b, (char*)args, len);
-
-    /* Token 0 = "set", Token 1 = key, Token 2 = value */
-    XELP_XB_TOP(b);
-    XelpTokN(&amp;b, 1, &amp;tok);
-    /* tok.s .. tok.p is the key string */
-
-    XELP_XB_TOP(b);
-    XelpTokN(&amp;b, 2, &amp;tok);
-    int value = XelpStr2Int(tok.s, tok.p - tok.s);
-
+<pre><code>XELPRESULT cmd_echo(XELP *ths, int argc, const char **argv) {
+    int i;
+    for (i = 1; i &lt; argc; i++) {
+        if (i &gt; 1) XelpOut(ths, " ", 0);
+        XelpOut(ths, argv[i], 0);
+    }
+    XelpOut(ths, "\n", 0);
     return XELP_S_OK;
 }
 </code></pre>

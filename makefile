@@ -13,7 +13,7 @@ BUILD_DIR=build
 INCLUDES=\
     -I$(LIB_DIR)\
 
-.PHONY: help tests clean clean-all coverage version fuzz fuzz-parsekey fuzz-parse fuzz-buf2argv examples example validate prerelease funcsizes sizes lint
+.PHONY: help tests clean clean-all clean-fuzz coverage version fuzz fuzz-parsekey fuzz-parse fuzz-buf2argv examples example validate prerelease funcsizes sizes lint
 
 #=======================================================================
 # Default target: print available targets
@@ -31,7 +31,7 @@ help:
 	@echo "  make version      Extract and print library version"
 	@echo "  make fuzz         Run fuzz tests (requires clang + libFuzzer)"
 	@echo "  make lint         Run cppcheck static analysis on src + examples"
-	@echo "  make clean        Remove test build artifacts"
+	@echo "  make clean        Remove test build artifacts and fuzz corpus growth"
 	@echo "  make clean-all    Remove all build artifacts including examples"
 	@echo ""
 
@@ -155,30 +155,42 @@ prerelease: validate
 	@echo "=== Pre-release complete: tests passed, sizes updated ==="
 
 #=======================================================================
-# Fuzz testing (requires clang with libFuzzer + ASan + UBSan)
-# Override FUZZ_CC for your system, e.g.: make fuzz FUZZ_CC=clang
+# Fuzz testing (requires clang with libFuzzer). Default sanitizer is fuzzer-only so
+# `make fuzz` succeeds on hosts where fuzzer+ASan/UBSan misbehaves (e.g. some Xcode setups).
+# For stronger fuzzing on Linux/Homebrew LLVM, try:
+#   make fuzz FUZZ_SAN=fuzzer,address,undefined FUZZ_CC=/path/to/llvm/clang
 FUZZ_CC ?= /usr/local/opt/llvm/bin/clang
-FUZZ_FLAGS = -fsanitize=fuzzer,address,undefined -g -O1 -I$(LIB_DIR)
+FUZZ_SAN ?= fuzzer
+FUZZ_FLAGS = -fsanitize=$(FUZZ_SAN) -g -O1 -I$(LIB_DIR)
 FUZZ_DIR = tests/fuzz
 FUZZ_TIME ?= 60
+FUZZ_CORPUS_PARSE_SEEDS = $(FUZZ_DIR)/corpus_parse/seeds
+FUZZ_CORPUS_PARSE_GEN = $(FUZZ_DIR)/corpus_parse/generated
+FUZZ_CORPUS_PARSEKEY_SEEDS = $(FUZZ_DIR)/corpus_parsekey/seeds
+FUZZ_CORPUS_PARSEKEY_GEN = $(FUZZ_DIR)/corpus_parsekey/generated
+FUZZ_CORPUS_BUF2ARGV_SEEDS = $(FUZZ_DIR)/corpus_buf2argv/seeds
+FUZZ_CORPUS_BUF2ARGV_GEN = $(FUZZ_DIR)/corpus_buf2argv/generated
 
 fuzz-parsekey: | $(BUILD_DIR)
 	$(FUZZ_CC) $(FUZZ_FLAGS) $(LIB_DIR)/xelp.c $(FUZZ_DIR)/fuzz_parsekey.c \
 		-o $(BUILD_DIR)/fuzz_parsekey
-	@mkdir -p $(FUZZ_DIR)/corpus_parsekey
-	$(BUILD_DIR)/fuzz_parsekey $(FUZZ_DIR)/corpus_parsekey -max_total_time=$(FUZZ_TIME)
+	@mkdir -p $(FUZZ_CORPUS_PARSEKEY_SEEDS) $(FUZZ_CORPUS_PARSEKEY_GEN)
+	@cp -n $(FUZZ_CORPUS_PARSEKEY_SEEDS)/* $(FUZZ_CORPUS_PARSEKEY_GEN)/ 2>/dev/null || true
+	$(BUILD_DIR)/fuzz_parsekey $(FUZZ_CORPUS_PARSEKEY_GEN) -max_total_time=$(FUZZ_TIME)
 
 fuzz-parse: | $(BUILD_DIR)
 	$(FUZZ_CC) $(FUZZ_FLAGS) $(LIB_DIR)/xelp.c $(FUZZ_DIR)/fuzz_parse.c \
 		-o $(BUILD_DIR)/fuzz_parse
-	@mkdir -p $(FUZZ_DIR)/corpus_parse
-	$(BUILD_DIR)/fuzz_parse $(FUZZ_DIR)/corpus_parse -max_total_time=$(FUZZ_TIME)
+	@mkdir -p $(FUZZ_CORPUS_PARSE_SEEDS) $(FUZZ_CORPUS_PARSE_GEN)
+	@cp -n $(FUZZ_CORPUS_PARSE_SEEDS)/* $(FUZZ_CORPUS_PARSE_GEN)/ 2>/dev/null || true
+	$(BUILD_DIR)/fuzz_parse $(FUZZ_CORPUS_PARSE_GEN) -max_total_time=$(FUZZ_TIME)
 
 fuzz-buf2argv: | $(BUILD_DIR)
 	$(FUZZ_CC) $(FUZZ_FLAGS) $(LIB_DIR)/xelp.c $(FUZZ_DIR)/fuzz_buf2argv.c \
 		-o $(BUILD_DIR)/fuzz_buf2argv
-	@mkdir -p $(FUZZ_DIR)/corpus_buf2argv
-	$(BUILD_DIR)/fuzz_buf2argv $(FUZZ_DIR)/corpus_buf2argv -max_total_time=$(FUZZ_TIME)
+	@mkdir -p $(FUZZ_CORPUS_BUF2ARGV_SEEDS) $(FUZZ_CORPUS_BUF2ARGV_GEN)
+	@cp -n $(FUZZ_CORPUS_BUF2ARGV_SEEDS)/* $(FUZZ_CORPUS_BUF2ARGV_GEN)/ 2>/dev/null || true
+	$(BUILD_DIR)/fuzz_buf2argv $(FUZZ_CORPUS_BUF2ARGV_GEN) -max_total_time=$(FUZZ_TIME)
 
 fuzz: fuzz-parsekey fuzz-parse fuzz-buf2argv
 
@@ -193,8 +205,18 @@ sizes:
 	@bash dev/size_profiles.sh
 
 #=======================================================================
+# clean-fuzz -- remove libFuzzer-grown corpus files (keep seeds/)
+clean-fuzz:
+	-rm -rf $(FUZZ_CORPUS_PARSE_GEN) $(FUZZ_CORPUS_PARSEKEY_GEN) $(FUZZ_CORPUS_BUF2ARGV_GEN)
+	-find $(FUZZ_DIR)/corpus_parse $(FUZZ_DIR)/corpus_parsekey $(FUZZ_DIR)/corpus_buf2argv \
+		-maxdepth 1 -type f -exec rm -f {} +
+	@find $(FUZZ_DIR)/corpus_parse/seeds $(FUZZ_DIR)/corpus_parsekey/seeds \
+		$(FUZZ_DIR)/corpus_buf2argv/seeds -maxdepth 1 -type f 2>/dev/null | \
+		grep -E '/[0-9a-f]{40}$$' | xargs rm -f
+
+#=======================================================================
 # clean -- wipe all build artifacts (src/ stays clean)
-clean:
+clean: clean-fuzz
 	-rm -rf $(BUILD_DIR)
 	-rm -f *.gcov *.gcda *.gcno
 

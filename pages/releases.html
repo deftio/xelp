@@ -29,6 +29,29 @@
 <p>See also: <a href="https://github.com/deftio/xelp/blob/master/CHANGELOG.md">CHANGELOG.md</a>
 on GitHub for the full changelog.</p>
 
+<h2>v0.4.0 (2026-05-14)</h2>
+<ul>
+  <li><strong>Native argc/argv dispatch (breaking):</strong> CLI handlers are now
+      <code>XELPRESULT fn(XELP *ths, int argc, const char **argv)</code>.
+      The engine tokenizes each command line before calling the handler.</li>
+  <li><code>mpfDefCLI</code> default handler signature updated to match.</li>
+  <li>Argv tokenization is always enabled with <code>XELP_ENABLE_CLI</code>
+      (removed <code>XELP_ENABLE_ARGV</code> compile flag).</li>
+  <li>Removed public APIs: <code>XelpArgs</code> iterator,
+      <code>XelpArgInt</code>/<code>XelpArgStr</code>,
+      <code>XelpTokN</code>/<code>XelpNumToks</code>,
+      <code>XELP_PARSE_ARGV</code> macro.
+      <code>XelpBuf2Argv</code> is internal (<code>_xelpBuf2Argv</code>).</li>
+  <li>Kept: <code>XelpArgvInt</code>, <code>XelpArgvStr</code>,
+      <code>XelpTokLineXB</code> (line/token PSM).</li>
+  <li>Tokenization failure no longer dispatches handlers with broken argv;
+      <code>mR[0]</code> set to <code>XELP_E_ERR</code>.</li>
+  <li>Fuzz harnesses updated for v0.4.0 handler signatures.</li>
+  <li>Test suite: 45 units, 597 test cases, 100% line coverage of <code>xelp.c</code>.</li>
+  <li>See <a href="https://github.com/deftio/xelp/blob/master/CHANGELOG.md#040---2026-05-14">CHANGELOG</a>
+      for migration steps from 0.3.x.</li>
+</ul>
+
 <h2>v0.3.3 (2026-05-12)</h2>
 <ul>
   <li><strong>Structured argc/argv parsing</strong> (<code>XELP_ENABLE_ARGV</code>):

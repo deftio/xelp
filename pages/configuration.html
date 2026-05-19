@@ -88,8 +88,7 @@ Profiles &amp; Configuration Guide</a> for full details.</p>
 <tr><td><code>XELP_ENABLE_THR</code></td><td>Pass-through mode (redirect keys to another peripheral)</td><td>~50&ndash;125 bytes</td></tr>
 <tr><td><code>XELP_ENABLE_HELP</code></td><td>Built-in help function listing all commands</td><td>~180&ndash;350 bytes</td></tr>
 <tr><td><code>XELP_ENABLE_HISTORY</code></td><td>Command history (UP/DOWN arrow recall). Requires <code>XELP_ENABLE_CLI</code> + <code>XELP_ENABLE_LINE_EDIT</code>.</td><td>~420 bytes</td></tr>
-<tr><td><code>XELP_ENABLE_ARGV</code></td><td>Structured argc/argv parsing (<code>XelpBuf2Argv</code>, <code>XELP_PARSE_ARGV</code>). Adds a per-instance scratch buffer.</td><td>~530&ndash;700 bytes + <code>XELP_ARGVBUFSZ</code> RAM</td></tr>
-<tr><td><code>XELP_ENABLE_FULL</code></td><td>Enable all of the above</td><td>All combined</td></tr>
+<tr><td><code>XELP_ENABLE_FULL</code></td><td>Enables KEY, CLI, THR, HELP (not LINE_EDIT or HISTORY)</td><td>All combined</td></tr>
 </tbody>
 </table>
 
@@ -116,7 +115,7 @@ Profiles &amp; Configuration Guide</a> for full details.</p>
 <tbody>
 <tr><td><code>XELP_CLI_ESC</code></td><td><code>`</code> (backtick)</td><td>Escape character at command line / in scripts</td></tr>
 <tr><td><code>XELP_QUO_ESC</code></td><td><code>\</code> (backslash)</td><td>Escape character inside quoted strings</td></tr>
-<tr><td><code>XELP_ESC_MAP</code></td><td><code>"n\x0A" "t\x09" ""</code></td><td>Packed key-value pairs for escape expansion inside double-quoted arguments (<code>XelpBuf2Argv</code>). Each 2-byte entry maps the char after <code>XELP_QUO_ESC</code> to a replacement byte (e.g. <code>\n</code> &rarr; newline). Set to <code>""</code> to disable.</td></tr>
+<tr><td><code>XELP_ESC_MAP</code></td><td><code>"n\x0A" "t\x09" ""</code></td><td>Packed key-value pairs for escape expansion inside double-quoted arguments during CLI dispatch tokenization. Each 2-byte entry maps the char after <code>XELP_QUO_ESC</code> to a replacement byte (e.g. <code>\n</code> &rarr; newline). Set to <code>""</code> to disable.</td></tr>
 </tbody>
 </table>
 
@@ -126,8 +125,8 @@ Profiles &amp; Configuration Guide</a> for full details.</p>
 <thead><tr><th>Define</th><th>Default</th><th>Purpose</th></tr></thead>
 <tbody>
 <tr><td><code>XELP_CMDBUFSZ</code></td><td>64</td><td>CLI input buffer size in bytes</td></tr>
-<tr><td><code>XELP_ARGVBUFSZ</code></td><td><code>XELP_CMDBUFSZ</code></td><td>Scratch buffer size for <code>XelpBuf2Argv</code> (bytes per instance, only when <code>XELP_ENABLE_ARGV</code>). Override for variable expansion.</td></tr>
-<tr><td><code>XELP_ARGV_MAX</code></td><td>8</td><td>Default max arguments for <code>XelpBuf2Argv</code> / <code>XELP_PARSE_ARGV</code>.</td></tr>
+<tr><td><code>XELP_ARGVBUFSZ</code></td><td><code>XELP_CMDBUFSZ</code></td><td>Scratch buffer for CLI dispatch argv tokenization (bytes per instance, requires <code>XELP_ENABLE_CLI</code>)</td></tr>
+<tr><td><code>XELP_ARGV_MAX</code></td><td>8</td><td>Maximum number of arguments for CLI dispatch tokenization</td></tr>
 <tr><td><code>XELP_HIST_DEPTH</code></td><td>4</td><td>Number of commands stored in history ring (requires <code>XELP_ENABLE_HISTORY</code>)</td></tr>
 <tr><td><code>XELP_REGS_SZ</code></td><td>4</td><td>Number of callee-clobbers-all return registers (minimum 4). R0 is command status, R1&ndash;R3 are command-specific.</td></tr>
 <tr><td><code>XELPREG</code></td><td><code>int</code></td><td>Register type (change for platforms where <code>int</code> is not ideal)</td></tr>

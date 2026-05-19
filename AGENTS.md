@@ -391,7 +391,7 @@ Edit `src/xelpcfg.h` to enable/disable features:
 | `XELP_ENABLE_KEY` | Single keypress mode | ~200-500 bytes |
 | `XELP_ENABLE_THR` | Pass-through mode | ~50-125 bytes |
 | `XELP_ENABLE_HELP` | Built-in help command | ~180-350 bytes |
-| `XELP_ENABLE_FULL` | All of the above (except history) | All combined |
+| `XELP_ENABLE_FULL` | Enables KEY, CLI, THR, HELP (not LINE_EDIT or HISTORY) | All combined |
 
 ### Buffer and register sizes
 
@@ -703,7 +703,7 @@ Methods: `begin()`, `setCommands()`, `poll()`, `parse()`,
 xelp uses **JumpBug**, a minimal C89-compatible unit test framework with
 no external dependencies. Tests are in `tests/xelp_unit_tests.c`.
 
-**47 test units, 598 test cases, 100% line coverage of xelp.c.**
+**45 test units, 597 test cases, 100% line coverage of xelp.c.**
 
 ### Running tests
 
@@ -749,7 +749,8 @@ JumpBug_RunUnit(&jb, &test_my_feature, "my feature");
 Harnesses in `tests/fuzz/`:
 - `fuzz_parse.c` -- fuzzes `XelpParse` (script buffer)
 - `fuzz_parsekey.c` -- fuzzes `XelpParseKey` (byte-by-byte input)
-Seed corpora in `tests/fuzz/corpus_parse/`.
+Seed corpora in `tests/fuzz/corpus_*/seeds/` (libFuzzer growth goes to
+`corpus_*/generated/`, gitignored; `make clean` removes generated inputs).
 
 ---
 

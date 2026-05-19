@@ -14,7 +14,7 @@ compiled out saves code space.
 | `XELP_ENABLE_THR` | Pass-through mode (redirect keys to another peripheral) | ~50--125 bytes |
 | `XELP_ENABLE_HELP` | Built-in help function listing all commands | ~180--350 bytes |
 | `XELP_ENABLE_HISTORY` | Command history (UP/DOWN arrow recall). Requires `XELP_ENABLE_CLI` + `XELP_ENABLE_LINE_EDIT`. | ~420 bytes |
-| `XELP_ENABLE_FULL` | Enable all of the above | All combined |
+| `XELP_ENABLE_FULL` | Enables KEY, CLI, THR, HELP (not LINE_EDIT or HISTORY) | All combined |
 
 ## Key Mappings
 

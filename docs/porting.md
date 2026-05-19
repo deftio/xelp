@@ -140,7 +140,7 @@ void my_putc(char c) { /* ... */ }
 void my_bksp(void)   { /* ... */ }
 
 /* Commands */
-XELPRESULT cmd_hello(XELP *ths, const char *args, int len) {
+XELPRESULT cmd_hello(XELP *ths, int argc, const char **argv) {
     XelpOut(ths, "Hello!\n", 0);
     return XELP_S_OK;
 }

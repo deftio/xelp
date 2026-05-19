@@ -50,6 +50,23 @@ build/
 dist/
 tmp/
 
+# libFuzzer: grown corpus + crash artifacts (committed seeds: corpus_*/seeds/)
+tests/fuzz/corpus_*/generated/
+tests/fuzz/corpus_parse/*
+!tests/fuzz/corpus_parse/seeds/
+!tests/fuzz/corpus_parse/seeds/**
+tests/fuzz/corpus_parsekey/*
+!tests/fuzz/corpus_parsekey/seeds/
+!tests/fuzz/corpus_parsekey/seeds/**
+tests/fuzz/corpus_buf2argv/*
+!tests/fuzz/corpus_buf2argv/seeds/
+!tests/fuzz/corpus_buf2argv/seeds/**
+tests/fuzz/crash-*
+tests/fuzz/hang-*
+tests/fuzz/leak-*
+tests/fuzz/timeout-*
+tests/fuzz/oom-*
+
 # Test logs
 xelp-test-log.yaml
 

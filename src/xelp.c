@@ -741,12 +741,15 @@ XELPRESULT XelpParseXB (XELP* ths, XelpBuf *args) {
             }
             if (f->mpCmd || ths->mpfDefCLI) {
                 argc = 0;
-                _xelpBuf2Argv(ths, line.s, (int)(line.e-line.s),
-                              &argc, argv, XELP_ARGV_MAX);
-                if (f->mpCmd)
-                    ths->mR[0] = (f->mFunPtr)(ths, argc, argv);
-                else
-                    ths->mR[0] = ths->mpfDefCLI(ths, argc, argv);
+                if (XELP_S_OK == _xelpBuf2Argv(ths, line.s, (int)(line.e-line.s),
+                                               &argc, argv, XELP_ARGV_MAX)) {
+                    if (f->mpCmd)
+                        ths->mR[0] = (f->mFunPtr)(ths, argc, argv);
+                    else
+                        ths->mR[0] = ths->mpfDefCLI(ths, argc, argv);
+                } else {
+                    ths->mR[0] = XELP_E_ERR;
+                }
             }
         }
 	}

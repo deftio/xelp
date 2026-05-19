@@ -27,7 +27,7 @@
 <h1>API Reference</h1>
 
 <p>All public types, functions, and macros defined in <code>xelp.h</code>.
-Version 0.3.2.</p>
+Version 0.4.0.</p>
 
 <h2>Types</h2>
 
@@ -40,7 +40,7 @@ Version 0.3.2.</p>
 <tr><td><code>XELPKEYCODE</code></td><td>Key code type (<code>unsigned long</code>). Single-char keys are their natural value; multi-byte ANSI sequences are packed little-endian.</td></tr>
 <tr><td><code>XelpBuf</code></td><td>Buffer wrapper with start, position, and end pointers.</td></tr>
 <tr><td><code>XELPKeyFuncMapEntry</code></td><td>Single-key command entry: <code>XELPRESULT fn(XELP *ths, XELPKEYCODE key)</code>, key code, help string.</td></tr>
-<tr><td><code>XELPCLIFuncMapEntry</code></td><td>CLI command entry: <code>XELPRESULT fn(XELP *ths, const char *args, int len)</code>, command name, help string.</td></tr>
+<tr><td><code>XELPCLIFuncMapEntry</code></td><td>CLI command entry: <code>XELPRESULT fn(XELP *ths, int argc, const char **argv)</code>, command name, help string.</td></tr>
 </tbody>
 </table>
 
@@ -80,7 +80,9 @@ Version 0.3.2.</p>
 <tr><td><code>XELP_SET_FN_EMCHG(ths, fn)</code></td><td>Set mode-change callback: <code>void fn(int)</code></td></tr>
 <tr><td><code>XELP_SET_FN_CLI(ths, tbl)</code></td><td>Set CLI command table</td></tr>
 <tr><td><code>XELP_SET_FN_KEY(ths, tbl)</code></td><td>Set KEY command table</td></tr>
-<tr><td><code>XELP_SET_VAL_CLI_PROMPT(ths, str)</code></td><td>Set CLI prompt string</td></tr>
+<tr><td><code>XELP_SET_FN_DEF_CLI(ths, fn)</code></td><td>Set default CLI handler (called when no command matches)</td></tr>
+<tr><td><code>XELP_SET_FN_DEF_KEY(ths, fn)</code></td><td>Set default KEY handler (called when no key matches)</td></tr>
+<tr><td><code>XELP_SET_VAL_CLI_PROMPT(ths, str)</code></td><td>Set CLI prompt string (stored by pointer)</td></tr>
 <tr><td><code>XELP_SET_ABOUT(ths, str)</code></td><td>Change the about/help message</td></tr>
 </tbody>
 </table>
@@ -115,7 +117,13 @@ complete command or multi-statement script.</p>
 </code></pre>
 <p>Output a string through the instance&rsquo;s output function. If
 <code>maxlen &gt; 0</code>, prints at most that many characters. If
-<code>maxlen == 0</code>, prints until null terminator.</p>
+<code>maxlen &lt;= 0</code>, prints until null terminator.</p>
+
+<h3><code>XelpPutc</code></h3>
+<pre><code>XELPRESULT XelpPutc(XELP *ths, char c);
+</code></pre>
+<p>Output a single character through the instance&rsquo;s output function.
+Respects <code>mOutEnable</code>.</p>
 
 <h3><code>XelpHelp</code></h3>
 <pre><code>XELPRESULT XelpHelp(XELP *ths);
@@ -131,105 +139,35 @@ when <code>XELP_ENABLE_HELP</code> is defined.</p>
 <p>Get the next token or line from a buffer. <code>srchType</code> is
 <code>XELP_TOK_ONLY</code> (token) or <code>XELP_TOK_LINE</code> (full line).</p>
 
-<h3><code>XelpTokN</code></h3>
-<pre><code>XELPRESULT XelpTokN(XelpBuf *buf, int n, XelpBuf *tok);
-</code></pre>
-<p>Get the Nth token (0-indexed) from a buffer.</p>
+<h2>Argument helpers</h2>
 
-<h3><code>XelpNumToks</code></h3>
-<pre><code>XELPRESULT XelpNumToks(XelpBuf *buf, int *n);
-</code></pre>
-<p>Count the number of tokens in a buffer.</p>
-
-<h2>XelpArgs &mdash; Sequential Argument Iterator</h2>
-
-<p>A left-to-right token iterator for CLI command handlers. O(1) per token.</p>
-
-<h3><code>XelpArgsInit</code></h3>
-<pre><code>XELPRESULT XelpArgsInit(XelpArgs *a, const char *args, int len);
-</code></pre>
-<p>Initialize an argument iterator from the callback&rsquo;s <code>args</code> and <code>len</code>.</p>
-
-<h3><code>XelpNextTok</code></h3>
-<pre><code>XELPRESULT XelpNextTok(XelpArgs *a, XelpBuf *tok);
-</code></pre>
-<p>Get the next token. Pass <code>NULL</code> for <code>tok</code> to skip.</p>
-
-<h3><code>XelpNextInt</code></h3>
-<pre><code>XELPRESULT XelpNextInt(XelpArgs *a, int *val);
-</code></pre>
-<p>Get the next token and parse it as an integer (decimal or hex).</p>
-
-<h3><code>XelpArgCount</code></h3>
-<pre><code>XELPRESULT XelpArgCount(XelpArgs *a, int *n);
-</code></pre>
-<p>Count total tokens without consuming them.</p>
-
-<h2>XelpBuf2Argv &mdash; Structured argc/argv Parsing</h2>
-
-<p>Requires <code>XELP_ENABLE_ARGV</code>. Tokenizes a command line into a
-standard argc/argv array using <code>ths-&gt;mArgvBuf</code> as scratch.
-Strips quotes, processes escape sequences (via <code>XELP_ESC_MAP</code>),
-and null-terminates each token.</p>
-
-<h3><code>XelpBuf2Argv</code></h3>
-<pre><code>XELPRESULT XelpBuf2Argv(XELP *ths, const char *args, int len,
-                         int *argc, const char **argv, int maxargs);
-</code></pre>
-<p>Tokenize <code>args</code> into <code>argv[0]..argv[argc-1]</code>.
-<code>argv[0]</code> is the command name. Returns <code>XELP_E_ERR</code>
-if input exceeds <code>XELP_ARGVBUFSZ</code> or too many tokens.</p>
-
-<h3><code>XELP_PARSE_ARGV</code></h3>
-<pre><code>XELP_PARSE_ARGV(ths, args, len);
-</code></pre>
-<p>Convenience macro (C99+ / C++). Declares <code>const char *argv[XELP_ARGV_MAX]</code>
-and <code>int argc</code>, calls <code>XelpBuf2Argv</code>, and returns
-<code>XELP_E_ERR</code> on failure. Place at the top of a handler body.</p>
+<p>The CLI dispatch engine automatically tokenizes the command line into
+<code>argc</code>/<code>argv</code> before calling the handler. The following
+helpers provide convenient access to individual arguments.</p>
 
 <h3><code>XelpArgvInt</code></h3>
 <pre><code>XELPRESULT XelpArgvInt(const char **argv, int argc, int n, int *val);
 </code></pre>
-<p>Get <code>argv[n]</code> as an integer.</p>
+<p>Get <code>argv[n]</code> as an integer. Returns <code>XELP_E_ERR</code> if
+out of range or not a valid number.</p>
 
 <h3><code>XelpArgvStr</code></h3>
 <pre><code>XELPRESULT XelpArgvStr(const char **argv, int argc, int n,
                         const char **s, int *slen);
 </code></pre>
-<p>Get <code>argv[n]</code> as a string pointer and length.</p>
+<p>Get <code>argv[n]</code> as a string pointer and length. Returns
+<code>XELP_E_ERR</code> if out of range.</p>
 
 <h3>Example</h3>
-<pre><code>XELPRESULT cmd_set(XELP *ths, const char *args, int len) {
-    XELP_PARSE_ARGV(ths, args, len);
+<pre><code>XELPRESULT cmd_set(XELP *ths, int argc, const char **argv) {
     /* argv[0]="set", argv[1]=key, argv[2]=value */
     int val;
     if (XelpArgvInt(argv, argc, 2, &amp;val) != XELP_S_OK)
         return XELP_E_ERR;
+    /* ... use argv[1] and val ... */
     return XELP_S_OK;
 }
 </code></pre>
-
-<h2>Direct Argument Access</h2>
-
-<h3><code>XelpArgInt</code></h3>
-<pre><code>XELPRESULT XelpArgInt(const char *args, int len, int n, int *val);
-</code></pre>
-<p>Get argument <code>n</code> (0-indexed) as an integer in one call.
-Wraps <code>XelpTokN</code> + <code>XelpParseNum</code>.</p>
-
-<h3><code>XelpArgStr</code></h3>
-<pre><code>XELPRESULT XelpArgStr(const char *args, int len, int n,
-                      const char **s, int *slen);
-</code></pre>
-<p>Get argument <code>n</code> (0-indexed) as a string span. On success,
-<code>*s</code> points to the token and <code>*slen</code> is its length.
-Not null-terminated.</p>
-
-<h3><code>XelpPutc</code></h3>
-<pre><code>XELPRESULT XelpPutc(XELP *ths, char c);
-</code></pre>
-<p>Output a single character through the instance&rsquo;s output function.
-Respects <code>mOutEnable</code>.</p>
 
 <h2>String utilities</h2>
 
@@ -308,16 +246,16 @@ command handlers, use <code>ths-&gt;mR[1]</code> directly.</p>
 <table>
 <thead><tr><th>Constant</th><th>Value</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td><code>XELP_VERSION</code></td><td>0x00000302</td><td>Library version (32-bit hex: <code>0x00MMmmpp</code>)</td></tr>
+<tr><td><code>XELP_VERSION</code></td><td>0x00000400</td><td>Library version (32-bit hex: <code>0x00MMmmpp</code>)</td></tr>
 <tr><td><code>XELP_VER_MAJOR(v)</code></td><td></td><td>Extract major version byte</td></tr>
 <tr><td><code>XELP_VER_MINOR(v)</code></td><td></td><td>Extract minor version byte</td></tr>
 <tr><td><code>XELP_VER_PATCH(v)</code></td><td></td><td>Extract patch version byte</td></tr>
 <tr><td><code>XELP_CMDBUFSZ</code></td><td>64</td><td>CLI input buffer size</td></tr>
-<tr><td><code>XELP_ARGVBUFSZ</code></td><td><code>XELP_CMDBUFSZ</code></td><td>Scratch buffer size for <code>XelpBuf2Argv</code></td></tr>
-<tr><td><code>XELP_ARGV_MAX</code></td><td>8</td><td>Default max arguments for <code>XelpBuf2Argv</code> / <code>XELP_PARSE_ARGV</code></td></tr>
+<tr><td><code>XELP_ARGVBUFSZ</code></td><td><code>XELP_CMDBUFSZ</code></td><td>Scratch buffer for CLI dispatch argv tokenization (requires <code>XELP_ENABLE_CLI</code>)</td></tr>
+<tr><td><code>XELP_ARGV_MAX</code></td><td>8</td><td>Maximum arguments for CLI dispatch tokenization</td></tr>
 <tr><td><code>XELP_ENTER_LF</code></td><td>1</td><td>Accept <code>\n</code> as ENTER in interactive input</td></tr>
 <tr><td><code>XELP_ENTER_CR</code></td><td>1</td><td>Accept <code>\r</code> as ENTER in interactive input</td></tr>
-<tr><td><code>XELP_ESC_MAP</code></td><td><code>"n\x0A" "t\x09" ""</code></td><td>Escape expansion table for quoted strings in <code>XelpBuf2Argv</code></td></tr>
+<tr><td><code>XELP_ESC_MAP</code></td><td><code>"n\x0A" "t\x09" ""</code></td><td>Escape expansion table for quoted strings during CLI dispatch tokenization</td></tr>
 <tr><td><code>XELP_MODE_CLI</code></td><td>0x00</td><td>CLI mode identifier</td></tr>
 <tr><td><code>XELP_MODE_KEY</code></td><td>0x01</td><td>KEY mode identifier</td></tr>
 <tr><td><code>XELP_MODE_THR</code></td><td>0x02</td><td>THRU mode identifier</td></tr>

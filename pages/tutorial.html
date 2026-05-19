@@ -40,7 +40,8 @@ void my_putc(char c) { putchar(c); }
 void my_bksp(void)   { my_putc('\b'); my_putc(' '); my_putc('\b'); }
 
 /* Your first command */
-XELPRESULT cmd_hello(XELP *ths, const char *args, int len) {
+XELPRESULT cmd_hello(XELP *ths, int argc, const char **argv) {
+    (void)argc; (void)argv;
     XelpOut(ths, "Hello, world!\n", 0);
     return XELP_S_OK;
 }
@@ -76,30 +77,22 @@ int main(void) {
   <li><code>XELP_SET_FN_BKSP</code> tells xelp how to handle destructive backspace.</li>
   <li><code>XELP_SET_FN_CLI</code> registers your command table.</li>
   <li><code>XelpParseKey</code> feeds one character at a time. When ENTER is received,
-      xelp tokenizes the line and dispatches to the matching command.</li>
+      xelp tokenizes the line into argc/argv and dispatches to the matching command.</li>
 </ol>
 
 <h2>2. Commands with arguments</h2>
 
-<p>Command functions receive the raw argument string and its length. Use the
-tokenizer to extract individual arguments:</p>
+<p>Command handlers receive their arguments as standard C <code>argc</code>/<code>argv</code>.
+The dispatch engine tokenizes the command line automatically &mdash; quotes are
+stripped, escape sequences (<code>\n</code>, <code>\t</code>, <code>\\</code>) are processed,
+and each token is null-terminated.</p>
 
-<pre><code>XELPRESULT cmd_add(XELP *ths, const char *args, int len) {
-    XelpBuf b, tok;
-    int a, result;
-
-    XELP_XB_INIT(b, args, len);
-
-    /* Token 0 = command name ("add"), 1 = first arg, 2 = second arg */
-    XELP_XB_TOP(b);
-    XelpTokN(&amp;b, 1, &amp;tok);
-    a = XelpStr2Int(tok.s, tok.p - tok.s);
-
-    XELP_XB_TOP(b);
-    XelpTokN(&amp;b, 2, &amp;tok);
-    result = a + XelpStr2Int(tok.s, tok.p - tok.s);
-
-    /* result now holds the sum */
+<pre><code>XELPRESULT cmd_add(XELP *ths, int argc, const char **argv) {
+    /* argv[0]="add", argv[1]=first arg, argv[2]=second arg */
+    int x, y;
+    if (XelpArgvInt(argv, argc, 1, &amp;x) != XELP_S_OK) return XELP_E_ERR;
+    if (XelpArgvInt(argv, argc, 2, &amp;y) != XELP_S_OK) return XELP_E_ERR;
+    /* ... x + y ... */
     return XELP_S_OK;
 }
 </code></pre>
@@ -120,49 +113,39 @@ tokenizer to extract individual arguments:</p>
 </tbody>
 </table>
 
-<h3>argc/argv style (alternative)</h3>
+<h3>argc/argv helper functions</h3>
 
-<p>If you prefer standard C argc/argv conventions, enable
-<code>XELP_ENABLE_ARGV</code> in <code>xelpcfg.h</code> and use
-<code>XELP_PARSE_ARGV</code>. This tokenizes the command line, strips
-quotes, processes escape sequences (<code>\n</code>, <code>\t</code>),
-and null-terminates each token:</p>
+<p><code>XelpArgvInt</code> and <code>XelpArgvStr</code> provide bounds-checked access:</p>
 
-<pre><code>XELPRESULT cmd_add(XELP *ths, const char *args, int len) {
-    XELP_PARSE_ARGV(ths, args, len);
-    /* argv[0]="add", argv[1]=first arg, argv[2]=second arg */
-    int x, y;
-    if (XelpArgvInt(argv, argc, 1, &amp;x) != XELP_S_OK) return XELP_E_ERR;
-    if (XelpArgvInt(argv, argc, 2, &amp;y) != XELP_S_OK) return XELP_E_ERR;
-    /* ... x + y ... */
+<pre><code>XELPRESULT cmd_greet(XELP *ths, int argc, const char **argv) {
+    const char *name;
+    int namelen;
+
+    if (XelpArgvStr(argv, argc, 1, &amp;name, &amp;namelen) != XELP_S_OK) {
+        XelpOut(ths, "usage: greet &lt;name&gt;\n", 0);
+        return XELP_E_ERR;
+    }
+    XelpOut(ths, "Hello, ", 0);
+    XelpOut(ths, name, namelen);
+    XelpOut(ths, "!\n", 0);
     return XELP_S_OK;
 }
 </code></pre>
 
-<p><code>XELP_PARSE_ARGV</code> declares <code>argc</code> and
-<code>argv</code> for you and returns <code>XELP_E_ERR</code> if
-tokenization fails. Tokens are null-terminated (unlike
-<code>XelpTokN</code> which returns pointer spans). For new code this is
-the recommended approach when you need multiple arguments.</p>
+<h2>3. Iterating and inspecting arguments</h2>
 
-<h2>3. Counting and iterating tokens</h2>
-
-<pre><code>XELPRESULT cmd_args(XELP *ths, const char *args, int len) {
-    XelpBuf b, tok;
-    int n, i;
-
-    XELP_XB_INIT(b, args, len);
-    XelpNumToks(&amp;b, &amp;n);
-
-    for (i = 0; i &lt; n; i++) {
-        XELP_XB_TOP(b);
-        XelpTokN(&amp;b, i, &amp;tok);
-        XelpOut(ths, tok.s, tok.p - tok.s);
+<pre><code>XELPRESULT cmd_args(XELP *ths, int argc, const char **argv) {
+    int i;
+    for (i = 0; i &lt; argc; i++) {
+        XelpOut(ths, argv[i], 0);
         XelpOut(ths, "\n", 0);
     }
     return XELP_S_OK;
 }
 </code></pre>
+
+<p><code>argc</code> includes the command name (<code>argv[0]</code>); user arguments
+start at <code>argv[1]</code>.</p>
 
 <h2>4. KEY mode &mdash; single keypress actions</h2>
 

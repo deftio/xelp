@@ -10,12 +10,13 @@
           src/xelp.c tests/fuzz/fuzz_parse.c -o build/fuzz_parse
 
   Run:
-    ./build/fuzz_parse tests/fuzz/corpus_parse -max_total_time=60
+    mkdir -p tests/fuzz/corpus_parse/generated
+    cp -n tests/fuzz/corpus_parse/seeds/* tests/fuzz/corpus_parse/generated/
+    ./build/fuzz_parse tests/fuzz/corpus_parse/generated -max_total_time=60
 */
 
 #include <stdint.h>
 #include <stddef.h>
-#include <string.h>
 #include "xelp.h"
 
 /* --- Null-sink callbacks ------------------------------------------------- */
@@ -30,13 +31,21 @@ static XELPRESULT fuzz_def_key(XELP *ths, XELPKEYCODE k) {
     return XELP_S_OK;
 }
 
-static XELPRESULT fuzz_cli_fn(XELP *ths, const char *args, int max) {
-    (void)ths; (void)args; (void)max;
+static XELPRESULT fuzz_cli_fn(XELP *ths, int argc, const char **argv) {
+    const char *s;
+    int v, slen;
+    (void)ths;
+
+    XelpArgvInt(argv, argc, 0, &v);
+    if (argc > 1)
+        XelpArgvStr(argv, argc, 1, &s, &slen);
     return XELP_S_OK;
 }
 
-static XELPRESULT fuzz_def_cli(XELP *ths, const char *args, int max) {
-    (void)ths; (void)args; (void)max;
+static XELPRESULT fuzz_def_cli(XELP *ths, int argc, const char **argv) {
+    int v;
+    (void)ths;
+    XelpArgvInt(argv, argc, argc - 1, &v);
     return XELP_S_OK;
 }
 

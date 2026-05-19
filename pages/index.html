@@ -29,7 +29,7 @@
   <img src="../img/xelp-prompt-med.png" alt="xelp" class="logo">
   <p class="tagline">A command line interpreter and script engine for embedded systems.</p>
   <div class="badges">
-    <img src="https://img.shields.io/badge/version-0.3.3-blue.svg" alt="Version">
+    <img src="https://img.shields.io/badge/version-0.4.0-blue.svg" alt="Version">
     <a href="https://opensource.org/licenses/BSD-2-Clause"><img src="https://img.shields.io/badge/License-BSD%202--Clause-blue.svg" alt="License"></a>
     <a href="https://github.com/deftio/xelp/actions/workflows/ci.yml"><img src="https://github.com/deftio/xelp/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
     <img src="https://img.shields.io/badge/coverage-100%25-brightgreen.svg" alt="Coverage">
@@ -60,9 +60,9 @@ dependencies.</p>
   <li><strong>Command history</strong> &mdash; UP/DOWN arrow recall of previous commands
       (optional, <code>XELP_ENABLE_HISTORY</code>)</li>
   <li>Built-in tokenizer with quoted strings, escape sequences, <code>#</code> comments</li>
-  <li><strong>argc/argv parsing</strong> &mdash; <code>XELP_PARSE_ARGV</code> macro for standard
-      C-style argument handling with null-terminated tokens
-      (optional, <code>XELP_ENABLE_ARGV</code>)</li>
+  <li><strong>Native argc/argv dispatch</strong> &mdash; handlers receive
+      <code>(ths, argc, argv)</code> with null-terminated tokens; use
+      <code>XelpArgvInt</code> / <code>XelpArgvStr</code> helpers</li>
   <li>Scriptable &mdash; run multi-command const strings from ROM or RAM</li>
   <li>Zero dependencies (no stdio.h, string.h, etc.)</li>
 </ul>
@@ -139,7 +139,8 @@ entry:</p>
 
 void uart_putc(char c) { UART_TX = c; }
 
-XELPRESULT cmd_hello(XELP *ths, const char *args, int len) {
+XELPRESULT cmd_hello(XELP *ths, int argc, const char **argv) {
+    (void)argc; (void)argv;
     XelpOut(ths, "Hello!\n", 0);
     return XELP_S_OK;
 }
