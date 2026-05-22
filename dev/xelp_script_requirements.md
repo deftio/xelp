@@ -269,16 +269,188 @@ _set x (* (+ $foo 4) 3)
 _set x (+ 1 (* 2 3))
 ```
 
-### Return paths vs **`XelpOut`** **(R‑\*)**
+### Return model **(R‑\*)**
 
 Separates chatter on the UART from machine-readable compose semantics—critical once BLE hosts automation.
 
+#### Two-channel return contract
+
+Every function invocation (C handler or script proc) produces two results:
+
+1. **Status channel: `XELPRESULT`** — did the function succeed? The existing
+   C return value. `XELP_S_OK` (0) = success, positive = warning, negative =
+   error. `_if` checks this channel for command truthiness.
+
+2. **Value channel: one `XelpVal`** — what did the function produce? A single
+   tagged value (INT or STR). Pushed onto a bounded result stack. Defaults to
+   NIL if the handler doesn't set it.
+
+Status and value are orthogonal. A function can succeed and return a value,
+succeed and return NIL, or fail (value is undefined/ignored on failure).
+
+#### Script function returns
+
+Script procs return one value via `_return`:
+
+```text
+_proc double
+  _return (_mul @1 2)       # return INT
+
+_proc greet
+  _return "hello"           # return STR
+
+_proc do_stuff              # no _return = implicit NIL, still success
+  led 1
+  delay 100
+```
+
+`_return` sets the value channel and exits the proc with `XELP_S_OK`.
+Falling off the end of a proc = success with NIL.
+
+#### C handler returns for script consumption
+
+C handlers already return `XELPRESULT`. To make a value visible to script
+callers, the handler calls `XelpSetResultInt` or `XelpSetResultStr` — a new
+API that pushes onto the result stack:
+
+```c
+XELPRESULT cmd_read_adc(XELP *ths, int argc, const char **argv) {
+    int channel = 0;
+    if (argc > 1) XelpArgvInt(argv, argc, 1, &channel);
+    int val = adc_read(channel);
+    XelpSetResultInt(ths, val);     /* value channel for script */
+    return XELP_S_OK;              /* status channel */
+}
+```
+
+Script side:
+
+```text
+_set x (read_adc 0)                # captures value channel into $x
+_if (_gt $x 100) _then _next :hot
+```
+
+C handlers that don't call `XelpSetResult*` return NIL to script callers.
+Existing handlers work unchanged — they just return NIL values until updated
+with `XelpSetResult*` calls. Migration is gradual.
+
+#### Result stack
+
+The result stack is a fixed-size, compile-time bounded array
+(`XELP_RESULT_STACK_SZ`, e.g. 8–16 entries). Each entry holds one `XelpVal`
+(tagged INT or STR). Frame entry records the stack pointer; frame exit pops
+back. Overflow = hard error.
+
+The result stack is the universal mechanism for script value composition:
+
+```text
+_set x (_mr 2)                    # _mr pushes mR[2] onto result stack
+_set y (_add $x 10)               # _add pushes sum onto result stack
+_if (_gt $y 100) _then _next :big # _gt pushes comparison result
+```
+
+Every builtin is just a function — same return contract, same result stack,
+same composition rules. No special cases.
+
+#### `mR[]` mailbox: `_mr`
+
+`mR[]` (the four per-instance integer registers) remains unchanged as the
+direct C-to-C communication channel. It is not the script return path.
+
+Script accesses `mR[]` via the `_mr` builtin, which follows the standard
+two-channel contract like any other function:
+
+* **Read:** `_mr <index>` — status = OK if index valid, value = `mR[index]`
+  as INT on the result stack.
+* **Write:** `_mr <index> <value>` — sets `mR[index]`, status = OK, value =
+  the value written.
+
+```text
+# read mR[0] left by a C handler
+_set x (_mr 0)
+
+# set mR[] for a C handler that reads it
+_mr 0 $gain
+_mr 1 $direction
+motor_update                  # C handler reads mR[0], mR[1]
+```
+
+`_mr` is not special — it's a builtin function that happens to read/write
+the mailbox. Same result stack, same status channel, same composition:
+
+```text
+_set x (_mr 2)                    # capture into variable
+_if (_gt (_mr 0) 100) _then :hot  # nested in expression
+_return (_mr 0)                   # pass through as proc return
+```
+
+#### C calling script, script calling C
+
+**C calling script proc:**
+
+```c
+XELPRESULT cmd_run_cal(XELP *ths, int argc, const char **argv) {
+    XelpVal result;
+    XELPRESULT r = XelpCallProc(ths, "double", "21", &result);
+    if (r == XELP_S_OK && result.kind == XELP_VAL_INT)
+        ths->mR[0] = result.v.i;   /* stash in mR[] for C-side use */
+    return r;
+}
+```
+
+**Script calling C (value-producing):**
+
+```text
+_set x (read_adc 0)       # C handler called XelpSetResultInt
+```
+
+**Script calling C (side-effect only):**
+
+```text
+led 1                      # C handler returns XELP_S_OK, no value
+```
+
+**Script ↔ C via mailbox (legacy interop):**
+
+```text
+_mr 0 $gain                # script → mR[0] → C reads ths->mR[0]
+motor_update
+_set x (_mr 0)             # C wrote ths->mR[0] → script reads it
+```
+
+#### Relationship between `mR[]` and result stack
+
+`mR[]` and the result stack are independent. A C handler can set both —
+`mR[]` for C callers, `XelpSetResult*` for script callers. Or just one.
+They don't interfere.
+
+* **`mR[]`** — per-instance, flat, no nesting, no types. Cheap. Best for
+  C-to-C or low-level script↔C integer passing.
+* **Result stack** — per-frame, typed, composable. Supports `( )` nesting.
+  The script-native return path.
+
+#### Identity principle
+
+xelp script is not a language with C bindings. C functions *are* the
+commands. The dispatch table is function pointers. `mR[]` is the same four
+ints whether read from C or from script via `_mr`. The XELP struct is shared
+state — C writes a field, script reads it on the next line. No marshaling,
+no serialization, no foreign function interface.
+
+`_mr` embodies this: it's not "script accessing C memory through a bridge."
+It's script reading the same struct field that C reads.
+
 | ID | Requirement |
 | --- | --- |
-| R-01 | Every C handler invoked via script pathways MUST expose deterministic success/warn/error lineage comparable in spirit to XELPRESULT/mR[0]—exact ABI left to implementation docs. |
-| R-02 | ( … ) MUST deliver exactly one sanctioned typed return or deterministic ERR/NIL—not garbage across nested evaluations. |
-| R-03 | XelpOut MUST NOT silently become the scripted return channel unless a documenting command declares that contract. |
-| R-04 | MAY keep narrow mailbox registers alongside typed cells if semantics stay reconciled for script callers. |
+| R-01 | Every function invocation (C handler or script proc) MUST produce a status (`XELPRESULT`) and at most one typed value (`XelpVal`). Status and value are orthogonal channels. |
+| R-02 | `( … )` MUST deliver exactly one `XelpVal` from the value channel or deterministic NIL — not garbage across nested evaluations. |
+| R-03 | `XelpOut` MUST NOT silently become the scripted return channel unless a documenting command declares that contract. |
+| R-04 | `mR[]` registers MUST remain available as the direct C-to-C communication channel. They are independent of the result stack. |
+| R-05 | Script procs MUST return one value via `_return`. No `_return` = implicit NIL with `XELP_S_OK`. |
+| R-06 | C handlers SHOULD call `XelpSetResultInt` / `XelpSetResultStr` to make values visible to script callers. Handlers that don't call `XelpSetResult*` MUST return NIL (not garbage). |
+| R-07 | The result stack MUST be fixed-size and compile-time bounded (`XELP_RESULT_STACK_SZ`). Overflow MUST be a hard error. Frame exit MUST pop results back to the frame entry point. |
+| R-08 | `_mr <index>` MUST be an ordinary builtin that follows the two-channel return contract. Read: pushes `mR[index]` onto result stack. Write: sets `mR[index]` and pushes the written value. Out-of-bounds index MUST error. |
+| R-09 | `_mr` is not special. It is a builtin function with the same return contract, result stack behavior, and composition rules as every other builtin. |
 
 ### Truthiness, predicates, and regression tests **(TH‑\*, TR‑\*)**
 
@@ -348,9 +520,259 @@ First ship focuses on Turing-light procedural charts without looping sugar.
 
 | ID | Requirement |
 | --- | --- |
-| F-01 | MUST ship set, if, goto, labeled lines scoped inside one artifact; duplicate labels must error cleanly. |
+| F-01 | MUST ship set, if, next, goto, labeled lines scoped inside one artifact. Duplicate label detection is a tooling/lint concern (see F-18), not an interpreter requirement. |
 | F-02 | Structured loops remain optional later—they MUST NOT gate MVP readiness (paired with Anti-goal A‑03). |
 | F-03 | Truth tables above plus mandated TR fixtures gate if; goto must not accidentally span unrelated blobs. |
+
+#### `_if` concrete syntax
+
+Grammar:
+
+```text
+_if <condition> _then <true-cmd> [_else <false-cmd>]
+```
+
+`_if`, `_then`, and `_else` are ordinary tokens to the existing PSM — no new
+parser states required. The `_if` handler receives the full argv, locates
+`_then` and `_else` token indices, slices, and dispatches each sub-command
+string via `XelpParse`.
+
+Examples:
+
+```text
+_if $x _then led 1                         # variable truthiness
+_if $x _then led 1 _else led 0             # with else clause
+_if check_sensor 3 _then log ok            # command truthiness (mR[0])
+_if $err _then :error_handler              # jump to label
+_if $mode _then motor $gain _else stop     # with variable expansion
+```
+
+Condition evaluation:
+
+* **Command as condition** — `_if` dispatches the condition tokens via
+  `XelpParse`. The condition is truthy when `ths->mR[0] == XELP_S_OK` (0)
+  after the command returns.
+* **Variable as condition** — when the condition is a single `$name` token,
+  evaluate per the truthiness table (TH-01 through TH-07): INT nonzero =
+  truthy, nonempty string = truthy, zero / empty / NIL = falsy.
+* `_else` is optional. When absent and condition is falsy, execution
+  continues at the next statement.
+
+Design constraints:
+
+* `_then` / `_else` keywords cost line budget (~11 chars) but are unambiguous
+  tokens with no collision risk. `:` was rejected as a delimiter because it
+  collides with label syntax (`:name`). `?` was rejected because it may appear
+  in command arguments.
+* On a 64-byte command buffer, `_if x _then y _else z` is 25 chars — leaves
+  39 for embedded commands which tend to be short (`led 1`, `adc 0`).
+* `_else` clause is a single command (with its arguments). Compound else
+  requires `_goto :label` or semicolon-separated script.
+* Nesting via labels: `_if a _then :handle_a _else _if b _then :handle_b` is
+  valid but discouraged for readability — prefer labels for multi-way branching.
+
+| ID | Requirement |
+| --- | --- |
+| F-04 | `_if` syntax MUST be: `_if <condition> _then <true-cmd> [_else <false-cmd>]`. |
+| F-05 | `_if` MUST evaluate condition truthiness per TH-01 through TH-07 when the condition is a variable. When the condition is a command, truthiness MUST be determined by `mR[0] == XELP_S_OK`. |
+| F-06 | `_if` handler MUST NOT require new PSM states — `_if`, `_then`, `_else` are ordinary tokens dispatched by the existing tokenizer. |
+| F-07 | `_then` and `_else` clauses each contain one command with its arguments. No implicit compound statements within a clause. |
+
+#### Jump keywords and labels
+
+##### Label syntax: `:name`
+
+Labels use a colon prefix: `:name`. The colon is already a valid token
+character — no tokenizer changes needed.
+
+Sigil summary for the script surface:
+
+```text
+$name     variable
+@n        positional parameter
+_keyword  reserved language builtin
+:name     label
+```
+
+##### Label definitions vs references
+
+A **label definition** is `:name` appearing as the **first token on a line**
+(or after `;`). It marks a jump target in the script buffer.
+
+A **label reference** is `:name` appearing as an argument to `_next`, `_goto`,
+`_if _then`, or `_if _else`. It names the target to jump to.
+
+```text
+:start                        # definition (first token on line)
+  read_sensor
+  _if $val _then :done        # reference (argument to _if _then)
+  delay 100
+  _goto :start                # reference (argument to _goto)
+:done                         # definition
+  log "finished"
+```
+
+This distinction is structural, not syntactic — the same token `:name`
+serves both roles. The scanner identifies definitions by position (first
+token on a line), so these are naturally excluded:
+
+* `:name` inside a comment (`# see :foo`) — tokenizer already skips comments.
+* `:name` as a mid-line argument (`_goto :foo`) — not first-token, so not a
+  definition site, only a reference.
+* `:name` inside a quoted string (`"jump to :foo"`) — inside quotes, not a
+  token.
+
+##### Two jump keywords: `_next` and `_goto`
+
+Two keywords with permanently distinct semantics — the grammar never changes
+between versions:
+
+**`_next`** — **execute or skip forward.**
+
+* `_next command arg arg` — execute the command. `_next` dispatches whatever
+  follows it.
+* `_next :label` — the argument starts with `:`, so scan forward from the
+  current parse position to find the label definition. Stop at the first
+  match. If `:label` is not found ahead, error.
+
+`_next` is always forward, always from the current position. No step budget
+required. Ships in MVP.
+
+```text
+  read_sensor
+  _if $val _then _next :done    # skip ahead
+  _next led 1                   # execute command
+  _next :done                   # skip ahead unconditionally
+:done
+  log "finished"
+```
+
+**`_goto :label`** — **scan from frame start (beginning of the function
+body).** Always scans from the top. Can reach any label in the function,
+including those before the current position. Enables loops. Requires S-01
+step budgeting to prevent runaway scripts. Ships after MVP.
+
+```text
+:top                             # label at top of function
+  read_sensor
+  _if $val _then _next :done     # forward skip with _next
+  delay 100
+  _goto :top                     # backward jump with _goto (loop)
+:done
+  log "finished"
+```
+
+The frame's XelpBuf provides the anchor — `.s` is always the top of the
+function body, so `_goto` resets the scan position to `frame.s` and searches
+from there. `_goto` always finds the **first** matching label from the top.
+
+**Why two keywords instead of one:** A single keyword that sometimes scans
+forward and sometimes from frame start would create version-dependent or
+context-dependent behavior. Two keywords make the scan direction explicit in
+the source text. `_next` is always forward-from-current, `_goto` is always
+from-frame-start — both definitions are permanent.
+
+##### `_if` interaction
+
+`_if` clauses can use either keyword or a bare label reference:
+
+```text
+_if $x _then _next :done        # forward skip
+_if $err _then _goto :retry     # backward jump (when _goto ships)
+_if $x _then :done              # bare label = implicit _next :done
+_if $x _then led 1              # execute command
+```
+
+Bare `:label` in an `_if` clause is syntactic sugar for `_next :label`
+(forward-only). To jump backward from an `_if`, use `_goto` explicitly.
+
+##### Block-skip pattern with `:_end`
+
+`_next :label` with a reserved repeatable label provides a lightweight
+block-comment / block-skip idiom:
+
+```text
+_next :_end
+  calibrate_adc 0
+  calibrate_adc 1
+  set_gain 12
+  verify_output
+:_end
+run_main
+```
+
+`:_end` is a **reserved label name** that is explicitly allowed to appear
+multiple times in the same script. Each `_next :_end` finds the nearest
+`:_end` ahead of it — forward-only scan guarantees deterministic matching.
+
+Multiple blocks:
+
+```text
+_next :_end
+  skip block 1
+:_end
+do_something
+_next :_end
+  skip block 2
+:_end
+do_more
+```
+
+To re-enable a skipped block, comment out or delete `_next :_end`. The
+`:_end` label can stay — labels are no-ops when nothing jumps to them:
+
+```text
+#_next :_end
+  calibrate_adc 0            # runs again
+  calibrate_adc 1            # runs again
+:_end                        # harmless, costs nothing
+run_main
+```
+
+`:_end` works with `_next` because `_next` scans forward and stops at the
+first match. `_goto :_end` would find the **first** `:_end` from the top of
+the function, which is almost certainly wrong — using `_goto` with `:_end`
+is a script bug, not something the interpreter polices.
+
+##### Duplicate labels
+
+The interpreter does **not** detect or reject duplicate label definitions.
+It is a simple forward-scanning byte parser — no symbol table, no pre-pass,
+no label registry. Each jump keyword scans from its defined start point
+(`_next`: current position; `_goto`: frame start) and stops at the first
+match.
+
+Consequences:
+
+* **`_next`** with duplicate labels: always correct. Finds the nearest match
+  ahead. This is the basis of the `:_end` block-skip pattern.
+* **`_goto`** with duplicate labels: always finds the first definition from
+  the top of the function. If that's not the intended target, it's a script
+  bug.
+
+Duplicate label detection is a **tooling/lint concern**, not an interpreter
+responsibility. Host-side linters, test harnesses, or IDE integrations
+SHOULD flag duplicate labels (except `:_end`) as warnings. The interpreter
+stays simple.
+
+##### Label scoping
+
+Labels are scoped to a single frame / script buffer. A jump MUST NOT cross
+frame boundaries or reach into a different script artifact.
+
+| ID | Requirement |
+| --- | --- |
+| F-08 | Labels MUST use `:name` syntax. `:` prefix is reserved for labels in the script namespace. |
+| F-09 | Label definitions MUST be the first token on a line (or after `;`). Mid-line `:name` tokens are references, not definitions. |
+| F-10 | Jump keywords MUST scan for label definitions by position (first-token-on-line), not by substring match, to avoid false matches in comments, arguments, or quoted strings. |
+| F-11 | `_next :label` MUST scan forward only from the current parse position. Stops at the first match. If the label is not found ahead, it MUST error. No step budget required. |
+| F-12 | `_next command arg ...` MUST dispatch the command. `_next` executes whatever follows it — a label reference triggers a forward jump, anything else is a command invocation. |
+| F-13 | `_goto :label` MUST scan from the frame start (beginning of function body). Stops at the first match. Can reach labels before or after the current position. `_goto` MUST NOT ship without S-01 step budgeting. |
+| F-14 | Labels MUST be scoped to a single frame / script buffer. Cross-frame jumps MUST NOT be supported. |
+| F-15 | `_if` clauses MAY use label references (`:name`) as the true/false target, equivalent to `_next :label` (forward-only). Backward jumps from `_if` require explicit `_goto`. |
+| F-16 | `_next` and `_goto` have permanently fixed semantics. `_next` is always forward-from-current. `_goto` is always from-frame-start. These definitions MUST NOT change between versions. |
+| F-17 | `:_end` is a reserved label name. It MAY appear multiple times in a script. It is the canonical block-skip terminator for use with `_next :_end`. |
+| F-18 | The interpreter MUST NOT detect or reject duplicate label definitions at runtime. Duplicate detection is a tooling/lint responsibility, not an interpreter responsibility. |
 
 ### Multi-instance capability policy **(M‑\*)**
 

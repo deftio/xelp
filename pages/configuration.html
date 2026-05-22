@@ -66,11 +66,13 @@ recall (~420 bytes, requires <code>XELP_ENABLE_LINE_EDIT</code>).</p>
 
 <h3>Full (~3&ndash;5 KB)</h3>
 
-<p>Everything in CLI plus THR (pass-through) mode, which forwards all
-keystrokes to another peripheral &mdash; a modem, radio module, or debug
-port. Adds ~50&ndash;125 bytes over CLI.</p>
+<p><code>XELP_ENABLE_FULL</code> enables KEY, CLI, THR, and HELP &mdash; but
+<strong>not</strong> LINE_EDIT or HISTORY. For cursor movement and command
+recall, add those flags explicitly:</p>
 
-<pre><code>#define XELP_ENABLE_FULL  1
+<pre><code>#define XELP_ENABLE_FULL       1
+#define XELP_ENABLE_LINE_EDIT  1   /* optional: cursor, insert, delete */
+#define XELP_ENABLE_HISTORY    1   /* optional: UP/DOWN recall */
 </code></pre>
 
 <p>Every flag is independent &mdash; mix and match. See the
