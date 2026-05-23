@@ -28,6 +28,9 @@ It runs at command speed. C/C++ remains the native fast path.
 
 Informative scenarios (non-exhaustive): factory calibration ladders, scripted bring-up, regression harness hooks on peripherals, field diagnostics macros over UART or BLE.
 
+## XELP background
+TODO: put deeper xelp background here (what it is its 15 years old, its 3KB parser, cli, key, thru, rommable scripts etc.)
+
 ## Language shape
 
 XELP is command-shaped. It can resemble Tcl from a distance—words in a row—but does not inherit Tcl’s full text-substitution model. Values behave as typed cells with explicit rules (`INT`, `STR`, and sentinel kinds), not interchangeable string soup rewired before every dispatch.
@@ -136,7 +139,7 @@ Behavior should be predictable for first-time readers:
 
 In command position, the first word is the verb (`foo a b` — `foo` is looked up).
 
-In argument position, an unquoted word is a literal, not automatic variable dereference (`print hello` prints the token `hello`).
+In argument position, an unquoted word is a literal, not automatic variable dereference (`print hello` sends the token hello to the print function).
 
 * To interpolate a variable, use **`$`** (`print $hello`).
 * To call a command for a value slot, parenthesize (`print (hello)`).
@@ -736,7 +739,7 @@ library `fr_math`). No reverse buffer needed. ~30–40 bytes ARM Thumb.
 | Consumer | How it uses `_xelpIntToStr` |
 |---|---|
 | **`$var` expansion** | Writes directly into arena scratch during argv packing. Primary use case. |
-| **`_echo` / `_print` builtin** | Does NOT need it — by the time `_echo` sees argv, `$var` is already expanded to a string. `_echo` just prints argv strings via `XelpOut`. |
+| **`_print` builtin** | Does NOT need it — by the time `_print` sees argv, `$var` is already expanded to a string. `_print` just prints argv strings via `XelpOut`. |
 | **C handler helpers** | Write to a small stack buffer (`char buf[12]`), then `XelpOut(ths, buf, len)`. Eliminates the need for `snprintf` in handlers that print integers. |
 | **Debug / diagnostic** | Print `mR[]` values, error codes, step counts, arena usage. Same pattern as handler helpers. |
 
@@ -1245,10 +1248,10 @@ no script buffer, no proc, no frame marker on the stack. Behavior:
 * `(+ 1 2)` — paren pre-pass runs, evaluator handles nesting. The result
   is computed then **discarded** (no consumer at statement level). Side
   effects of the inner command still run. To capture: `_set x (+ 1 2)`.
-  To print: `_echo (+ 1 2)`.
+  To print: `_print (+ 1 2) "\n"`.
 * `_if $x _then led 1` — single-line conditional, works.
 * `_mr 0 42` — reads/writes mailbox, same as in script.
-* Math builtins, `_echo`, etc. — all work normally.
+* Math builtins, `_print`, etc. — all work normally.
 
 **Errors at the CLI:**
 
@@ -1426,6 +1429,126 @@ added later without changing any current design decisions.
 | PE-07 | `$var` in command position (first token) MUST expand before command lookup. Variable expansion applies to all token positions. |
 | PE-08 | `_run` (string-as-command-line execution) is deferred past MVP. It MUST NOT be required for indirect dispatch — command-position `$var` (PE-07) covers that case. |
 
+### Output builtin **(IO‑\*)**
+
+One output command: `_print`. Newlines are explicit via escape sequences
+in quoted strings — the existing `XELP_ESC_MAP` tokenizer machinery
+handles `\n` → `0x0A` and `\t` → `0x09` during tokenization, before
+`_print` ever sees the argv.
+
+#### `_print`
+
+`_print` concatenates all its arguments with no separator and no trailing
+newline. The caller controls all whitespace and line endings explicitly.
+
+```text
+_print "hello world\n"                              # hello world + newline
+_print "the value is: " $x "\n"                     # the value is: 10 + newline
+_print "x=" $x " y=" $y "\n"                        # x=10 y=20 + newline
+_print "no newline here"                             # partial output
+_print "line1\nline2\n"                              # two lines (tokenizer expands \n)
+_print "col1\tcol2\n"                                # tab-separated
+_print "this is an update\n" "value: " $x "\n"       # two lines, clean
+```
+
+`_print` is a normal command — it receives argc/argv after all expansion
+and escape processing has happened. It doesn't interpret its arguments,
+perform variable lookup, or reformat values. It prints exactly what's in
+argv. Zero arguments = no output.
+
+**No separator, no surprises.** Arguments are concatenated directly. If
+you want a space, include it in the string: `_print $x " " $y`. This
+avoids the grammar ugliness of trying to suppress an automatic separator
+when you don't want one.
+
+**Escape processing is the tokenizer's job, not `_print`'s.** Double-
+quoted strings are processed by `XELP_ESC_MAP` during tokenization. By
+the time `_print` sees the argv string, `\n` is already a literal `0x0A`
+byte. This means every command benefits from escape handling — not just
+`_print`.
+
+#### Implementation
+
+Trivial — ~20-30 bytes of ARM Thumb:
+
+```c
+XELPRESULT _xelpPrint(XELP *ths, int argc, const char **argv) {
+    int i;
+    for (i = 1; i < argc; i++)
+        XelpOut(ths, argv[i], -1);
+    return XELP_S_OK;
+}
+```
+
+Returns `XELP_S_OK` always (output can't fail — `mpfOut` is void-
+returning). Value channel = NIL (side effect, not a value). Using
+`_print` inside `()` is legal but useless — the result is NIL.
+
+#### Float interaction
+
+`_print $x` prints whatever the expansion path produced. If
+`XELP_FLOAT_EXPAND_HEX` is active, it prints `0f4048F5C3`. If
+`XELP_FLOAT_EXPAND_DEC` is active, it prints `3.14`. The expansion
+mode is the integrator's choice — `_print` doesn't reformat.
+
+For hand-typed float literals at the CLI, `_print 3.14` just prints the
+literal string `3.14` (it's a bare token, not a variable — no expansion
+happens).
+
+| ID | Requirement |
+| --- | --- |
+| IO-01 | `_print` MUST concatenate all arguments (argv[1..argc-1]) with no separator and no trailing newline. Zero arguments MUST produce no output. All whitespace and line endings are the caller's responsibility. |
+| IO-02 | `_print` MUST use the instance's `mpfOut` output path, gated by `mOutEnable`. No separate output channel. |
+| IO-03 | `_print` MUST print argv strings as-is. No variable lookup, no escape processing, no reformatting. Escape sequences (`\n`, `\t`) are resolved by the tokenizer's `XELP_ESC_MAP` before dispatch — all commands benefit, not just `_print`. |
+| IO-04 | `_print` MUST return `XELP_S_OK` with NIL value channel. Using it inside `()` is legal but yields NIL. |
+| IO-05 | `_print` SHOULD be registered as a `_`-prefixed builtin. It is available whenever `XELP_ENABLE_SCRIPT` (or equivalent) is enabled. |
+
+#### `_lpad` / `_rpad` — string alignment
+
+`_lpad` is a value-producing builtin that right-aligns a string in a
+field of a given width by padding on the left. It's a string operation —
+it doesn't know or care whether the argument is a number. By the time
+`_lpad` sees it, `$x` is already the string `"42"`.
+
+Naming follows SQL convention: `LPAD` = pad on the **L**eft (right-align),
+`RPAD` = pad on the **R**ight (left-align). `_rpad` is reserved for
+future use — same interface, padding on the opposite side.
+
+```text
+_lpad "42" 6                          # returns "    42"
+_lpad "hello" 10                      # returns "     hello"
+_lpad "toolong" 3                     # returns "toolong" (no truncation)
+```
+
+Composed with `_print` for aligned column output:
+
+```text
+:top
+  _print "adc0=" (_lpad (read_adc 0) 5) " adc1=" (_lpad (read_adc 1) 5) "\n"
+  delay 100
+  _goto :top
+```
+
+```
+adc0=  342 adc1= 1021
+adc0=  339 adc1= 1024
+adc0=  341 adc1= 1019
+```
+
+Implementation: strlen, emit (width - len) spaces, emit string. If
+string is longer than width, emit as-is — no truncation. Returns the
+padded string as STR on the result stack. ~30-40 bytes ARM Thumb.
+
+Aligns with string pad operations in other languages (Python `rjust`,
+JavaScript `padStart`, Rust `format!("{:>w}")`). Operates on strings,
+not types.
+
+| ID | Requirement |
+| --- | --- |
+| IO-06 | `_lpad` MUST right-align its first argument (a string) in a field of width given by its second argument (an integer). Padding character is space. If the string is longer than width, it MUST be returned as-is (no truncation). |
+| IO-07 | `_lpad` MUST return the padded string as STR on the result stack. It is a value-producing builtin, intended for use inside `()` composition with `_print`. |
+| IO-08 | `_lpad` is a string operation. It MUST NOT perform type detection or numeric parsing. The argument is a string — whatever expansion produced. |
+
 ### Multi-instance capability policy **(M‑\*)**
 
 Answers “why two shells differ”: security or business policy—not accidental forked languages.
@@ -1453,6 +1576,64 @@ Token-level grammar annexes deliberately avoid bloating checklist prose.
 ### Document precedence
 
 Requirements here constrain exploratory drafts (`dev/xelp_script_proposal1.md`, `dev/xelp_script_proposal2.md`, `dev/xelp_script_proposal3.md`). If proposal text clashes with numbered IDs (`A‑01`, `C‑01`, …), revise either the proposal or this document deliberately—silent divergence is unacceptable for safety reviews.
+
+---
+
+## Open items to resolve
+
+Gaps identified during design. Each needs discussion and either promotion
+to numbered requirements or explicit deferral.
+
+- [ ] **`_proc` definition mechanics.** How are procs registered, stored,
+  and looked up? ROM-resident vs runtime-defined? Can procs be defined
+  at the CLI (multi-line input)? What's the storage format — name →
+  XelpBuf pointing into script source? Registration in a table or linear
+  scan of script text?
+
+- [ ] **Step budgeting details (S-01).** `_goto` requires this but it's
+  not fleshed out. Where does the counter live — XELP struct field?
+  Default limit value? How to override (`XELP_STEP_BUDGET` compile
+  flag)? What happens on budget exhaustion — error + stop? Resume
+  mechanism?
+
+- [ ] **Safe execution / interrupt mechanism.** Design center mentions
+  ESC-ESC or CTRL-C to break runaway scripts. How does the interpreter
+  check for break between statements? Poll `mpfIn`? Separate callback?
+  Key sequence detection while script is running?
+
+- [ ] **`_set` type inference.** `_set x 3` → INT, `_set x "hello"` →
+  STR. What about `_set x 3.14` when `XELP_ENABLE_FLOAT` is disabled?
+  Error? Store as STR? What about `_set x 0xFF` — INT (parsed as hex)
+  or STR?
+
+- [ ] **Math builtins roster.** `_add`, `_mul`, `_sub`, `_div`, `_mod`,
+  `_gt`, `_lt`, `_eq`, `_neq`, `_ge`, `_le`, `_and`, `_or`, `_not`,
+  `_band`, `_bor`, `_bxor`, `_bnot`, `_shl`, `_shr`. Which are MVP?
+  Arity (binary only, or variadic for `_add`/`_mul`)? Symbol aliases
+  (`+`, `*`, `>`, etc.) — which ship?
+
+- [ ] **Comparison and equality semantics.** `_eq` across types — is
+  `_eq 3 "3"` true? Does it coerce? Or strict type match required?
+  Ties into truthiness (TH-05).
+
+- [ ] **`_unset` / `_clear`.** Root frame variables accumulate at the CLI.
+  Need a way to release them? Or just document that instance reset is
+  the cleanup mechanism?
+
+- [ ] **Builtin registration mechanism.** Script builtins (`_set`, `_if`,
+  `_print`, etc.) — are they a separate function table from
+  `mpCLIModeFuncs`? Searched first (reserved namespace priority)? Or
+  interleaved? How does the dispatch order work: builtins → user
+  commands → default handler?
+
+- [ ] **`_proc` calling convention.** How does `XelpCallProc` (C calling
+  script) work? It needs to push a frame, set up argv from C-provided
+  strings, run the proc body, and return the result. What's the API
+  shape?
+
+- [ ] **Float proposal sign-off.** Hex vs decimal expansion switch,
+  `XelpArgvFloat` API, `XELP_ENABLE_FLOAT` gating. Currently
+  exploratory — needs promotion or deferral.
 
 ---
 
@@ -1523,7 +1704,7 @@ which float width to reconstruct.
 
 ```text
 _set x 3.14                   # user types decimal — parsed to F32
-_echo $x                      # prints decimal for humans (see expansion modes)
+_print $x "\n"                # prints whatever expansion mode produces
 motor $x                      # argv gets expanded float string
 ```
 
@@ -1573,10 +1754,12 @@ The expansion mode only affects the `$var` → argv path. Everything else
 (arena storage, type tags, expansion dispatch, frame layout) is identical
 regardless of the switch.
 
-**`_echo` / `_print` output:** Always decimal for human readability,
-regardless of the expansion mode switch. `_echo` is for humans on a
-terminal. The expansion mode is for machine consumption (argv strings
-passed to C handlers).
+**`_print` output:** `_print` prints argv strings as-is — it does not
+reformat. If the expansion mode is hex, `_print $x` prints
+`0f4048F5C3`. If the expansion mode is decimal, `_print $x` prints
+`3.14`. The expansion mode controls what all commands see, including
+`_print`. If human-readable float output matters, use
+`XELP_FLOAT_EXPAND_DEC`.
 
 **C handler side:**
 
@@ -1614,7 +1797,7 @@ int. The expansion switch (EX-08) adds a case for each float kind.
 | Decimal → F32 parser (`_set x 3.14`) | ~150-250 bytes | `XELP_ENABLE_FLOAT` |
 | F32 → hex-string formatter | ~20-30 bytes | `XELP_ENABLE_FLOAT` |
 | Hex-string → F32 parser (`XelpArgvFloat`) | ~30-40 bytes | `XELP_ENABLE_FLOAT` |
-| F32 → decimal formatter (for `_echo` + opt-in expansion) | ~200-400 bytes | `XELP_ENABLE_FLOAT` + `XELP_FLOAT_EXPAND_DEC` |
+| F32 → decimal formatter (for `_print` + opt-in expansion) | ~200-400 bytes | `XELP_ENABLE_FLOAT` + `XELP_FLOAT_EXPAND_DEC` |
 | Expansion switch case | ~10 bytes | `XELP_ENABLE_FLOAT` |
 
 Minimum float support (hex expansion): ~210-330 bytes.
@@ -1636,7 +1819,7 @@ A **staging** idea under discussion—not normative unless promoted into numbere
 
 * **Subset chain (concept):** **`Xelp CLI`** ⊆ **Tier 1** ⊆ **Tier 2**, each step additive so scripts written for an earlier tier keep working when a later tier ships.
 
-* **Tier 1 (inspector / bring-up posture, sketch)** — Same flat **`command arg …`** shape as today's CLI (**no parentheses**, **no `$` variables**, minimal or no flow control). Optionally route tokens whose name starts with **`_`** through a small **reserved builtin table** (**`_peek`**, **`_poke`**, **`_echo`**, integer math/bit helpers, …) before the ordinary user **`mpCLIModeFuncs`** search—thin glue on **`argc`/`argv`**, not a second interpreter.
+* **Tier 1 (inspector / bring-up posture, sketch)** — Same flat **`command arg …`** shape as today's CLI (**no parentheses**, **no `$` variables**, minimal or no flow control). Optionally route tokens whose name starts with **`_`** through a small **reserved builtin table** (**`_peek`**, **`_poke`**, **`_print`**, integer math/bit helpers, …) before the ordinary user **`mpCLIModeFuncs`** search—thin glue on **`argc`/`argv`**, not a second interpreter.
 
 * **Tier 2 (full script posture, sketch)** — Adds **`( … )` nested value calls**, **`$` and `@` addressing**, procedural control (**`_if`**, **`_goto`**, labels when specified), scripted procedures where designed, fuller truthiness, and bounded script arena state—a larger lexer/eval/memory story than a **`_*` builtin table** on **`argc`/`argv`** alone.
 
