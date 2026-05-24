@@ -2,7 +2,7 @@
 
 XELP Script is a small, no-malloc, instance-local scripting and orchestration layer for embedded C and C++ systems. It is not trying to become Lua, MicroPython, Tcl, Forth, or a general-purpose VM. Its purpose is narrower: give firmware a tiny live command surface that can sequence, compose, and lightly control native C and C++ functions.  
 
-XELP’s core power is that C functions are not foreign bindings. They are the native vocabulary of the system. Script procs (when present), CLI commands, key commands where applicable, and C functions participate in one command-shaped fabric—as much as feasible without inventing parallel parsers or registries per transport.
+XELP's core power is that C functions are not foreign bindings. They are the native vocabulary of the system. Script funcs (when present), CLI commands, key commands where applicable, and C functions participate in one command-shaped fabric—as much as feasible without inventing parallel parsers or registries per transport.
 
 Below, the prose sections explain intent and ergonomics first. Tables at the bottom are normative checklist items only: each row has an ID usable in reviews, hazards analysis, tests, and change control.
 
@@ -76,10 +76,15 @@ ESC for KEY, CTRL-T for THRU).
   completely. Configurations range from ~550 bytes (KEY-only on ARM
   Thumb) to ~3–5 KB (full CLI + KEY + THRU + HELP + LINE_EDIT +
   HISTORY).
-* **Platform abstraction.** Five function pointers in the XELP struct
-  (`mpfOut`, `mpfIn`, `mpfInReady`, `mpfGetTicks`, `mpfDelay`) abstract
-  all platform dependencies. Porting to a new target is implementing
-  these five functions.
+* **Platform abstraction.** Function pointers in the XELP struct
+  (`mpfOut`, `mpfErr`, `mpfEditModeChg`, `mpfBksp`, `mpfPassThru`)
+  abstract platform dependencies. Porting to a new target means
+  implementing these hooks. The script extension (`XELP_ENABLE_SCRIPT`)
+  adds `mpfBreakpoint` for observability. Input hooks (`mpfIn`,
+  `mpfInReady`) are **not** part of xelp core — input arrives via
+  `XelpParseKey` one character at a time from the integrator's main
+  loop. Script input (e.g. `inkey`) is a C handler concern, not a
+  core struct field.
 * **Cross-architecture.** Tested on 8-bit (AVR, 8051), 16-bit (MSP430),
   32-bit (ARM Cortex-M, ESP32, RISC-V rv32, Xtensa), and 64-bit (x86-64)
   targets. CI runs 18 cross-compilation targets via Docker.
@@ -320,7 +325,11 @@ These rows exist so ports to eight-bit MCUs through 64-bit bare metal remain hon
 | C-01 | MUST NOT rely on heap allocation (malloc, calloc, growable arenas, etc.). All runtime footprint MUST be bounded by compile-time or documented integration-time sizing. |
 | C-02 | MUST support multiple independent instances without mandating global interpreter mutable state required for correctness. |
 | C-03 | Script source MAY live in ROM/flash; execution MUST NOT rely on rewriting those source bytes to run. |
-| C-04 | SHOULD NOT force parallel “script-only” registries for the same product verbs CLI already exposes unless policy demands it—the same canonical names SHOULD work from ROM scripts and typed lines except where deliberately restricted (see M‑01). |
+| C-04 | SHOULD NOT force parallel "script-only" registries for the same product verbs CLI already exposes unless policy demands it—the same canonical names SHOULD work from ROM scripts and typed lines except where deliberately restricted (see M‑01). |
+| C-05 | Script functionality MUST be gated by `XELP_ENABLE_SCRIPT`. When disabled, the arena, evaluator, builtins, and all script-related struct members MUST compile out completely. Non-script builds MUST NOT grow. |
+| C-06 | Script-enabled profiles SHOULD default `XELP_CMDBUFSZ` >= 128 and `XELP_ARGV_MAX` >= 16. Rich `_if` lines with expanded `$variables` can exceed 64 bytes. The spec MUST document minimum buffer sizes for script use. |
+| C-07 | `XELP_SCRIPT_ARENA_SZ` default SHOULD be 2048 on 32-bit targets. Integrators on constrained targets (AVR, ATtiny) SHOULD override to 256–512 bytes. The default MUST be documented as a starting point, not a hard minimum. |
+| C-08 | Three script profiles SHOULD be published with measured code/RAM sizes: **Script-Minimal** (no funcs, no `_goto`, sequencing + `_if` + `_next`), **Script-Standard** (adds `_func`, `_goto`, math), **Script-Full** (adds symbol aliases, `_lpad`, all builtins). |
 
 ### Relationship to native code **(N‑\*)**
 
@@ -372,8 +381,9 @@ Why: carve namespace so `_set` / `_if` stay obviously “language,” while firm
 | --- | --- |
 | B-01 | **Identifier-shaped** language builtins **SHOULD** use the **`_name`** pattern (`_set`, `_if`, `_goto`, `_add`, `_gt`, …). |
 | B-02 | **`_<identifier>` MUST** remain reserved; application commands **MUST NOT** collide—integrators **SHOULD** catch collisions at integrate time (registration or lint), not ambiguously at runtime. |
-| B-03 | Compile profiles **MAY** register **symbol-only** commands (`+`, `*`, `>`) **as aliases** to the same implementations as **`_add`**, `_mul`, **`_gt`**, etc.—still dispatched as ordinary commands (**never** infix precedence parsing). |
+| B-03 | Compile profiles **MAY** register **symbol-only** commands (`+`, `*`, `>`) **as aliases** to the same implementations as **`_add`**, `_mul`, **`_gt`**, etc.—still dispatched as ordinary commands (**never** infix precedence parsing). Symbol aliases SHOULD be gated by `XELP_SCRIPT_SYMOPS` (default **off** on constrained builds). |
 | B-04 | **SHOULD NOT** canonically spell punctuation builtins as **`_+`**, **`_>`**, etc.—use **`+`** (**B‑03** alias) or **`_add`** (**B‑01**), not **`_`** glued to punctuation. |
+| B-05 | **`:` in argument position** is a label token in script buffers. Integrators SHOULD be warned that `:` has script-reserved semantics — a firmware command that uses `:` in its arguments (e.g. `time 12:30`) may need quoting in script context. |
 
 #### Comments / statement breaks
 
@@ -428,7 +438,7 @@ Separates chatter on the UART from machine-readable compose semantics—critical
 
 #### Two-channel return contract
 
-Every function invocation (C handler or script proc) produces two results:
+Every function invocation (C handler or script func) produces two results:
 
 1. **Status channel: `XELPRESULT`** — did the function succeed? The existing
    C return value. `XELP_S_OK` (0) = success, positive = warning, negative =
@@ -443,22 +453,22 @@ succeed and return NIL, or fail (value is undefined/ignored on failure).
 
 #### Script function returns
 
-Script procs return one value via `_return`:
+Script funcs return one value via `_return`:
 
 ```text
-_proc double
+_func double
   _return (_mul @1 2)       # return INT
 
-_proc greet
+_func greet
   _return "hello"           # return STR
 
-_proc do_stuff              # no _return = implicit NIL, still success
+_func do_stuff              # no _return = implicit NIL, still success
   led 1
   delay 100
 ```
 
-`_return` sets the value channel and exits the proc with `XELP_S_OK`.
-Falling off the end of a proc = success with NIL.
+`_return` sets the value channel and exits the func with `XELP_S_OK`.
+Falling off the end of a func = success with NIL.
 
 #### C handler returns for script consumption
 
@@ -489,10 +499,12 @@ with `XelpSetResult*` calls. Migration is gradual.
 
 #### Result stack
 
-The result stack is a fixed-size, compile-time bounded array
-(`XELP_RESULT_STACK_SZ`, e.g. 8–16 entries). Each entry holds one `XelpVal`
-(tagged INT or STR). Frame entry records the stack pointer; frame exit pops
-back. Overflow = hard error.
+The result stack is the upward-growing region of the script arena (see
+AR-01, AR-02). Result entries are variable-length tagged records packed
+in the arena byte-stream — not a separate fixed-size array. The same
+overflow check (SP >= HP) bounds both results and variables in one
+buffer. Frame entry records the stack pointer; frame exit pops back.
+Overflow = hard error.
 
 The result stack is the universal mechanism for script value composition:
 
@@ -534,19 +546,24 @@ the mailbox. Same result stack, same status channel, same composition:
 ```text
 _set x (_mr 2)                    # capture into variable
 _if (_gt (_mr 0) 100) _then :hot  # nested in expression
-_return (_mr 0)                   # pass through as proc return
+_return (_mr 0)                   # pass through as func return
 ```
 
 #### C calling script, script calling C
 
-**C calling script proc:**
+**C calling script func:**
 
 ```c
 XELPRESULT cmd_run_cal(XELP *ths, int argc, const char **argv) {
-    XelpVal result;
-    XELPRESULT r = XelpCallProc(ths, "double", "21", &result);
-    if (r == XELP_S_OK && result.kind == XELP_VAL_INT)
-        ths->mR[0] = result.v.i;   /* stash in mR[] for C-side use */
+    XELPRESULT r = XelpCallProc(ths, "double 21");
+    if (r == XELP_S_OK) {
+        /* quick path: _return <int> mirrors to mR[1] */
+        int val = ths->mR[1];
+        /* typed path: */
+        XelpResult res;
+        XelpGetResult(ths, &res);
+        if (res.kind == XELP_VAL_INT) val = res.intVal;
+    }
     return r;
 }
 ```
@@ -595,16 +612,16 @@ It's script reading the same struct field that C reads.
 
 | ID | Requirement |
 | --- | --- |
-| R-01 | Every function invocation (C handler or script proc) MUST produce a status (`XELPRESULT`) and at most one typed value (`XelpVal`). Status and value are orthogonal channels. |
+| R-01 | Every function invocation (C handler or script func) MUST produce a status (`XELPRESULT`) and at most one typed value (`XelpVal`). Status and value are orthogonal channels. |
 | R-02 | `( … )` MUST deliver exactly one `XelpVal` from the value channel or deterministic NIL — not garbage across nested evaluations. |
 | R-03 | `XelpOut` MUST NOT silently become the scripted return channel unless a documenting command declares that contract. |
 | R-04 | `mR[]` registers MUST remain available as the direct C-to-C communication channel. They are independent of the result stack. |
-| R-05 | Script procs MUST return one value via `_return`. No `_return` = implicit NIL with `XELP_S_OK`. |
+| R-05 | Script funcs MUST return one value via `_return`. No `_return` = implicit NIL with `XELP_S_OK`. |
 | R-06 | C handlers SHOULD call `XelpSetResultInt` / `XelpSetResultStr` to make values visible to script callers. Handlers that don't call `XelpSetResult*` MUST return NIL (not garbage). |
 | R-07 | The script arena MUST be a single fixed-size, compile-time bounded buffer (`XELP_SCRIPT_ARENA_SZ`). Overflow MUST be a hard error. Frame exit MUST pop results and local variables back to the frame entry point. |
 | R-08 | `_mr <index>` MUST be an ordinary builtin that follows the two-channel return contract. Read: pushes `mR[index]` onto result stack. Write: sets `mR[index]` and pushes the written value. Out-of-bounds index MUST error. |
 | R-09 | `_mr` is not special. It is a builtin function with the same return contract, result stack behavior, and composition rules as every other builtin. |
-| R-10 | The script engine MUST NOT use `mR[]` for its own return values. `XELPRESULT` status for script functions lives on the result stack, not in `mR[0]`. `mR[]` is exclusively for C handler communication. |
+| R-10 | The script engine MUST NOT use `mR[0]` for typed value returns. `mR[0]` is always the XELPRESULT status of the last dispatched statement (same as v0.4.0). Typed values (INT, STR) live on the arena result stack exclusively. `_return <int>` SHOULD mirror the integer to `mR[1]` (not `mR[0]`) as a convenience for C callers. `mR[0]` reflects whether `_return` itself succeeded (`XELP_S_OK`), not the returned value. |
 
 ### Value types **(VT‑\*)**
 
@@ -663,7 +680,7 @@ free. For types wider than the stack entry union (F64 on 32-bit), the
 entry stores an arena-heap offset to an 8-byte slot rather than inline,
 keeping entry size fixed.
 
-**PROC as a type.** A variable holding a reference to a callable proc.
+**PROC as a type.** A variable holding a reference to a callable func.
 Enables `_set callback my_handler` then `_call $callback`. First-class
 function references for event-driven patterns. Reserved, not in MVP.
 
@@ -766,17 +783,20 @@ pointer array: `@n` = `pointers[n]`. No scanning, no separate storage.
 **Variable entries** (heap, growing downward):
 
 ```text
-INT:   [ kind_1B | nameHash_2B | value_4B ]                = 7 bytes
-STR:   [ kind_1B | nameHash_2B | len_2B | string_bytes ]   = 5 + len bytes
+INT:   [ kind_1B | nameHash_2B | nameLen_1B | name_bytes | value_4B ]
+STR:   [ kind_1B | nameHash_2B | nameLen_1B | name_bytes | len_2B | string_bytes ]
 ```
 
 Variable lookup is a linear scan of the heap region — bounded by the
 number of variables (small in embedded scripts). Hash comparison
-avoids strcmp on every entry.
+filters quickly; on hash match, a byte comparison of the stored name
+confirms identity (AR-08). The name bytes cost a few extra bytes per
+variable but eliminate hash collision bugs — essential for correctness
+with a 16-bit hash and arbitrary user-chosen names.
 
 #### Frame lifecycle
 
-**Enter proc:** push a FRAME marker onto the stack. It records the
+**Enter func:** push a FRAME marker onto the stack. It records the
 current heap pointer (varHP) and return address. Everything above this
 marker on the stack, and everything below the saved varHP on the heap,
 belongs to the callee.
@@ -802,11 +822,11 @@ After return:
 All temporaries and local variables are reclaimed in one SP/HP reset.
 No fragmentation. The arena space is immediately reusable.
 
-#### Zero overhead when not using procs
+#### Zero overhead when not using funcs
 
 Flat scripts (`_set`, `_if`, `_next`, `_mr`, C commands) never push
 frame markers. The full arena is available for results and variables.
-Frames are opt-in overhead — only `_proc` calls create them.
+Frames are opt-in overhead — only `_func` calls create them.
 
 #### Sizing budget (2 KB arena, 32-bit target)
 
@@ -817,9 +837,9 @@ Example: 4 frames deep, typical command sizes, 16 result entries,
 |---|---|---|---|
 | Frames (header + argv strings + pointers) | ~36 | 4 | 144 |
 | Result entries (INT) | ~9 | 16 | 144 |
-| Variable entries (INT) | ~7 | 24 | 168 |
-| Variable entries (STR, avg 8 chars) | ~13 | 8 | 104 |
-| Free / headroom | — | — | ~1488 |
+| Variable entries (INT, avg 3-char name) | ~11 | 24 | 264 |
+| Variable entries (STR, avg 3-char name, avg 8-char value) | ~17 | 8 | 136 |
+| Free / headroom | — | — | ~1360 |
 
 Because records are variable-length, there are no hard partitions.
 A script with many variables but shallow nesting uses more heap. Deep
@@ -832,8 +852,9 @@ nesting with few variables uses more stack. The arena self-balances.
 | AR-03 | Frame markers MUST be interleaved in the stack as variable-length tagged records (kind = `XELP_VAL_FRAME`). A frame record includes the header, packed argv strings, and the argv pointer array — sized to actual content, not a fixed struct. |
 | AR-04 | Frame exit MUST pop the stack to the frame marker position and reset the heap to the saved varHP, reclaiming all callee-local results and variables in one operation. |
 | AR-05 | The arena layout is internal to the engine. The public API (`_return`, `_set`, `XelpSetResultInt`, `XelpCallProc`) MUST NOT expose arena offsets, stack pointers, or entry formats. Internal layout MAY change without affecting scripts or C handler code. |
-| AR-06 | Flat scripts that do not use `_proc` MUST NOT incur frame marker overhead. The full arena is available for results and variables. |
+| AR-06 | Flat scripts that do not use `_func` MUST NOT incur frame marker overhead. The full arena is available for results and variables. |
 | AR-07 | Arena overflow MUST be a hard error. The engine MUST NOT silently corrupt memory or wrap pointers. |
+| AR-08 | Variable lookup by `nameHash_2B` MUST be collision-safe. On hash match, the engine MUST confirm identity with a byte comparison against the stored variable name (or name suffix). Hash is an accelerator, not identity. Two distinct names with the same 16-bit hash MUST NOT alias. |
 
 ### Variable expansion and argv scratch **(EX‑\*)**
 
@@ -901,8 +922,8 @@ to complete the int↔string round-trip. Decision deferred to implementation.
 
 The argv strings and pointer array are packed into the frame record
 in the arena, not on the C stack. This is required because the script
-evaluator is iterative (a loop, not recursive C calls). When proc A
-calls proc B, there is only one set of C-stack locals — B's dispatch
+evaluator is iterative (a loop, not recursive C calls). When func A
+calls func B, there is only one set of C-stack locals — B's dispatch
 would clobber A's argv.
 
 **Why C stack doesn't work:**
@@ -914,7 +935,7 @@ A: motor $gain ; _set x (B 10 20) ; other_cmd $x $gain
 ```
 
 A dispatches `motor $gain` — argv strings are `"motor\075\01\0"`.
-Then A calls proc B. B needs its own argv for `_add @1 @2`. If B
+Then A calls func B. B needs its own argv for `_add @1 @2`. If B
 writes into the same scratch buffer, A's argv strings are gone. When
 B returns and A continues with `other_cmd`, `@1` and `@2` (which
 point into A's argv) are clobbered.
@@ -950,7 +971,7 @@ from the frame directly to the handler. The pointers already point
 into the frame's packed strings. No copying, no temp arrays.
 
 **Non-script path is unchanged.** The existing `XelpParseXB` (no script
-engine, no procs) continues to use C-stack locals for argv scratch.
+engine, no funcs) continues to use C-stack locals for argv scratch.
 The arena-based scratch is only used when the script evaluator is
 active. This means non-script builds pay zero RAM for the arena.
 
@@ -1089,7 +1110,7 @@ Why canonical helper: **`_truthy`** centralizes coercion so **`_if`** cannot spr
 
 | ID | Requirement |
 | --- | --- |
-| TH-06 | NIL / unset $var MUST pick falsy-vs-error semantics once; interplay with downstream ERR propagation documented beside EH-04. |
+| TH-06 | NIL / undefined `$var` MUST pick falsy-vs-error semantics once (see SG-03 — expansion of undefined variables errors). Interplay with downstream ERR propagation documented beside EH-04. |
 | TH-07 | ERR-valued nested expressions occupying _if predicate slots MUST declare policy (falsy+warn, scripted abort, or hard stop)—see EH-*. |
 
 #### Mandatory scripted regression matrix
@@ -1135,9 +1156,18 @@ Translates ergonomics bullets into contractual clarity for tooling and training.
 
 First ship focuses on Turing-light procedural charts without looping sugar.
 
+**MVP scope limitation:** The initial milestone provides **sequencing,
+conditionals (`_if`), and forward jumps (`_next`)**. It does **not**
+provide loops — `_goto` (which enables backward jumps) ships after
+`mpfBreakpoint` (S-01) is wired, to prevent runaway scripts on
+unattended targets. This is intentional: MVP = "branch and sequence,"
+not "general program." Factory calibration ladders that need iteration
+can call C loop functions. This limitation MUST be documented in
+release notes and the tutorial.
+
 | ID | Requirement |
 | --- | --- |
-| F-01 | MUST ship set, if, next, goto, labeled lines scoped inside one artifact. Duplicate label detection is a tooling/lint concern (see F-18), not an interpreter requirement. |
+| F-01 | MUST ship `_set`, `_if`, `_next`, labeled lines scoped inside one artifact. `_goto` ships when `mpfBreakpoint` (S-01) is wired — it MUST NOT ship without step budget capability. Duplicate label detection is a tooling/lint concern (see F-18), not an interpreter requirement. |
 | F-02 | Structured loops remain optional later—they MUST NOT gate MVP readiness (paired with Anti-goal A‑03). |
 | F-03 | Truth tables above plus mandated TR fixtures gate if; goto must not accidentally span unrelated blobs. |
 
@@ -1150,9 +1180,13 @@ _if <condition> _then <true-cmd> [_else <false-cmd>]
 ```
 
 `_if`, `_then`, and `_else` are ordinary tokens to the existing PSM — no new
-parser states required. The `_if` handler receives the full argv, locates
-`_then` and `_else` token indices, slices, and dispatches each sub-command
-string via `XelpParse`.
+parser states required. The `_if` builtin locates `_then` and `_else` token
+boundaries, slices, and dispatches each sub-command via an internal
+single-statement evaluator (`_xelpEvalStatement` or equivalent) — **not**
+the top-level `XelpParse` loop. This avoids re-entering the outer parse loop,
+clobbering `mArgvBuf`, or resetting cursor state. The internal evaluator
+handles variable expansion, `$`/`()` processing, and command dispatch for one
+statement only.
 
 Examples:
 
@@ -1166,9 +1200,9 @@ _if $mode _then motor $gain _else stop     # with variable expansion
 
 Condition evaluation:
 
-* **Command as condition** — `_if` dispatches the condition tokens via
-  `XelpParse`. The condition is truthy when `ths->mR[0] == XELP_S_OK` (0)
-  after the command returns.
+* **Command as condition** — `_if` dispatches the condition tokens via the
+  internal single-statement evaluator. The condition is truthy when
+  `ths->mR[0] == XELP_S_OK` (0) after the command returns.
 * **Variable as condition** — when the condition is a single `$name` token,
   evaluate per the truthiness table (TH-01 through TH-07): INT nonzero =
   truthy, nonempty string = truthy, zero / empty / NIL = falsy.
@@ -1181,8 +1215,9 @@ Design constraints:
   tokens with no collision risk. `:` was rejected as a delimiter because it
   collides with label syntax (`:name`). `?` was rejected because it may appear
   in command arguments.
-* On a 64-byte command buffer, `_if x _then y _else z` is 25 chars — leaves
-  39 for embedded commands which tend to be short (`led 1`, `adc 0`).
+* On a 64-byte command buffer (non-script default), `_if x _then y _else z`
+  is 25 chars — leaves 39 for embedded commands which tend to be short
+  (`led 1`, `adc 0`). Script-enabled profiles SHOULD use 128+ bytes (C-06).
 * `_else` clause is a single command (with its arguments). Compound else
   requires `_goto :label` or semicolon-separated script.
 * Nesting via labels: `_if a _then :handle_a _else _if b _then :handle_b` is
@@ -1193,6 +1228,7 @@ Design constraints:
 | F-04 | `_if` syntax MUST be: `_if <condition> _then <true-cmd> [_else <false-cmd>]`. |
 | F-05 | `_if` MUST evaluate condition truthiness per TH-01 through TH-07 when the condition is a variable. When the condition is a command, truthiness MUST be determined by `mR[0] == XELP_S_OK`. |
 | F-06 | `_if` handler MUST NOT require new PSM states — `_if`, `_then`, `_else` are ordinary tokens dispatched by the existing tokenizer. |
+| F-06a | `_if` MUST dispatch condition, `_then`, and `_else` sub-commands via an internal single-statement evaluator — NOT the top-level `XelpParse` loop. Sub-commands require variable expansion and `()` processing. Calling `XelpParse` from within the script evaluator would re-enter the outer loop and clobber parse state. |
 | F-07 | `_then` and `_else` clauses each contain one command with its arguments. No implicit compound statements within a clause. |
 
 #### Jump keywords and labels
@@ -1240,6 +1276,11 @@ token on a line), so these are naturally excluded:
   token.
 
 ##### Two jump keywords: `_next` and `_goto`
+
+**Implementation note:** label scanning reuses `XelpFindTok` with
+`XELP_TOK_LINE` semantics (first token on line). This function already
+exists in v0.4.0 — no new scanner required. This is intentional reuse,
+not coincidence.
 
 Two keywords with permanently distinct semantics — the grammar never changes
 between versions:
@@ -1447,7 +1488,7 @@ Edge cases:
 
 ### Variable scoping **(SC‑\*)**
 
-Variables are local to the frame that created them. A child proc cannot see
+Variables are local to the frame that created them. A child func cannot see
 or modify its parent's variables. Data flows through arguments (`@1`, `@2`)
 and return values — explicit, traceable, no invisible coupling.
 
@@ -1468,13 +1509,13 @@ at the bottom of the heap, below all frames. Not MVP — `mR[]` and explicit
 arguments cover the common cases.
 
 ```text
-_proc calibrate
+_func calibrate
   _set gain 12          # local to calibrate's frame
   _set offset 3         # local to calibrate's frame
   motor_setup $gain $offset
   _return $gain
 
-_proc main
+_func main
   _set x (calibrate)    # $x = 12 (return value)
   # $gain is NOT visible here — it was local to calibrate
   # $offset is NOT visible here
@@ -1483,7 +1524,7 @@ _proc main
 
 | ID | Requirement |
 | --- | --- |
-| SC-01 | Variables created by `_set` MUST be scoped to the frame that created them. Variable lookup MUST NOT walk parent frames. |
+| SC-01 | Variables created by `_set` MUST be scoped to the frame that created them. Variable lookup (`$name`) MUST NOT walk parent frames. This applies to data variables (INT, STR) accessed via `$`. It does NOT apply to command dispatch — PROC entries in the root frame are found by the dispatch path (DA-07), not by `$` expansion. |
 | SC-02 | Frame exit MUST release all variables created in that frame (HP reset to saved varHP). Parent variables MUST survive child frame exit. |
 | SC-03 | Data between frames MUST flow through arguments (`@n`), return values (`_return`), or the `mR[]` mailbox. No implicit sharing. |
 | SC-04 | A future `_global` keyword MAY store variables in a persistent heap region that survives frame exits. This is not MVP. |
@@ -1491,7 +1532,7 @@ _proc main
 #### CLI as root frame
 
 Script builtins typed at the interactive CLI run in the **root frame** —
-no script buffer, no proc, no frame marker on the stack. Behavior:
+no script buffer, no func, no frame marker on the stack. Behavior:
 
 **Works at the CLI:**
 
@@ -1843,7 +1884,7 @@ provide:
 | `_if ... _then ... _else ...` | Conditional dispatch of sub-commands, control flow branching |
 | `_set x 10` | Write to arena heap (variable storage), raw token inspection for type inference (TI-01) |
 | `_return` | Pop frame, capture result, reset SP/HP |
-| `_proc` | Register callable, or push frame and redirect parsing |
+| `_func` | Register callable, or push frame and redirect parsing |
 | `_print` | Could be a normal handler, but lives in builtin path for namespace consistency |
 | `_lpad` | Could be a normal handler, but lives in builtin path for namespace consistency |
 | `_mr` | Reads/writes `mR[]`, pushes to result stack |
@@ -2008,6 +2049,22 @@ Answers "why two shells differ": security or business policy—not accidental fo
 | ID | Requirement |
 | --- | --- |
 | M-01 | Instances MAY vary transport, builtin availability, capability masks (e.g. disallow raw poke over BLE)—policy articulated per product deployment. |
+| M-02 | Dynamic `_func` (defined at CLI or in script) MAY be restricted per instance via capability policy. Production BLE consoles SHOULD consider disabling dynamic `_func` to prevent users from shadowing safety-critical C commands. C-registered ROM script funcs are always safe (immutable). |
+
+**M-01 / M-02 examples:**
+
+```text
+# Debug UART instance — full access, dynamic _func allowed
+XelpInit(&debugXelp, ...);
+debugXelp.mpScriptFuncs = allScriptFuncs;  /* C-registered ROM funcs */
+/* dynamic _func: allowed (default) */
+
+# BLE instance — restricted, no dynamic _func
+XelpInit(&bleXelp, ...);
+bleXelp.mpScriptFuncs = safeScriptFuncs;   /* subset of ROM funcs */
+bleXelp.mPolicy |= XELP_POLICY_NO_DYN_FUNC;  /* block _func at CLI */
+/* inkey not registered — no input capability on BLE */
+```
 
 ### Observability and safety envelopes **(S‑\*)**
 
@@ -2043,16 +2100,18 @@ Nothing is special about `_goto`, `_next`, or `:label` — they are
 statements like any other. The tokenizer processes them, the callback
 fires, the debugger decides what to do.
 
-Example integrator callback:
+Example integrator callback (integrator provides `uartReady`/`uartGetc`
+and `stepCount` — these are **not** xelp struct fields):
 ```c
+static int stepCount;  /* integrator's budget counter */
+
 XELPRESULT myBreakpoint(XELP *ths) {
     if (--stepCount <= 0) return XELP_E_BUDGET;       /* budget */
-    if (ths->mpfInReady && ths->mpfInReady()) {        /* break */
-        if (ths->mpfIn() == 0x03) return XELP_E_BREAK;
-    }
+    if (uartReady() && uartGetc() == 0x03)            /* break char */
+        return XELP_E_BREAK;
     traceLog(ths);          /* log statement to debug UART */
     inspectVars(ths);       /* dump arena / variable state */
-    waitForKey(ths);        /* single-step: block on mpfIn */
+    waitForKey();           /* single-step: block on input */
     return XELP_S_OK;
 }
 ```
@@ -2083,6 +2142,17 @@ Token-level grammar annexes deliberately avoid bloating checklist prose.
 ### Document precedence
 
 Requirements here constrain exploratory drafts (`dev/xelp_script_proposal1.md`, `dev/xelp_script_proposal2.md`, `dev/xelp_script_proposal3.md`). If proposal text clashes with numbered IDs (`A‑01`, `C‑01`, …), revise either the proposal or this document deliberately—silent divergence is unacceptable for safety reviews.
+
+### Version bump policy
+
+XELP Script adds new struct members (arena, `mpfBreakpoint`, script func
+table pointer, policy flags) to the `XELP` struct. This changes ABI size.
+Integrators who size-match `XELP` structs (e.g. static allocation,
+shared-memory IPC) MUST recompile. The script extension SHOULD ship as
+a **minor version** (v0.5.0) if the non-script `XELP` struct is unchanged
+behind `#ifdef`, or a **major version** if struct layout changes unconditionally.
+Release notes MUST call out struct size changes for static-allocation
+integrators.
 
 ---
 
@@ -2116,8 +2186,8 @@ to numbered requirements or explicit deferral.
   ```text
   _func square "_set r (* @1 @1) ; _return $r"
   ```
-  **Help for dynamic procs:** not worth arena cost. If help is needed,
-  register from C where the help string is free (ROM). Dynamic procs
+  **Help for dynamic funcs:** not worth arena cost. If help is needed,
+  register from C where the help string is free (ROM). Dynamic funcs
   are throwaway/debug — help not expected.
   **Dispatch order settled (DA-07):** builtins → user script funcs →
   user C commands → default handler. User script funcs win over C
@@ -2133,7 +2203,7 @@ to numbered requirements or explicit deferral.
   root frame's heap region, regardless of call depth. This is the one
   exception to "writes go to current frame." The root frame heap is
   the bottom of the arena — never reclaimed by frame pops — so funcs
-  persist until `_unset` or instance reset. No separate global heap
+  persist until instance reset (`XelpInit`). No separate global heap
   or arena partition needed. Variables remain frame-local (SC-01);
   funcs are instance-global via root frame targeting. Lookup during
   dispatch: linear scan of root heap for PROC entries. This is a
@@ -2197,10 +2267,12 @@ to numbered requirements or explicit deferral.
   Requires `XelpSetResultInt`/`XelpSetResultStr` public API for C
   handlers to push typed values onto the result stack.
   **`inkey "prompt"`** — MVP input primitive. C handler prints prompt
-  via `mpfOut`, spins on `mpfInReady`/`mpfIn` (integrator controls the
-  spin loop — yield, service DMA, pet watchdog, etc.), returns keycode
-  as INT via `XelpSetResultInt`. ~20-30 bytes of user code. Capability
-  policy: don't register `inkey` on restricted instances.
+  via `ths->mpfOut`, then uses the integrator's own input function
+  (whatever reads from the physical transport — UART, BLE, USB) to
+  spin for a keypress. The integrator controls the spin loop — yield,
+  service DMA, pet watchdog, etc. Returns keycode as INT via
+  `XelpSetResultInt`. ~20-30 bytes of user code. Capability policy:
+  don't register `inkey` on restricted instances.
   **`input "prompt" [esc_key]`** — line input. Lower priority, not MVP,
   but not deferred. C handler with line buffer, backspace/echo, ENTER
   detection. Returns STR via `XelpSetResultStr`. Optional escape key
@@ -2230,8 +2302,8 @@ requirements.**
 ### The gap
 
 `XelpParse(ths, "script text")` already runs a script from C and returns
-`XELPRESULT`. C reads `mR[0]` for integer results. What's missing: a
-frame (local scope + `@n` args) and typed result capture.
+`XELPRESULT`. C reads `mR[0]` for status. What's missing: a frame
+(local scope + `@n` args) and typed result capture.
 
 ### Proposed API
 
@@ -2242,8 +2314,8 @@ only pays for typed inspection if they need it.
 /* Call — same string format as CLI, tokenizer splits it */
 XELPRESULT r = XelpCallProc(ths, "calibrate 12 3");
 
-/* Simple path: integer result via mR[0] */
-int gain = ths->mR[0];
+/* Simple path: integer result mirrored to mR[1] */
+int gain = ths->mR[1];
 
 /* Typed path: inspect what _return actually pushed */
 XelpResult res;
@@ -2272,39 +2344,47 @@ convention (`strtok`, `getenv`).
 | Direction | Push typed value | Read typed value |
 |---|---|---|
 | C handler → xelp result stack | `XelpSetResultInt` / `XelpSetResultStr` | evaluator reads internally |
-| xelp `_return` → C caller | `_return` writes to result stack (+ `mR[0]` for ints) | `XelpGetResult` reads from result stack |
+| xelp `_return` → C caller | `_return` writes to result stack (+ `mR[1]` for ints) | `XelpGetResult` reads from result stack |
 
-### `_return` and `mR[0]`
+### `_return` and `mR[]`
 
-`_return 42` SHOULD also write to `mR[0]` as a side effect — maintains
-backward compatibility with `XelpParse` users who already read `mR[0]`.
-`_return "hello"` does not write to `mR[0]` (int register, no meaningful
-string representation). String returns require `XelpGetResult`.
+`mR[0]` is always the XELPRESULT status of the last dispatched
+statement — same contract as v0.4.0. It is NOT a value return
+channel.
+
+`_return 42` writes the typed value to the arena result stack and
+mirrors the integer to `mR[1]` as a convenience for C callers who
+want a quick int without calling `XelpGetResult`. `mR[0]` reflects
+the status of the `_return` operation itself (`XELP_S_OK`).
+
+`_return "hello"` writes to the result stack only. `mR[1]` is
+unchanged (no meaningful int representation). String returns require
+`XelpGetResult`.
 
 ### No `_return` case
 
-If a proc ends without `_return`, the result is NIL. `XelpGetResult`
-returns `kind == XELP_VAL_NIL`. `mR[0]` is unchanged from whatever
-was there before the call.
+If a func ends without `_return`, the result is NIL. `XelpGetResult`
+returns `kind == XELP_VAL_NIL`. `mR[0]` = `XELP_S_OK` (the func
+completed successfully). `mR[1]` is unchanged.
 
 ### Proposed requirements (pending review)
 
 | ID | Requirement |
 | --- | --- |
-| CC-01 | `XelpCallProc(ths, "name args...")` MUST push a frame, tokenize the string into `@n` positional parameters, execute the proc body, pop the frame, and return `XELPRESULT` status. Same string format as CLI input. |
+| CC-01 | `XelpCallProc(ths, "name args...")` MUST push a frame, tokenize the string into `@n` positional parameters, execute the func body, pop the frame, and return `XELPRESULT` status. Same string format as CLI input. |
 | CC-02 | `XelpGetResult(ths, &result)` MUST read the top of the result stack into an `XelpResult` struct. The struct MUST report kind (INT, STR, NIL), intVal, strVal, and strLen. |
 | CC-03 | `XelpResult.strVal` MUST point into the arena. It is valid until the next xelp API call on that instance. Caller MUST copy if longer lifetime is needed. |
-| CC-04 | `_return <int>` SHOULD write to `mR[0]` as a side effect for backward compatibility. `_return <str>` MUST NOT write to `mR[0]`. |
-| CC-05 | If a proc ends without `_return`, `XelpGetResult` MUST return `kind == XELP_VAL_NIL`. `mR[0]` MUST be unchanged. |
-| CC-06 | Re-entrancy: `XelpCallProc` → proc calls C handler → C handler calls `XelpCallProc` MUST work. Arena stack nesting handles frame isolation. Depth is bounded by arena size. |
+| CC-04 | `_return <int>` SHOULD mirror the integer to `mR[1]` (not `mR[0]`) as a convenience for C callers. `mR[0]` reflects the status of the `_return` operation (`XELP_S_OK`). `_return <str>` MUST NOT touch `mR[1]`. |
+| CC-05 | If a func ends without `_return`, `XelpGetResult` MUST return `kind == XELP_VAL_NIL`. `mR[0]` = `XELP_S_OK`. `mR[1]` MUST be unchanged. |
+| CC-06 | Re-entrancy: `XelpCallProc` → func calls C handler → C handler calls `XelpCallProc` MUST work. Arena stack nesting handles frame isolation. Depth is bounded by arena size. |
 
 ### Open concerns for external review
 
 1. **String lifetime.** Arena pointer is fragile if caller isn't careful.
    Should we copy into a caller-provided buffer instead?
-2. **`mR[0]` side effect.** Is writing `_return` to `mR[0]` a clean
-   design or an awkward dual-channel return? Should `mR[0]` be the ONLY
-   return path (no `XelpResult`)?
+2. **`mR[1]` convenience mirror.** Resolved: `_return <int>` mirrors
+   to `mR[1]` (not `mR[0]`). `mR[0]` stays pure status. Is `mR[1]`
+   the right slot? Could it conflict with handlers that use `mR[1]`?
 3. **Re-entrancy depth.** Is there a practical limit? Should
    `XelpCallProc` check arena headroom before pushing a frame?
 4. **No `_return` behavior.** NIL result vs error — which is more useful?
@@ -2453,12 +2533,14 @@ at the CLI (no variable expansion, plain decimal literal).
 
 **Arena storage:**
 
-Float variables in the heap use the same byte-stream encoding as integers:
+Float variables in the heap use the same byte-stream encoding as integers
+(note: actual format includes `nameLen_1B | name_bytes` per AR-08;
+sizes below are approximate and will increase by name length):
 
 ```text
-F32:  [ 0x0A | nameHash_2B | value_4B ]     = 7 bytes  (same as INT)
-F64:  [ 0x0B | nameHash_2B | value_8B ]     = 11 bytes
-F16:  [ 0x09 | nameHash_2B | value_2B ]     = 5 bytes
+F32:  [ 0x0A | nameHash_2B | nameLen+name | value_4B ]
+F64:  [ 0x0B | nameHash_2B | nameLen+name | value_8B ]
+F16:  [ 0x09 | nameHash_2B | nameLen+name | value_2B ]
 ```
 
 No structural change to the arena. The kind byte distinguishes float from
@@ -2488,6 +2570,12 @@ Without `XELP_ENABLE_FLOAT`: zero cost — compile flag gates everything.
 ---
 
 ## Possible tiers (exploratory—not committed)
+
+> **NON-NORMATIVE.** This section is exploratory brainstorming. It does
+> not contain requirements and MUST NOT be treated as specification text.
+> The normative body above (C-05, C-08) defines the actual compile-time
+> script profiles. This section will be either promoted to numbered
+> requirements or deleted before implementation begins.
 
 A **staging** idea under discussion—not normative unless promoted into numbered **`ID`** rows later.
 
