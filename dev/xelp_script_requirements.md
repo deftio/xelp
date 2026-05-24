@@ -29,7 +29,83 @@ It runs at command speed. C/C++ remains the native fast path.
 Informative scenarios (non-exhaustive): factory calibration ladders, scripted bring-up, regression harness hooks on peripherals, field diagnostics macros over UART or BLE.
 
 ## XELP background
-TODO: put deeper xelp background here (what it is its 15 years old, its 3KB parser, cli, key, thru, rommable scripts etc.)
+
+xelp is a lightweight, embeddable command-line interpreter written in
+pure C89. It has been in continuous use since approximately 2005–2006,
+originally developed as a debug shell for bare-metal embedded projects
+targeting 8051 and MSP430 microcontrollers. The codebase migrated through
+Subversion and Bitbucket before being open-sourced on GitHub in 2024
+under the BSD 2-Clause license.
+
+### What xelp is
+
+A character-at-a-time parser that processes input one byte at a time —
+no line buffering required, no OS, no malloc, no stdlib dependencies.
+It provides three operating modes:
+
+* **CLI mode** — line-buffered command prompt with backspace, cursor
+  movement (left/right, Home/End), insert-at-cursor, Delete, and
+  optional command history (UP/DOWN arrow recall). Commands are
+  dispatched via a function pointer table: each registered command name
+  maps to a C function with the signature
+  `XELPRESULT fn(XELP *ths, int argc, const char **argv)`.
+* **KEY mode** — single-keypress dispatch. Each key (including multi-byte
+  ANSI escape sequences) triggers a function immediately, no ENTER
+  needed. Ideal for debug menus and hardware test jigs.
+* **THRU mode** — pass-through. All input is forwarded to another
+  peripheral or handler. Used for bridging between UARTs or redirecting
+  input to a subsystem.
+
+Mode switching is done via configurable hotkeys (default: CTRL-P for CLI,
+ESC for KEY, CTRL-T for THRU).
+
+### Key properties
+
+* **No dynamic allocation.** All state lives in a fixed-size struct
+  (`XELP`). Buffer sizes are compile-time constants. Zero malloc, zero
+  free, zero heap.
+* **Multi-instance.** Multiple independent xelp instances can run on
+  one MCU — e.g. one on USB Serial, one on BLE, one on a debug UART.
+  Each has its own buffers, mode, command tables, output function, and
+  optional capability policy. No global mutable state.
+* **ROM-able scripts.** The existing `XelpParse` function executes
+  command sequences from a `const char *` buffer — script source can
+  live in ROM or flash. The parser does not mutate the source text.
+* **Compile-time feature selection.** Features are controlled by
+  `#define` flags in `xelpcfg.h`. Unused features compile out
+  completely. Configurations range from ~550 bytes (KEY-only on ARM
+  Thumb) to ~3–5 KB (full CLI + KEY + THRU + HELP + LINE_EDIT +
+  HISTORY).
+* **Platform abstraction.** Five function pointers in the XELP struct
+  (`mpfOut`, `mpfIn`, `mpfInReady`, `mpfGetTicks`, `mpfDelay`) abstract
+  all platform dependencies. Porting to a new target is implementing
+  these five functions.
+* **Cross-architecture.** Tested on 8-bit (AVR, 8051), 16-bit (MSP430),
+  32-bit (ARM Cortex-M, ESP32, RISC-V rv32, Xtensa), and 64-bit (x86-64)
+  targets. CI runs 18 cross-compilation targets via Docker.
+
+### Current size (v0.4.0, ARM Thumb, full config)
+
+~3,079 bytes code. This includes CLI mode with argc/argv dispatch, KEY
+mode, THRU mode, HELP, line editing, command history, tokenizer with
+quoted strings and escape sequences, and multi-instance support.
+
+### What xelp is not
+
+xelp is not a scripting language, an operating system, a scheduler, or a
+protocol stack. It is a command dispatcher. C functions are the commands.
+The XELP struct is shared state between the parser and the application —
+there is no foreign function interface, no bindings, no marshaling. A
+command handler reads `argv`, calls hardware drivers directly, and
+returns a status code.
+
+### Why XELP Script
+
+The existing `XelpParse` executes flat command sequences from ROM — but
+with no variables, no conditionals, no composition. Every non-trivial
+flow requires a C function. XELP Script adds just enough language
+support to make command streams programmable without replacing C as the
+primary implementation path. See [Design center](#design-center) above.
 
 ## Language shape
 
@@ -118,20 +194,45 @@ Each parenthesized subexpression yields exactly one typed value (or a defined ER
 Keep variables, call parameters, and command invocation visually distinct.
 
 ```text
-$name     named variable lookup
+$name     expand variable — get the value of "name"
 @1        first positional argument of innermost scripted callable
 @2        second positional argument
 @name     named argument, if supported
 @#        argument count (if supported)
-foo       verb in command position
+foo       verb in command position / literal name in argument position
 (foo ...) nested value-producing call
 ```
 
 Three domains:
 
-* **Variables via `$`** - `$temperature` resolves in the active variable scope for this instance/script artifact.
+* **Variables via `$`** - `$temperature` resolves in the active variable scope for this instance/script artifact. `$` is an expansion operator, not part of the variable name — it means "get the value of."
 * **Parameters via `@`** - `@1` is always positional parameter one; avoids bash confusion where `$1` means something else entirely.
 * **Invocation by name** - `motor 50` is a statement. `(motor 50)` participates as a nested value expression only where grammar allows.
+
+### `$` sigil rule — expand semantics
+
+**One rule: `$name` always means "expand to the value of name." Always. Everywhere. No exceptions.**
+
+Without `$`, a token is a literal — the text itself, not a variable reference. This is the Tcl/bash model, not the PHP/Perl model. The sigil tells the reader whether a token is being expanded or used literally. The question "do I need `$` here?" becomes: "do I want the value or the name?"
+
+```text
+_set x 10         # bare "x" = the name to bind, "10" = literal value
+_set y $x         # bare "y" = name to bind, $x = expand x → 10
+_print $x         # $x = expand → "10"
+_if (> $x 5) ...  # $x = expand → 10, compare to 5
+```
+
+**Indirect assignment falls out naturally:**
+
+```text
+_set target "temperature"
+_set $target 42   # $target expands → "temperature", so this sets variable "temperature" to 42
+_print $temperature   # → "42"
+```
+
+Both `$` tokens in `_set $target 42` are expanded because both have `$`. The user wrote `$` on both because they *want* both expanded. If they wanted to set the literal variable `target`, they'd write `_set target 42`.
+
+If a `$` reference is undefined, expansion fails → error (undefined variable). No silent empty-string substitution.
 
 ## Bare word rule
 
@@ -148,12 +249,60 @@ In argument position, an unquoted word is a literal, not automatic variable dere
 Recommended decoding after tokenization:
 
 ```text
-digits / numeric literals     -> INT (same parsing spirit as CLI)
-"quoted …"                     -> STR
-bare word                     -> literal (SYM / STR convention per profile)
-$name                         -> typed variable value
+unquoted digits / numeric      -> INT (XelpParseNum succeeds)
+"quoted …"                     -> STR (always, even if content is numeric)
+bare word (unquoted, non-num)  -> STR literal
+$name                         -> typed variable value (expand)
 @1 / @name                    -> parameter value
 (... )                        -> typed return from nested call
+```
+
+### Quotes as type annotation
+
+Quotes resolve the "3" vs 3 ambiguity. The evaluator can see raw tokens
+(before quote stripping) for builtins. The rule:
+
+```text
+_set x 3        # unquoted, XelpParseNum("3") succeeds → INT(3)
+_set x "3"      # quoted → STR("3"), regardless of content
+_set x hello    # unquoted, XelpParseNum("hello") fails → STR("hello")
+_set x "hello"  # quoted → STR("hello")
+_set x 0xFF     # unquoted, XelpParseNum("0xFF") succeeds → INT(255)
+_set x "0xFF"   # quoted → STR("0xFF")
+```
+
+This gives explicit control when it matters. For the common case (numbers
+are numbers, strings are strings), inference does the right thing. For the
+edge case of a string that looks like a number, quotes force STR. The cost
+is ~zero: one `if (*tok == '"')` branch in the builtin evaluation path.
+
+### Two-path type handling
+
+Type information flows through **two separate channels** depending on
+the dispatch path:
+
+**User C handlers** (normal dispatch) — quotes are stripped, everything
+in argv is a plain null-terminated string. Exactly like today. `_foo $x 3 "3"` → handler sees `argv = ["_foo", "10", "3", "3"]`. The two "3"s are
+indistinguishable. This is the existing contract (EX-02). C handlers don't
+know or care about script types. If the handler wants an int, it calls
+`XelpArgvInt`.
+
+**Builtins** (`_set`, `_if`, etc.) — the evaluator processes raw tokens
+*before* building argv. It sees quotes, `$` sigils, `()` nesting. Type
+decisions happen during evaluation, not from argv strings. The type tag
+is stored in the arena entry.
+
+**Type info does not round-trip through argv.** When `$x` (INT 3) and
+`$y` (STR "3") are expanded into argv for a C handler, both become the
+string `"3"`. But inside the script variable system, they have different
+type tags and behave differently under operations like `+` or `_eq`.
+
+```text
+_set a 3          # INT(3)
+_set b "3"        # STR("3")
+_print $a $b      # both print "3" — no visible difference in output
+(+ $a 1)          # → 4, INT + INT works
+(+ $b 1)          # → type error: STR + INT (see comparison semantics)
 ```
 
 ## Normative requirements (how to read this section)
@@ -815,6 +964,110 @@ active. This means non-script builds pay zero RAM for the arena.
 | EX-06 | The script dispatch path MUST reuse the existing `_xelpBuf2Argv` tokenization logic with variable expansion added as a pre-copy step, writing packed strings directly into the arena at the current stack pointer. |
 | EX-07 | INT-to-string formatting during `$var` expansion MUST use a shared internal utility (`_xelpIntToStr`) that writes decimal digits to a destination buffer. The same utility SHOULD be reusable by C handler helpers and diagnostic output. Exposing it as public API (`XelpIntToStr`) is recommended but deferred to implementation. |
 | EX-08 | The `$var` expansion path MUST be type-dispatched (switch on value kind). Adding a new type (e.g. float) MUST only require adding a formatter case and the formatter function — no structural changes to the expansion loop or arena layout. |
+
+### Sigil semantics and type inference **(SG‑\*, TI‑\*)**
+
+The `$` sigil uses **expand semantics**: `$name` always means "get the
+current value of the variable named `name`." Without `$`, a token in
+argument position is the literal text — the name itself, not a reference.
+This is the Tcl/bash model. The complete rule is one sentence: **`$` means
+expand, always.**
+
+The consequence: in `_set x 10`, bare `x` is the target name and `10` is a
+literal value. In `_set y $x`, bare `y` is the target name and `$x` is
+expanded to the value of `x`. Both uses of `$` and bare tokens are
+consistent because the rule never changes — `$` = expand, bare = literal.
+
+Indirect assignment (`_set $ptr value` where `$ptr` holds a variable name)
+works because `$ptr` expands to a name string which `_set` uses as its
+target. No extra machinery needed.
+
+**Type inference for `_set`:** the evaluator inspects the raw token (before
+quote stripping) to determine the stored type. Quotes are the explicit type
+annotation:
+
+* Unquoted token that passes `XelpParseNum` → **INT**
+* Quoted token (`"..."`) → **STR**, regardless of content
+* Unquoted token that fails `XelpParseNum` → **STR**
+* Value from `$` expansion → **preserves the source variable's type**
+* Value from `()` subexpression → **preserves the return type**
+
+This means `_set x 3` stores INT(3), `_set x "3"` stores STR("3"), and
+`_set x $y` copies whatever type `$y` has. The quote mark is the escape
+hatch when the user needs a string that looks like a number.
+
+**Two-path type handling:** type information lives in **arena entries**
+(typed variable system), not in argv strings. When a typed variable is
+expanded into argv for a C handler, it becomes a plain string — the type
+tag does not survive the argv boundary. C handlers see strings. Builtins
+see types.
+
+| ID | Requirement |
+| --- | --- |
+| SG-01 | `$name` MUST always mean "expand the variable named `name` to its current value." This rule MUST have no exceptions — `$` is the expansion operator in every context. |
+| SG-02 | A bare word in argument position MUST be the literal text, not an implicit variable reference. `_set x 10` means the target name is the string `"x"`, not "the variable x." |
+| SG-03 | Expansion of an undefined variable MUST produce an error (`XELP_E_ERR`), not a silent empty string. |
+| SG-04 | Indirect assignment (`_set $ptr value` where `$ptr` holds a name string) MUST work by expanding `$ptr` first, then using the resulting string as the target name. No special syntax needed. |
+| TI-01 | `_set` MUST infer stored type from the raw token. Unquoted tokens that pass `XelpParseNum` → INT. Quoted tokens → STR. Unquoted tokens that fail `XelpParseNum` → STR. |
+| TI-02 | Values arriving from `$` expansion or `()` subexpressions MUST preserve the source type. `_set y $x` copies x's type tag. `_set z (+ 1 2)` stores INT(3). |
+| TI-03 | Builtins (`_set`, `_if`, etc.) MUST have access to raw tokens before quote stripping for type inference. This is provided by the builtin dispatch path (DA-02). |
+| TI-04 | C handlers MUST receive argv with quotes stripped and all values as plain strings (EX-02). Type information MUST NOT leak into the C handler argv — types live in arena entries only. |
+| TI-05 | `0xFF`, `0b1010`, and other `XelpParseNum`-compatible formats MUST parse as INT when unquoted. `"0xFF"` (quoted) MUST store as STR. |
+| TI-06 | When `XELP_ENABLE_FLOAT` is disabled, unquoted tokens like `3.14` that fail `XelpParseNum` MUST store as STR (not error). When `XELP_ENABLE_FLOAT` is enabled, they MUST parse as the appropriate float type. |
+
+### Variable lifecycle **(VL‑\*)**
+
+Variables are declared by first `_set` and live until their frame pops
+(or instance reset for root frame). Type is fixed at declaration — like
+C, not like Python.
+
+**Type immutability:** the first `_set x 10` declares x as INT. All
+subsequent `_set x <value>` must produce INT. `_set x "hello"` after
+x is INT → `XELP_E_ERR`. This eliminates arena entry resizing for
+type changes and makes memory usage predictable.
+
+**INT reassignment:** overwrite value in place. Entry size never changes.
+Zero arena cost.
+
+**STR reassignment, same length or shorter:** overwrite in place. Entry
+size unchanged, tail bytes unused but bounded.
+
+**STR reassignment, longer:** `memmove` the current frame's heap entries
+between HP and the target entry toward the free space by `delta` bytes.
+Update HP. Write new string data into the expanded entry. Overflow check
+(`SP + delta <= HP`) before the move — `XELP_E_ERR` if arena full.
+
+```text
+Before:  ... free ... | var_c | var_b | var_a("hi") | parent_vars
+                        ^
+                        HP
+
+_set var_a "hello world"    # needs 9 more bytes, delta = 9
+
+After:   ... free | var_c | var_b | var_a("hello world") | parent_vars
+                    ^
+                    HP (moved 9 bytes toward stack)
+```
+
+The moved data is only current-frame entries between HP and the target
+— typically 30-100 bytes for a frame with a few variables. Lookup is
+by scan (name hash), so no pointers need updating — just HP. The cost
+is in the same neighborhood as the lookup scan that already found the
+variable.
+
+**No `_unset`.** Variables die when their frame pops (automatic). Root
+frame variables persist until `XelpInit` (instance reset). Dynamic
+`_func` entries persist until instance reset. This matches C semantics
+— declaration is lifetime, scope is cleanup.
+
+| ID | Requirement |
+| --- | --- |
+| VL-01 | The first `_set` for a name MUST declare the variable with the inferred type (TI-01). Subsequent `_set` to the same name MUST preserve the type. Type-changing reassignment (`_set x 10` then `_set x "hello"`) MUST produce `XELP_E_ERR`. |
+| VL-02 | INT reassignment MUST overwrite the value in place. Zero arena growth. |
+| VL-03 | STR reassignment with same-length or shorter string MUST overwrite in place. |
+| VL-04 | STR reassignment with longer string MUST `memmove` current-frame heap entries between HP and the target to make room. HP MUST be updated. Arena overflow (`SP + delta > HP`) MUST produce `XELP_E_ERR`. |
+| VL-05 | Variables MUST be scoped to their declaring frame. Frame pop reclaims all frame-local variables automatically (AR-04). Root frame variables persist until instance reset (`XelpInit`). |
+| VL-06 | No `_unset` or `_clear` builtin. Scope-based lifetime is the only cleanup mechanism. |
 
 ### Truthiness, predicates, and regression tests **(TH‑\*, TR‑\*)**
 
@@ -1549,9 +1802,208 @@ not types.
 | IO-07 | `_lpad` MUST return the padded string as STR on the result stack. It is a value-producing builtin, intended for use inside `()` composition with `_print`. |
 | IO-08 | `_lpad` is a string operation. It MUST NOT perform type detection or numeric parsing. The argument is a string — whatever expansion produced. |
 
+### Dispatch architecture **(DA‑\*)**
+
+The script evaluator has two dispatch paths — one for language builtins,
+one for user commands. They are separated by a single-byte test on the
+command name.
+
+#### Two-path dispatch
+
+```text
+evaluator loop:
+    get next command token
+    if token[0] == '_':
+        _xelpBuiltinDispatch(ths, token, &parseState, &arena)
+    else:
+        tokenize into argc/argv
+        look up in user command table
+        call handler(ths, argc, argv)
+```
+
+**Builtin path (`_xxx`):** A single internal function that is part of
+the evaluator, not a registered handler. It has full access to evaluator
+internals — parse position, arena stack/heap pointers, frame state,
+continuation markers. Internally dispatches by builtin name (switch,
+small hash, or compact table).
+
+**User command path:** Normal C handler dispatch via the command table
+(`mpCLIModeFuncs` or equivalent). Handlers receive the standard
+`(ths, argc, argv)` signature. No access to evaluator internals.
+
+#### Why builtins can't be normal handlers
+
+Language constructs need evaluator access that `(ths, argc, argv)` doesn't
+provide:
+
+| Builtin | Needs |
+|---|---|
+| `_goto :label` | Modify parse position — scan from frame start |
+| `_next :label` | Modify parse position — scan forward |
+| `_if ... _then ... _else ...` | Conditional dispatch of sub-commands, control flow branching |
+| `_set x 10` | Write to arena heap (variable storage), raw token inspection for type inference (TI-01) |
+| `_return` | Pop frame, capture result, reset SP/HP |
+| `_proc` | Register callable, or push frame and redirect parsing |
+| `_print` | Could be a normal handler, but lives in builtin path for namespace consistency |
+| `_lpad` | Could be a normal handler, but lives in builtin path for namespace consistency |
+| `_mr` | Reads/writes `mR[]`, pushes to result stack |
+
+Some builtins (`_print`, `_lpad`, `_mr`) don't strictly need evaluator
+access — they could be normal handlers. But placing them in the builtin
+path keeps the `_` namespace unified: all `_xxx` tokens go through one
+dispatch point. No split where some `_` commands are in the builtin
+function and others are in the user table.
+
+#### Detection is cheap
+
+`token[0] == '_'` — one byte compare. If match, builtin dispatch. If no
+match, user command lookup. No ambiguity because `_<identifier>` is
+reserved (B-02) — user commands MUST NOT start with `_`.
+
+This check happens before tokenization into argc/argv. For builtins that
+need to manipulate parse state (`_goto`, `_next`, `_if`), the evaluator
+can process the raw token stream directly without building a full argv
+first. For builtins that work with argc/argv (`_print`, `_set`, `_lpad`),
+the builtin dispatch tokenizes as needed.
+
+#### User command lookup
+
+Because builtin dispatch is separated out, the user command lookup path
+is independent and can use any strategy:
+
+* **Linear scan** (current `mpCLIModeFuncs`): Simple, zero overhead.
+  Fine for small command sets (< ~20 commands). O(n) per dispatch.
+* **Sorted array + binary search**: O(log n) lookup, zero extra RAM
+  beyond the table itself. Good for medium command sets.
+* **Prefix trie**: O(k) where k = command name length. Fast for large
+  command sets, compact if commands share prefixes (`motor_start`,
+  `motor_stop`, `motor_speed`).
+* **Hash table**: O(1) amortized. Costs RAM for the table. Best for
+  large command sets where lookup speed matters.
+
+The strategy is an integrator decision — controlled by a compile flag
+or by which lookup function the integrator provides. The default can
+remain linear scan for backward compatibility. The architecture enables
+faster strategies without changing the builtin path or the handler
+signature.
+
+#### Dispatch order
+
+For the script evaluator:
+
+1. Check `token[0] == '_'` → builtin dispatch (always wins).
+2. User script funcs (dynamic `XELP_VAL_PROC` variables + C-registered
+   script func table).
+3. User C command table (`mpCLIModeFuncs`).
+4. If not found → default handler (`mpfDefCLI`) if set, else
+   `XELP_E_CMDNOTFOUND`.
+
+User script funcs are checked before C commands so a user can override
+a C handler with a script wrapper if needed. A policy flag MAY gate
+whether overriding is allowed (e.g. disallow on production builds,
+allow on debug builds).
+
+For the non-script CLI path (`XelpParseXB`), behavior is unchanged —
+it searches `mpCLIModeFuncs` as today. Builtins are only available when
+the script evaluator is active. This means non-script builds pay zero
+for builtin dispatch code.
+
+If a future profile wants builtins at the non-script CLI (e.g. `_print`
+without the full script engine), the `_` check could be added to
+`XelpParseXB` with a compile flag. But that's not MVP.
+
+| ID | Requirement |
+| --- | --- |
+| DA-01 | The script evaluator MUST split dispatch into two paths: builtin (`_xxx`) and user command. Detection MUST be a single-byte test (`token[0] == '_'`). |
+| DA-02 | Builtin dispatch MUST be a single internal function with full access to evaluator internals (parse position, arena, frame state, continuation markers). It is part of the evaluator, not a registered handler. |
+| DA-03 | User command dispatch MUST use the existing handler signature `(ths, argc, argv)`. Handlers MUST NOT have access to evaluator internals. |
+| DA-04 | All `_`-prefixed tokens MUST route through builtin dispatch. No split where some `_` commands are builtins and others are in the user command table. The `_` namespace is unified. |
+| DA-05 | Builtin dispatch MUST be internal to the script evaluator. Non-script `XelpParseXB` MUST NOT change. Non-script builds pay zero for builtin dispatch. |
+| DA-06 | The user command lookup strategy (linear scan, sorted array, trie, hash) SHOULD be an integrator decision. The default MAY remain linear scan for backward compatibility. The architecture MUST NOT constrain the lookup strategy. |
+| DA-07 | Dispatch order: (1) builtins (token starts with `_`), (2) user script funcs (dynamic PROC variables + C-registered script func table), (3) user C command table, (4) default handler (`mpfDefCLI`), (5) `XELP_E_CMDNOTFOUND`. User script funcs before C commands enables overriding. A policy flag MAY gate whether overriding is allowed. |
+
+### Math and logic builtins **(MA‑\*)**
+
+Integer math builtins use Lisp-style prefix syntax. All operate on INT
+values. Symbol aliases are optional ergonomic shortcuts — same handlers,
+shorter names (per B-03 convention). All math builtins push their result
+onto the result stack for `()` composition.
+
+#### Arithmetic
+
+| Builtin | Alias | Arity | Notes |
+|---|---|---|---|
+| `_add` | `+` | variadic | `(+ 1 2 3)` → 6. Two or more args. |
+| `_sub` | `-` | binary | `(- 10 3)` → 7. |
+| `_mul` | `*` | variadic | `(* 2 3 4)` → 24. Two or more args. |
+| `_div` | `/` | binary | Integer division. `(/ 10 3)` → 3. Division by zero → `XELP_E_ERR`. |
+| `_mod` | `%` | binary | Integer modulo. `(% 10 3)` → 1. |
+
+#### Logical (boolean, operate on truthiness)
+
+| Builtin | Arity | Notes |
+|---|---|---|
+| `_and` | binary | Boolean AND. Operands evaluated via truthiness (TH-01). |
+| `_or` | binary | Boolean OR. |
+| `_not` | unary | Boolean NOT. `(_not 0)` → 1, `(_not 5)` → 0. |
+
+#### Bitwise
+
+| Builtin | Alias | Notes |
+|---|---|---|
+| `_band` | `&` | Bitwise AND. |
+| `_bor` | `\|` | Bitwise OR. |
+| `_bxor` | `^` | Bitwise XOR. |
+| `_bnot` | `~` | Bitwise NOT (unary). |
+| `_shl` | `<<` | Shift left. `(_shl 1 4)` → 16. |
+| `_shr` | `>>` | Shift right. `(_shr 16 4)` → 1. |
+
+#### In-place mutation
+
+| Builtin | Notes |
+|---|---|
+| `_inc` | `_inc x` — increment variable x in place (bare name, like `_set`). Pushes the new value onto the result stack. `(_inc x)` both mutates x and yields the new value. |
+| `_dec` | `_dec x` — decrement variable x in place. Same semantics as `_inc`. |
+
+`_inc` and `_dec` take bare names (not `$x`) because they need the
+variable name to mutate it — same evaluator access as `_set` (TI-03).
+They are syntactic sugar for `_set x (_add $x 1)` but avoid the arena
+churn of creating a new entry for loop counters.
+
+| ID | Requirement |
+| --- | --- |
+| MA-01 | All math builtins MUST operate on INT values. Non-INT arguments MUST produce `XELP_E_ERR` (no silent coercion from STR). |
+| MA-02 | All math builtins MUST push their result onto the result stack as INT for `()` composition. |
+| MA-03 | `_add` and `_mul` MUST accept two or more arguments (variadic). `_sub`, `_div`, `_mod` MUST be binary. |
+| MA-04 | `_div` and `_mod` with divisor zero MUST return `XELP_E_ERR`, not crash or invoke undefined behavior. |
+| MA-05 | `_inc` and `_dec` MUST take a bare variable name (not `$`), mutate the variable in place, and push the new value onto the result stack. The variable MUST be INT; non-INT MUST produce `XELP_E_ERR`. |
+| MA-06 | Symbol aliases (`+`, `-`, `*`, `/`, `%`, `&`, `\|`, `^`, `~`, `<<`, `>>`) are optional ergonomic aliases bound to the same handlers. They do NOT get a `_` prefix (per B-03). A compile flag MAY exclude symbol aliases for ROM-constrained builds. |
+| MA-07 | Logical builtins (`_and`, `_or`, `_not`) MUST evaluate operands via the canonical truthiness mapping (TH-01). Results MUST be INT 0 or 1. |
+
+#### Comparison
+
+| Builtin | Alias | Types | Notes |
+|---|---|---|---|
+| `_eq` | `==` | INT, STR | Type-aware. Same type → compare values. Different types → false (no coercion). |
+| `_neq` | `!=` | INT, STR | Inverse of `_eq`. Different types → true. |
+| `_gt` | `>` | INT only | Non-INT → `XELP_E_ERR`. |
+| `_lt` | `<` | INT only | Non-INT → `XELP_E_ERR`. |
+| `_ge` | `>=` | INT only | Non-INT → `XELP_E_ERR`. |
+| `_le` | `<=` | INT only | Non-INT → `XELP_E_ERR`. |
+
+String `_eq` / `_neq` is byte comparison — same length + same bytes =
+equal. No locale, no case folding.
+
+| ID | Requirement |
+| --- | --- |
+| MA-08 | All comparison builtins MUST return INT 0 or 1 and push the result onto the result stack for `()` composition. |
+| MA-09 | `_eq` and `_neq` MUST accept both INT and STR operands. Same-type comparison: INT uses numeric equality, STR uses byte-for-byte comparison. Cross-type (`_eq 3 "3"`) MUST return false — no coercion. |
+| MA-10 | `_gt`, `_lt`, `_ge`, `_le` MUST accept INT operands only. Non-INT MUST produce `XELP_E_ERR`. |
+| MA-11 | Comparison symbol aliases (`==`, `!=`, `>`, `<`, `>=`, `<=`) follow the same rules as math aliases (MA-06): optional, no `_` prefix, same handlers. |
+
 ### Multi-instance capability policy **(M‑\*)**
 
-Answers “why two shells differ”: security or business policy—not accidental forked languages.
+Answers "why two shells differ": security or business policy—not accidental forked languages.
 
 | ID | Requirement |
 | --- | --- |
@@ -1561,9 +2013,64 @@ Answers “why two shells differ”: security or business policy—not accidenta
 
 Prevents unattended scripts wedging MCU unless manufacturing unlock explicitly allows it.
 
+The core mechanism is a single function pointer callback — `mpfBreakpoint`
+— called at the top of the evaluator loop every time the tokenizer fires
+to get the next statement. One hook point, one code location,
+deterministic. The callback receives the full XELP struct and can
+implement any combination of: step budgeting, break character detection,
+trace logging, variable inspection, single-step debugging. If the
+callback returns anything other than `XELP_S_OK`, the evaluator stops.
+
+If `mpfBreakpoint` is NULL, no call is made — scripts run without limits.
+The evaluator contains zero policy code. All safety, debugging, and
+tracing behavior is the integrator's responsibility via the callback.
+
+```c
+/* in XELP struct */
+XELPRESULT (*mpfBreakpoint)(XELP *ths);
+
+/* evaluator loop */
+while (XELP_S_OK == XelpTokLineXB(args, &line, XELP_TOK_LINE)) {
+    if (ths->mpfBreakpoint) {
+        XELPRESULT r = ths->mpfBreakpoint(ths);
+        if (r != XELP_S_OK) return r;
+    }
+    /* dispatch statement */
+}
+```
+
+Nothing is special about `_goto`, `_next`, or `:label` — they are
+statements like any other. The tokenizer processes them, the callback
+fires, the debugger decides what to do.
+
+Example integrator callback:
+```c
+XELPRESULT myBreakpoint(XELP *ths) {
+    if (--stepCount <= 0) return XELP_E_BUDGET;       /* budget */
+    if (ths->mpfInReady && ths->mpfInReady()) {        /* break */
+        if (ths->mpfIn() == 0x03) return XELP_E_BREAK;
+    }
+    traceLog(ths);          /* log statement to debug UART */
+    inspectVars(ths);       /* dump arena / variable state */
+    waitForKey(ths);        /* single-step: block on mpfIn */
+    return XELP_S_OK;
+}
+```
+
 | ID | Requirement |
 | --- | --- |
-| S-01 | SHOULD ship statement/step budgeting default enabled; MAY document explicit unlimited mode for jig-only builds. |
+| S-01 | The evaluator MUST call `mpfBreakpoint(ths)` at the top of the evaluator loop, before each statement, every time the tokenizer fires. If the callback returns anything other than `XELP_S_OK`, the evaluator MUST stop and return that status. |
+| S-02 | If `mpfBreakpoint` is NULL, no call is made. Scripts run without limits. The evaluator contains zero policy code — no built-in budget, no built-in break detection. |
+| S-03 | The `mpfBreakpoint` callback receives the full XELP struct. It MAY inspect variables, frame state, arena, registers, parse position, and input readiness. It MAY block (for single-step debugging). |
+| S-04 | Step budgeting, break character detection, trace logging, and all other safety/debug behavior are integrator policy implemented in the callback. xelp provides the hook and example implementations. |
+| S-05 | `XELP_BREAK_CHAR` SHOULD be provided as a compile-time define (default CTRL-C / 0x03) for use by integrator callbacks. |
+
+**Footnote — cross-instance debugging:** because xelp supports multiple
+independent instances and `mpfBreakpoint` receives the full XELP struct,
+one xelp instance can single-step another. Instance A (debug console on
+UART) runs C commands that inspect and control instance B (target on BLE).
+B's `mpfBreakpoint` callback blocks and waits for commands from A. All
+with existing multi-instance machinery — no extra debug protocol needed.
 
 ### Deferred specificity **(T‑\*)**
 
@@ -1584,56 +2091,151 @@ Requirements here constrain exploratory drafts (`dev/xelp_script_proposal1.md`, 
 Gaps identified during design. Each needs discussion and either promotion
 to numbered requirements or explicit deferral.
 
-- [ ] **`_proc` definition mechanics.** How are procs registered, stored,
-  and looked up? ROM-resident vs runtime-defined? Can procs be defined
-  at the CLI (multi-line input)? What's the storage format — name →
-  XelpBuf pointing into script source? Registration in a table or linear
-  scan of script text?
+- [ ] **`_func` definition mechanics.** Partially settled. Name is
+  `_func`. A func is a named string with execute permission — the
+  evaluator doesn't care whether statements came from a func body or
+  a ROM script. The frame gives it local scope, `@n` gives it arguments,
+  `_return` gives it a result.
+  **C-side registration:** array of `{name, body, help}` structs, same
+  pattern as `mpCLIModeFuncs`. Bodies are `const char *` — ROM-able.
+  Help text is a string in the struct (free, lives in ROM).
+  ```c
+  typedef struct {
+      const char *mpCmd;   /* function name */
+      const char *mpBody;  /* script text, ROM-able */
+      const char *mpHelp;  /* help string, or NULL */
+  } XELPScriptFuncEntry;
+  ```
+  C-registered bodies can use `\n` or `;` as statement separators
+  (C compiler turns `\n` into 0x0A, tokenizer sees it as separator).
+  **Dynamic definition (from script/CLI):** `_func` stores the body
+  as a `XELP_VAL_PROC`-typed entry (reserved in type enum, VT-05) in
+  the root frame. `;` is the practical statement delimiter — ENTER
+  submits the CLI line so real newlines can't be embedded in a quoted
+  string interactively.
+  ```text
+  _func square "_set r (* @1 @1) ; _return $r"
+  ```
+  **Help for dynamic procs:** not worth arena cost. If help is needed,
+  register from C where the help string is free (ROM). Dynamic procs
+  are throwaway/debug — help not expected.
+  **Dispatch order settled (DA-07):** builtins → user script funcs →
+  user C commands → default handler. User script funcs win over C
+  commands, enabling overrides. Policy flag MAY gate this.
+  **Redefinition rules settled:** dynamic PROC variables (defined via
+  `_func` at CLI or in script) MAY be redefined or unset — they're
+  entries in the root frame. C-registered script funcs and `_` builtins
+  MUST NOT be modified or unset — they live in ROM/tables outside the
+  arena. A dynamic `_func` with the same name as a C command will be
+  found first in dispatch (per DA-07) effectively shadowing the C
+  command, but the C registration is unchanged.
+  **Scope settled:** `_func` ALWAYS writes a PROC-typed entry to the
+  root frame's heap region, regardless of call depth. This is the one
+  exception to "writes go to current frame." The root frame heap is
+  the bottom of the arena — never reclaimed by frame pops — so funcs
+  persist until `_unset` or instance reset. No separate global heap
+  or arena partition needed. Variables remain frame-local (SC-01);
+  funcs are instance-global via root frame targeting. Lookup during
+  dispatch: linear scan of root heap for PROC entries. This is a
+  dispatch step (DA-07), not a variable lookup.
+  **Lookup strategy:** linear scan of root heap PROC entries. Left to
+  implementation — fine for the handful of funcs embedded scripts
+  define.
 
-- [ ] **Step budgeting details (S-01).** `_goto` requires this but it's
-  not fleshed out. Where does the counter live — XELP struct field?
-  Default limit value? How to override (`XELP_STEP_BUDGET` compile
-  flag)? What happens on budget exhaustion — error + stop? Resume
-  mechanism?
+- [x] **Step budgeting + interrupt + trace mechanism (S-01 through S-05).**
+  Settled. Single `mpfBreakpoint` callback called every time the tokenizer
+  fires. NULL = no limits, no overhead. Callback receives full XELP struct,
+  integrator implements all policy (budget, break, trace, single-step).
+  Zero policy code in the evaluator.
 
-- [ ] **Safe execution / interrupt mechanism.** Design center mentions
-  ESC-ESC or CTRL-C to break runaway scripts. How does the interpreter
-  check for break between statements? Poll `mpfIn`? Separate callback?
-  Key sequence detection while script is running?
+- [x] **`_set` type inference and `$` sigil semantics.** Resolved: `$` is
+  expand-only (Tcl/bash model, SG-01 through SG-04). Type inference uses
+  quotes as type annotation (TI-01 through TI-06). Unquoted numeric →
+  INT, quoted → STR, `$` expansion preserves source type. `0xFF` unquoted
+  → INT(255). `3.14` without `XELP_ENABLE_FLOAT` → STR. Two-path type
+  handling: builtins see raw tokens with types; C handlers get stripped
+  argv strings only (TI-04).
 
-- [ ] **`_set` type inference.** `_set x 3` → INT, `_set x "hello"` →
-  STR. What about `_set x 3.14` when `XELP_ENABLE_FLOAT` is disabled?
-  Error? Store as STR? What about `_set x 0xFF` — INT (parsed as hex)
-  or STR?
+- [x] **Math builtins roster (MA-01 through MA-07).** Settled.
+  Arithmetic: `_add`(+), `_sub`(-), `_mul`(*), `_div`(/), `_mod`(%).
+  Logical: `_and`, `_or`, `_not`. Bitwise: `_band`(&), `_bor`(|),
+  `_bxor`(^), `_bnot`(~), `_shl`(<<), `_shr`(>>). In-place: `_inc`,
+  `_dec`. `_add`/`_mul` variadic, others binary or unary. All push INT
+  result. `_inc`/`_dec` take bare names, mutate in place, push new value.
+  Symbol aliases optional, no `_` prefix. Comparisons still open (item 5).
 
-- [ ] **Math builtins roster.** `_add`, `_mul`, `_sub`, `_div`, `_mod`,
-  `_gt`, `_lt`, `_eq`, `_neq`, `_ge`, `_le`, `_and`, `_or`, `_not`,
-  `_band`, `_bor`, `_bxor`, `_bnot`, `_shl`, `_shr`. Which are MVP?
-  Arity (binary only, or variadic for `_add`/`_mul`)? Symbol aliases
-  (`+`, `*`, `>`, etc.) — which ship?
+- [x] **Comparison and equality semantics (MA-08 through MA-11).**
+  Settled. `_eq`/`_neq` work for INT and STR. Cross-type → false, no
+  coercion. `_gt`/`_lt`/`_ge`/`_le` INT-only, non-INT → error. String
+  comparison is byte-for-byte. All return INT 0 or 1.
 
-- [ ] **Comparison and equality semantics.** `_eq` across types — is
-  `_eq 3 "3"` true? Does it coerce? Or strict type match required?
-  Ties into truthiness (TH-05).
+- [x] **`_unset` / `_clear` → no `_unset` (VL-01 through VL-06).**
+  Settled. Variables are C-like: type fixed at first `_set`, live until
+  frame pops (or instance reset for root). No `_unset`. INT overwrites
+  in place. STR same-or-shorter overwrites in place. STR longer →
+  memmove current-frame heap entries to make room. No arena
+  fragmentation, no tombstones.
 
-- [ ] **`_unset` / `_clear`.** Root frame variables accumulate at the CLI.
-  Need a way to release them? Or just document that instance reset is
-  the cleanup mechanism?
+- [x] **Builtin registration mechanism.** Resolved: two-path dispatch
+  (DA-01 through DA-07). `_xxx` tokens route to a single internal
+  dispatch function with full evaluator access. User commands go through
+  the existing handler table. Detection is `token[0] == '_'`.
 
-- [ ] **Builtin registration mechanism.** Script builtins (`_set`, `_if`,
-  `_print`, etc.) — are they a separate function table from
-  `mpCLIModeFuncs`? Searched first (reserved namespace priority)? Or
-  interleaved? How does the dispatch order work: builtins → user
-  commands → default handler?
-
-- [ ] **`_proc` calling convention.** How does `XelpCallProc` (C calling
-  script) work? It needs to push a frame, set up argv from C-provided
-  strings, run the proc body, and return the result. What's the API
-  shape?
+- [ ] **C→xelp calling convention (`XelpCallProc`).** Not settled —
+  needs external review. C can already run a script via
+  `XelpParse(ths, "...")`. The gap is narrow: frame scoping and result
+  capture. Proposed shape:
+  `XelpCallProc(ths, "procname arg1 arg2", &result)` — same string
+  format as the CLI, tokenized by the existing tokenizer. Essentially
+  `XelpParse` but pushes a frame (local scoping, `@n` access) and
+  captures the return value. Two return paths under consideration:
+  **(1) `mR[0]`** for the quick integer case (90% of use, already
+  works today, zero ceremony). **(2) `XelpResult` typed struct** for
+  when C needs to inspect what came back (INT, STR, NIL):
+  `XelpResult { kind, intVal, strVal, strLen }`. String pointer points
+  into arena, valid until next xelp API call on that instance — caller
+  copies if needed (standard C convention). `NULL` result pointer =
+  fire-and-forget. Provides symmetry with `XelpSetResultInt`/
+  `XelpSetResultStr` (C handler → result stack) and `_return` (xelp →
+  result stack). Concerns: string lifetime tied to arena stability is
+  fragile if caller isn't careful. Interaction with `mR[]` — does
+  `_return` also write to `mR[0]`, or are they separate channels?
+  Needs review for edge cases.
 
 - [ ] **Float proposal sign-off.** Hex vs decimal expansion switch,
   `XelpArgvFloat` API, `XELP_ENABLE_FLOAT` gating. Currently
   exploratory — needs promotion or deferral.
+
+- [ ] **Script input (`inkey`, `input`).** Exploratory. Both should be
+  **C handlers** (no `_` prefix), not builtins — input is fundamentally
+  platform-specific and blocking behavior is the integrator's problem.
+  xelp ships example implementations; integrator copies and adapts.
+  Script captures values via `()` composition: `_set k (inkey "prompt")`.
+  Requires `XelpSetResultInt`/`XelpSetResultStr` public API for C
+  handlers to push typed values onto the result stack.
+  **`inkey "prompt"`** — MVP input primitive. C handler prints prompt
+  via `mpfOut`, spins on `mpfInReady`/`mpfIn` (integrator controls the
+  spin loop — yield, service DMA, pet watchdog, etc.), returns keycode
+  as INT via `XelpSetResultInt`. ~20-30 bytes of user code. Capability
+  policy: don't register `inkey` on restricted instances.
+  **`input "prompt" [esc_key]`** — line input. Lower priority, not MVP,
+  but not deferred. C handler with line buffer, backspace/echo, ENTER
+  detection. Returns STR via `XelpSetResultStr`. Optional escape key
+  argument. Buffer is on the C stack or integrator's static allocation —
+  not xelp's concern. Building `input` from `inkey` in script is
+  theoretically possible but practically ugly — backspace requires
+  `\b \b` console output, cursor tracking, prompt-boundary protection.
+  That plumbing belongs in C.
+
+- [x] **Debug / trace / single-step system.** Subsumed by `mpfBreakpoint`
+  callback (S-01 through S-05). The callback receives the full XELP
+  struct and can implement trace logging, variable inspection, and
+  single-step debugging — all as integrator-provided policy, zero
+  interpreter code. Trace output SHOULD go to `mpfErr` or a separate
+  debug output function pointer so it doesn't pollute user-facing
+  output. xelp MAY ship example callbacks in the examples directory
+  (trace logger, single-step debugger). Potentially unique among
+  sub-10 KB interpreters.
 
 ---
 
