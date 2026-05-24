@@ -2182,25 +2182,8 @@ to numbered requirements or explicit deferral.
   the existing handler table. Detection is `token[0] == '_'`.
 
 - [ ] **C→xelp calling convention (`XelpCallProc`).** Not settled —
-  needs external review. C can already run a script via
-  `XelpParse(ths, "...")`. The gap is narrow: frame scoping and result
-  capture. Proposed shape:
-  `XelpCallProc(ths, "procname arg1 arg2", &result)` — same string
-  format as the CLI, tokenized by the existing tokenizer. Essentially
-  `XelpParse` but pushes a frame (local scoping, `@n` access) and
-  captures the return value. Two return paths under consideration:
-  **(1) `mR[0]`** for the quick integer case (90% of use, already
-  works today, zero ceremony). **(2) `XelpResult` typed struct** for
-  when C needs to inspect what came back (INT, STR, NIL):
-  `XelpResult { kind, intVal, strVal, strLen }`. String pointer points
-  into arena, valid until next xelp API call on that instance — caller
-  copies if needed (standard C convention). `NULL` result pointer =
-  fire-and-forget. Provides symmetry with `XelpSetResultInt`/
-  `XelpSetResultStr` (C handler → result stack) and `_return` (xelp →
-  result stack). Concerns: string lifetime tied to arena stability is
-  fragile if caller isn't careful. Interaction with `mR[]` — does
-  `_return` also write to `mR[0]`, or are they separate channels?
-  Needs review for edge cases.
+  needs external review. Proposal documented below (CC-01 through
+  CC-06). See "C→xelp calling convention — proposal for review."
 
 - [ ] **Float proposal sign-off.** Hex vs decimal expansion switch,
   `XelpArgvFloat` API, `XELP_ENABLE_FLOAT` gating. Currently
@@ -2236,6 +2219,95 @@ to numbered requirements or explicit deferral.
   output. xelp MAY ship example callbacks in the examples directory
   (trace logger, single-step debugger). Potentially unique among
   sub-10 KB interpreters.
+
+---
+
+## C→xelp calling convention — proposal for review
+
+**Status: proposed — needs external review before promotion to normative
+requirements.**
+
+### The gap
+
+`XelpParse(ths, "script text")` already runs a script from C and returns
+`XELPRESULT`. C reads `mR[0]` for integer results. What's missing: a
+frame (local scope + `@n` args) and typed result capture.
+
+### Proposed API
+
+Separate "call" from "read result" — keeps `XelpCallProc` simple, caller
+only pays for typed inspection if they need it.
+
+```c
+/* Call — same string format as CLI, tokenizer splits it */
+XELPRESULT r = XelpCallProc(ths, "calibrate 12 3");
+
+/* Simple path: integer result via mR[0] */
+int gain = ths->mR[0];
+
+/* Typed path: inspect what _return actually pushed */
+XelpResult res;
+XelpGetResult(ths, &res);
+if (res.kind == XELP_VAL_INT)  printf("%d\n", res.intVal);
+if (res.kind == XELP_VAL_STR)  printf("%.*s\n", res.strLen, res.strVal);
+```
+
+### XelpResult struct
+
+```c
+typedef struct {
+    uint8_t     kind;       /* XELP_VAL_INT, XELP_VAL_STR, XELP_VAL_NIL */
+    int         intVal;     /* valid when kind == INT */
+    const char *strVal;     /* valid when kind == STR, points into arena */
+    int         strLen;
+} XelpResult;
+```
+
+String pointer points into the arena. Valid until the next xelp API call
+on that instance. Caller copies if they need it longer. Standard C
+convention (`strtok`, `getenv`).
+
+### Symmetry with C→xelp push
+
+| Direction | Push typed value | Read typed value |
+|---|---|---|
+| C handler → xelp result stack | `XelpSetResultInt` / `XelpSetResultStr` | evaluator reads internally |
+| xelp `_return` → C caller | `_return` writes to result stack (+ `mR[0]` for ints) | `XelpGetResult` reads from result stack |
+
+### `_return` and `mR[0]`
+
+`_return 42` SHOULD also write to `mR[0]` as a side effect — maintains
+backward compatibility with `XelpParse` users who already read `mR[0]`.
+`_return "hello"` does not write to `mR[0]` (int register, no meaningful
+string representation). String returns require `XelpGetResult`.
+
+### No `_return` case
+
+If a proc ends without `_return`, the result is NIL. `XelpGetResult`
+returns `kind == XELP_VAL_NIL`. `mR[0]` is unchanged from whatever
+was there before the call.
+
+### Proposed requirements (pending review)
+
+| ID | Requirement |
+| --- | --- |
+| CC-01 | `XelpCallProc(ths, "name args...")` MUST push a frame, tokenize the string into `@n` positional parameters, execute the proc body, pop the frame, and return `XELPRESULT` status. Same string format as CLI input. |
+| CC-02 | `XelpGetResult(ths, &result)` MUST read the top of the result stack into an `XelpResult` struct. The struct MUST report kind (INT, STR, NIL), intVal, strVal, and strLen. |
+| CC-03 | `XelpResult.strVal` MUST point into the arena. It is valid until the next xelp API call on that instance. Caller MUST copy if longer lifetime is needed. |
+| CC-04 | `_return <int>` SHOULD write to `mR[0]` as a side effect for backward compatibility. `_return <str>` MUST NOT write to `mR[0]`. |
+| CC-05 | If a proc ends without `_return`, `XelpGetResult` MUST return `kind == XELP_VAL_NIL`. `mR[0]` MUST be unchanged. |
+| CC-06 | Re-entrancy: `XelpCallProc` → proc calls C handler → C handler calls `XelpCallProc` MUST work. Arena stack nesting handles frame isolation. Depth is bounded by arena size. |
+
+### Open concerns for external review
+
+1. **String lifetime.** Arena pointer is fragile if caller isn't careful.
+   Should we copy into a caller-provided buffer instead?
+2. **`mR[0]` side effect.** Is writing `_return` to `mR[0]` a clean
+   design or an awkward dual-channel return? Should `mR[0]` be the ONLY
+   return path (no `XelpResult`)?
+3. **Re-entrancy depth.** Is there a practical limit? Should
+   `XelpCallProc` check arena headroom before pushing a frame?
+4. **No `_return` behavior.** NIL result vs error — which is more useful?
 
 ---
 
