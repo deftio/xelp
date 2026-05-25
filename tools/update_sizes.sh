@@ -52,23 +52,23 @@ echo "Found $ROW_COUNT valid targets."
 
 # --- Generate Markdown table ----------------------------------------------
 
-MD_TABLE="| CPU | Width | Compiler | KEY (bytes) | CLI (bytes) | FULL (bytes) |
-|-----|------:|----------|------------:|------------:|-------------:|"
+MD_TABLE="| CPU | Width | Compiler | KEY (bytes) | CLI (bytes) | HIST (bytes) | SCRIPT (bytes) |
+|-----|------:|----------|------------:|------------:|-------------:|---------------:|"
 
-while IFS=',' read -r cpu width compiler key cli full; do
+while IFS=',' read -r cpu width compiler key cli hist script; do
     MD_TABLE="${MD_TABLE}
-| ${cpu} | ${width} | ${compiler} | ${key} | ${cli} | ${full} |"
+| ${cpu} | ${width} | ${compiler} | ${key} | ${cli} | ${hist} | ${script} |"
 done <<< "$SORTED"
 
 # --- Generate HTML table -------------------------------------------------
 
 HTML_TABLE='<table>
-<thead><tr><th>CPU</th><th style="text-align:right">Width</th><th>Compiler</th><th style="text-align:right">KEY (bytes)</th><th style="text-align:right">CLI (bytes)</th><th style="text-align:right">FULL (bytes)</th></tr></thead>
+<thead><tr><th>CPU</th><th style="text-align:right">Width</th><th>Compiler</th><th style="text-align:right">KEY (bytes)</th><th style="text-align:right">CLI (bytes)</th><th style="text-align:right">HIST (bytes)</th><th style="text-align:right">SCRIPT (bytes)</th></tr></thead>
 <tbody>'
 
-while IFS=',' read -r cpu width compiler key cli full; do
+while IFS=',' read -r cpu width compiler key cli hist script; do
     HTML_TABLE="${HTML_TABLE}
-<tr><td>${cpu}</td><td style=\"text-align:right\">${width}</td><td>${compiler}</td><td style=\"text-align:right\">${key}</td><td style=\"text-align:right\">${cli}</td><td style=\"text-align:right\">${full}</td></tr>"
+<tr><td>${cpu}</td><td style=\"text-align:right\">${width}</td><td>${compiler}</td><td style=\"text-align:right\">${key}</td><td style=\"text-align:right\">${cli}</td><td style=\"text-align:right\">${hist}</td><td style=\"text-align:right\">${script}</td></tr>"
 done <<< "$SORTED"
 
 HTML_TABLE="${HTML_TABLE}

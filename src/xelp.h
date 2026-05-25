@@ -137,6 +137,16 @@ typedef unsigned long XELPKEYCODE;
 #define XELP_E_CMDBUFFULL 	(-2)
 #define XELP_E_CMDNOTFOUND  (-3)
 
+#ifdef XELP_ENABLE_SCRIPT
+#define XELP_E_ARENA_FULL   (-4)
+#define XELP_E_UNDEF_VAR    (-5)
+#define XELP_E_TYPE_ERR     (-6)
+#define XELP_E_NO_LABEL     (-7)
+#define XELP_E_NO_FRAME     (-8)
+#define XELP_E_BUDGET       (-9)
+#define XELP_E_BREAK        (-10)
+#endif
+
 #define XELP_T_OK(r) ((r)>=0) 	/* simple macro for testing OK or warning (e.g. not a failure) */
 
 
@@ -266,6 +276,36 @@ typedef struct
 
 
 /*****************************************************************************
+ Script engine types (when XELP_ENABLE_SCRIPT is defined)
+*/
+#ifdef XELP_ENABLE_SCRIPT
+
+/* Value kind tags for arena entries and result stack */
+#define XELP_VAL_NIL    (0x00)
+#define XELP_VAL_INT    (0x03)
+#define XELP_VAL_STR    (0x10)
+#define XELP_VAL_FRAME  (0xF0)
+#define XELP_VAL_PROC   (0xF1)
+#define XELP_VAL_CONT   (0xF2)
+
+/* Typed result structure for script value passing */
+typedef struct {
+    unsigned char kind;   /* XELP_VAL_NIL, XELP_VAL_INT, or XELP_VAL_STR */
+    int           intVal; /* valid when kind == XELP_VAL_INT               */
+    const char   *strVal; /* valid when kind == XELP_VAL_STR               */
+    int           strLen; /* length of strVal (no null-term guarantee)      */
+} XelpResult;
+
+/* C-registered script function entry (ROM-able table) */
+typedef struct {
+    const char *mpCmd;    /* command name (null-terminated)    */
+    const char *mpBody;   /* script body text                  */
+    const char *mpHelp;   /* optional help string              */
+} XELPScriptFuncEntry;
+
+#endif /* XELP_ENABLE_SCRIPT */
+
+/*****************************************************************************
  XELP definition
  A runtime instance of the interpretor.  If enough memory exists several instances can
  be run at the same time.
@@ -320,6 +360,20 @@ typedef struct XELP_tag
 	char  mHistBrowse;   /* browse position (-1 = not browsing)                  */
 	char  mHistSaved[XELP_CMDBUFSZ]; /* stash of in-progress line on first UP   */
 	char  mHistSavedLen; /* length of saved in-progress line                     */
+#endif
+
+#ifdef XELP_ENABLE_SCRIPT
+	char   mArena[XELP_SCRIPT_ARENA_SZ]; /* single arena buffer                    */
+	char  *mSP;              /* stack pointer (grows up from arena start)            */
+	char  *mHP;              /* heap pointer (grows down from arena end)             */
+	int    mFrameDepth;      /* 0 = root frame, bounded by arena capacity           */
+	const char *mpScriptS;   /* start of current script buffer                      */
+	const char *mpScriptP;   /* current instruction pointer in script               */
+	const char *mpScriptE;   /* end of current script buffer                        */
+	const char *mpFrameArgData; /* packed arg strings for current frame (@1, @2)    */
+	char   mFrameArgc;       /* number of positional args in current frame          */
+	XELPScriptFuncEntry *mpScriptFuncs; /* C-registered ROM script funcs table      */
+	XELPRESULT (*mpfBreakpoint)(struct XELP_tag *); /* safety callback (S-01)       */
 #endif
 
 	/****
@@ -427,6 +481,17 @@ XELPRESULT XelpBufCmp (const char *as, const char *ae, const char *bs, const cha
 #define XELP_CMP_TYPE_A0    (0x01) /* buffer a also treats \0 as a end of buffer                                                */
 #define XELP_CMP_TYPE_A0B0  (0x11) /* if either buffer has \0 that is treated as the end of the buffer like in stdlib::strcmp() */
 
+#ifdef XELP_ENABLE_SCRIPT
+/* Script engine public API */
+XELPRESULT XelpCallProc(XELP *ths, const char *cmdline);
+XELPRESULT XelpGetResult(XELP *ths, XelpResult *result);
+XELPRESULT XelpSetResultInt(XELP *ths, int val);
+XELPRESULT XelpSetResultStr(XELP *ths, const char *s, int slen);
+
+/* Script engine setup macros */
+#define XELP_SET_FN_SCRIPT(ths, pfaScr)  ((ths).mpScriptFuncs = (pfaScr))
+#define XELP_SET_FN_BREAKPOINT(ths, pfBk) ((ths).mpfBreakpoint = (pfBk))
+#endif /* XELP_ENABLE_SCRIPT */
 
 #ifdef __cplusplus
 }

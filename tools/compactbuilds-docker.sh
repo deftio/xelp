@@ -2,10 +2,11 @@
 # compactbuilds-docker.sh -- cross-compile xelp inside Docker container
 # Runs inside the Docker image built from Dockerfile.crossbuild.
 #
-# Builds each target in three configurations:
-#   KEY  -- XELP_ENABLE_KEY only (minimal, single-key dispatch)
-#   CLI  -- XELP_ENABLE_KEY + CLI + LINE_EDIT + HELP (typical interactive)
-#   FULL -- All features (KEY + CLI + LINE_EDIT + HELP + THR)
+# Builds each target in four configurations:
+#   KEY    -- XELP_ENABLE_KEY only (minimal, single-key dispatch)
+#   CLI    -- KEY + CLI + LINE_EDIT + HELP (typical interactive, no history)
+#   HIST   -- CLI + HISTORY + THR (full interactive without scripting)
+#   SCRIPT -- HIST + SCRIPT (all features including XelpScript engine)
 #
 # Output is grouped by word size (8/16/32/64-bit), ascending.
 
@@ -20,7 +21,7 @@ LOG_FILE=/xelp/build/crossbuild.log
 
 SEP="============================================================"
 
-# Accumulate summary rows: "group|target|key_size|cli_size|full_size"
+# Accumulate summary rows: "group|target|key_size|cli_size|hist_size|script_size"
 SUMMARY=""
 
 # CSV accumulator (written to CSV_FILE at end)
@@ -38,9 +39,9 @@ echo "$SEP" >> "$LOG_FILE"
 
 # --- Create config override headers ----------------------------------------
 # XELP_CONFIG_OVERRIDE causes xelpcfg.h to #include "xelp_ovr.h" instead of
-# its defaults.  We create three versions and swap -I paths to select one.
+# its defaults.  We create four versions and swap -I paths to select one.
 
-mkdir -p "$CFG_DIR/key" "$CFG_DIR/cli" "$CFG_DIR/full"
+mkdir -p "$CFG_DIR/key" "$CFG_DIR/cli" "$CFG_DIR/hist" "$CFG_DIR/script"
 
 cat > "$CFG_DIR/key/xelp_ovr.h" << 'EOF'
 /* KEY-only config: minimal single-key dispatch, no CLI, no THR */
@@ -51,6 +52,7 @@ cat > "$CFG_DIR/key/xelp_ovr.h" << 'EOF'
 #undef XELP_ENABLE_KEY
 #undef XELP_ENABLE_THR
 #undef XELP_ENABLE_HELP
+#undef XELP_ENABLE_SCRIPT
 
 #define XELP_ENABLE_KEY       1
 EOF
@@ -64,6 +66,7 @@ cat > "$CFG_DIR/cli/xelp_ovr.h" << 'EOF'
 #undef XELP_ENABLE_KEY
 #undef XELP_ENABLE_THR
 #undef XELP_ENABLE_HELP
+#undef XELP_ENABLE_SCRIPT
 
 #define XELP_ENABLE_KEY       1
 #define XELP_ENABLE_CLI       1
@@ -71,8 +74,8 @@ cat > "$CFG_DIR/cli/xelp_ovr.h" << 'EOF'
 #define XELP_ENABLE_HELP      1
 EOF
 
-cat > "$CFG_DIR/full/xelp_ovr.h" << 'EOF'
-/* FULL config: all features enabled */
+cat > "$CFG_DIR/hist/xelp_ovr.h" << 'EOF'
+/* HIST config: full interactive CLI, no script engine */
 #undef XELP_ENABLE_CLI
 #undef XELP_ENABLE_LINE_EDIT
 #undef XELP_ENABLE_HISTORY
@@ -80,14 +83,35 @@ cat > "$CFG_DIR/full/xelp_ovr.h" << 'EOF'
 #undef XELP_ENABLE_KEY
 #undef XELP_ENABLE_THR
 #undef XELP_ENABLE_HELP
+#undef XELP_ENABLE_SCRIPT
 
 #define XELP_ENABLE_KEY       1
 #define XELP_ENABLE_CLI       1
 #define XELP_ENABLE_LINE_EDIT 1
+#define XELP_ENABLE_HELP      1
+#define XELP_ENABLE_HISTORY   1
+#define XELP_ENABLE_THR       1
+EOF
+
+cat > "$CFG_DIR/script/xelp_ovr.h" << 'EOF'
+/* SCRIPT config: all features + XelpScript engine */
+#undef XELP_ENABLE_CLI
+#undef XELP_ENABLE_LINE_EDIT
+#undef XELP_ENABLE_HISTORY
+#undef XELP_ENABLE_ARGV
+#undef XELP_ENABLE_KEY
+#undef XELP_ENABLE_THR
+#undef XELP_ENABLE_HELP
+#undef XELP_ENABLE_SCRIPT
+
+#define XELP_ENABLE_KEY       1
+#define XELP_ENABLE_CLI       1
+#define XELP_ENABLE_LINE_EDIT 1
+#define XELP_ENABLE_HELP      1
 #define XELP_ENABLE_HISTORY   1
 #define XELP_ENABLE_ARGV      1
-#define XELP_ENABLE_HELP      1
 #define XELP_ENABLE_THR       1
+#define XELP_ENABLE_SCRIPT    1
 EOF
 
 # --- Helper: compile and return .text size ---------------------------------
@@ -163,20 +187,22 @@ build_target() {
     echo "" >> "$LOG_FILE"
     echo "TARGET: $label ($group)" >> "$LOG_FILE"
 
-    local key_sz cli_sz full_sz
+    local key_sz cli_sz hist_sz script_sz
 
     echo "  CONFIG: KEY" >> "$LOG_FILE"
-    key_sz=$(get_text_size  "$cc_base -DXELP_CONFIG_OVERRIDE -I $CFG_DIR/key")
+    key_sz=$(get_text_size    "$cc_base -DXELP_CONFIG_OVERRIDE -I $CFG_DIR/key")
     echo "  CONFIG: CLI" >> "$LOG_FILE"
-    cli_sz=$(get_text_size  "$cc_base -DXELP_CONFIG_OVERRIDE -I $CFG_DIR/cli")
-    echo "  CONFIG: FULL" >> "$LOG_FILE"
-    full_sz=$(get_text_size "$cc_base -DXELP_CONFIG_OVERRIDE -I $CFG_DIR/full")
+    cli_sz=$(get_text_size    "$cc_base -DXELP_CONFIG_OVERRIDE -I $CFG_DIR/cli")
+    echo "  CONFIG: HIST" >> "$LOG_FILE"
+    hist_sz=$(get_text_size   "$cc_base -DXELP_CONFIG_OVERRIDE -I $CFG_DIR/hist")
+    echo "  CONFIG: SCRIPT" >> "$LOG_FILE"
+    script_sz=$(get_text_size "$cc_base -DXELP_CONFIG_OVERRIDE -I $CFG_DIR/script")
 
-    echo "  RESULT: KEY=$key_sz CLI=$cli_sz FULL=$full_sz" >> "$LOG_FILE"
+    echo "  RESULT: KEY=$key_sz CLI=$cli_sz HIST=$hist_sz SCRIPT=$script_sz" >> "$LOG_FILE"
 
-    printf "  %-34s %8s  %8s  %8s\n" "$label" "$key_sz" "$cli_sz" "$full_sz"
-    SUMMARY="${SUMMARY}${group}|${label}|${key_sz}|${cli_sz}|${full_sz}\n"
-    CSV_ROWS="${CSV_ROWS}${cpu},${width},${compiler},${key_sz},${cli_sz},${full_sz}\n"
+    printf "  %-34s %8s  %8s  %8s  %8s\n" "$label" "$key_sz" "$cli_sz" "$hist_sz" "$script_sz"
+    SUMMARY="${SUMMARY}${group}|${label}|${key_sz}|${cli_sz}|${hist_sz}|${script_sz}\n"
+    CSV_ROWS="${CSV_ROWS}${cpu},${width},${compiler},${key_sz},${cli_sz},${hist_sz},${script_sz}\n"
 }
 
 # --- Report header ---------------------------------------------------------
@@ -186,9 +212,10 @@ echo "xelp cross-compilation size report (multi-config)"
 echo "Date: $(date -u '+%Y-%m-%d %H:%M UTC')"
 echo ""
 echo "Configurations:"
-echo "  KEY  = XELP_ENABLE_KEY only (minimal single-key dispatch)"
-echo "  CLI  = KEY + CLI + LINE_EDIT + HELP (typical interactive)"
-echo "  FULL = CLI + THR (all features)"
+echo "  KEY    = XELP_ENABLE_KEY only (minimal single-key dispatch)"
+echo "  CLI    = KEY + CLI + LINE_EDIT + HELP (interactive, no history)"
+echo "  HIST   = CLI + HISTORY + THR (full interactive without scripting)"
+echo "  SCRIPT = HIST + SCRIPT (all features including XelpScript engine)"
 echo ""
 echo "All sizes are .text section bytes (GCC targets use -Os)."
 
@@ -199,8 +226,8 @@ print_header() {
     echo "$SEP"
     echo "$1"
     echo "$SEP"
-    printf "  %-34s %8s  %8s  %8s\n" "Target" "KEY" "CLI" "FULL"
-    printf "  %-34s %8s  %8s  %8s\n" "----------------------------------" "--------" "--------" "--------"
+    printf "  %-34s %8s  %8s  %8s  %8s\n" "Target" "KEY" "CLI" "HIST" "SCRIPT"
+    printf "  %-34s %8s  %8s  %8s  %8s\n" "----------------------------------" "--------" "--------" "--------" "--------"
 }
 
 # --- 8-bit targets ---------------------------------------------------------
@@ -286,11 +313,11 @@ build_target 64 "RISC-V (rv64)" "riscv64-linux-gnu-gcc" \
 build_target 64 "MIPS64" "mips64el-linux-gnuabi64-gcc" \
     "mips64el-linux-gnuabi64-gcc -c $SRC $INCLUDE -Os -Wall -o $OBJ"
 
-# --- Function size table (native GCC, FULL config) -------------------------
+# --- Function size table (native GCC, SCRIPT config) -----------------------
 
 echo ""
 echo "$SEP"
-echo "Function size table (GCC x86-64, FULL config)"
+echo "Function size table (GCC x86-64, SCRIPT config)"
 echo "$SEP"
 gcc -c $SRC $INCLUDE -Os -Wall -o $OBJ 2>&1
 nm $OBJ -n -S --size-sort -f sysv -t d 2>/dev/null | grep -E "FUNC" || true
@@ -305,12 +332,12 @@ echo "$SEP"
 
 for grp in "8-bit" "16-bit" "32-bit" "64-bit"; do
     echo ""
-    printf "  %-34s %8s  %8s  %8s\n" "$grp" "KEY" "CLI" "FULL"
-    printf "  %-34s %8s  %8s  %8s\n" "----------------------------------" "--------" "--------" "--------"
-    echo -e "$SUMMARY" | while IFS='|' read -r g label ks cs fs; do
+    printf "  %-34s %8s  %8s  %8s  %8s\n" "$grp" "KEY" "CLI" "HIST" "SCRIPT"
+    printf "  %-34s %8s  %8s  %8s  %8s\n" "----------------------------------" "--------" "--------" "--------" "--------"
+    echo -e "$SUMMARY" | while IFS='|' read -r g label ks cs hs ss; do
         [ -z "$g" ] && continue
         [ "$g" != "$grp" ] && continue
-        printf "  %-34s %8s  %8s  %8s\n" "$label" "$ks" "$cs" "$fs"
+        printf "  %-34s %8s  %8s  %8s  %8s\n" "$label" "$ks" "$cs" "$hs" "$ss"
     done
 done
 
@@ -319,7 +346,7 @@ done
 echo ""
 echo "Writing CSV to $CSV_FILE ..."
 {
-    echo "cpu,width,compiler,key,cli,full"
+    echo "cpu,width,compiler,key,cli,hist,script"
     echo -e "$CSV_ROWS" | sed '/^$/d'
 } > "$CSV_FILE"
 echo "CSV written: $(wc -l < "$CSV_FILE") rows (including header)."

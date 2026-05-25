@@ -218,6 +218,26 @@
 
 
 /****************************************************************************************************
+ Enable Script Engine.
+ When defined, adds a no-malloc, ROM-able, instance-local scripting layer with variables,
+ conditionals, labels/jumps, parenthesized subexpressions, script functions, math/comparison/logic
+ builtins, and a breakpoint callback for safe execution. Requires XELP_ENABLE_CLI.
+ */
+#ifndef XELP_ENABLE_SCRIPT
+#define XELP_ENABLE_SCRIPT   1
+#endif
+
+/****************************************************************************************************
+ XELP_SCRIPT_ARENA_SZ is the per-instance arena buffer size in bytes for the script engine.
+ The arena holds variables, result stack, call frames, and CONT records.
+ Default scales with word size: 512 on 16-bit, 1024 on 32-bit, 2048 on 64-bit.
+ RAM cost: XELP_SCRIPT_ARENA_SZ bytes per instance (when XELP_ENABLE_SCRIPT).
+ */
+#ifndef XELP_SCRIPT_ARENA_SZ
+#define XELP_SCRIPT_ARENA_SZ  (sizeof(int) * 256)
+#endif
+
+/****************************************************************************************************
  XELP_CONFIG_OVERRIDE -- customize the library without modifying source files.
 
  To use your own configuration:
@@ -235,7 +255,7 @@
 
    #undef  XELP_ENABLE_THR
 
- See docs/build-profiles.md for more examples.
+ See docs/build-reference.md for more examples.
  */
 #ifdef XELP_CONFIG_OVERRIDE
 #include "xelp_ovr.h"
@@ -243,6 +263,7 @@
 
 /* Auto-disable dependent features when their base is missing.
    LINE_EDIT and HISTORY require CLI; HISTORY requires LINE_EDIT.
+   SCRIPT requires CLI.
    This prevents compile errors from invalid override combinations. */
 #if defined(XELP_ENABLE_LINE_EDIT) && !defined(XELP_ENABLE_CLI)
 #undef XELP_ENABLE_LINE_EDIT
@@ -252,6 +273,9 @@
 #endif
 #if defined(XELP_ENABLE_HISTORY) && !defined(XELP_ENABLE_LINE_EDIT)
 #undef XELP_ENABLE_HISTORY
+#endif
+#if defined(XELP_ENABLE_SCRIPT) && !defined(XELP_ENABLE_CLI)
+#undef XELP_ENABLE_SCRIPT
 #endif
 
 #endif  /* __XELP_CONFIG_H__ */

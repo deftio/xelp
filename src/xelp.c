@@ -384,6 +384,15 @@ XELPRESULT XelpHelp(XELP* ths)
 	return XELP_S_OK;
 }
 #endif
+#ifdef XELP_ENABLE_SCRIPT
+static void _xelpArenaInit(XELP *ths);
+static XELPRESULT _xelpEvalLoop(XELP *ths, int targetDepth);
+static int _xelpStackEntrySize(const char *p);
+/* Internal signals for iterative eval loop */
+#define XELP_S_CALL   (3)  /* frame pushed by function call, continue loop */
+#define XELP_S_RETURN (4)  /* _return executed, pop frame */
+#endif
+
 XELPRESULT XelpInit 	 (
 						XELP *ths,
 						const char *			pAboutMsg
@@ -412,6 +421,9 @@ XELPRESULT XelpInit 	 (
 #endif
 #if defined(XELP_ENABLE_CLI) && defined(XELP_ENABLE_HISTORY)
 	ths->mHistBrowse = -1;
+#endif
+#ifdef XELP_ENABLE_SCRIPT
+	_xelpArenaInit(ths);
 #endif
 	/* comand mode mssage index
 	ths->mCmdMsgIndex = 0;  //set to 0 by ptr loop at top
@@ -677,6 +689,7 @@ XELPRESULT XelpTokLineXB (XelpBuf *buf, XelpBuf *tok, int srchType) {
  Reads directly from the source buffer (ROM-safe) and writes tokens into
  mArgvBuf — no upfront copy needed since escape expansion only shrinks.
  */
+#ifndef XELP_ENABLE_SCRIPT
 static XELPRESULT _xelpBuf2Argv(XELP *ths, const char *r, int len,
                          int *argc, const char **argv, int maxargs)
 {
@@ -717,6 +730,7 @@ static XELPRESULT _xelpBuf2Argv(XELP *ths, const char *r, int len,
     *argc = ac;
     return XELP_S_OK;
 }
+#endif /* !XELP_ENABLE_SCRIPT */
 
 /********************************************************
  XelpParseXB() parse buffer and execute commands.
@@ -724,6 +738,18 @@ static XELPRESULT _xelpBuf2Argv(XELP *ths, const char *r, int len,
  */
 
 XELPRESULT XelpParseXB (XELP* ths, XelpBuf *args) {
+#ifdef XELP_ENABLE_SCRIPT
+	{
+	XELPRESULT r;
+	ths->mpScriptS = args->s;
+	ths->mpScriptP = args->s;
+	ths->mpScriptE = args->e;
+	r = _xelpEvalLoop(ths, 0);
+	/* Clean up any leftover results on stack (SC-07) */
+	ths->mSP = ths->mArena;
+	return r;
+	}
+#else
 	XelpBuf line;
 	XELPCLIFuncMapEntry   *f;
 	const char *argv[XELP_ARGV_MAX];
@@ -754,6 +780,7 @@ XELPRESULT XelpParseXB (XELP* ths, XelpBuf *args) {
         }
 	}
 	return XELP_S_OK;
+#endif /* XELP_ENABLE_SCRIPT */
 }
 XELPRESULT XelpParse 		(XELP *ths, const char *buf, int blen)
 {
@@ -821,7 +848,16 @@ static void _xelpHandleEnter(XELP *ths) {
 #endif
 	_PUTC(XELPKEY_ENTER);
 	XELP_XB_INIT_PTRS(line, ths->mCmdXB.s, ths->mCmdXB.s, ths->mCmdXB.p);
+#ifdef XELP_ENABLE_SCRIPT
+	ths->mpScriptS = line.s;
+	ths->mpScriptP = line.s;
+	ths->mpScriptE = line.e;
+	_xelpEvalLoop(ths, 0);
+	/* Clean up any leftover results on stack after CLI statement (SC-07) */
+	ths->mSP = ths->mArena;
+#else
 	XelpParseXB(ths, &line);
+#endif
 	XELP_XB_TOP(ths->mCmdXB);
 #ifdef XELP_ENABLE_LINE_EDIT
 	ths->mCur = ths->mCmdXB.s;
@@ -1004,6 +1040,1460 @@ XELPRESULT XelpParseKey (XELP *ths, char key)
 
 	return XELP_S_OK;
 }
+/********************************************************
+ XELP Script Engine
+ All script code is gated by XELP_ENABLE_SCRIPT.
+ ********************************************************/
+#ifdef XELP_ENABLE_SCRIPT
+
+/*****************************************
+ _xelpArenaInit() - reset arena pointers to empty state.
+ SP starts at arena[0], HP starts at arena[end].
+ */
+static void _xelpArenaInit(XELP *ths) {
+    ths->mSP = ths->mArena;
+    ths->mHP = ths->mArena + XELP_SCRIPT_ARENA_SZ;
+    ths->mFrameDepth = 0;
+    ths->mpScriptS = 0;
+    ths->mpScriptP = 0;
+    ths->mpScriptE = 0;
+    ths->mpFrameArgData = 0;
+    ths->mFrameArgc = 0;
+}
+
+/*****************************************
+ Pointer store/load helpers (alignment-safe, byte-by-byte).
+ Used to store/load pointers in arena frame entries on targets
+ where unaligned pointer access may fault.
+ */
+#define XELP_PTR_SZ ((int)sizeof(void*))
+
+static void _xelpStorePtr(char *dst, const void *val) {
+    int i;
+    const char *src = (const char *)&val;
+    for (i = 0; i < XELP_PTR_SZ; i++) dst[i] = src[i];
+}
+
+static void _xelpLoadPtr(const char *src, void *out) {
+    int i;
+    char *dst = (char *)out;
+    for (i = 0; i < XELP_PTR_SZ; i++) dst[i] = src[i];
+}
+
+/*****************************************
+ Frame layout on arena stack:
+
+   Offset          Size       Field
+   0               1          XELP_VAL_FRAME (0xF0)
+   1               PTR_SZ     caller's mpScriptS
+   1+PS            PTR_SZ     caller's mpScriptP (resume point)
+   1+2*PS          PTR_SZ     caller's mpScriptE
+   1+3*PS          PTR_SZ     caller's mpFrameArgData
+   1+4*PS          1          caller's mFrameArgc
+   2+4*PS          1          new frame's argc
+   3+4*PS          2          argdata length (little-endian 16-bit)
+   5+4*PS          var        argdata: "cmd\0arg1\0arg2\0"
+
+ Total: 5 + 4*PTR_SZ + argdata_len bytes per frame.
+ */
+#define XELP_FRAME_HDR (5 + 4 * XELP_PTR_SZ)
+
+/* _xelpFramePush: save caller context, copy argv into arena frame.
+   Sets up mpFrameArgData and mFrameArgc for new frame.
+   Returns XELP_E_ARENA_FULL if arena is exhausted. */
+static XELPRESULT _xelpFramePush(XELP *ths, const char **argv, int argc) {
+    int argDataLen = 0;
+    int frameSize, i;
+    char *p;
+
+    /* Compute total argdata length */
+    for (i = 0; i < argc; i++)
+        argDataLen += XelpStrLen(argv[i]) + 1;
+
+    frameSize = XELP_FRAME_HDR + argDataLen;
+    if (ths->mSP + frameSize > ths->mHP)
+        return XELP_E_ARENA_FULL;
+
+    p = ths->mSP;
+
+    /* Write frame header */
+    p[0] = (char)XELP_VAL_FRAME;
+    _xelpStorePtr(p + 1,              ths->mpScriptS);
+    _xelpStorePtr(p + 1 + XELP_PTR_SZ,   ths->mpScriptP);
+    _xelpStorePtr(p + 1 + 2*XELP_PTR_SZ, ths->mpScriptE);
+    _xelpStorePtr(p + 1 + 3*XELP_PTR_SZ, ths->mpFrameArgData);
+    p[1 + 4*XELP_PTR_SZ] = ths->mFrameArgc;
+    p[2 + 4*XELP_PTR_SZ] = (char)argc;
+    p[3 + 4*XELP_PTR_SZ] = (char)(argDataLen & 0xFF);
+    p[4 + 4*XELP_PTR_SZ] = (char)((argDataLen >> 8) & 0xFF);
+
+    /* Copy argv strings into argdata region */
+    {
+        char *wp = p + XELP_FRAME_HDR;
+        for (i = 0; i < argc; i++) {
+            const char *s = argv[i];
+            while (*s) *wp++ = *s++;
+            *wp++ = '\0';
+        }
+    }
+
+    ths->mSP += frameSize;
+    ths->mFrameDepth++;
+    ths->mpFrameArgData = p + XELP_FRAME_HDR;
+    ths->mFrameArgc = (char)argc;
+    return XELP_S_OK;
+}
+
+/* _xelpFramePop: restore caller context from top frame on arena stack.
+   Preserves any result entries above the frame by shifting them down.
+   Assumes mFrameDepth > 0. */
+static void _xelpFramePop(XELP *ths) {
+    char *base = ths->mArena;
+    char *scan = base;
+    char *lastFrame = 0;
+    int frameSize = 0;
+
+    /* Walk stack to find topmost XELP_VAL_FRAME */
+    while (scan < ths->mSP) {
+        unsigned char kind = (unsigned char)*scan;
+        if (kind == XELP_VAL_FRAME) {
+            lastFrame = scan;
+            frameSize = _xelpStackEntrySize(scan);
+        }
+        scan += _xelpStackEntrySize(scan);
+    }
+    if (!lastFrame) return;
+
+    /* Restore caller context from frame header */
+    _xelpLoadPtr(lastFrame + 1,                    &ths->mpScriptS);
+    _xelpLoadPtr(lastFrame + 1 + XELP_PTR_SZ,     &ths->mpScriptP);
+    _xelpLoadPtr(lastFrame + 1 + 2*XELP_PTR_SZ,   &ths->mpScriptE);
+    _xelpLoadPtr(lastFrame + 1 + 3*XELP_PTR_SZ,   &ths->mpFrameArgData);
+    ths->mFrameArgc = lastFrame[1 + 4*XELP_PTR_SZ];
+
+    /* Shift any result data above frame down to overwrite it */
+    {
+        char *frameEnd = lastFrame + frameSize;
+        int resultBytes = (int)(ths->mSP - frameEnd);
+        if (resultBytes > 0) {
+            int i;
+            for (i = 0; i < resultBytes; i++)
+                lastFrame[i] = frameEnd[i];
+            ths->mSP = lastFrame + resultBytes;
+        } else {
+            ths->mSP = lastFrame;
+        }
+    }
+    ths->mFrameDepth--;
+}
+
+/* _xelpFrameArg: get nth argument from current frame's packed argdata.
+   Returns pointer to null-terminated string, or "" if out of range. */
+static const char *_xelpFrameArg(XELP *ths, int n) {
+    const char *p = ths->mpFrameArgData;
+    int i;
+    if (!p || n < 0 || n >= (int)ths->mFrameArgc) return "";
+    for (i = 0; i < n; i++) {
+        while (*p) p++;
+        p++;
+    }
+    return p;
+}
+
+/*****************************************
+ _xelpIntToStr() - convert int to decimal string in caller's buffer.
+ Writes digits (and optional leading '-') into buf[0..buflen).
+ Returns number of chars written (no null terminator appended).
+ */
+static int _xelpIntToStr(int val, char *buf, int buflen) {
+    char tmp[12]; /* enough for -2147483648 */
+    int neg = 0, len = 0, i;
+
+    if (buflen <= 0) return 0;
+
+    if (val < 0) { neg = 1; val = -val; }
+    /* special case: val==0 */
+    if (val == 0) { tmp[len++] = '0'; }
+    else {
+        while (val > 0 && len < 11) {
+            tmp[len++] = (char)('0' + (val % 10));
+            val /= 10;
+        }
+    }
+    if (neg && len < 11) tmp[len++] = '-';
+
+    /* reverse into output buffer */
+    if (len > buflen) len = buflen;
+    for (i = 0; i < len; i++)
+        buf[i] = tmp[len - 1 - i];
+    return len;
+}
+
+/*****************************************
+ _xelpNameHash() - 16-bit hash for variable/proc name lookup.
+ Simple djb2-style hash reduced to 16 bits.
+ */
+static unsigned short _xelpNameHash(const char *name, int len) {
+    unsigned short h = 5381;
+    int i;
+    for (i = 0; i < len; i++)
+        h = (unsigned short)(((h << 5) + h) ^ (unsigned char)name[i]);
+    return h;
+}
+
+/*****************************************
+ Arena heap variable layout (grows downward from HP):
+   [kind:1][hash:2][nameLen:1][name:nameLen][value...]
+   - INT value: 4 bytes (stored as little-endian int)
+   - STR value: [strLen:2][strBytes:strLen]
+ Total entry size for INT: 1+2+1+nameLen+4 = nameLen+8
+ Total entry size for STR: 1+2+1+nameLen+2+strLen = nameLen+strLen+6
+ */
+
+/* Internal: scan heap for variable by name. Returns pointer to kind byte or NULL. */
+static char *_xelpVarFind(XELP *ths, const char *name, int nlen) {
+    unsigned short hash = _xelpNameHash(name, nlen);
+    char *p = ths->mHP;
+    char *end = ths->mArena + XELP_SCRIPT_ARENA_SZ;
+
+    while (p < end) {
+        unsigned char kind = (unsigned char)*p;
+        unsigned short eh;
+        unsigned char enl;
+        int entrySize;
+
+        eh = (unsigned short)(((unsigned char)p[1]) | ((unsigned char)p[2] << 8));
+        enl = (unsigned char)p[3];
+
+        if (kind == XELP_VAL_PROC) {
+            int blen = (int)(((unsigned char)p[4 + enl]) | ((unsigned char)p[5 + enl] << 8));
+            entrySize = 4 + (int)enl + 2 + blen;
+        } else if (kind == XELP_VAL_INT) {
+            entrySize = 4 + (int)enl + 4;
+        } else if (kind == XELP_VAL_STR) {
+            int slen = (int)(((unsigned char)p[4 + enl]) | ((unsigned char)p[5 + enl] << 8));
+            entrySize = 4 + (int)enl + 2 + slen;
+        } else {
+            break; /* unknown kind terminates scan */
+        }
+
+        if (eh == hash && enl == (unsigned char)nlen) {
+            const char *en = p + 4;
+            int i, match = 1;
+            for (i = 0; i < nlen; i++) {
+                if (en[i] != name[i]) { match = 0; break; }
+            }
+            if (match) return p;
+        }
+
+        p += entrySize;
+    }
+    return 0; /* not found */
+}
+
+/* Internal: get the total size of a variable entry pointed to by p */
+static int _xelpVarEntrySize(const char *p) {
+    unsigned char kind = (unsigned char)*p;
+    unsigned char enl = (unsigned char)p[3];
+    if (kind == XELP_VAL_INT) return 4 + (int)enl + 4;
+    if (kind == XELP_VAL_PROC) {
+        int blen = (int)(((unsigned char)p[4 + enl]) | ((unsigned char)p[5 + enl] << 8));
+        return 4 + (int)enl + 2 + blen;
+    }
+    /* STR */
+    {
+        int slen = (int)(((unsigned char)p[4 + enl]) | ((unsigned char)p[5 + enl] << 8));
+        return 4 + (int)enl + 2 + slen;
+    }
+}
+
+/* Internal: store a 32-bit int as 4 bytes (little-endian) */
+static void _xelpStoreInt(char *dst, int val) {
+    unsigned int u = (unsigned int)val;
+    dst[0] = (char)(u & 0xFF);
+    dst[1] = (char)((u >> 8) & 0xFF);
+    dst[2] = (char)((u >> 16) & 0xFF);
+    dst[3] = (char)((u >> 24) & 0xFF);
+}
+
+/* Internal: load a 32-bit int from 4 bytes (little-endian) */
+static int _xelpLoadInt(const char *src) {
+    unsigned int u = ((unsigned char)src[0])
+                   | (((unsigned int)(unsigned char)src[1]) << 8)
+                   | (((unsigned int)(unsigned char)src[2]) << 16)
+                   | (((unsigned int)(unsigned char)src[3]) << 24);
+    return (int)u;
+}
+
+/* Set/create variable. Returns XELP_S_OK or XELP_E_ARENA_FULL. */
+static XELPRESULT _xelpVarSet(XELP *ths, const char *name, int nlen,
+                              unsigned char kind, int intVal,
+                              const char *strVal, int strLen) {
+    char *existing = _xelpVarFind(ths, name, nlen);
+    unsigned short hash = _xelpNameHash(name, nlen);
+    int newSize, i;
+
+    if (kind == XELP_VAL_INT) {
+        newSize = 4 + nlen + 4;
+    } else {
+        newSize = 4 + nlen + 2 + strLen;
+    }
+
+    if (existing) {
+        int oldSize = _xelpVarEntrySize(existing);
+        unsigned char oldKind = (unsigned char)*existing;
+
+        /* Fast path: INT overwriting INT (same size) */
+        if (kind == XELP_VAL_INT && oldKind == XELP_VAL_INT) {
+            _xelpStoreInt(existing + 4 + nlen, intVal);
+            return XELP_S_OK;
+        }
+
+        /* Need to delete old and create new: shift heap entries */
+        {
+            char *entryEnd = existing + oldSize;
+            char *heapEnd = ths->mArena + XELP_SCRIPT_ARENA_SZ;
+            int moveBytes = (int)(existing - ths->mHP);
+
+            /* shift entries that are below this one upward */
+            if (moveBytes > 0) {
+                char *dst = existing + oldSize - 1;
+                char *src = existing - 1;
+                while (moveBytes-- > 0) { *dst-- = *src--; }
+            }
+            ths->mHP += oldSize;
+            (void)entryEnd;
+            (void)heapEnd;
+        }
+        existing = 0; /* invalidated */
+    }
+
+    /* Check space */
+    if (ths->mSP + newSize > ths->mHP - newSize)
+        return XELP_E_ARENA_FULL;
+
+    /* Allocate at HP (grows down) */
+    ths->mHP -= newSize;
+    {
+        char *p = ths->mHP;
+        p[0] = (char)kind;
+        p[1] = (char)(hash & 0xFF);
+        p[2] = (char)((hash >> 8) & 0xFF);
+        p[3] = (char)nlen;
+        for (i = 0; i < nlen; i++) p[4 + i] = name[i];
+        if (kind == XELP_VAL_INT) {
+            _xelpStoreInt(p + 4 + nlen, intVal);
+        } else {
+            p[4 + nlen] = (char)(strLen & 0xFF);
+            p[4 + nlen + 1] = (char)((strLen >> 8) & 0xFF);
+            for (i = 0; i < strLen; i++) p[4 + nlen + 2 + i] = strVal[i];
+        }
+    }
+    return XELP_S_OK;
+}
+
+/* Get variable value. Returns XELP_S_OK or XELP_E_UNDEF_VAR. */
+static XELPRESULT _xelpVarGet(XELP *ths, const char *name, int nlen, XelpResult *out) {
+    char *p = _xelpVarFind(ths, name, nlen);
+    unsigned char enl;
+    if (!p) return XELP_E_UNDEF_VAR;
+
+    enl = (unsigned char)p[3];
+    out->kind = (unsigned char)p[0];
+    if (out->kind == XELP_VAL_INT) {
+        out->intVal = _xelpLoadInt(p + 4 + enl);
+        out->strVal = 0;
+        out->strLen = 0;
+    } else if (out->kind == XELP_VAL_STR) {
+        out->strLen = (int)(((unsigned char)p[4 + enl]) | ((unsigned char)p[5 + enl] << 8));
+        out->strVal = p + 4 + enl + 2;
+        out->intVal = 0;
+    } else {
+        /* PROC or other - return as NIL for variable access */
+        out->kind = XELP_VAL_NIL;
+        out->intVal = 0;
+        out->strVal = 0;
+        out->strLen = 0;
+    }
+    return XELP_S_OK;
+}
+
+/*****************************************
+ Result stack operations (grows up from SP).
+ Result entry format: [kind:1][payload:4 for INT, 2+N for STR]
+ NIL entry: [0x00] (1 byte)
+ INT entry: [0x03][int:4] (5 bytes)
+ STR entry: [0x10][len:2][bytes:len] (3+len bytes)
+ */
+
+static XELPRESULT _xelpResultPushNil(XELP *ths) {
+    if (ths->mSP + 1 > ths->mHP) return XELP_E_ARENA_FULL;
+    *ths->mSP++ = (char)XELP_VAL_NIL;
+    return XELP_S_OK;
+}
+
+static XELPRESULT _xelpResultPushInt(XELP *ths, int val) {
+    if (ths->mSP + 5 > ths->mHP) return XELP_E_ARENA_FULL;
+    *ths->mSP++ = (char)XELP_VAL_INT;
+    _xelpStoreInt(ths->mSP, val);
+    ths->mSP += 4;
+    return XELP_S_OK;
+}
+
+static XELPRESULT _xelpResultPushStr(XELP *ths, const char *s, int slen) {
+    int i;
+    if (ths->mSP + 3 + slen > ths->mHP) return XELP_E_ARENA_FULL;
+    *ths->mSP++ = (char)XELP_VAL_STR;
+    *ths->mSP++ = (char)(slen & 0xFF);
+    *ths->mSP++ = (char)((slen >> 8) & 0xFF);
+    for (i = 0; i < slen; i++) *ths->mSP++ = s[i];
+    return XELP_S_OK;
+}
+
+/* Peek at the top result without removing it. Returns kind, or XELP_VAL_NIL if empty.
+   Used by _if condition evaluation and paren result handling. */
+/* Helper: compute size of a stack entry starting at p.
+   Handles NIL, INT, STR, and FRAME entries. */
+static int _xelpStackEntrySize(const char *p) {
+    unsigned char k = (unsigned char)*p;
+    if (k == XELP_VAL_INT) return 5;
+    if (k == XELP_VAL_STR) {
+        int sl = (int)(((unsigned char)p[1]) | ((unsigned char)p[2] << 8));
+        return 3 + sl;
+    }
+    if (k == XELP_VAL_FRAME) {
+        int adl = (int)(((unsigned char)p[3 + 4*XELP_PTR_SZ])
+                       | ((unsigned char)p[4 + 4*XELP_PTR_SZ] << 8));
+        return XELP_FRAME_HDR + adl;
+    }
+    return 1; /* NIL or unknown: skip byte */
+}
+
+/* Pop top result into XelpResult. Skips frame entries. Returns XELP_S_OK or XELP_E_ERR if empty. */
+static XELPRESULT _xelpResultPop(XELP *ths, XelpResult *out) {
+    char *base = ths->mArena;
+    char *p, *last;
+    /* Walk from base to find the last non-frame entry.
+       If stack is empty or contains only frame entries, last stays 0. */
+    last = 0;
+    if (ths->mSP > base) {
+        p = base;
+        while (p < ths->mSP) {
+            unsigned char k = (unsigned char)*p;
+            if (k != XELP_VAL_FRAME) last = p;
+            p += _xelpStackEntrySize(p);
+        }
+    }
+    if (!last) {
+        out->kind = XELP_VAL_NIL; out->intVal = 0; out->strVal = 0; out->strLen = 0;
+        return XELP_E_ERR;
+    }
+    {
+        unsigned char k = (unsigned char)*last;
+        out->kind = k;
+        if (k == XELP_VAL_INT) {
+            out->intVal = _xelpLoadInt(last + 1);
+            out->strVal = 0; out->strLen = 0;
+        } else if (k == XELP_VAL_STR) {
+            out->strLen = (int)(((unsigned char)last[1]) | ((unsigned char)last[2] << 8));
+            out->strVal = last + 3;
+            out->intVal = 0;
+        } else {
+            out->intVal = 0; out->strVal = 0; out->strLen = 0;
+        }
+        ths->mSP = last; /* pop */
+    }
+    return XELP_S_OK;
+}
+
+/*****************************************
+ Public result API
+ */
+XELPRESULT XelpSetResultInt(XELP *ths, int val) {
+    return _xelpResultPushInt(ths, val);
+}
+
+XELPRESULT XelpSetResultStr(XELP *ths, const char *s, int slen) {
+    return _xelpResultPushStr(ths, s, slen);
+}
+
+XELPRESULT XelpGetResult(XELP *ths, XelpResult *result) {
+    return _xelpResultPop(ths, result);
+}
+
+/*****************************************
+ _xelpNextTokSpan() - shared token boundary scanner.
+ Reports the next token's start and end in the source buffer without copying.
+ Handles: whitespace skip, quoted strings (with escape), unquoted tokens, CLI_ESC.
+ Sets *isQuoted = 1 if the token was quoted.
+ Returns: 1 if a token was found, 0 if end of input.
+ Advances *pos past the token (including closing quote).
+ */
+static int _xelpNextTokSpan(const char **pos, const char *end,
+                            const char **tokStart, const char **tokEnd,
+                            int *isQuoted) {
+    const char *r = *pos;
+    *isQuoted = 0;
+
+    /* skip whitespace */
+    while (r < end && (*r == ' ' || *r == '\t')) r++;
+    if (r >= end) { *pos = r; return 0; }
+
+    if (*r == '"') {
+        /* quoted token: content is between quotes */
+        *isQuoted = 1;
+        *tokStart = r; /* include the opening quote for type inference */
+        r++;
+        while (r < end && *r != '"') {
+            if (*r == XELP_QUO_ESC && r + 1 < end) r++;
+            r++;
+        }
+        if (r < end) r++; /* skip closing quote */
+        *tokEnd = r;
+    } else {
+        /* unquoted token */
+        *tokStart = r;
+        while (r < end && *r != ' ' && *r != '\t') {
+            if (*r == XELP_CLI_ESC && r + 1 < end) r++;
+            r++;
+        }
+        *tokEnd = r;
+    }
+    *pos = r;
+    return 1;
+}
+
+/*****************************************
+ Paren pre-pass: copies line into scratch, inserts spaces around ( and )
+ so they become separate tokens for the evaluator.
+ Returns length of processed string in scratch, or -1 on overflow.
+ */
+static int _xelpParenPrepass(const char *src, int srcLen, char *scratch, int scratchLen) {
+    int si = 0, di = 0;
+    int inQuote = 0;
+
+    while (si < srcLen && di < scratchLen - 1) {
+        char c = src[si];
+        if (c == '"') {
+            inQuote = !inQuote;
+            scratch[di++] = c;
+            si++;
+        } else if (!inQuote && (c == '(' || c == ')')) {
+            /* insert space before paren if not at start and prev not space */
+            if (di > 0 && scratch[di-1] != ' ' && di < scratchLen - 1)
+                scratch[di++] = ' ';
+            if (di < scratchLen - 1)
+                scratch[di++] = c;
+            /* insert space after paren */
+            if (di < scratchLen - 1)
+                scratch[di++] = ' ';
+            si++;
+        } else if (!inQuote && c == XELP_QUO_ESC && si + 1 < srcLen) {
+            scratch[di++] = c; si++;
+            if (di < scratchLen - 1) { scratch[di++] = src[si]; si++; }
+        } else {
+            scratch[di++] = c;
+            si++;
+        }
+    }
+    if (di >= scratchLen) return -1;
+    scratch[di] = '\0';
+    return di;
+}
+
+/*****************************************
+ Script evaluator: _xelpEvalStatement()
+ Evaluates a single statement line (after tokenization by XelpTokLineXB).
+ Handles: $var expansion, @n params, builtin dispatch, user command dispatch.
+ */
+
+/* Forward declarations */
+static XELPRESULT _xelpEvalLoop(XELP *ths, int targetDepth);
+static XELPRESULT _xelpEvalStatement(XELP *ths, const char *lineS, int lineLen);
+
+/* Expand $var or @n in a token, writing result into scratch buffer.
+   Returns length written, or negative on error. */
+static int _xelpExpandToken(XELP *ths, const char *tok, int tokLen,
+                            char *buf, int bufLen) {
+    /* Only called for $-prefixed tokens */
+    XelpResult val;
+    XELPRESULT r;
+    if (tokLen <= 1) return 0; /* bare $ */
+
+    r = _xelpVarGet(ths, tok + 1, tokLen - 1, &val);
+    if (r != XELP_S_OK) return -1; /* XELP_E_UNDEF_VAR */
+    if (val.kind == XELP_VAL_INT) {
+        return _xelpIntToStr(val.intVal, buf, bufLen);
+    } else if (val.kind == XELP_VAL_STR) {
+        int i;
+        if (val.strLen > bufLen) return -2;
+        for (i = 0; i < val.strLen; i++) buf[i] = val.strVal[i];
+        return val.strLen;
+    }
+    return 0; /* NIL expands to empty */
+}
+
+/*****************************************
+ Builtin dispatch table (internal)
+ */
+
+/* _print: concatenate argv[1..] to output */
+static XELPRESULT _xelpBuiltin_print(XELP *ths, int argc, const char **argv) {
+    int i;
+    (void)argv;
+    for (i = 1; i < argc; i++) {
+        const char *s = argv[i];
+        while (*s) { _PUTC(*s); s++; }
+    }
+    return XELP_S_OK;
+}
+
+/* _set: set variable with type inference */
+static XELPRESULT _xelpBuiltin_set(XELP *ths, int argc, const char **argv) {
+    const char *name;
+    int nlen, valInt;
+
+    if (argc < 3) return XELP_E_ERR;
+
+    /* argv[1] = variable name (already expanded by tokenizer if was $var) */
+    name = argv[1];
+    nlen = XelpStrLen(argv[1]);
+
+    /* argv[2] = value - determine type */
+    {
+        const char *valStr = argv[2];
+        int valLen = XelpStrLen(valStr);
+
+        /* Type inference: unquoted numeric -> INT, else -> STR */
+        if (XelpParseNum(valStr, valLen, &valInt) == XELP_S_OK) {
+            return _xelpVarSet(ths, name, nlen, XELP_VAL_INT, valInt, 0, 0);
+        } else {
+            return _xelpVarSet(ths, name, nlen, XELP_VAL_STR, 0, valStr, valLen);
+        }
+    }
+}
+
+/* _mr: read/write mR[] registers, push to result stack */
+static XELPRESULT _xelpBuiltin_mr(XELP *ths, int argc, const char **argv) {
+    int idx, val;
+    if (argc < 2) return XELP_E_ERR;
+    if (XelpParseNum(argv[1], XelpStrLen(argv[1]), &idx) != XELP_S_OK) return XELP_E_ERR;
+    if (idx < 0 || idx >= XELP_REGS_SZ) return XELP_E_ERR;
+
+    if (argc >= 3) {
+        /* write mode */
+        if (XelpParseNum(argv[2], XelpStrLen(argv[2]), &val) != XELP_S_OK) return XELP_E_ERR;
+        ths->mR[idx] = val;
+        return _xelpResultPushInt(ths, val);
+    }
+    /* read mode */
+    return _xelpResultPushInt(ths, (int)ths->mR[idx]);
+}
+
+/* Math builtins */
+static XELPRESULT _xelpBuiltin_add(XELP *ths, int argc, const char **argv) {
+    int sum = 0, i, val;
+    for (i = 1; i < argc; i++) {
+        if (XelpParseNum(argv[i], XelpStrLen(argv[i]), &val) != XELP_S_OK)
+            return XELP_E_TYPE_ERR;
+        sum += val;
+    }
+    return _xelpResultPushInt(ths, sum);
+}
+
+static XELPRESULT _xelpBuiltin_sub(XELP *ths, int argc, const char **argv) {
+    int result, val;
+    if (argc < 3) return XELP_E_ERR;
+    if (XelpParseNum(argv[1], XelpStrLen(argv[1]), &result) != XELP_S_OK) return XELP_E_TYPE_ERR;
+    if (XelpParseNum(argv[2], XelpStrLen(argv[2]), &val) != XELP_S_OK) return XELP_E_TYPE_ERR;
+    return _xelpResultPushInt(ths, result - val);
+}
+
+static XELPRESULT _xelpBuiltin_mul(XELP *ths, int argc, const char **argv) {
+    int result = 1, i, val;
+    for (i = 1; i < argc; i++) {
+        if (XelpParseNum(argv[i], XelpStrLen(argv[i]), &val) != XELP_S_OK)
+            return XELP_E_TYPE_ERR;
+        result *= val;
+    }
+    return _xelpResultPushInt(ths, result);
+}
+
+static XELPRESULT _xelpBuiltin_div(XELP *ths, int argc, const char **argv) {
+    int a, b;
+    if (argc < 3) return XELP_E_ERR;
+    if (XelpParseNum(argv[1], XelpStrLen(argv[1]), &a) != XELP_S_OK) return XELP_E_TYPE_ERR;
+    if (XelpParseNum(argv[2], XelpStrLen(argv[2]), &b) != XELP_S_OK) return XELP_E_TYPE_ERR;
+    if (b == 0) return XELP_E_ERR;
+    return _xelpResultPushInt(ths, a / b);
+}
+
+static XELPRESULT _xelpBuiltin_mod(XELP *ths, int argc, const char **argv) {
+    int a, b;
+    if (argc < 3) return XELP_E_ERR;
+    if (XelpParseNum(argv[1], XelpStrLen(argv[1]), &a) != XELP_S_OK) return XELP_E_TYPE_ERR;
+    if (XelpParseNum(argv[2], XelpStrLen(argv[2]), &b) != XELP_S_OK) return XELP_E_TYPE_ERR;
+    if (b == 0) return XELP_E_ERR;
+    return _xelpResultPushInt(ths, a % b);
+}
+
+/* Bitwise builtins */
+static XELPRESULT _xelpBuiltin_band(XELP *ths, int argc, const char **argv) {
+    int a, b;
+    if (argc < 3) return XELP_E_ERR;
+    if (XelpParseNum(argv[1], XelpStrLen(argv[1]), &a) != XELP_S_OK) return XELP_E_TYPE_ERR;
+    if (XelpParseNum(argv[2], XelpStrLen(argv[2]), &b) != XELP_S_OK) return XELP_E_TYPE_ERR;
+    return _xelpResultPushInt(ths, a & b);
+}
+
+static XELPRESULT _xelpBuiltin_bor(XELP *ths, int argc, const char **argv) {
+    int a, b;
+    if (argc < 3) return XELP_E_ERR;
+    if (XelpParseNum(argv[1], XelpStrLen(argv[1]), &a) != XELP_S_OK) return XELP_E_TYPE_ERR;
+    if (XelpParseNum(argv[2], XelpStrLen(argv[2]), &b) != XELP_S_OK) return XELP_E_TYPE_ERR;
+    return _xelpResultPushInt(ths, a | b);
+}
+
+static XELPRESULT _xelpBuiltin_bxor(XELP *ths, int argc, const char **argv) {
+    int a, b;
+    if (argc < 3) return XELP_E_ERR;
+    if (XelpParseNum(argv[1], XelpStrLen(argv[1]), &a) != XELP_S_OK) return XELP_E_TYPE_ERR;
+    if (XelpParseNum(argv[2], XelpStrLen(argv[2]), &b) != XELP_S_OK) return XELP_E_TYPE_ERR;
+    return _xelpResultPushInt(ths, a ^ b);
+}
+
+static XELPRESULT _xelpBuiltin_bnot(XELP *ths, int argc, const char **argv) {
+    int a;
+    if (argc < 2) return XELP_E_ERR;
+    if (XelpParseNum(argv[1], XelpStrLen(argv[1]), &a) != XELP_S_OK) return XELP_E_TYPE_ERR;
+    return _xelpResultPushInt(ths, ~a);
+}
+
+static XELPRESULT _xelpBuiltin_shl(XELP *ths, int argc, const char **argv) {
+    int a, b;
+    if (argc < 3) return XELP_E_ERR;
+    if (XelpParseNum(argv[1], XelpStrLen(argv[1]), &a) != XELP_S_OK) return XELP_E_TYPE_ERR;
+    if (XelpParseNum(argv[2], XelpStrLen(argv[2]), &b) != XELP_S_OK) return XELP_E_TYPE_ERR;
+    if (b < 0 || b >= 32) return XELP_E_ERR;
+    return _xelpResultPushInt(ths, (int)((unsigned)a << b));
+}
+
+static XELPRESULT _xelpBuiltin_shr(XELP *ths, int argc, const char **argv) {
+    int a, b;
+    if (argc < 3) return XELP_E_ERR;
+    if (XelpParseNum(argv[1], XelpStrLen(argv[1]), &a) != XELP_S_OK) return XELP_E_TYPE_ERR;
+    if (XelpParseNum(argv[2], XelpStrLen(argv[2]), &b) != XELP_S_OK) return XELP_E_TYPE_ERR;
+    if (b < 0 || b >= 32) return XELP_E_ERR;
+    return _xelpResultPushInt(ths, (int)((unsigned int)a >> b));
+}
+
+static XELPRESULT _xelpBuiltin_inc(XELP *ths, int argc, const char **argv) {
+    XelpResult val;
+    const char *name;
+    int nlen, newVal;
+    if (argc < 2) return XELP_E_ERR;
+    name = argv[1]; nlen = XelpStrLen(name);
+    if (_xelpVarGet(ths, name, nlen, &val) != XELP_S_OK) return XELP_E_UNDEF_VAR;
+    if (val.kind != XELP_VAL_INT) return XELP_E_TYPE_ERR;
+    newVal = val.intVal + 1;
+    _xelpVarSet(ths, name, nlen, XELP_VAL_INT, newVal, 0, 0);
+    return _xelpResultPushInt(ths, newVal);
+}
+
+static XELPRESULT _xelpBuiltin_dec(XELP *ths, int argc, const char **argv) {
+    XelpResult val;
+    const char *name;
+    int nlen, newVal;
+    if (argc < 2) return XELP_E_ERR;
+    name = argv[1]; nlen = XelpStrLen(name);
+    if (_xelpVarGet(ths, name, nlen, &val) != XELP_S_OK) return XELP_E_UNDEF_VAR;
+    if (val.kind != XELP_VAL_INT) return XELP_E_TYPE_ERR;
+    newVal = val.intVal - 1;
+    _xelpVarSet(ths, name, nlen, XELP_VAL_INT, newVal, 0, 0);
+    return _xelpResultPushInt(ths, newVal);
+}
+
+/* Comparison builtins */
+static XELPRESULT _xelpBuiltin_eq(XELP *ths, int argc, const char **argv) {
+    int a, b, result;
+    if (argc < 3) return XELP_E_ERR;
+    /* Try numeric comparison first */
+    if (XelpParseNum(argv[1], XelpStrLen(argv[1]), &a) == XELP_S_OK &&
+        XelpParseNum(argv[2], XelpStrLen(argv[2]), &b) == XELP_S_OK) {
+        result = (a == b) ? 1 : 0;
+    } else {
+        /* String comparison */
+        result = (XelpBufCmp(argv[1], argv[1] + XelpStrLen(argv[1]),
+                             argv[2], argv[2] + XelpStrLen(argv[2]),
+                             XELP_CMP_TYPE_BUF) == XELP_S_OK) ? 1 : 0;
+    }
+    return _xelpResultPushInt(ths, result);
+}
+
+static XELPRESULT _xelpBuiltin_neq(XELP *ths, int argc, const char **argv) {
+    int a, b, result;
+    if (argc < 3) return XELP_E_ERR;
+    if (XelpParseNum(argv[1], XelpStrLen(argv[1]), &a) == XELP_S_OK &&
+        XelpParseNum(argv[2], XelpStrLen(argv[2]), &b) == XELP_S_OK) {
+        result = (a != b) ? 1 : 0;
+    } else {
+        result = (XelpBufCmp(argv[1], argv[1] + XelpStrLen(argv[1]),
+                             argv[2], argv[2] + XelpStrLen(argv[2]),
+                             XELP_CMP_TYPE_BUF) != XELP_S_OK) ? 1 : 0;
+    }
+    return _xelpResultPushInt(ths, result);
+}
+
+static XELPRESULT _xelpBuiltin_gt(XELP *ths, int argc, const char **argv) {
+    int a, b;
+    if (argc < 3) return XELP_E_ERR;
+    if (XelpParseNum(argv[1], XelpStrLen(argv[1]), &a) != XELP_S_OK) return XELP_E_TYPE_ERR;
+    if (XelpParseNum(argv[2], XelpStrLen(argv[2]), &b) != XELP_S_OK) return XELP_E_TYPE_ERR;
+    return _xelpResultPushInt(ths, (a > b) ? 1 : 0);
+}
+
+static XELPRESULT _xelpBuiltin_lt(XELP *ths, int argc, const char **argv) {
+    int a, b;
+    if (argc < 3) return XELP_E_ERR;
+    if (XelpParseNum(argv[1], XelpStrLen(argv[1]), &a) != XELP_S_OK) return XELP_E_TYPE_ERR;
+    if (XelpParseNum(argv[2], XelpStrLen(argv[2]), &b) != XELP_S_OK) return XELP_E_TYPE_ERR;
+    return _xelpResultPushInt(ths, (a < b) ? 1 : 0);
+}
+
+static XELPRESULT _xelpBuiltin_ge(XELP *ths, int argc, const char **argv) {
+    int a, b;
+    if (argc < 3) return XELP_E_ERR;
+    if (XelpParseNum(argv[1], XelpStrLen(argv[1]), &a) != XELP_S_OK) return XELP_E_TYPE_ERR;
+    if (XelpParseNum(argv[2], XelpStrLen(argv[2]), &b) != XELP_S_OK) return XELP_E_TYPE_ERR;
+    return _xelpResultPushInt(ths, (a >= b) ? 1 : 0);
+}
+
+static XELPRESULT _xelpBuiltin_le(XELP *ths, int argc, const char **argv) {
+    int a, b;
+    if (argc < 3) return XELP_E_ERR;
+    if (XelpParseNum(argv[1], XelpStrLen(argv[1]), &a) != XELP_S_OK) return XELP_E_TYPE_ERR;
+    if (XelpParseNum(argv[2], XelpStrLen(argv[2]), &b) != XELP_S_OK) return XELP_E_TYPE_ERR;
+    return _xelpResultPushInt(ths, (a <= b) ? 1 : 0);
+}
+
+/* Logic builtins - truthiness: 0 and "" are false, everything else true */
+static int _xelpTruthy(const char *s) {
+    int v;
+    if (!s || !*s) return 0; /* empty = false */
+    if (XelpParseNum(s, XelpStrLen(s), &v) == XELP_S_OK) return v != 0;
+    return 1; /* non-empty non-numeric string = true */
+}
+
+static XELPRESULT _xelpBuiltin_and(XELP *ths, int argc, const char **argv) {
+    if (argc < 3) return XELP_E_ERR;
+    return _xelpResultPushInt(ths, (_xelpTruthy(argv[1]) && _xelpTruthy(argv[2])) ? 1 : 0);
+}
+
+static XELPRESULT _xelpBuiltin_or(XELP *ths, int argc, const char **argv) {
+    if (argc < 3) return XELP_E_ERR;
+    return _xelpResultPushInt(ths, (_xelpTruthy(argv[1]) || _xelpTruthy(argv[2])) ? 1 : 0);
+}
+
+static XELPRESULT _xelpBuiltin_not(XELP *ths, int argc, const char **argv) {
+    if (argc < 2) return XELP_E_ERR;
+    return _xelpResultPushInt(ths, _xelpTruthy(argv[1]) ? 0 : 1);
+}
+
+/* _lpad: right-align string with space padding */
+static XELPRESULT _xelpBuiltin_lpad(XELP *ths, int argc, const char **argv) {
+    int width, slen, pad, i;
+    const char *s;
+    if (argc < 3) return XELP_E_ERR;
+    s = argv[1];
+    slen = XelpStrLen(s);
+    if (XelpParseNum(argv[2], XelpStrLen(argv[2]), &width) != XELP_S_OK) return XELP_E_TYPE_ERR;
+    pad = width - slen;
+    for (i = 0; i < pad; i++) _PUTC(' ');
+    for (i = 0; i < slen; i++) _PUTC(s[i]);
+    return XELP_S_OK;
+}
+
+/*****************************************
+ Control flow builtins
+ */
+
+/* _if: _if <cond> _then <cmd> [_else <cmd>]
+   cond is truthy if: non-zero int, non-empty string, or result of () evaluation */
+static XELPRESULT _xelpBuiltin_if(XELP *ths, int argc, const char **argv) {
+    int condTrue, thenIdx = -1, elseIdx = -1, i;
+    const char *condStr;
+
+    if (argc < 4) return XELP_E_ERR; /* minimum: _if cond _then cmd */
+
+    /* Find _then and _else boundaries */
+    for (i = 2; i < argc; i++) {
+        if (XelpStrEq(argv[i], XelpStrLen(argv[i]), "_then") == XELP_S_OK) thenIdx = i;
+        else if (XelpStrEq(argv[i], XelpStrLen(argv[i]), "_else") == XELP_S_OK) elseIdx = i;
+    }
+    if (thenIdx < 0) return XELP_E_ERR;
+
+    /* Evaluate condition: argv[1] */
+    condStr = argv[1];
+    condTrue = _xelpTruthy(condStr);
+
+    /* Execute appropriate branch */
+    if (condTrue && thenIdx + 1 < argc) {
+        /* Build command string from _then+1 to _else (or end) */
+        int cmdEnd = (elseIdx > 0) ? elseIdx : argc;
+        /* Execute single command: argv[thenIdx+1] with remaining args */
+        if (thenIdx + 1 < cmdEnd) {
+            /* Reconstruct command line for the _then branch */
+            char cmdBuf[XELP_ARGVBUFSZ];
+            int pos = 0, j;
+            for (j = thenIdx + 1; j < cmdEnd && pos < XELP_ARGVBUFSZ - 2; j++) {
+                const char *s = argv[j];
+                if (j > thenIdx + 1 && pos < XELP_ARGVBUFSZ - 1) cmdBuf[pos++] = ' ';
+                while (*s && pos < XELP_ARGVBUFSZ - 1) cmdBuf[pos++] = *s++;
+            }
+            cmdBuf[pos] = '\0';
+            return _xelpEvalStatement(ths, cmdBuf, pos);
+        }
+    } else if (!condTrue && elseIdx >= 0 && elseIdx + 1 < argc) {
+        /* Execute _else branch */
+        char cmdBuf[XELP_ARGVBUFSZ];
+        int pos = 0, j;
+        for (j = elseIdx + 1; j < argc && pos < XELP_ARGVBUFSZ - 2; j++) {
+            const char *s = argv[j];
+            if (j > elseIdx + 1 && pos < XELP_ARGVBUFSZ - 1) cmdBuf[pos++] = ' ';
+            while (*s && pos < XELP_ARGVBUFSZ - 1) cmdBuf[pos++] = *s++;
+        }
+        cmdBuf[pos] = '\0';
+        return _xelpEvalStatement(ths, cmdBuf, pos);
+    }
+    return XELP_S_OK;
+}
+
+/* _next: jump forward to label or execute a sub-command */
+/* _next: forward jump to label, or execute sub-command.
+   For :label form: scans forward from current mpScriptP for label.
+   Modifies mpScriptP directly. :_end sets position to end-of-script. */
+static XELPRESULT _xelpBuiltin_next(XELP *ths, int argc, const char **argv) {
+    if (argc < 2) return XELP_E_ERR;
+
+    /* _next command - execute sub-command */
+    if (argv[1][0] != ':') {
+        char cmdBuf[XELP_ARGVBUFSZ];
+        int pos = 0, j;
+        for (j = 1; j < argc && pos < XELP_ARGVBUFSZ - 2; j++) {
+            const char *s = argv[j];
+            if (j > 1 && pos < XELP_ARGVBUFSZ - 1) cmdBuf[pos++] = ' ';
+            while (*s && pos < XELP_ARGVBUFSZ - 1) cmdBuf[pos++] = *s++;
+        }
+        cmdBuf[pos] = '\0';
+        return _xelpEvalStatement(ths, cmdBuf, pos);
+    }
+
+    /* _next :label - forward jump */
+    {
+        const char *label = argv[1];
+        int labelLen = XelpStrLen(label);
+        XelpBuf searchBuf;
+
+        /* No script context (standalone call) -- nothing to scan */
+        if (!ths->mpScriptS) return XELP_S_OK;
+
+        if (XelpStrEq(label, labelLen, ":_end") == XELP_S_OK) {
+            ths->mpScriptP = ths->mpScriptE;
+            return XELP_S_OK;
+        }
+        /* Forward search from current position */
+        XELP_XB_INIT_PTRS(searchBuf,
+            (char*)ths->mpScriptS, (char*)ths->mpScriptP, (char*)ths->mpScriptE);
+        if (XelpFindTok(&searchBuf, label, label + labelLen, XELP_TOK_LINE) == XELP_S_OK) {
+            ths->mpScriptP = searchBuf.p;
+            return XELP_S_OK;
+        }
+        return XELP_E_NO_LABEL;
+    }
+}
+
+/* _goto: jump to label by scanning from start of current script buffer.
+   Modifies mpScriptP directly; eval loop picks up new position on next iteration.
+   If label not found: XELP_E_NO_LABEL. :_end sets position to end-of-script. */
+static XELPRESULT _xelpBuiltin_goto(XELP *ths, int argc, const char **argv) {
+    const char *label;
+    int labelLen;
+    XelpBuf searchBuf;
+    if (argc < 2) return XELP_E_NO_LABEL;
+    label = argv[1];
+    if (label[0] != ':') return XELP_E_NO_LABEL;
+    labelLen = XelpStrLen(label);
+
+    /* No script context (standalone call) -- nothing to scan */
+    if (!ths->mpScriptS) return XELP_S_OK;
+
+    /* :_end means exit current script */
+    if (XelpStrEq(label, labelLen, ":_end") == XELP_S_OK) {
+        ths->mpScriptP = ths->mpScriptE;
+        return XELP_S_OK;
+    }
+    /* Scan from beginning of current script */
+    XELP_XB_INIT_PTRS(searchBuf,
+        (char*)ths->mpScriptS, (char*)ths->mpScriptS, (char*)ths->mpScriptE);
+    if (XelpFindTok(&searchBuf, label, label + labelLen, XELP_TOK_LINE) == XELP_S_OK) {
+        ths->mpScriptP = searchBuf.p;
+        return XELP_S_OK;
+    }
+    return XELP_E_NO_LABEL;
+}
+
+/* _return: return from current frame.
+   Pushes return value onto result stack and signals XELP_S_RETURN
+   so the eval loop pops the frame. */
+static XELPRESULT _xelpBuiltin_return(XELP *ths, int argc, const char **argv) {
+    if (ths->mFrameDepth <= 0) return XELP_E_NO_FRAME;
+
+    if (argc >= 2) {
+        /* Push return value */
+        int intVal;
+        const char *s = argv[1];
+        int slen = XelpStrLen(s);
+        if (XelpParseNum(s, slen, &intVal) == XELP_S_OK) {
+            _xelpResultPushInt(ths, intVal);
+            ths->mR[1] = intVal; /* mirror to mR[1] per spec */
+        } else {
+            _xelpResultPushStr(ths, s, slen);
+        }
+    } else {
+        _xelpResultPushNil(ths);
+    }
+    return XELP_S_RETURN;
+}
+
+/* _func: define a script procedure */
+static XELPRESULT _xelpBuiltin_func(XELP *ths, int argc, const char **argv) {
+    const char *name, *body;
+    int nlen, bodyLen;
+    unsigned short hash;
+    int entrySize, i;
+
+    if (argc < 3) return XELP_E_ERR;
+    name = argv[1]; nlen = XelpStrLen(name);
+    body = argv[2]; bodyLen = XelpStrLen(body);
+
+    /* Store PROC entry in heap: [kind:1][hash:2][nameLen:1][name:nlen][bodyLen:2][body:bodyLen] */
+    hash = _xelpNameHash(name, nlen);
+    entrySize = 4 + nlen + 2 + bodyLen;
+
+    if ((ths->mHP - entrySize) < ths->mSP)
+        return XELP_E_ARENA_FULL;
+
+    ths->mHP -= entrySize;
+    {
+        char *p = ths->mHP;
+        p[0] = (char)XELP_VAL_PROC;
+        p[1] = (char)(hash & 0xFF);
+        p[2] = (char)((hash >> 8) & 0xFF);
+        p[3] = (char)nlen;
+        for (i = 0; i < nlen; i++) p[4 + i] = name[i];
+        /* Store body length and body inline */
+        p[4 + nlen] = (char)(bodyLen & 0xFF);
+        p[4 + nlen + 1] = (char)((bodyLen >> 8) & 0xFF);
+        for (i = 0; i < bodyLen; i++) p[4 + nlen + 2 + i] = body[i];
+    }
+    return XELP_S_OK;
+}
+
+/* Find a PROC entry by name. Returns pointer to body or NULL. */
+static const char *_xelpFindProc(XELP *ths, const char *name, int nlen, int *bodyLen) {
+    unsigned short hash = _xelpNameHash(name, nlen);
+    char *p = ths->mHP;
+    char *end = ths->mArena + XELP_SCRIPT_ARENA_SZ;
+
+    while (p < end) {
+        unsigned char kind = (unsigned char)*p;
+        unsigned short eh;
+        unsigned char enl;
+        int entrySize;
+
+        if (kind == XELP_VAL_INT) {
+            enl = (unsigned char)p[3];
+            entrySize = 4 + (int)enl + 4;
+        } else if (kind == XELP_VAL_STR) {
+            enl = (unsigned char)p[3];
+            {
+                int slen = (int)(((unsigned char)p[4 + enl]) | ((unsigned char)p[5 + enl] << 8));
+                entrySize = 4 + (int)enl + 2 + slen;
+            }
+        } else if (kind == XELP_VAL_PROC) {
+            int blen;
+            enl = (unsigned char)p[3];
+            eh = (unsigned short)(((unsigned char)p[1]) | ((unsigned char)p[2] << 8));
+            blen = (int)(((unsigned char)p[4 + enl]) | ((unsigned char)p[5 + enl] << 8));
+            entrySize = 4 + (int)enl + 2 + blen;
+
+            if (eh == hash && enl == (unsigned char)nlen) {
+                const char *en = p + 4;
+                int i, match = 1;
+                for (i = 0; i < nlen; i++) {
+                    if (en[i] != name[i]) { match = 0; break; }
+                }
+                if (match) {
+                    *bodyLen = blen;
+                    return (const char *)(p + 4 + nlen + 2);
+                }
+            }
+        } else {
+            break; /* unknown kind, end of entries */
+        }
+        p += entrySize;
+    }
+
+    /* Check C-registered script funcs */
+    if (ths->mpScriptFuncs) {
+        XELPScriptFuncEntry *sf = ths->mpScriptFuncs;
+        while (sf->mpCmd) {
+            if (XelpStrEq(name, nlen, sf->mpCmd) == XELP_S_OK) {
+                *bodyLen = XelpStrLen(sf->mpBody);
+                return sf->mpBody;
+            }
+            sf++;
+        }
+    }
+    return 0;
+}
+
+/*****************************************
+ _xelpEvalStatement() - evaluate one statement with $ expansion and dispatch.
+ lineS points to the statement text, lineLen is its length.
+ */
+static XELPRESULT _xelpEvalStatement(XELP *ths, const char *lineS, int lineLen) {
+    char scratch[XELP_ARGVBUFSZ];
+    char expandBuf[XELP_ARGVBUFSZ];
+    const char *argv[XELP_ARGV_MAX];
+    int argc = 0;
+    const char *pos, *end, *tokS, *tokE;
+    int isQuoted, ppLen;
+    char *wp;
+    XELPRESULT r;
+
+    if (lineLen <= 0) return XELP_S_OK;
+    /* Reject lines that exceed argument buffer size (matches legacy _xelpBuf2Argv behavior) */
+    if (lineLen >= XELP_ARGVBUFSZ) return XELP_E_ERR;
+
+    /* Label: first char ':' is a no-op (callers guarantee non-ws start) */
+    if (*lineS == ':') return XELP_S_OK;
+
+    /* Paren pre-pass */
+    ppLen = _xelpParenPrepass(lineS, lineLen, scratch, XELP_ARGVBUFSZ);
+    if (ppLen < 0) return XELP_E_ERR;
+
+    /* Check for parenthesized subexpressions - evaluate them */
+    {
+        int hasParens = 0, si;
+        for (si = 0; si < ppLen; si++) {
+            if (scratch[si] == '(' && (si == 0 || scratch[si-1] != XELP_CLI_ESC)) {
+                hasParens = 1; break;
+            }
+        }
+
+        if (hasParens) {
+            /* Evaluate parenthesized expressions by iterative substitution */
+            char workBuf[XELP_ARGVBUFSZ];
+            int workLen = ppLen, changed;
+
+            /* Copy scratch to workBuf */
+            for (si = 0; si < ppLen; si++) workBuf[si] = scratch[si];
+            workBuf[ppLen] = '\0';
+
+            do {
+                changed = 0;
+                /* Find innermost () pair */
+                {
+                    int openIdx = -1, closeIdx = -1;
+                    for (si = 0; si < workLen; si++) {
+                        if (workBuf[si] == '(') openIdx = si;
+                        else if (workBuf[si] == ')') { closeIdx = si; break; }
+                    }
+                    if (openIdx >= 0 && closeIdx > openIdx) {
+                        /* Evaluate the content between ( and ) */
+                        char innerBuf[XELP_ARGVBUFSZ];
+                        int innerLen = closeIdx - openIdx - 1;
+                        char resultBuf[32] = {0};
+                        int resultLen = 0;
+                        XelpResult res;
+
+                        for (si = 0; si < innerLen; si++)
+                            innerBuf[si] = workBuf[openIdx + 1 + si];
+                        innerBuf[innerLen] = '\0';
+
+                        /* Evaluate the inner expression */
+                        {
+                            int savedDepth = ths->mFrameDepth;
+                            r = _xelpEvalStatement(ths, innerBuf, innerLen);
+                            /* If inner expr called a script function, run it */
+                            if (r == XELP_S_CALL)
+                                r = _xelpEvalLoop(ths, savedDepth);
+                        }
+
+                        /* Get result from stack */
+                        if (_xelpResultPop(ths, &res) == XELP_S_OK) {
+                            if (res.kind == XELP_VAL_INT) {
+                                resultLen = _xelpIntToStr(res.intVal, resultBuf, 32);
+                            } else if (res.kind == XELP_VAL_STR) {
+                                resultLen = (res.strLen < 31) ? res.strLen : 31;
+                                for (si = 0; si < resultLen; si++)
+                                    resultBuf[si] = res.strVal[si];
+                            }
+                        }
+                        (void)r;
+
+                        /* Substitute: replace (expr) with result in workBuf */
+                        {
+                            char newWork[XELP_ARGVBUFSZ];
+                            int ni = 0;
+                            for (si = 0; si < openIdx && ni < XELP_ARGVBUFSZ - 1; si++)
+                                newWork[ni++] = workBuf[si];
+                            for (si = 0; si < resultLen && ni < XELP_ARGVBUFSZ - 1; si++)
+                                newWork[ni++] = resultBuf[si];
+                            for (si = closeIdx + 1; si < workLen && ni < XELP_ARGVBUFSZ - 1; si++)
+                                newWork[ni++] = workBuf[si];
+                            newWork[ni] = '\0';
+                            workLen = ni;
+                            for (si = 0; si <= workLen; si++) workBuf[si] = newWork[si];
+                        }
+                        changed = 1;
+                    }
+                }
+            } while (changed);
+
+            /* Use workBuf for final tokenization */
+            for (si = 0; si <= workLen; si++) scratch[si] = workBuf[si];
+            ppLen = workLen;
+        }
+    }
+
+    /* Tokenize with $ expansion */
+    pos = scratch;
+    end = scratch + ppLen;
+    wp = expandBuf;
+
+    while (argc < XELP_ARGV_MAX && _xelpNextTokSpan(&pos, end, &tokS, &tokE, &isQuoted)) {
+        int tokLen = (int)(tokE - tokS);
+
+        if (isQuoted) {
+            /* Quoted: strip quotes, process escapes, store as-is */
+            const char *r2 = tokS + 1; /* skip open quote */
+            const char *e2 = tokE - 1; /* before close quote */
+            argv[argc++] = wp;
+            while (r2 < e2 && wp < expandBuf + XELP_ARGVBUFSZ - 1) {
+                char c = *r2++;
+                if (c == XELP_QUO_ESC && r2 < e2) {
+                    const char *m = XELP_ESC_MAP;
+                    c = *r2++;
+                    while (*m) { if (c == m[0]) { c = m[1]; break; } m += 2; }
+                }
+                *wp++ = c;
+            }
+            *wp++ = '\0';
+        } else if (tokLen > 0 && tokS[0] == '$') {
+            /* Variable expansion */
+            int expLen;
+            argv[argc++] = wp;
+            expLen = _xelpExpandToken(ths, tokS, tokLen, wp, (int)(expandBuf + XELP_ARGVBUFSZ - wp - 1));
+            if (expLen < 0) return XELP_E_UNDEF_VAR;
+            wp += expLen;
+            *wp++ = '\0';
+        } else if (tokLen > 1 && tokS[0] == '@') {
+            /* Positional parameter expansion: @1, @2, etc. */
+            int idx;
+            argv[argc++] = wp;
+            if (XelpParseNum(tokS + 1, tokLen - 1, &idx) == XELP_S_OK &&
+                idx >= 0 && idx < (int)ths->mFrameArgc) {
+                const char *arg = _xelpFrameArg(ths, idx);
+                while (*arg && wp < expandBuf + XELP_ARGVBUFSZ - 1) {
+                    *wp++ = *arg++;
+                }
+            }
+            *wp++ = '\0';
+        } else {
+            /* Literal token: process CLI_ESC */
+            int i;
+            argv[argc++] = wp;
+            for (i = 0; i < tokLen && wp < expandBuf + XELP_ARGVBUFSZ - 1; i++) {
+                if (tokS[i] == XELP_CLI_ESC && i + 1 < tokLen) { i++; }
+                *wp++ = tokS[i];
+            }
+            *wp++ = '\0';
+        }
+    }
+
+    /* Check for argv overflow: if we filled ARGV_MAX, check for remaining tokens */
+    if (argc >= XELP_ARGV_MAX && _xelpNextTokSpan(&pos, end, &tokS, &tokE, &isQuoted))
+        return XELP_E_ERR;
+
+    if (argc == 0) return XELP_S_OK;
+
+    /* Dispatch: builtins -> script funcs -> C commands -> default handler */
+    {
+        const char *cmd = argv[0];
+        int cmdLen = XelpStrLen(cmd);
+
+        /* Check builtins (start with '_') */
+        if (cmd[0] == '_') {
+            if (XelpStrEq(cmd, cmdLen, "_set") == XELP_S_OK) return _xelpBuiltin_set(ths, argc, argv);
+            if (XelpStrEq(cmd, cmdLen, "_print") == XELP_S_OK) return _xelpBuiltin_print(ths, argc, argv);
+            if (XelpStrEq(cmd, cmdLen, "_mr") == XELP_S_OK) return _xelpBuiltin_mr(ths, argc, argv);
+            if (XelpStrEq(cmd, cmdLen, "_add") == XELP_S_OK) return _xelpBuiltin_add(ths, argc, argv);
+            if (XelpStrEq(cmd, cmdLen, "_sub") == XELP_S_OK) return _xelpBuiltin_sub(ths, argc, argv);
+            if (XelpStrEq(cmd, cmdLen, "_mul") == XELP_S_OK) return _xelpBuiltin_mul(ths, argc, argv);
+            if (XelpStrEq(cmd, cmdLen, "_div") == XELP_S_OK) return _xelpBuiltin_div(ths, argc, argv);
+            if (XelpStrEq(cmd, cmdLen, "_mod") == XELP_S_OK) return _xelpBuiltin_mod(ths, argc, argv);
+            if (XelpStrEq(cmd, cmdLen, "_inc") == XELP_S_OK) return _xelpBuiltin_inc(ths, argc, argv);
+            if (XelpStrEq(cmd, cmdLen, "_dec") == XELP_S_OK) return _xelpBuiltin_dec(ths, argc, argv);
+            if (XelpStrEq(cmd, cmdLen, "_eq") == XELP_S_OK) return _xelpBuiltin_eq(ths, argc, argv);
+            if (XelpStrEq(cmd, cmdLen, "_neq") == XELP_S_OK) return _xelpBuiltin_neq(ths, argc, argv);
+            if (XelpStrEq(cmd, cmdLen, "_gt") == XELP_S_OK) return _xelpBuiltin_gt(ths, argc, argv);
+            if (XelpStrEq(cmd, cmdLen, "_lt") == XELP_S_OK) return _xelpBuiltin_lt(ths, argc, argv);
+            if (XelpStrEq(cmd, cmdLen, "_ge") == XELP_S_OK) return _xelpBuiltin_ge(ths, argc, argv);
+            if (XelpStrEq(cmd, cmdLen, "_le") == XELP_S_OK) return _xelpBuiltin_le(ths, argc, argv);
+            if (XelpStrEq(cmd, cmdLen, "_and") == XELP_S_OK) return _xelpBuiltin_and(ths, argc, argv);
+            if (XelpStrEq(cmd, cmdLen, "_or") == XELP_S_OK) return _xelpBuiltin_or(ths, argc, argv);
+            if (XelpStrEq(cmd, cmdLen, "_not") == XELP_S_OK) return _xelpBuiltin_not(ths, argc, argv);
+            if (XelpStrEq(cmd, cmdLen, "_if") == XELP_S_OK) return _xelpBuiltin_if(ths, argc, argv);
+            if (XelpStrEq(cmd, cmdLen, "_next") == XELP_S_OK) return _xelpBuiltin_next(ths, argc, argv);
+            if (XelpStrEq(cmd, cmdLen, "_goto") == XELP_S_OK) return _xelpBuiltin_goto(ths, argc, argv);
+            if (XelpStrEq(cmd, cmdLen, "_return") == XELP_S_OK) return _xelpBuiltin_return(ths, argc, argv);
+            if (XelpStrEq(cmd, cmdLen, "_func") == XELP_S_OK) return _xelpBuiltin_func(ths, argc, argv);
+            if (XelpStrEq(cmd, cmdLen, "_lpad") == XELP_S_OK) return _xelpBuiltin_lpad(ths, argc, argv);
+            if (XelpStrEq(cmd, cmdLen, "_band") == XELP_S_OK) return _xelpBuiltin_band(ths, argc, argv);
+            if (XelpStrEq(cmd, cmdLen, "_bor") == XELP_S_OK) return _xelpBuiltin_bor(ths, argc, argv);
+            if (XelpStrEq(cmd, cmdLen, "_bxor") == XELP_S_OK) return _xelpBuiltin_bxor(ths, argc, argv);
+            if (XelpStrEq(cmd, cmdLen, "_bnot") == XELP_S_OK) return _xelpBuiltin_bnot(ths, argc, argv);
+            if (XelpStrEq(cmd, cmdLen, "_shl") == XELP_S_OK) return _xelpBuiltin_shl(ths, argc, argv);
+            if (XelpStrEq(cmd, cmdLen, "_shr") == XELP_S_OK) return _xelpBuiltin_shr(ths, argc, argv);
+            return XELP_E_CMDNOTFOUND;
+        }
+
+        /* Check script funcs (PROC entries) */
+        {
+            int bodyLen;
+            const char *body = _xelpFindProc(ths, cmd, cmdLen, &bodyLen);
+            if (body) {
+                /* Push arena frame (saves caller context, copies argv) */
+                r = _xelpFramePush(ths, argv, argc);
+                if (r != XELP_S_OK) return r;
+                /* Set up new script context for function body */
+                ths->mpScriptS = body;
+                ths->mpScriptP = body;
+                ths->mpScriptE = body + bodyLen;
+                return XELP_S_CALL; /* signal eval loop to continue */
+            }
+        }
+
+        /* Check user C commands */
+        {
+            XELPCLIFuncMapEntry *f = ths->mpCLIModeFuncs;
+            if (f) {
+                while (f->mpCmd) {
+                    if (XelpStrEq(cmd, cmdLen, f->mpCmd) == XELP_S_OK) {
+                        ths->mR[0] = f->mFunPtr(ths, argc, argv);
+                        return ths->mR[0];
+                    }
+                    f++;
+                }
+            }
+        }
+
+        /* Default handler */
+        if (ths->mpfDefCLI) {
+            ths->mR[0] = ths->mpfDefCLI(ths, argc, argv);
+            return ths->mR[0];
+        }
+
+        ths->mR[0] = XELP_E_CMDNOTFOUND;
+        return XELP_E_CMDNOTFOUND;
+    }
+}
+
+/*****************************************
+ _xelpEvalLoop() - iterative script evaluator.
+ Processes script from ths->mpScriptS/P/E via XelpTokLineXB.
+ Runs until frame depth drops to targetDepth (script ends or all frames returned).
+ Function calls push arena frames and continue the loop (no C recursion).
+ _goto/_next modify mpScriptP directly; the loop picks up the new position.
+ */
+static XELPRESULT _xelpEvalLoop(XELP *ths, int targetDepth) {
+    XelpBuf script, line;
+    XELPRESULT r;
+
+    for (;;) {
+        int lineLen;
+        const char *lineS;
+
+        /* Build script buf from current context */
+        XELP_XB_INIT_PTRS(script,
+            (char*)ths->mpScriptS, (char*)ths->mpScriptP, (char*)ths->mpScriptE);
+
+        if (XelpTokLineXB(&script, &line, XELP_TOK_LINE) != XELP_S_OK) {
+            /* Current script ended */
+            if (ths->mFrameDepth <= targetDepth)
+                return XELP_S_OK;
+            /* Pop frame: restore caller context and continue */
+            _xelpFramePop(ths);
+            continue;
+        }
+
+        /* Save advanced position back to struct */
+        ths->mpScriptP = script.p;
+
+        lineLen = (int)(line.e - line.s);
+        lineS = line.s;
+
+        if (lineLen <= 0) continue;
+        if (*lineS == ':') continue; /* skip labels */
+
+        /* Evaluate statement (handles _goto/_next/_return via signals) */
+        r = _xelpEvalStatement(ths, lineS, lineLen);
+
+        /* XELP_S_CALL: function call pushed a frame, new context is set up */
+        if (r == XELP_S_CALL) continue;
+
+        /* XELP_S_RETURN: _return executed, pop frame and check if done */
+        if (r == XELP_S_RETURN) {
+            _xelpFramePop(ths);
+            if (ths->mFrameDepth <= targetDepth)
+                return XELP_S_OK;
+            continue;
+        }
+
+        /* Error propagation */
+        if (r < 0 && r != XELP_E_CMDNOTFOUND) {
+            if (r == XELP_E_BREAK || r == XELP_E_ARENA_FULL ||
+                r == XELP_E_NO_FRAME || r == XELP_E_NO_LABEL)
+                return r;
+        }
+
+        /* Breakpoint callback: fires after each statement to check budget */
+        if (ths->mpfBreakpoint) {
+            r = ths->mpfBreakpoint(ths);
+            if (r != XELP_S_OK) return XELP_E_BREAK;
+        }
+    }
+}
+
+/*****************************************
+ XelpCallProc() - call a script function from C code.
+ cmdline: "funcname arg1 arg2 ..."
+ If the command is a script function, runs its body via the eval loop.
+ */
+XELPRESULT XelpCallProc(XELP *ths, const char *cmdline) {
+    int cmdLen = XelpStrLen(cmdline);
+    int savedDepth = ths->mFrameDepth;
+    XELPRESULT r = _xelpEvalStatement(ths, cmdline, cmdLen);
+    if (r == XELP_S_CALL) {
+        r = _xelpEvalLoop(ths, savedDepth);
+    }
+    return r;
+}
+
+#endif /* XELP_ENABLE_SCRIPT */
+
 #define XELP_MUL10(x)	(((x)<<3)+(((x)<<1)))  /* many old micros don't have multiply in core inst set */
 #define XELP_INT_MAX    ((int)(((unsigned)-1) >> 1))  /* portable INT_MAX without <limits.h> */
 /********************************************************

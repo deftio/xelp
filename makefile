@@ -4,7 +4,7 @@
 CC=gcc   	# C compiler to use
 CPP=g++		# C++ compiler to use
 
-C_FLAGS=-I. -Wall -Wextra -Werror -g -O0 -fprofile-arcs -ftest-coverage
+C_FLAGS=-I. -Wall -Wextra -Werror -g -O0 -fprofile-arcs -ftest-coverage -DXELP_ENABLE_SCRIPT
 CPP_FLAGS=-std=c++11 -Wall
 
 LIB_DIR=src
@@ -13,7 +13,7 @@ BUILD_DIR=build
 INCLUDES=\
     -I$(LIB_DIR)\
 
-.PHONY: help tests clean clean-all clean-fuzz coverage version fuzz fuzz-parsekey fuzz-parse fuzz-buf2argv examples example validate prerelease funcsizes sizes lint
+.PHONY: help tests clean clean-all clean-fuzz coverage version fuzz fuzz-parsekey fuzz-parse fuzz-buf2argv fuzz-script examples example validate prerelease funcsizes sizes lint build-ref
 
 #=======================================================================
 # Default target: print available targets
@@ -27,6 +27,7 @@ help:
 	@echo "  make example      Build + run the posix ncurses demo (interactive)"
 	@echo "  make coverage     Tests + coverage summary"
 	@echo "  make funcsizes    Per-function compiled sizes (x86-32, ARM32)"
+	@echo "  make build-ref    Generate build/build-reference.md with measured sizes"
 	@echo "  make sizes        Feature profile compiled sizes (ARM + host)"
 	@echo "  make version      Extract and print library version"
 	@echo "  make fuzz         Run fuzz tests (requires clang + libFuzzer)"
@@ -88,6 +89,8 @@ examples:
 	$(MAKE) -C examples/scripting BUILD_DIR=../../build/examples/scripting build
 	@echo "--- Building posix-argv ---"
 	$(MAKE) -C examples/posix-argv BUILD_DIR=../../build/examples/posix-argv build
+	@echo "--- Building xelp-script ---"
+	$(MAKE) -C examples/xelp-script BUILD_DIR=../../build/examples/xelp-script build
 	@echo "--- All examples built ---"
 
 # Build and run the posix ncurses demo (interactive)
@@ -104,7 +107,7 @@ lint:
 			--error-exitcode=1 \
 			--suppress=missingIncludeSystem \
 			-I src \
-			src/ examples/posix-simple/ examples/scripting/ examples/posix-argv/; \
+			src/ examples/posix-simple/ examples/scripting/ examples/posix-argv/ examples/xelp-script/; \
 		echo "--- cppcheck: examples (C++) ---"; \
 		cppcheck --enable=warning,performance,portability \
 			--error-exitcode=1 \
@@ -152,6 +155,9 @@ prerelease: validate
 	@echo "--- Updating size tables in README.md and pages/index.html ---"
 	bash tools/update_sizes.sh
 	@echo ""
+	@echo "--- Generating docs/build-reference.md ---"
+	bash tools/gen_build_reference.sh
+	@echo ""
 	@echo "=== Pre-release complete: tests passed, sizes updated ==="
 
 #=======================================================================
@@ -192,7 +198,22 @@ fuzz-buf2argv: | $(BUILD_DIR)
 	@cp -n $(FUZZ_CORPUS_BUF2ARGV_SEEDS)/* $(FUZZ_CORPUS_BUF2ARGV_GEN)/ 2>/dev/null || true
 	$(BUILD_DIR)/fuzz_buf2argv $(FUZZ_CORPUS_BUF2ARGV_GEN) -max_total_time=$(FUZZ_TIME)
 
-fuzz: fuzz-parsekey fuzz-parse fuzz-buf2argv
+FUZZ_CORPUS_SCRIPT_SEEDS = $(FUZZ_DIR)/corpus_script/seeds
+FUZZ_CORPUS_SCRIPT_GEN = $(FUZZ_DIR)/corpus_script/generated
+
+fuzz-script: | $(BUILD_DIR)
+	$(FUZZ_CC) $(FUZZ_FLAGS) -DXELP_ENABLE_SCRIPT $(LIB_DIR)/xelp.c $(FUZZ_DIR)/fuzz_script.c \
+		-o $(BUILD_DIR)/fuzz_script
+	@mkdir -p $(FUZZ_CORPUS_SCRIPT_SEEDS) $(FUZZ_CORPUS_SCRIPT_GEN)
+	@cp -n $(FUZZ_CORPUS_SCRIPT_SEEDS)/* $(FUZZ_CORPUS_SCRIPT_GEN)/ 2>/dev/null || true
+	$(BUILD_DIR)/fuzz_script $(FUZZ_CORPUS_SCRIPT_GEN) -max_total_time=$(FUZZ_TIME)
+
+fuzz: fuzz-parsekey fuzz-parse fuzz-buf2argv fuzz-script
+
+#=======================================================================
+# Build reference document with measured sizes and sizeof(XELP)
+build-ref:
+	@bash tools/gen_build_reference.sh
 
 #=======================================================================
 # Per-function compiled sizes (x86-32 and ARM32 if available)
@@ -207,11 +228,11 @@ sizes:
 #=======================================================================
 # clean-fuzz -- remove libFuzzer-grown corpus files (keep seeds/)
 clean-fuzz:
-	-rm -rf $(FUZZ_CORPUS_PARSE_GEN) $(FUZZ_CORPUS_PARSEKEY_GEN) $(FUZZ_CORPUS_BUF2ARGV_GEN)
-	-find $(FUZZ_DIR)/corpus_parse $(FUZZ_DIR)/corpus_parsekey $(FUZZ_DIR)/corpus_buf2argv \
-		-maxdepth 1 -type f -exec rm -f {} +
+	-rm -rf $(FUZZ_CORPUS_PARSE_GEN) $(FUZZ_CORPUS_PARSEKEY_GEN) $(FUZZ_CORPUS_BUF2ARGV_GEN) $(FUZZ_CORPUS_SCRIPT_GEN)
+	-find $(FUZZ_DIR)/corpus_parse $(FUZZ_DIR)/corpus_parsekey $(FUZZ_DIR)/corpus_buf2argv $(FUZZ_DIR)/corpus_script \
+		-maxdepth 1 -type f -exec rm -f {} + 2>/dev/null || true
 	@find $(FUZZ_DIR)/corpus_parse/seeds $(FUZZ_DIR)/corpus_parsekey/seeds \
-		$(FUZZ_DIR)/corpus_buf2argv/seeds -maxdepth 1 -type f 2>/dev/null | \
+		$(FUZZ_DIR)/corpus_buf2argv/seeds $(FUZZ_DIR)/corpus_script/seeds -maxdepth 1 -type f 2>/dev/null | \
 		grep -E '/[0-9a-f]{40}$$' | xargs rm -f
 
 #=======================================================================
@@ -226,4 +247,5 @@ clean-all: clean
 	-$(MAKE) -C examples/posix-simple-cpp BUILD_DIR=../../build/examples/posix-simple-cpp clean
 	-$(MAKE) -C examples/scripting BUILD_DIR=../../build/examples/scripting clean
 	-$(MAKE) -C examples/posix-argv BUILD_DIR=../../build/examples/posix-argv clean
+	-$(MAKE) -C examples/xelp-script BUILD_DIR=../../build/examples/xelp-script clean
 

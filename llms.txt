@@ -38,7 +38,7 @@ the CLI or from scripts.
 - [API Reference](https://github.com/deftio/xelp/blob/master/docs/api-reference.md): All public types, functions, macros, and return codes
 - [Tutorial](https://github.com/deftio/xelp/blob/master/docs/tutorial.md): Step-by-step introduction with complete code examples
 - [Configuration Guide](https://github.com/deftio/xelp/blob/master/docs/configuration.md): Compile-time feature flags, buffer sizes, key mappings
-- [Build Profiles](https://github.com/deftio/xelp/blob/master/docs/build-profiles.md): Feature system and compile-time options with size impact
+- [Build Reference](https://github.com/deftio/xelp/blob/master/docs/build-reference.md): Feature profiles, per-platform code/RAM sizes, compile-time flags
 - [Porting Guide](https://github.com/deftio/xelp/blob/master/docs/porting.md): How to bring up xelp on a new platform
 - [Examples Guide](https://github.com/deftio/xelp/blob/master/docs/examples.md): Annotated code for POSIX, Arduino, ESP32, bare-metal, multi-instance
 - [Testing Guide](https://github.com/deftio/xelp/blob/master/docs/testing.md): JumpBug test framework reference

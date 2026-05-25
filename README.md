@@ -89,7 +89,7 @@ the cli to flip in to a mode where one can send raw commands (such AT commands) 
 ```
 
 Every flag is independent -- mix and match. For the full reference see
-[Build Profiles & Configuration Guide](docs/build-profiles.md).
+[Build Reference](docs/build-reference.md).
 
 ## Quick Start (Pure C)
 
@@ -211,7 +211,7 @@ make clean          # remove test build artifacts
 make clean-all      # clean tests + all examples
 ```
 
-45 test units, 597 test cases, 100% line coverage of `xelp.c`.
+232 test units, 967 test cases, 100% line coverage of `xelp.c`.
 
 Feature profile sizes: `dev/size_profiles.sh` (uses Docker for ARM Cortex-M0, falls back to host GCC).
 
@@ -240,34 +240,35 @@ development uses `make validate` which takes seconds.
 
 ## Compiled Sizes
 
-Compiled `.text` section sizes with `-Os`. Three configurations: KEY
-(single-key dispatch only), CLI (typical interactive use), FULL (all
-features including history, argv, and THR). Even the largest full build
-is under 12 KB.
+Compiled `.text` section sizes with `-Os`. Four configurations: KEY
+(single-key dispatch only), CLI (interactive with line editing and help),
+HIST (CLI + command history and thru mode), SCRIPT (HIST + XelpScript
+engine -- variables, math, conditionals, functions). Developers who want
+a full interactive CLI without scripting use the HIST profile.
 
 <!-- Build Size Table -->
-| CPU | Width | Compiler | KEY (bytes) | CLI (bytes) | FULL (bytes) |
-|-----|------:|----------|------------:|------------:|-------------:|
-| AVR (ATtiny85) | 8 | avr-gcc | 990 | 4059 | 4985 |
-| AVR (ATmega328P) | 8 | avr-gcc | 998 | 4145 | 5083 |
-| Z80 | 8 | SDCC | 1969 | 7164 | 8340 |
-| 6800 (HC08) | 8 | SDCC | 2096 | 8260 | 9733 |
-| MSP430 | 16 | msp430-gcc | 782 | 3234 | 4026 |
-| 68HC11 | 16 | m68hc11-gcc | 2169 | 6709 | 8586 |
-| ARM Thumb | 32 | arm-none-eabi-gcc | 600 | 2563 | 3059 |
-| Xtensa LX7 (ESP32-S3) | 32 | xtensa-esp-elf-gcc | 620 | 2661 | 3101 |
-| m68k | 32 | m68k-linux-gnu-gcc | 746 | 3151 | 3865 |
-| RISC-V (rv32) | 32 | riscv64-unknown-elf-gcc | 746 | 3068 | 3636 |
-| Xtensa LX106 (ESP8266) | 32 | xtensa-lx106-elf-gcc | 747 | 2940 | 3436 |
-| ARM32 | 32 | arm-none-eabi-gcc | 1008 | 3891 | 4603 |
-| x86-32 | 32 | GCC | 1099 | 4510 | 5225 |
-| MIPS32 | 32 | mipsel-linux-gnu-gcc | 1312 | 4864 | 5728 |
-| PowerPC | 32 | powerpc-linux-gnu-gcc | 1536 | 5567 | 6355 |
-| RISC-V (rv64) | 64 | riscv64-linux-gnu-gcc | 780 | 3290 | 3898 |
-| x86-64 | 64 | Clang | 1069 | 4971 | 6045 |
-| x86-64 | 64 | GCC | 1084 | 4519 | 5340 |
-| AArch64 (ARM64) | 64 | aarch64-linux-gnu-gcc | 1336 | 4915 | 5623 |
-| MIPS64 | 64 | mips64el-linux-gnuabi64-gcc | 1376 | 5392 | 6480 |
+| CPU | Width | Compiler | KEY (bytes) | CLI (bytes) | HIST (bytes) | SCRIPT (bytes) |
+|-----|------:|----------|------------:|------------:|-------------:|---------------:|
+| AVR (ATtiny85) | 8 | avr-gcc | 990 | 4069 | 4995 | 14054 |
+| AVR (ATmega328P) | 8 | avr-gcc | 998 | 4155 | 5093 | 14546 |
+| Z80 | 8 | SDCC | 1969 | 7205 | 8381 | 26733 |
+| 6800 (HC08) | 8 | SDCC | 2096 | 8268 | 9785 | 31894 |
+| MSP430 | 16 | msp430-gcc | 782 | 3240 | 4032 | 12578 |
+| 68HC11 | 16 | m68hc11-gcc | 2169 | 6739 | 8616 | 30851 |
+| ARM Thumb | 32 | arm-none-eabi-gcc | 600 | 2575 | 3071 | 9200 |
+| Xtensa LX7 (ESP32-S3) | 32 | xtensa-esp-elf-gcc | 620 | 2677 | 3113 | 9542 |
+| m68k | 32 | m68k-linux-gnu-gcc | 746 | 3167 | 3881 | 11098 |
+| RISC-V (rv32) | 32 | riscv64-unknown-elf-gcc | 746 | 3078 | 3646 | 10970 |
+| Xtensa LX106 (ESP8266) | 32 | xtensa-lx106-elf-gcc | 747 | 2956 | 3456 | 10469 |
+| ARM32 | 32 | arm-none-eabi-gcc | 1008 | 3895 | 4607 | 13704 |
+| x86-32 | 32 | GCC | 1099 | 4523 | 5238 | 15102 |
+| MIPS32 | 32 | mipsel-linux-gnu-gcc | 1312 | 4864 | 5728 | 15472 |
+| PowerPC | 32 | powerpc-linux-gnu-gcc | 1536 | 5591 | 6379 | 16832 |
+| RISC-V (rv64) | 64 | riscv64-linux-gnu-gcc | 780 | 3292 | 3900 | 11682 |
+| x86-64 | 64 | Clang | 1060 | 4661 | 5649 | 21711 |
+| x86-64 | 64 | GCC | 1084 | 4556 | 5377 | 13986 |
+| AArch64 (ARM64) | 64 | aarch64-linux-gnu-gcc | 1336 | 4931 | 5639 | 14928 |
+| MIPS64 | 64 | mips64el-linux-gnuabi64-gcc | 1376 | 5392 | 6464 | 17360 |
 <!-- Build Size Table -->
 
 x86-64 GCC row is measured directly; others from cross-compilation via
@@ -278,7 +279,7 @@ x86-64 GCC row is measured directly; others from cross-compilation via
 All compile-time options (buffer size, key mappings, prompt, escape
 characters, register count) are controlled via `#define` flags in
 `src/xelpcfg.h`. See the
-[Build Profiles & Configuration Guide](docs/build-profiles.md).
+[Build Reference](docs/build-reference.md).
 
 ## Porting
 
@@ -347,7 +348,7 @@ what we welcome, branch model, and the release process.
 - [Tutorial](docs/tutorial.md) -- step-by-step introduction to xelp
 - [Examples](docs/examples.md) -- annotated code for various platforms
 - [API Reference](docs/api-reference.md) -- all public functions, macros, types
-- [Build Profiles & Configuration Guide](docs/build-profiles.md) -- feature system and compile-time options
+- [Build Reference](docs/build-reference.md) -- feature system and compile-time options
 - [Configuration Quick Reference](docs/configuration.md) -- all `#define` flags at a glance
 - [Porting Guide](docs/porting.md) -- bringing up xelp on a new platform
 - [Release Management](release_management.md) -- versioning, CI, release workflow
