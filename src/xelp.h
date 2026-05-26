@@ -59,7 +59,6 @@ extern "C"
 #define XELP_ENABLE_KEY 		1   /* enable direct key press mode                            */
 #define XELP_ENABLE_CLI         1   /* enable command line prompt, scripting abilities         */
 #define XELP_ENABLE_THR 		1   /* enable THRU mode (redirect to other peripherals)        */
-#define XELP_ENABLE_HELP		1   /* compile in built-in help function.               	   */
 #endif
 
 #ifndef XELP_REGS_SZ
@@ -355,11 +354,11 @@ typedef struct XELP_tag
 	char					mLastWasCR;		 /* 1 after CR, swallow next LF to coalesce CRLF */
 #endif
 
-#if defined(XELP_ENABLE_CLI) && defined(XELP_ENABLE_LINE_EDIT)
+#ifdef XELP_ENABLE_CLI
 	char*					mCur;			 /* cursor position in [mCmdXB.s .. mCmdXB.p]  */
 #endif
 
-#if defined(XELP_ENABLE_CLI) && defined(XELP_ENABLE_HISTORY)
+#if defined(XELP_ENABLE_CLI) && defined(XELP_ENABLE_CLI_HISTORY)
 	char  mHistBuf[XELP_HIST_DEPTH][XELP_CMDBUFSZ]; /* history ring             */
 	char  mHistWrite;    /* next write slot (ring index)                          */
 	char  mHistCount;    /* entries stored (0..DEPTH)                             */
@@ -390,11 +389,8 @@ typedef struct XELP_tag
 	void (*mpfErr)(char);		  /* function to handle errors (optional callback)           */
 	void (*mpfEditModeChg)(int);  /* function called when key entry mode changed (optional)  */
 
-#ifdef XELP_ENABLE_THR	
+#ifdef XELP_ENABLE_THR
 	void (*mpfPassThru)(char);    /* function to pass keys in thru mode                      */
-#endif 	
-#ifdef XELP_ENABLE_CLI	
-	void (*mpfBksp)(void);		  /* function to handle destructive backspace at CLI prompt  */
 #endif
 
 }XELP;
@@ -418,7 +414,6 @@ XELPRESULT XelpInit (XELP *ths, const char *pAboutMsg);			    /* initialize inst
 #define XELP_SET_FN_THR(ths,pfThru)    (ths.mpfPassThru=pfThru)     /* Thru callback                   */
 #define XELP_SET_FN_ERR(ths,pfErr)     (ths.mpfErr=pfErr)           /* Error callback                  */
 #define XELP_SET_FN_EMCHG(ths,pfEMCHG) (ths.mpfEditModeChg=pfEMCHG) /* Entry Mode Change               */
-#define XELP_SET_FN_BKSP(ths,pfBKSP)   (ths.mpfBksp=pfBKSP)	        /* Handle Backspace                */
 
 #define XELP_SET_VAL_CLI_PROMPT(ths,prompt)	(ths.mpPrompt=prompt)   /* stored by ptr: must be \0 terminated, must outlive instance */
 
@@ -448,7 +443,7 @@ XELPRESULT XelpInit (XELP *ths, const char *pAboutMsg);			    /* initialize inst
 #define XELP_SET_ECHO(ths, ch)         ((ths).mEchoChar = (ch))
 #define XELP_GET_ECHO(ths)             ((ths).mEchoChar)
 
-#ifdef XELP_ENABLE_HELP
+#ifdef XELP_ENABLE_CLI
 XELPRESULT XelpHelp	        (XELP *ths);                             /* print online help (if avail)    */
 #endif
 

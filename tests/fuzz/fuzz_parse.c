@@ -23,7 +23,6 @@
 
 static void fuzz_out(char c)       { (void)c; }
 static void fuzz_thr(char c)       { (void)c; }
-static void fuzz_bksp(void)        { }
 static void fuzz_emchg(int mode)   { (void)mode; }
 
 static XELPRESULT fuzz_def_key(XELP *ths, XELPKEYCODE k) {
@@ -74,7 +73,6 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     XELP_SET_FN_CLI(x, fuzz_cli_cmds);
     XELP_SET_FN_KEY(x, fuzz_key_cmds);
     XELP_SET_FN_THR(x, &fuzz_thr);
-    XELP_SET_FN_BKSP(x, &fuzz_bksp);
     XELP_SET_FN_DEF_CLI(x, &fuzz_def_cli);
     XELP_SET_FN_DEF_KEY(x, &fuzz_def_key);
     XELP_SET_FN_EMCHG(x, &fuzz_emchg);

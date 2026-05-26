@@ -1,9 +1,11 @@
 /*
  * xelp-script-example.c -- XelpScript engine demonstration.
  *
- * Non-interactive POSIX example (no ncurses) showing XelpScript
- * features via XelpParse().  Covers:
+ * POSIX example (no ncurses) showing XelpScript features via XelpParse().
+ * Each command is echoed before execution so the user can follow along.
+ * After the demo sections, drops into interactive CLI mode.
  *
+ * Covers:
  *   1. Variables + print       (_set, $ expansion, _print)
  *   2. Math builtins           (_add, _sub, _mul, _div, _mod, _inc, _dec)
  *   3. Paren subexpressions    (_set area (_mul (_add $w 1) $h))
@@ -13,6 +15,7 @@
  *   7. Functions               (C-registered ROM script funcs, @1/@2 params)
  *   8. C interop               (C command calls XelpCallProc for script func)
  *   9. Register access         (_mr for reading/writing mR[])
+ *  10. _list                   (inspect arena variables and functions)
  *
  * Build (from repo root):
  *   gcc -Wall -Wextra -Isrc examples/xelp-script/xelp-script-example.c \
@@ -20,6 +23,8 @@
  */
 
 #include <stdio.h>
+#include <unistd.h>
+#include <termios.h>
 #include "xelp.h"
 
 /* ------------------------------------------------------------------ */
@@ -102,6 +107,12 @@ static XELPRESULT cmd_help(XELP *ths, int argc, const char **argv)
     return XelpHelp(ths);
 }
 
+static XELPRESULT cmd_quit(XELP *ths, int argc, const char **argv)
+{
+    (void)ths; (void)argc; (void)argv;
+    return XELP_E_BREAK;  /* signal exit */
+}
+
 /* ------------------------------------------------------------------ */
 /* Command table                                                       */
 /* ------------------------------------------------------------------ */
@@ -111,6 +122,7 @@ XELPCLIFuncMapEntry commands[] = {
     { &cmd_echo,       "echo",       "echo arguments"                    },
     { &cmd_show,       "show",       "print registers R0-R3"             },
     { &cmd_callscript, "callscript", "callscript <func> [args]"          },
+    { &cmd_quit,       "quit",       "exit interactive mode"             },
     XELP_FUNC_ENTRY_LAST
 };
 
@@ -159,10 +171,14 @@ int main(void)
     /* =============================================================== */
 
     run_section("1. Variables + print",
+        "echo \"  > _set x 42\"\n"
         "_set x 42\n"
+        "echo \"  > _print $x\"\n"
         "_print $x\n"
         "echo ---\n"
+        "echo \"  > _set msg hello\"\n"
         "_set msg hello\n"
+        "echo \"  > _print $msg\"\n"
         "_print $msg\n"
     );
 
@@ -174,23 +190,30 @@ int main(void)
     /* =============================================================== */
 
     run_section("2. Math builtins",
+        "echo \"  > _set a 10 ; _set b 3\"\n"
         "_set a 10\n"
         "_set b 3\n"
+        "echo \"  > _set r (_add $a $b) ; _print $r\"\n"
         "_set r (_add $a $b)\n"
         "_print $r\n"
         "echo ---\n"
+        "echo \"  > _set r (_sub $a $b) ; _print $r\"\n"
         "_set r (_sub $a $b)\n"
         "_print $r\n"
         "echo ---\n"
+        "echo \"  > _set r (_mul $a $b) ; _print $r\"\n"
         "_set r (_mul $a $b)\n"
         "_print $r\n"
         "echo ---\n"
+        "echo \"  > _set r (_div $a $b) ; _print $r\"\n"
         "_set r (_div $a $b)\n"
         "_print $r\n"
         "echo ---\n"
+        "echo \"  > _set r (_mod $a $b) ; _print $r\"\n"
         "_set r (_mod $a $b)\n"
         "_print $r\n"
         "echo ---\n"
+        "echo \"  > _inc a ; _dec b ; _print $a ; _print $b\"\n"
         "_inc a\n"
         "_dec b\n"
         "_print $a\n"
@@ -204,9 +227,12 @@ int main(void)
     /* =============================================================== */
 
     run_section("3. Paren subexpressions",
+        "echo \"  > _set w 4 ; _set h 5\"\n"
         "_set w 4\n"
         "_set h 5\n"
+        "echo \"  > _set area (_mul (_add $w 1) $h)\"\n"
         "_set area (_mul (_add $w 1) $h)\n"
+        "echo \"  > _print $area\"\n"
         "_print $area\n"
     );
 
@@ -216,14 +242,18 @@ int main(void)
     /* =============================================================== */
 
     run_section("4. Comparison + logic",
+        "echo \"  > _set x 10 ; _set y 20\"\n"
         "_set x 10\n"
         "_set y 20\n"
+        "echo \"  > _set r (_eq $x $y) ; _print $r\"\n"
         "_set r (_eq $x $y)\n"
         "_print $r\n"
         "echo ---\n"
+        "echo \"  > _set r (_lt $x $y) ; _print $r\"\n"
         "_set r (_lt $x $y)\n"
         "_print $r\n"
         "echo ---\n"
+        "echo \"  > _set r (_not 0) ; _print $r\"\n"
         "_set r (_not 0)\n"
         "_print $r\n"
     );
@@ -234,9 +264,13 @@ int main(void)
     /* =============================================================== */
 
     run_section("5. Conditionals",
+        "echo \"  > _set t 75\"\n"
         "_set t 75\n"
+        "echo \"  > _if (_lt $t 100) _then echo OK _else echo OVER\"\n"
         "_if (_lt $t 100) _then echo OK _else echo OVER\n"
+        "echo \"  > _set t 120\"\n"
         "_set t 120\n"
+        "echo \"  > _if (_lt $t 100) _then echo OK _else echo OVER\"\n"
         "_if (_lt $t 100) _then echo OK _else echo OVER\n"
     );
 
@@ -248,6 +282,8 @@ int main(void)
     /* =============================================================== */
 
     run_section("6. Labels + loops",
+        "echo \"  > _set i 0 ; :top ; _print $i ; _inc i\"\n"
+        "echo \"  > _if (_lt $i 5) _then _goto :top\"\n"
         "_set i 0\n"
         ":top\n"
         "_print $i\n"
@@ -265,9 +301,11 @@ int main(void)
     /* =============================================================== */
 
     run_section("7. ROM script functions",
+        "echo \"  > _set r (double 7) ; _print $r\"\n"
         "_set r (double 7)\n"
         "_print $r\n"
         "echo ---\n"
+        "echo \"  > _set r (add2 3 4) ; _print $r\"\n"
         "_set r (add2 3 4)\n"
         "_print $r\n"
     );
@@ -280,7 +318,9 @@ int main(void)
     /* =============================================================== */
 
     run_section("8. C interop",
+        "echo \"  > callscript triple 5\"\n"
         "callscript triple 5\n"
+        "echo \"  > show\"\n"
         "show\n"
     );
 
@@ -290,16 +330,97 @@ int main(void)
     /* =============================================================== */
 
     run_section("9. Register access",
+        "echo \"  > _mr 1 42 ; _mr 2 99\"\n"
         "_mr 1 42\n"
         "_mr 2 99\n"
+        "echo \"  > show\"\n"
         "show\n"
+        "echo \"  > _set v (_mr 1) ; _print $v\"\n"
         "_set v (_mr 1)\n"
         "_print $v\n"
     );
 
     /* =============================================================== */
-    /* Done                                                            */
+    /* 10. _list -- inspect arena variables and functions               */
     /* =============================================================== */
+
+    run_section("10. _list",
+        "echo \"  > _set x 42 ; _set msg hello\"\n"
+        "_set x 42\n"
+        "_set msg hello\n"
+        "echo \"  > _func square `\"_return (_mul @1 @1)`\"\"\n"
+        "_func square \"_return (_mul @1 @1)\"\n"
+        "echo\n"
+        "echo \"  > _list\"\n"
+        "_list\n"
+        "echo\n"
+        "echo \"  > _list vars\"\n"
+        "_list vars\n"
+        "echo\n"
+        "echo \"  > _list funcs\"\n"
+        "_list funcs\n"
+    );
+
+    /* =============================================================== */
+    /* Interactive mode                                                 */
+    /* =============================================================== */
+
+    printf("\n=== Interactive mode ===\n");
+    printf("Type script commands (help, _set, _print, _list, quit).\n");
+    printf("Press Ctrl-D or type 'quit' to exit.\n\n");
+
+    /* Re-init for interactive use, keeping some demo state */
+    XelpInit(&cli, "XelpScript Interactive\n");
+    XELP_SET_FN_OUT(cli, &out_putc);
+    XELP_SET_FN_CLI(cli, commands);
+    XELP_SET_FN_SCRIPT(cli, script_funcs);
+    XELP_SET_FN_BREAKPOINT(cli, &breakpoint_cb);
+    g_step_budget = 10000;
+
+    /* Set terminal to raw mode for character-at-a-time input */
+    {
+        struct termios oldt, newt;
+        int c;
+
+        if (tcgetattr(STDIN_FILENO, &oldt) == 0) {
+            newt = oldt;
+            newt.c_lflag &= (unsigned long)~(ICANON | ECHO);
+            newt.c_cc[VMIN] = 1;
+            newt.c_cc[VTIME] = 0;
+            tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+
+            /* Print initial prompt */
+            printf("xelp>");
+            fflush(stdout);
+
+            while ((c = getchar()) != EOF) {
+                XELPRESULT r = XelpParseKey(&cli, (char)c);
+                fflush(stdout);
+                if (r == XELP_E_BREAK)
+                    break;
+                /* Reset budget after each command */
+                g_step_budget = 10000;
+            }
+
+            /* Restore terminal */
+            tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+        } else {
+            /* Fallback: line-buffered mode (e.g. piped input) */
+            char buf[128];
+            printf("xelp>");
+            fflush(stdout);
+            while (fgets(buf, sizeof(buf), stdin)) {
+                int len = 0;
+                while (buf[len] && buf[len] != '\n') len++;
+                if (len > 0) {
+                    XelpParse(&cli, buf, len);
+                    g_step_budget = 10000;
+                }
+                printf("xelp>");
+                fflush(stdout);
+            }
+        }
+    }
 
     printf("\n=== XelpScript demo complete ===\n");
     return 0;

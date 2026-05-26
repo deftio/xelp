@@ -22,7 +22,6 @@
 /* --- Null-sink callbacks ------------------------------------------------- */
 
 static void fuzz_out(char c)       { (void)c; }
-static void fuzz_bksp(void)        { }
 static void fuzz_emchg(int mode)   { (void)mode; }
 
 static int gBudget;
@@ -68,7 +67,6 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     XELP_SET_FN_OUT(x, &fuzz_out);
     XELP_SET_FN_CLI(x, fuzz_cli_cmds);
     XELP_SET_FN_KEY(x, fuzz_key_cmds);
-    XELP_SET_FN_BKSP(x, &fuzz_bksp);
     XELP_SET_FN_DEF_CLI(x, &fuzz_def_cli);
     XELP_SET_FN_EMCHG(x, &fuzz_emchg);
     XELP_SET_FN_BREAKPOINT(x, &fuzz_breakpoint);

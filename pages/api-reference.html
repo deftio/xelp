@@ -75,7 +75,6 @@ Version 0.4.0.</p>
 <tbody>
 <tr><td><code>XELP_SET_FN_OUT(ths, fn)</code></td><td>Set output function: <code>void fn(char)</code></td></tr>
 <tr><td><code>XELP_SET_FN_ERR(ths, fn)</code></td><td>Set error output function</td></tr>
-<tr><td><code>XELP_SET_FN_BKSP(ths, fn)</code></td><td>Set backspace handler: <code>void fn(void)</code></td></tr>
 <tr><td><code>XELP_SET_FN_THR(ths, fn)</code></td><td>Set pass-through function</td></tr>
 <tr><td><code>XELP_SET_FN_EMCHG(ths, fn)</code></td><td>Set mode-change callback: <code>void fn(int)</code></td></tr>
 <tr><td><code>XELP_SET_FN_CLI(ths, tbl)</code></td><td>Set CLI command table</td></tr>
@@ -129,7 +128,7 @@ Respects <code>mOutEnable</code>.</p>
 <pre><code>XELPRESULT XelpHelp(XELP *ths);
 </code></pre>
 <p>Print help listing all registered KEY and CLI commands. Only available
-when <code>XELP_ENABLE_HELP</code> is defined.</p>
+when <code>XELP_ENABLE_CLI</code> is defined.</p>
 
 <h2>Tokenizer</h2>
 

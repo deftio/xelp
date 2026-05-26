@@ -18,7 +18,6 @@ The smallest useful xelp program: one command, one output function.
 
 /* Platform: write one char. Replace with your UART TX. */
 void my_putc(char c) { putchar(c); }
-void my_bksp(void)   { my_putc('\b'); my_putc(' '); my_putc('\b'); }
 
 /* Your first command */
 XELPRESULT cmd_hello(XELP *ths, int argc, const char **argv) {
@@ -38,7 +37,6 @@ XELP cli;
 int main(void) {
     XelpInit(&cli, "Tutorial v1.0");
     XELP_SET_FN_OUT(cli, &my_putc);
-    XELP_SET_FN_BKSP(cli, &my_bksp);
     XELP_SET_FN_CLI(cli, commands);
 
     /* Feed characters from stdin (or UART, BLE, etc.) */
@@ -62,9 +60,8 @@ Type `hello` and press ENTER. You should see `Hello, world!`.
 
 1. `XelpInit` zeroes all internal state and stores the about message.
 2. `XELP_SET_FN_OUT` tells xelp how to emit characters on this platform.
-3. `XELP_SET_FN_BKSP` tells xelp how to handle destructive backspace.
-4. `XELP_SET_FN_CLI` registers your command table.
-5. `XelpParseKey` feeds one character at a time into xelp's state machine.
+3. `XELP_SET_FN_CLI` registers your command table.
+4. `XelpParseKey` feeds one character at a time into xelp's state machine.
    When ENTER is received, xelp tokenizes the line into argc/argv and
    dispatches to the matching command function.
 
@@ -217,9 +214,9 @@ XelpParseXB(&cli, &xb);
 
 ## 6. Help system
 
-If `XELP_ENABLE_HELP` is defined in `xelpcfg.h`, calling `XelpHelp(&cli)`
-prints a listing of all registered KEY and CLI commands with their help
-strings. This is why the third field in every command table entry matters:
+When `XELP_ENABLE_CLI` is defined, calling `XelpHelp(&cli)` prints a
+listing of all registered KEY and CLI commands with their help strings.
+This is why the third field in every command table entry matters:
 
 ```c
 { &cmd_hello, "hello", "say hello" },
@@ -290,24 +287,22 @@ CLI mode.
 
 ## 10. Line editing
 
-When `XELP_ENABLE_LINE_EDIT` is defined in `xelpcfg.h`, the CLI prompt
-supports cursor movement and mid-line editing:
+When `XELP_ENABLE_CLI` is defined, the CLI prompt includes full cursor
+movement and mid-line editing:
 
 - **Left/Right arrow** -- move cursor within the line
 - **Home/End** -- jump to beginning/end of line
 - **Delete** -- delete character at cursor
 - **Insert** -- insert characters at cursor position (shift model)
+- **Backspace** -- delete character before cursor
 
 Multi-byte key sequences (arrow keys, Home/End, Delete) are automatically
 recognized by xelp's key accumulator. No terminal configuration needed
 beyond standard VT100/ANSI support.
 
-Without `XELP_ENABLE_LINE_EDIT`, CLI uses append-only input with
-backspace via the `mpfBksp` callback.
-
 ## 10a. Command history
 
-When `XELP_ENABLE_HISTORY` is defined (requires `XELP_ENABLE_LINE_EDIT`),
+When `XELP_ENABLE_CLI_HISTORY` is defined (requires `XELP_ENABLE_CLI`),
 the CLI remembers previously entered commands. Press UP to recall older
 commands, DOWN to return to newer ones.
 

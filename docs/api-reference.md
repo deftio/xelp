@@ -44,7 +44,6 @@ Initialize an XELP instance. Must be called before any other function.
 |-------|---------|
 | `XELP_SET_FN_OUT(ths, fn)` | Set output function: `void fn(char)` |
 | `XELP_SET_FN_ERR(ths, fn)` | Set error output function |
-| `XELP_SET_FN_BKSP(ths, fn)` | Set backspace handler: `void fn(void)` |
 | `XELP_SET_FN_THR(ths, fn)` | Set pass-through function |
 | `XELP_SET_FN_EMCHG(ths, fn)` | Set mode-change callback: `void fn(int)` |
 | `XELP_SET_FN_CLI(ths, tbl)` | Set CLI command table |
@@ -117,8 +116,8 @@ emitting a single character.
 XELPRESULT XelpHelp(XELP *ths);
 ```
 
-Print help listing all registered KEY and CLI commands. Only available when
-`XELP_ENABLE_HELP` is defined.
+Print help listing all registered KEY and CLI commands. Available when
+`XELP_ENABLE_CLI` is defined.
 
 ## Tokenizer
 
@@ -326,16 +325,11 @@ Cortex-M0 (Thumb, `-Os`):
 | Profile | .text (bytes) | Flags |
 |---------|------------:|-------|
 | KEY only | 532 | `XELP_ENABLE_KEY` |
-| CLI only | 1512 | `XELP_ENABLE_CLI` |
-| CLI + help | 1612 | + `XELP_ENABLE_HELP` |
-| CLI + key | 1616 | + `XELP_ENABLE_KEY` |
-| CLI + help + key | 1990 | + both |
-| CLI + help + key + thru | 2030 | + `XELP_ENABLE_THR` |
-| CLI + line edit | 1956 | + `XELP_ENABLE_LINE_EDIT` |
-| CLI + LE + help | 2052 | + `XELP_ENABLE_HELP` |
-| CLI + LE + help + key | 2470 | + `XELP_ENABLE_KEY` |
-| Full | 2510 | + `XELP_ENABLE_THR` |
-| Full + history | 2926 | + `XELP_ENABLE_HISTORY` |
+| CLI only | 1956 | `XELP_ENABLE_CLI` |
+| CLI + key | 2470 | + `XELP_ENABLE_KEY` |
+| CLI + key + thru | 2510 | + `XELP_ENABLE_THR` |
+| Full | 2510 | `XELP_ENABLE_FULL` |
+| Full + history | 2926 | + `XELP_ENABLE_CLI_HISTORY` |
 
 Use `dev/size_profiles.sh` to regenerate this table for your toolchain.
 

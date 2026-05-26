@@ -40,14 +40,6 @@ void gPutChar(char c) {
 }
 
 
-void handleBackspace() {
-	//ncurses stuff
-	int r,c;
-	getyx(stdscr, r, c);
-	move(r, c-1);   
-	delch();
-	refresh();
-}
 XELP example; /* xelp instance -- one per UART/console you want to control */
 int gExit=0;  //global flag for when to quit interpretor loop, not part of XELP, just the demo
 
@@ -336,7 +328,6 @@ int main (int argc, char *argv[])
 
 	XELP_SET_FN_OUT(example,  &gPutChar);        /* character output   */
 	XELP_SET_FN_ERR(example,  &gPutChar);        /* error output       */
-	XELP_SET_FN_BKSP(example, &handleBackspace); /* destructive bksp   */
 	XELP_SET_FN_EMCHG(example,&modeChangeMsg);   /* mode change notify */
 	XELP_SET_FN_KEY(example,   gMyKeyCommands);   /* single-key table   */
 	XELP_SET_FN_CLI(example,   gMyCLICommands);   /* CLI command table   */

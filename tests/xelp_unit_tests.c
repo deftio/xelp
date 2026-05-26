@@ -906,18 +906,7 @@ XELPRESULT test_XelpParseKey() {
         }
 
 
-#ifndef XELP_ENABLE_LINE_EDIT
-        XELP_SET_FN_BKSP(x, dummyVoid1);
-        dummyVoid0();
-        r = XelpParseKey(&x,XELPKEY_CLI);
-        r = XelpParseKey(&x,'a');
-        r = XelpParseKey(&x,XELPKEY_BKSP);
-        r = XelpParseKey(&x,XELPKEY_ENTER);
-        if (JB_ASSERT( (r!= XELP_S_OK) || (gBool != 1), "XelpParseKey --  bskp callback test")){
-            return XELP_E_ERR;
-        }
-#else
-        /* with line editing, mpfBksp is not called; library handles visual feedback */
+        /* backspace with line editing: library handles visual feedback */
         r = XelpParseKey(&x,XELPKEY_CLI);
         r = XelpParseKey(&x,'a');
         r = XelpParseKey(&x,XELPKEY_BKSP);
@@ -925,7 +914,6 @@ XELPRESULT test_XelpParseKey() {
         if (JB_ASSERT(r!= XELP_S_OK, "XelpParseKey --  bskp line edit test")){
             return XELP_E_ERR;
         }
-#endif
 
     }
 
@@ -1013,7 +1001,6 @@ XELPRESULT test_XelpParseKey() {
 
     /* test backspace at buffer start (no-op) */
     {
-        XELP_SET_FN_BKSP(x,0);
         r = XelpParseKey(&x,XELPKEY_CLI);
         /* buffer is now at start, backspace should be no-op */
         r = XelpParseKey(&x,XELPKEY_BKSP);
@@ -1023,7 +1010,6 @@ XELPRESULT test_XelpParseKey() {
 
     /* test CLI buffer overflow -- type more than XELP_CMDBUFSZ chars */
     {
-        XELP_SET_FN_BKSP(x,0);
         r = XelpParseKey(&x,XELPKEY_CLI);
         for (i = 0; i < XELP_CMDBUFSZ + 10; i++) {
             r = XelpParseKey(&x,'x');
@@ -2364,7 +2350,7 @@ XELPRESULT test_KeyAccumulator() {
 
     /* ESC + '[' + 'A' = UP arrow in CLI */
     XelpParseKey(&x, 'A');
-#ifdef XELP_ENABLE_HISTORY
+#ifdef XELP_ENABLE_CLI_HISTORY
     /* history recalls "a" (typed above): buf should have 1 char */
     if (JB_ASSERT(XELP_XB_POS(x.mCmdXB) != 1, "accum UP arrow recalls from history"))
         return XELP_E_ERR;
@@ -2455,7 +2441,7 @@ XELPRESULT test_MultiByteKeyDispatch() {
     return XELP_S_OK;
 }
 
-#ifdef XELP_ENABLE_LINE_EDIT
+#ifdef XELP_ENABLE_CLI
 /* ====================================================================
  Helper: feed a string of raw bytes to XelpParseKey (for simulating typed input)
  */
@@ -2816,7 +2802,7 @@ XELPRESULT test_CLILineEdit_BufferFull() {
 
     return XELP_S_OK;
 }
-#endif /* XELP_ENABLE_LINE_EDIT */
+#endif /* XELP_ENABLE_CLI */
 
 /* ====================================================================
  test_HelpMultiByteKeys() - cover ALL _xelpPrintKeyName branches
@@ -2858,7 +2844,7 @@ XELPRESULT test_HelpMultiByteKeys() {
     return XELP_S_OK;
 }
 
-#ifdef XELP_ENABLE_LINE_EDIT
+#ifdef XELP_ENABLE_CLI
 /* ====================================================================
  test_CLILineEdit_Right() - RIGHT arrow moves cursor forward
  */
@@ -2897,7 +2883,7 @@ XELPRESULT test_CLILineEdit_Right() {
 
     return XELP_S_OK;
 }
-#endif /* XELP_ENABLE_LINE_EDIT */
+#endif /* XELP_ENABLE_CLI */
 
 /* ====================================================================
  test_AccumOverflow() - CSI sequences with intermediate bytes that hit 4-byte overflow
@@ -3051,8 +3037,6 @@ XELPRESULT test_MultiInstance() {
     XELP_SET_FN_KEY(b, gMyKeyCommands);
     XELP_SET_FN_OUT(a, dummyOut);
     XELP_SET_FN_OUT(b, dummyOut);
-    XELP_SET_FN_BKSP(a, dummyVoid0);
-    XELP_SET_FN_BKSP(b, dummyVoid0);
     XELP_SET_FN_THR(a, dummyOut);
     XELP_SET_FN_THR(b, dummyOut);
 
@@ -3790,10 +3774,10 @@ XELPRESULT test_EchoControl() {
 }
 
 /* ====================================================================
- Command History tests -- guarded by both XELP_ENABLE_LINE_EDIT and
- XELP_ENABLE_HISTORY so they compile out when history is disabled.
+ Command History tests -- guarded by XELP_ENABLE_CLI_HISTORY
+ so they compile out when history is disabled.
  */
-#if defined(XELP_ENABLE_LINE_EDIT) && defined(XELP_ENABLE_HISTORY)
+#ifdef XELP_ENABLE_CLI_HISTORY
 
 /* ====================================================================
  test_HistoryBasic() -- ~8 cases covering fundamental history recall
@@ -4429,7 +4413,7 @@ XELPRESULT test_HistoryAndEcho() {
     return XELP_S_OK;
 }
 
-#endif /* XELP_ENABLE_LINE_EDIT && XELP_ENABLE_HISTORY */
+#endif /* XELP_ENABLE_CLI_HISTORY */
 
 /* ====================================================================
  test_XelpArgvDispatch() - test native argc/argv dispatch path
@@ -9293,6 +9277,201 @@ XELPRESULT test_ScriptPrepassEscNearLimit(void) {
     return XELP_S_OK;
 }
 
+/* ---- _list builtin tests ---- */
+
+XELPRESULT test_ScriptListAll(void) {
+    XELP x;
+    const char *c;
+    scriptTestInit(&x);
+
+    c = "_set x 42";
+    XelpParse(&x, c, XelpStrLen((char*)c));
+    c = "_set msg \"hello\"";
+    XelpParse(&x, c, XelpStrLen((char*)c));
+    c = "_func myfn \"_return 1\"";
+    XelpParse(&x, c, XelpStrLen((char*)c));
+
+    resetDummyBuf();
+    c = "_list";
+    XelpParse(&x, c, XelpStrLen((char*)c));
+
+    /* output should contain $x, $msg, func myfn */
+    {
+        int foundX = 0, foundMsg = 0, foundFn = 0, i;
+        for (i = 0; i < GDUMMYBUFLEN - 2 && gDummyBuf[i]; i++) {
+            if (gDummyBuf[i] == '$' && gDummyBuf[i+1] == 'x') foundX = 1;
+            if (gDummyBuf[i] == '$' && gDummyBuf[i+1] == 'm' && gDummyBuf[i+2] == 's') foundMsg = 1;
+            if (gDummyBuf[i] == 'm' && gDummyBuf[i+1] == 'y' && gDummyBuf[i+2] == 'f') foundFn = 1;
+        }
+        if (JB_ASSERT(!foundX, "_list should show $x"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(!foundMsg, "_list should show $msg"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(!foundFn, "_list should show func myfn"))
+            return XELP_E_ERR;
+    }
+    return XELP_S_OK;
+}
+
+XELPRESULT test_ScriptListVars(void) {
+    XELP x;
+    const char *c;
+    scriptTestInit(&x);
+
+    c = "_set a 10";
+    XelpParse(&x, c, XelpStrLen((char*)c));
+    c = "_func foo \"_return 1\"";
+    XelpParse(&x, c, XelpStrLen((char*)c));
+
+    resetDummyBuf();
+    c = "_list vars";
+    XelpParse(&x, c, XelpStrLen((char*)c));
+
+    /* should contain $a but NOT func foo */
+    {
+        int foundA = 0, foundFunc = 0, i;
+        for (i = 0; i < GDUMMYBUFLEN - 2 && gDummyBuf[i]; i++) {
+            if (gDummyBuf[i] == '$' && gDummyBuf[i+1] == 'a') foundA = 1;
+            if (gDummyBuf[i] == 'f' && gDummyBuf[i+1] == 'u' &&
+                gDummyBuf[i+2] == 'n' && gDummyBuf[i+3] == 'c') foundFunc = 1;
+        }
+        if (JB_ASSERT(!foundA, "_list vars should show $a"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(foundFunc, "_list vars should not show func"))
+            return XELP_E_ERR;
+    }
+    return XELP_S_OK;
+}
+
+XELPRESULT test_ScriptListFuncs(void) {
+    XELP x;
+    const char *c;
+    scriptTestInit(&x);
+
+    /* create both INT and STR vars, plus a func -- all should be hidden by "funcs" filter */
+    c = "_set z 99";
+    XelpParse(&x, c, XelpStrLen((char*)c));
+    c = "_set s \"hello\"";
+    XelpParse(&x, c, XelpStrLen((char*)c));
+    c = "_func bar \"_return 2\"";
+    XelpParse(&x, c, XelpStrLen((char*)c));
+
+    resetDummyBuf();
+    c = "_list funcs";
+    XelpParse(&x, c, XelpStrLen((char*)c));
+
+    /* should contain func bar but NOT $z or $s */
+    {
+        int foundZ = 0, foundS = 0, foundBar = 0, i;
+        for (i = 0; i < GDUMMYBUFLEN - 2 && gDummyBuf[i]; i++) {
+            if (gDummyBuf[i] == '$' && gDummyBuf[i+1] == 'z') foundZ = 1;
+            if (gDummyBuf[i] == '$' && gDummyBuf[i+1] == 's') foundS = 1;
+            if (gDummyBuf[i] == 'b' && gDummyBuf[i+1] == 'a' && gDummyBuf[i+2] == 'r') foundBar = 1;
+        }
+        if (JB_ASSERT(foundZ, "_list funcs should not show $z"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(foundS, "_list funcs should not show $s"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(!foundBar, "_list funcs should show bar"))
+            return XELP_E_ERR;
+    }
+    return XELP_S_OK;
+}
+
+static XELPScriptFuncEntry gListTestRomFuncs[] = {
+    { "romfn", "_return 0", "rom function" },
+    { 0, 0, 0 }
+};
+
+XELPRESULT test_ScriptListRomFuncs(void) {
+    XELP x;
+    const char *c;
+    scriptTestInit(&x);
+    x.mpScriptFuncs = gListTestRomFuncs;
+
+    resetDummyBuf();
+    c = "_list funcs";
+    XelpParse(&x, c, XelpStrLen((char*)c));
+
+    /* should contain "romfn" and "(ROM)" */
+    {
+        int foundRom = 0, i;
+        for (i = 0; i < GDUMMYBUFLEN - 4 && gDummyBuf[i]; i++) {
+            if (gDummyBuf[i] == 'r' && gDummyBuf[i+1] == 'o' &&
+                gDummyBuf[i+2] == 'm' && gDummyBuf[i+3] == 'f') foundRom = 1;
+        }
+        if (JB_ASSERT(!foundRom, "_list funcs should show ROM funcs"))
+            return XELP_E_ERR;
+    }
+    return XELP_S_OK;
+}
+
+XELPRESULT test_ScriptListEmpty(void) {
+    XELP x;
+    const char *c;
+    scriptTestInit(&x);
+
+    resetDummyBuf();
+    c = "_list";
+    XelpParse(&x, c, XelpStrLen((char*)c));
+
+    /* empty arena, no ROM funcs: output should be empty */
+    if (JB_ASSERT(gDummyBuf[0] != 0, "_list on empty arena should produce no output"))
+        return XELP_E_ERR;
+    return XELP_S_OK;
+}
+
+XELPRESULT test_ScriptListUnknownFilter(void) {
+    XELP x;
+    const char *c;
+    scriptTestInit(&x);
+
+    c = "_set v 5";
+    XelpParse(&x, c, XelpStrLen((char*)c));
+    c = "_func fn \"_return 0\"";
+    XelpParse(&x, c, XelpStrLen((char*)c));
+
+    /* Unknown filter word: should show both vars and funcs (same as no arg) */
+    resetDummyBuf();
+    c = "_list bogus";
+    XelpParse(&x, c, XelpStrLen((char*)c));
+
+    {
+        int foundV = 0, foundFn = 0, i;
+        for (i = 0; i < GDUMMYBUFLEN - 2 && gDummyBuf[i]; i++) {
+            if (gDummyBuf[i] == '$' && gDummyBuf[i+1] == 'v') foundV = 1;
+            if (gDummyBuf[i] == 'f' && gDummyBuf[i+1] == 'n') foundFn = 1;
+        }
+        if (JB_ASSERT(!foundV, "_list bogus should show vars"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(!foundFn, "_list bogus should show funcs"))
+            return XELP_E_ERR;
+    }
+    return XELP_S_OK;
+}
+
+XELPRESULT test_ScriptListBogusHeap(void) {
+    XELP x;
+    const char *c;
+    scriptTestInit(&x);
+
+    /* Put a var so HP moves, then corrupt the kind byte to an unknown value */
+    c = "_set q 1";
+    XelpParse(&x, c, XelpStrLen((char*)c));
+
+    /* Corrupt the kind byte at mHP to an unknown value */
+    *x.mHP = (char)0xFF;
+
+    resetDummyBuf();
+    c = "_list";
+    XelpParse(&x, c, XelpStrLen((char*)c));
+
+    /* Should not crash -- the unknown kind terminates the scan gracefully */
+    if (JB_ASSERT(0, "_list bogus heap entry"))
+        return XELP_E_ERR;
+    return XELP_S_OK;
+}
+
 #endif /* XELP_ENABLE_SCRIPT */
 /* ===================== END SCRIPT ENGINE TESTS ===================== */
 
@@ -9338,7 +9517,7 @@ int run_tests() {
     JumpBug_RunUnit(test_XelpRegisters,"XelpRegisters");
     JumpBug_RunUnit(test_KeyAccumulator,"KeyAccumulator");
     JumpBug_RunUnit(test_MultiByteKeyDispatch,"MultiByteKeyDispatch");
-#ifdef XELP_ENABLE_LINE_EDIT
+#ifdef XELP_ENABLE_CLI
     JumpBug_RunUnit(test_CLILineEdit_Insert,"LineEditInsert");
     JumpBug_RunUnit(test_CLILineEdit_Delete,"LineEditDelete");
     JumpBug_RunUnit(test_CLILineEdit_HomeEnd,"LineEditHomeEnd");
@@ -9354,12 +9533,12 @@ int run_tests() {
     JumpBug_RunUnit(test_MultiInstance,"MultiInstance");
     JumpBug_RunUnit(test_XelpArgvDispatch,"XelpArgvDispatch");
     JumpBug_RunUnit(test_BranchCoverage,"BranchCoverage");
-#ifdef XELP_ENABLE_LINE_EDIT
+#ifdef XELP_ENABLE_CLI
     JumpBug_RunUnit(test_CursorWithEcho,"CursorWithEcho");
 #endif
     JumpBug_RunUnit(test_OutputEnable,"OutputEnable");
     JumpBug_RunUnit(test_EchoControl,"EchoControl");
-#if defined(XELP_ENABLE_LINE_EDIT) && defined(XELP_ENABLE_HISTORY)
+#ifdef XELP_ENABLE_CLI_HISTORY
     JumpBug_RunUnit(test_HistoryBasic,"HistoryBasic");
     JumpBug_RunUnit(test_HistoryInProgressSave,"HistInProgress");
     JumpBug_RunUnit(test_HistoryFull,"HistoryFull");
@@ -9555,6 +9734,13 @@ int run_tests() {
     JumpBug_RunUnit(test_ScriptExpandLargeStr,"ScriptExpLS");
     JumpBug_RunUnit(test_ScriptIfCondTrueNoBody,"ScriptIfCTN");
     JumpBug_RunUnit(test_ScriptPrepassEscNearLimit,"ScriptPPENL");
+    JumpBug_RunUnit(test_ScriptListAll,"ScriptListAll");
+    JumpBug_RunUnit(test_ScriptListVars,"ScriptListVars");
+    JumpBug_RunUnit(test_ScriptListFuncs,"ScriptListFnc");
+    JumpBug_RunUnit(test_ScriptListRomFuncs,"ScriptListROM");
+    JumpBug_RunUnit(test_ScriptListEmpty,"ScriptListEmp");
+    JumpBug_RunUnit(test_ScriptListUnknownFilter,"ScriptListUF");
+    JumpBug_RunUnit(test_ScriptListBogusHeap,"ScriptListBH");
 #endif
 
     JumpBug_PrintResults();

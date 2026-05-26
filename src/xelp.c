@@ -65,7 +65,7 @@ static void _xelp_echo(XELP *ths, char c) {
 #define _XELP_IS_ENTER(ch) ((ch) == '\n')
 #endif
 
-#if defined(XELP_ENABLE_CLI) && defined(XELP_ENABLE_LINE_EDIT)
+#ifdef XELP_ENABLE_CLI
 static void _xelp_cursor(XELP *ths, char c) {
     if (ths->mEchoChar != XELP_ECHO_OFF && ths->mOutEnable && ths->mpfOut)
         ths->mpfOut(c);
@@ -153,7 +153,7 @@ static int _xelpKeyAccum(XELP *ths, char byte, int *reprocess) {
     return 1;
 }
 
-#if defined(XELP_ENABLE_CLI) && defined(XELP_ENABLE_LINE_EDIT)
+#ifdef XELP_ENABLE_CLI
 /*****************************************
  _xelpRedrawFromCursor() - reprint from cursor to end, erase trailing, reposition
  */
@@ -177,7 +177,7 @@ static void _xelpRedrawFromCursor(XELP *ths) {
 }
 #endif
 
-#if defined(XELP_ENABLE_CLI) && defined(XELP_ENABLE_LINE_EDIT) && defined(XELP_ENABLE_HISTORY)
+#if defined(XELP_ENABLE_CLI) && defined(XELP_ENABLE_CLI_HISTORY)
 
 /*****************************************
  _xelpHistReplaceLine() - clear displayed line and load new content.
@@ -283,9 +283,9 @@ static void _xelpHistRecall(XELP *ths, int dir) {
         _xelpHistReplaceLine(ths, ths->mHistBuf[slot], XelpStrLen(ths->mHistBuf[slot]));
     }
 }
-#endif /* XELP_ENABLE_CLI && XELP_ENABLE_LINE_EDIT && XELP_ENABLE_HISTORY */
+#endif /* XELP_ENABLE_CLI && XELP_ENABLE_CLI_HISTORY */
 
-#if defined(XELP_ENABLE_HELP) && defined(XELP_ENABLE_KEY)
+#if defined(XELP_ENABLE_CLI) && defined(XELP_ENABLE_KEY)
 /*****************************************
  _xelpPrintKeyName() - print human-readable name for a keycode in help output
  */
@@ -345,7 +345,7 @@ XELPRESULT XelpPutc(XELP *ths, char c)
  see xelpcfg.h for setting or overriding
  XELP_HELP_ABT_STR, XELP_HELP_KEY_STR, XELP_HELP_CLI_STR
  */
-#ifdef XELP_ENABLE_HELP
+#ifdef XELP_ENABLE_CLI
 XELPRESULT XelpHelp(XELP* ths)
 {
 #ifdef XELP_ENABLE_KEY
@@ -416,10 +416,10 @@ XELPRESULT XelpInit 	 (
 	   fail to compile. */
 	XELP_XB_INIT(ths->mCmdXB,ths->mCmdMsgBuf,XELP_CMDBUFSZ-1);
 #endif
-#if defined(XELP_ENABLE_CLI) && defined(XELP_ENABLE_LINE_EDIT)
+#ifdef XELP_ENABLE_CLI
 	ths->mCur = ths->mCmdXB.s;
 #endif
-#if defined(XELP_ENABLE_CLI) && defined(XELP_ENABLE_HISTORY)
+#if defined(XELP_ENABLE_CLI) && defined(XELP_ENABLE_CLI_HISTORY)
 	ths->mHistBrowse = -1;
 #endif
 #ifdef XELP_ENABLE_SCRIPT
@@ -431,7 +431,6 @@ XELPRESULT XelpInit 	 (
 	/* i/o handlers			note: each set to 0 using ptr loop
 	ths->mpfOut=0; 	  		// used for data output
 	ths->mpfPassThru=0;   	// function to pass keys in normal mode
-	ths->mpfBksp=0;			// function to handle destructive backspace
 	ths->mpErr=0;			// function to handle error reporting
 	ths->mpfEditModeChg=0;	// function for CLI/Key/Thru mode change callbacks
 	*/
@@ -821,7 +820,7 @@ XELPRESULT XelpArgvStr(const char **argv, int argc, int n, const char **s, int *
 	then if in command mode looks for <ENTER> and the attempts to parse current buffer.
 
 */
-#if defined(XELP_ENABLE_CLI) && defined(XELP_ENABLE_LINE_EDIT)
+#ifdef XELP_ENABLE_CLI
 /* move cursor left (dir<0) or right (dir>0); all=1 moves to boundary */
 static void _xelpCursorMove(XELP *ths, int dir, int all) {
 	do {
@@ -842,7 +841,7 @@ static void _xelpCursorMove(XELP *ths, int dir, int all) {
 /* handle ENTER: echo newline, save to history, execute buffer, reset, show prompt */
 static void _xelpHandleEnter(XELP *ths) {
 	XelpBuf line;
-#if defined(XELP_ENABLE_CLI) && defined(XELP_ENABLE_LINE_EDIT) && defined(XELP_ENABLE_HISTORY)
+#if defined(XELP_ENABLE_CLI) && defined(XELP_ENABLE_CLI_HISTORY)
 	_xelpHistSave(ths);
 #endif
 	_PUTC(XELPKEY_ENTER);
@@ -858,9 +857,7 @@ static void _xelpHandleEnter(XELP *ths) {
 	XelpParseXB(ths, &line);
 #endif
 	XELP_XB_TOP(ths->mCmdXB);
-#ifdef XELP_ENABLE_LINE_EDIT
 	ths->mCur = ths->mCmdXB.s;
-#endif
 #ifdef XELP_CLI_PROMPT
 	XelpOut(ths, XELP_CLI_PROMPT, -1);
 #endif
@@ -940,8 +937,6 @@ XELPRESULT XelpParseKey (XELP *ths, char key)
 			default: /* XELP_MODE_CLI */
 #ifdef XELP_ENABLE_CLI
 			{
-#ifdef XELP_ENABLE_LINE_EDIT
-				/* --- Line editing enabled --- */
 				if (!is_single) {
 					/* multi-byte key in CLI mode */
 					switch (keycode) {
@@ -959,12 +954,12 @@ XELPRESULT XelpParseKey (XELP *ths, char key)
 							break;
 						}
 						case XELP_KEYCODE_UP:
-#ifdef XELP_ENABLE_HISTORY
+#ifdef XELP_ENABLE_CLI_HISTORY
 							_xelpHistRecall(ths, -1);
 #endif
 							break;
 						case XELP_KEYCODE_DOWN:
-#ifdef XELP_ENABLE_HISTORY
+#ifdef XELP_ENABLE_CLI_HISTORY
 							_xelpHistRecall(ths, +1);
 #endif
 							break;
@@ -973,7 +968,7 @@ XELPRESULT XelpParseKey (XELP *ths, char key)
 							break;
 					}
 				} else {
-					/* single-char key in CLI mode with line editing */
+					/* single-char key in CLI mode */
 					char ch = (char)keycode;
 					if (ch == XELPKEY_BKSP || ch == XELPKEY_BS || ch == XELPKEY_DEL) {
 						/* delete char before cursor */
@@ -1011,26 +1006,6 @@ XELPRESULT XelpParseKey (XELP *ths, char key)
 					}
 					/* other control chars silently dropped */
 				}
-#else
-				/* --- Line editing NOT enabled (append-only, old behavior) --- */
-				if (!is_single) {
-					/* silently drop multi-byte keys */
-				} else {
-					char ch = (char)keycode;
-					if (ch == XELPKEY_BKSP || ch == XELPKEY_BS) {
-						if (ths->mCmdXB.p > ths->mCmdXB.s) {
-							(ths->mCmdXB.p)--;
-							if (ths->mpfBksp)
-								ths->mpfBksp();
-						}
-					} else if (_XELP_IS_ENTER(ch)) {
-						_xelpHandleEnter(ths);
-					} else {
-						_ECHO(ch);
-						XELP_XB_PUTC(ths->mCmdXB,ch);
-					}
-				}
-#endif /* XELP_ENABLE_LINE_EDIT */
 			}
 #endif /* XELP_ENABLE_CLI */
 				break;
@@ -1912,6 +1887,80 @@ static XELPRESULT _xelpBuiltin_lpad(XELP *ths, int argc, const char **argv) {
     return XELP_S_OK;
 }
 
+/* _list: list arena variables and/or script functions */
+static XELPRESULT _xelpBuiltin_list(XELP *ths, int argc, const char **argv) {
+    int showVars = 1, showFuncs = 1;
+    char nbuf[12];
+    int nlen;
+
+    if (argc >= 2) {
+        if (XelpStrEq(argv[1], XelpStrLen(argv[1]), "vars") == XELP_S_OK)
+            showFuncs = 0;
+        else if (XelpStrEq(argv[1], XelpStrLen(argv[1]), "funcs") == XELP_S_OK)
+            showVars = 0;
+    }
+
+    /* Walk arena heap entries */
+    {
+        char *p = ths->mHP;
+        char *end = ths->mArena + XELP_SCRIPT_ARENA_SZ;
+
+        while (p < end) {
+            unsigned char kind = (unsigned char)*p;
+            unsigned char enl = (unsigned char)p[3];
+            int entrySize;
+
+            if (kind == XELP_VAL_INT) {
+                entrySize = 4 + (int)enl + 4;
+                if (showVars) {
+                    int val = _xelpLoadInt(p + 4 + enl);
+                    XelpOut(ths, "  $", 0);
+                    XelpOut(ths, p + 4, (int)enl);
+                    XelpOut(ths, " = ", 0);
+                    nlen = _xelpIntToStr(val, nbuf, 12);
+                    nbuf[nlen] = '\0';
+                    XelpOut(ths, nbuf, 0);
+                    XelpOut(ths, "\n", 0);
+                }
+            } else if (kind == XELP_VAL_STR) {
+                int slen = (int)(((unsigned char)p[4 + enl]) | ((unsigned char)p[5 + enl] << 8));
+                entrySize = 4 + (int)enl + 2 + slen;
+                if (showVars) {
+                    XelpOut(ths, "  $", 0);
+                    XelpOut(ths, p + 4, (int)enl);
+                    XelpOut(ths, " = \"", 0);
+                    XelpOut(ths, p + 4 + enl + 2, slen);
+                    XelpOut(ths, "\"\n", 0);
+                }
+            } else if (kind == XELP_VAL_PROC) {
+                int blen = (int)(((unsigned char)p[4 + enl]) | ((unsigned char)p[5 + enl] << 8));
+                entrySize = 4 + (int)enl + 2 + blen;
+                if (showFuncs) {
+                    XelpOut(ths, "  func ", 0);
+                    XelpOut(ths, p + 4, (int)enl);
+                    XelpOut(ths, " {...}\n", 0);
+                }
+            } else {
+                break; /* unknown kind terminates scan */
+            }
+            p += entrySize;
+        }
+    }
+
+    /* Walk C-registered ROM script funcs */
+    if (showFuncs && ths->mpScriptFuncs) {
+        XELPScriptFuncEntry *sf = ths->mpScriptFuncs;
+        while (sf->mpCmd) {
+            XelpOut(ths, "  func ", 0);
+            XelpOut(ths, sf->mpCmd, 0);
+            XelpOut(ths, " (ROM)\n", 0);
+            sf++;
+        }
+    }
+
+    return XELP_S_OK;
+}
+
 /*****************************************
  Control flow builtins
  */
@@ -2359,6 +2408,7 @@ static XELPRESULT _xelpEvalStatement(XELP *ths, const char *lineS, int lineLen) 
             if (XelpStrEq(cmd, cmdLen, "_return") == XELP_S_OK) return _xelpBuiltin_return(ths, argc, ths->mArgv);
             if (XelpStrEq(cmd, cmdLen, "_func") == XELP_S_OK) return _xelpBuiltin_func(ths, argc, ths->mArgv);
             if (XelpStrEq(cmd, cmdLen, "_lpad") == XELP_S_OK) return _xelpBuiltin_lpad(ths, argc, ths->mArgv);
+            if (XelpStrEq(cmd, cmdLen, "_list") == XELP_S_OK) return _xelpBuiltin_list(ths, argc, ths->mArgv);
             if (XelpStrEq(cmd, cmdLen, "_band") == XELP_S_OK) return _xelpBuiltin_band(ths, argc, ths->mArgv);
             if (XelpStrEq(cmd, cmdLen, "_bor") == XELP_S_OK) return _xelpBuiltin_bor(ths, argc, ths->mArgv);
             if (XelpStrEq(cmd, cmdLen, "_bxor") == XELP_S_OK) return _xelpBuiltin_bxor(ths, argc, ths->mArgv);

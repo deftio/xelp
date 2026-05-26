@@ -37,7 +37,6 @@ CLI with custom commands, KEY mode shortcuts, scripting, and token parsing.</p>
 
 /* Platform: write one char. Replace with your UART TX. */
 void my_putc(char c) { putchar(c); }
-void my_bksp(void)   { my_putc('\b'); my_putc(' '); my_putc('\b'); }
 
 /* Your first command */
 XELPRESULT cmd_hello(XELP *ths, int argc, const char **argv) {
@@ -57,7 +56,6 @@ XELP cli;
 int main(void) {
     XelpInit(&amp;cli, "Tutorial v1.0");
     XELP_SET_FN_OUT(cli, &amp;my_putc);
-    XELP_SET_FN_BKSP(cli, &amp;my_bksp);
     XELP_SET_FN_CLI(cli, commands);
 
     int c;
@@ -74,7 +72,6 @@ int main(void) {
 <ol>
   <li><code>XelpInit</code> zeroes all internal state and stores the about message.</li>
   <li><code>XELP_SET_FN_OUT</code> tells xelp how to emit characters on this platform.</li>
-  <li><code>XELP_SET_FN_BKSP</code> tells xelp how to handle destructive backspace.</li>
   <li><code>XELP_SET_FN_CLI</code> registers your command table.</li>
   <li><code>XelpParseKey</code> feeds one character at a time. When ENTER is received,
       xelp tokenizes the line into argc/argv and dispatches to the matching command.</li>
@@ -202,7 +199,7 @@ XelpParse(&amp;cli, script, XelpStrLen(script));
 
 <h2>6. Help system</h2>
 
-<p>With <code>XELP_ENABLE_HELP</code> defined, <code>XelpHelp(&amp;cli)</code>
+<p>With <code>XELP_ENABLE_CLI</code> defined, <code>XelpHelp(&amp;cli)</code>
 prints all registered KEY and CLI commands. The third field in every command
 table entry is the help text:</p>
 

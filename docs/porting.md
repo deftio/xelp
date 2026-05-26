@@ -38,23 +38,9 @@ void UART_RX_ISR(void) {
 }
 ```
 
-## Optional: Backspace Handler
-
-If using CLI mode, provide a destructive backspace handler:
-
-```c
-void handle_bksp(void) {
-    uart_putc('\b');
-    uart_putc(' ');
-    uart_putc('\b');
-}
-
-XELP_SET_FN_BKSP(myXelp, &handle_bksp);
-```
-
 ## Optional: Command History
 
-If you enable `XELP_ENABLE_HISTORY` (requires `XELP_ENABLE_CLI` + `XELP_ENABLE_LINE_EDIT`),
+If you enable `XELP_ENABLE_CLI_HISTORY` (requires `XELP_ENABLE_CLI`),
 users can recall previous commands with UP/DOWN arrows. No extra setup needed --
 it works automatically. Be aware of the RAM cost:
 
@@ -137,7 +123,6 @@ bash tools/crossbuild.sh --build    # force rebuild the Docker image
 
 /* Platform HAL */
 void my_putc(char c) { /* ... */ }
-void my_bksp(void)   { /* ... */ }
 
 /* Commands */
 XELPRESULT cmd_hello(XELP *ths, int argc, const char **argv) {
@@ -155,7 +140,6 @@ XELP x;
 void main(void) {
     XelpInit(&x, "My Device v1.0");
     XELP_SET_FN_OUT(x, &my_putc);
-    XELP_SET_FN_BKSP(x, &my_bksp);
     XELP_SET_FN_CLI(x, cmds);
 
     for (;;) {

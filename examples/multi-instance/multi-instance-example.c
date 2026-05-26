@@ -22,9 +22,6 @@
 static void uart0_putc(char c) { (void)c; /* UART0 TX */ }
 static void uart1_putc(char c) { (void)c; /* UART1 TX */ }
 
-static void uart0_bksp(void) { uart0_putc('\b'); uart0_putc(' '); uart0_putc('\b'); }
-static void uart1_bksp(void) { uart1_putc('\b'); uart1_putc(' '); uart1_putc('\b'); }
-
 /* ------------------------------------------------------------------ */
 /* Shared commands -- ths points to whichever instance called them      */
 /* ------------------------------------------------------------------ */
@@ -73,13 +70,11 @@ void main(void)
     XelpInit(&cli_a, "Debug Console (UART0)");
     XelpInit(&cli_b, "Service Port (UART1)");
 
-    /* Each gets its own output and backspace handler */
+    /* Each gets its own output handler */
     XELP_SET_FN_OUT(cli_a, &uart0_putc);
-    XELP_SET_FN_BKSP(cli_a, &uart0_bksp);
     XELP_SET_FN_CLI(cli_a, commands_a);
 
     XELP_SET_FN_OUT(cli_b, &uart1_putc);
-    XELP_SET_FN_BKSP(cli_b, &uart1_bksp);
     XELP_SET_FN_CLI(cli_b, commands_b);
 
     /* Each can have its own prompt */

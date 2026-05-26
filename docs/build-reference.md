@@ -1,6 +1,6 @@
 # xelp Build Reference
 
-> **Auto-generated** on 2026-05-25 (arena-based frames refactor)
+> **Auto-generated** on 2026-05-26 03:06 UTC
 > xelp 0.4.0 | Apple clang version 21.0.0 (clang-2100.1.1.101) | Darwin arm64
 >
 > Regenerate: `make build-ref`
@@ -14,14 +14,14 @@ features are compiled in. Unused features are stripped at compile time.
 
 All flags are independent -- mix and match freely. These profiles are convenient
 bundles, not hard requirements. For example, `XELP_ENABLE_THR` can be added to
-any profile, or `XELP_ENABLE_SCRIPT` can be used without `XELP_ENABLE_HISTORY`.
+any profile, or `XELP_ENABLE_SCRIPT` can be used without `XELP_ENABLE_CLI_HISTORY`.
 
 | Profile | Flags | Description |
 |---------|-------|-------------|
 | **KEY** | `XELP_ENABLE_KEY` | Single-keypress dispatch only. Menus, debug jigs, minimal footprint. |
-| **CLI** | `KEY` + `CLI` + `LINE_EDIT` + `HELP` | Interactive command line with cursor editing and help. |
-| **HIST** | CLI + `HISTORY` + `THR` | CLI plus command history (UP/DOWN recall) and pass-through mode. |
-| **SCRIPT** | HIST + `SCRIPT` | All features including the XelpScript engine. |
+| **CLI** | `KEY` + `CLI` | Interactive command line with cursor editing and help. |
+| **HIST** | CLI + `CLI_HISTORY` + `THR` | CLI plus command history (UP/DOWN recall) and pass-through mode. |
+| **SCRIPT** | HIST + `SCRIPT` + `ARGV` | All features including the XelpScript engine. |
 
 ---
 
@@ -58,33 +58,8 @@ Flags marked `*` have no dependencies and can be added to any profile.
 
 ## Code Size (.text bytes, `-Os`)
 
-| Platform | Bits | Compiler | KEY | CLI | HIST | SCRIPT |
-|----------|-----:|----------|----:|----:|-----:|-------:|
-| AVR (ATtiny85) | 8 | avr-gcc | 990 | 4069 | 4995 | 14054 |
-| AVR (ATmega328P) | 8 | avr-gcc | 998 | 4155 | 5093 | 14546 |
-| Z80 | 8 | SDCC | 1969 | 7205 | 8381 | 26733 |
-| 6800 (HC08) | 8 | SDCC | 2096 | 8268 | 9785 | 31894 |
-| MSP430 | 16 | msp430-gcc | 782 | 3240 | 4032 | 12578 |
-| 68HC11 | 16 | m68hc11-gcc | 2169 | 6739 | 8616 | 30851 |
-| ARM Thumb | 32 | arm-none-eabi-gcc | 600 | 2575 | 3071 | 9200 |
-| Xtensa LX7 (ESP32-S3) | 32 | xtensa-esp-elf-gcc | 620 | 2677 | 3113 | 9542 |
-| m68k | 32 | m68k-linux-gnu-gcc | 746 | 3167 | 3881 | 11098 |
-| RISC-V (rv32) | 32 | riscv64-unknown-elf-gcc | 746 | 3078 | 3646 | 10970 |
-| Xtensa LX106 (ESP8266) | 32 | xtensa-lx106-elf-gcc | 747 | 2956 | 3456 | 10469 |
-| ARM32 | 32 | arm-none-eabi-gcc | 1008 | 3895 | 4607 | 13704 |
-| x86-32 | 32 | GCC | 1099 | 4523 | 5238 | 15102 |
-| MIPS32 | 32 | mipsel-linux-gnu-gcc | 1312 | 4864 | 5728 | 15472 |
-| PowerPC | 32 | powerpc-linux-gnu-gcc | 1536 | 5591 | 6379 | 16832 |
-| RISC-V (rv64) | 64 | riscv64-linux-gnu-gcc | 780 | 3292 | 3900 | 11682 |
-| x86-64 | 64 | Clang | 1060 | 4661 | 5649 | 21711 |
-| x86-64 | 64 | GCC | 1084 | 4556 | 5377 | 13986 |
-| AArch64 (ARM64) | 64 | aarch64-linux-gnu-gcc | 1336 | 4931 | 5639 | 14928 |
-| MIPS64 | 64 | mips64el-linux-gnuabi64-gcc | 1376 | 5392 | 6464 | 17360 |
-
-All targets compiled with `-Os`. Sizes are `.text` section only (no data/BSS).
-The x86-64 Clang row is measured on the host; all other rows are from the last
-Docker cross-build and the SCRIPT column may be stale after major refactors.
-Run `make prerelease` to regenerate all rows (requires Docker).
+No cross-compiled data. Run `make prerelease` (requires Docker) to cross-compile
+for AVR, MSP430, ARM Thumb, ESP32, RISC-V, MIPS, and more.
 
 ---
 
@@ -94,9 +69,9 @@ With `XELP_CMDBUFSZ=64`, `XELP_HIST_DEPTH=4`, `XELP_SCRIPT_ARENA_SZ=sizeof(int)*
 
 | Platform class | KEY | CLI | HIST | SCRIPT |
 |----------------|----:|----:|-----:|-------:|
-| 16-bit (MSP430, AVR) | ~50 | ~192 | ~522 | ~1596 |
-| 32-bit (ARM Thumb, ESP32, RISC-V) | ~64 | ~220 | ~552 | ~1636 |
-| 64-bit (x86-64, AArch64) | 96 | 280 | 616 | 1720 |
+| 16-bit (MSP430, AVR) | ~50 | ~254 | ~584 | ~1658 |
+| 32-bit (ARM Thumb, ESP32, RISC-V) | ~64 | ~280 | ~612 | ~1696 |
+| 64-bit (x86-64, AArch64) | 96 | 336 | 672 | 1776 |
 
 64-bit row is measured on Darwin arm64. 32-bit and 16-bit rows are
 estimated from the measured value by adjusting for pointer width (each pointer
@@ -114,8 +89,9 @@ to the buffers.
 | `mArena[]` (script engine arena) | 512-2048 | SCRIPT only (scales with word size) |
 | `mHistBuf[4][64]` + `mHistSaved[64]` (history ring) | 324 | HIST, SCRIPT |
 | `mCmdMsgBuf[64]` + `mArgvBuf[64]` (CLI buffers) | 128 | CLI, HIST, SCRIPT |
+| `mGotoLabel[16]` (script goto target) | 16 | SCRIPT only |
 | `mR[4]` (return registers) | 16 | All |
-| Pointers (function tables, callbacks, script context) | 12-160 | varies by config and word size |
+| Pointers (function tables, callbacks, XelpBuf) | 12-160 | varies by config and word size |
 | Scalar state (mode, counters, flags) | ~10 | All |
 
 ---
@@ -140,22 +116,19 @@ to the buffers.
 | Flag | What it enables | Requires | Code cost |
 |------|----------------|----------|----------|
 | `XELP_ENABLE_KEY` | Single key press dispatch (menus) | -- | ~200-500 B |
-| `XELP_ENABLE_CLI` | Command line prompt, tokenizer, command dispatch | -- | ~1.5-2.5 KB |
-| `XELP_ENABLE_LINE_EDIT` | Cursor movement, insert-at-cursor, Delete, ANSI keys | `CLI` | ~800-1000 B |
-| `XELP_ENABLE_HISTORY` | Command history (UP/DOWN arrow recall) | `CLI` + `LINE_EDIT` | ~420 B |
+| `XELP_ENABLE_CLI` | Command line prompt, tokenizer, line editing, help, command dispatch | -- | ~2.5-3.5 KB |
+| `XELP_ENABLE_CLI_HISTORY` | Command history (UP/DOWN arrow recall) | `CLI` | ~420 B |
 | `XELP_ENABLE_THR` | Pass-through mode (redirect keys to peripheral) | **none** | ~50-125 B |
-| `XELP_ENABLE_HELP` | Built-in help command listing | **none** | ~180-350 B |
-| `XELP_ENABLE_SCRIPT` | XelpScript: variables, math, conditionals, labels, functions | `CLI` | ~6-16 KB |
-| `XELP_ENABLE_FULL` | Shorthand: KEY + CLI + THR + HELP (no LINE_EDIT, HISTORY, SCRIPT) | -- | combined |
+| `XELP_ENABLE_SCRIPT` | XelpScript: variables, math, conditionals, labels, functions | `CLI` | ~1-2 KB |
+| `XELP_ENABLE_FULL` | Shorthand: KEY + CLI + THR | -- | combined |
 
 ### Dependency Rules
 
 Unmet dependencies are silently disabled (no compile errors):
 
-- `LINE_EDIT` requires `CLI`
-- `HISTORY` requires `CLI` + `LINE_EDIT`
+- `CLI_HISTORY` requires `CLI`
 - `SCRIPT` requires `CLI`
-- `KEY`, `THR`, `HELP` -- **no dependencies**, work alone or with any profile
+- `KEY`, `THR` -- **no dependencies**, work alone or with any profile
 
 ### Key Mappings
 
@@ -207,27 +180,22 @@ Customize the build without modifying source files:
 ```c
 /* xelp_ovr.h -- lean build for ATtiny (KEY only) */
 #undef XELP_ENABLE_CLI
-#undef XELP_ENABLE_LINE_EDIT
-#undef XELP_ENABLE_HISTORY
+#undef XELP_ENABLE_CLI_HISTORY
 #undef XELP_ENABLE_THR
-#undef XELP_ENABLE_HELP
 #undef XELP_ENABLE_SCRIPT
 ```
 
 ```c
 /* xelp_ovr.h -- CLI + THR, no history, no scripting */
 #undef XELP_ENABLE_CLI
-#undef XELP_ENABLE_LINE_EDIT
-#undef XELP_ENABLE_HISTORY
+#undef XELP_ENABLE_CLI_HISTORY
+#undef XELP_ENABLE_ARGV
 #undef XELP_ENABLE_KEY
 #undef XELP_ENABLE_THR
-#undef XELP_ENABLE_HELP
 #undef XELP_ENABLE_SCRIPT
 
 #define XELP_ENABLE_KEY       1
 #define XELP_ENABLE_CLI       1
-#define XELP_ENABLE_LINE_EDIT 1
-#define XELP_ENABLE_HELP      1
 #define XELP_ENABLE_THR       1
 ```
 

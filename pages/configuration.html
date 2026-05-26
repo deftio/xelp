@@ -53,26 +53,22 @@ multi-byte ANSI key recognition, tokenizer, scripting, and help. This is
 the typical interactive configuration.</p>
 
 <pre><code>#define XELP_ENABLE_CLI        1
-#define XELP_ENABLE_LINE_EDIT  1
 #define XELP_ENABLE_KEY        1
-#define XELP_ENABLE_HELP       1
 </code></pre>
 
-<p>Optional: add <code>XELP_ENABLE_HISTORY</code> for UP/DOWN arrow command
-recall (~420 bytes, requires <code>XELP_ENABLE_LINE_EDIT</code>).</p>
+<p>Optional: add <code>XELP_ENABLE_CLI_HISTORY</code> for UP/DOWN arrow command
+recall (~420 bytes, requires <code>XELP_ENABLE_CLI</code>).</p>
 
 <p>Representative size: <strong>~2600 bytes</strong> on ARM Thumb,
 <strong>~4200 bytes</strong> on AVR.</p>
 
 <h3>Full (~3&ndash;5 KB)</h3>
 
-<p><code>XELP_ENABLE_FULL</code> enables KEY, CLI, THR, and HELP &mdash; but
-<strong>not</strong> LINE_EDIT or HISTORY. For cursor movement and command
-recall, add those flags explicitly:</p>
+<p><code>XELP_ENABLE_FULL</code> enables KEY, CLI, and THR. For command
+recall, add the history flag explicitly:</p>
 
-<pre><code>#define XELP_ENABLE_FULL       1
-#define XELP_ENABLE_LINE_EDIT  1   /* optional: cursor, insert, delete */
-#define XELP_ENABLE_HISTORY    1   /* optional: UP/DOWN recall */
+<pre><code>#define XELP_ENABLE_FULL          1
+#define XELP_ENABLE_CLI_HISTORY   1   /* optional: UP/DOWN recall */
 </code></pre>
 
 <p>Every flag is independent &mdash; mix and match. See the
@@ -84,13 +80,11 @@ Reference</a> for full details.</p>
 <table>
 <thead><tr><th>Flag</th><th>Purpose</th><th>Size impact</th></tr></thead>
 <tbody>
-<tr><td><code>XELP_ENABLE_CLI</code></td><td>Command line mode with prompt, backspace, and command dispatch</td><td>Required for CLI and scripting</td></tr>
-<tr><td><code>XELP_ENABLE_LINE_EDIT</code></td><td>Cursor movement (left/right, Home/End), insert-at-cursor, Delete. Requires <code>XELP_ENABLE_CLI</code>.</td><td>~800&ndash;1000 bytes</td></tr>
+<tr><td><code>XELP_ENABLE_CLI</code></td><td>Command line mode with prompt, backspace, line editing, help, and command dispatch</td><td>Required for CLI and scripting</td></tr>
 <tr><td><code>XELP_ENABLE_KEY</code></td><td>Single key press mode (menus, immediate actions)</td><td>~200&ndash;500 bytes</td></tr>
 <tr><td><code>XELP_ENABLE_THR</code></td><td>Pass-through mode (redirect keys to another peripheral)</td><td>~50&ndash;125 bytes</td></tr>
-<tr><td><code>XELP_ENABLE_HELP</code></td><td>Built-in help function listing all commands</td><td>~180&ndash;350 bytes</td></tr>
-<tr><td><code>XELP_ENABLE_HISTORY</code></td><td>Command history (UP/DOWN arrow recall). Requires <code>XELP_ENABLE_CLI</code> + <code>XELP_ENABLE_LINE_EDIT</code>.</td><td>~420 bytes</td></tr>
-<tr><td><code>XELP_ENABLE_FULL</code></td><td>Enables KEY, CLI, THR, HELP (not LINE_EDIT or HISTORY)</td><td>All combined</td></tr>
+<tr><td><code>XELP_ENABLE_CLI_HISTORY</code></td><td>Command history (UP/DOWN arrow recall). Requires <code>XELP_ENABLE_CLI</code>.</td><td>~420 bytes</td></tr>
+<tr><td><code>XELP_ENABLE_FULL</code></td><td>Enables KEY, CLI, and THR</td><td>All combined</td></tr>
 </tbody>
 </table>
 
@@ -128,7 +122,7 @@ Reference</a> for full details.</p>
 <tbody>
 <tr><td><code>XELP_CMDBUFSZ</code></td><td>64</td><td>CLI input buffer size in bytes</td></tr>
 <tr><td><code>XELP_ARGVBUFSZ</code></td><td><code>XELP_CMDBUFSZ</code></td><td>Scratch buffer for CLI dispatch argv tokenization (bytes per instance, requires <code>XELP_ENABLE_CLI</code>). Argv capacity is derived: <code>XELP_ARGVBUFSZ / sizeof(const char *)</code></td></tr>
-<tr><td><code>XELP_HIST_DEPTH</code></td><td>4</td><td>Number of commands stored in history ring (requires <code>XELP_ENABLE_HISTORY</code>)</td></tr>
+<tr><td><code>XELP_HIST_DEPTH</code></td><td>4</td><td>Number of commands stored in history ring (requires <code>XELP_ENABLE_CLI_HISTORY</code>)</td></tr>
 <tr><td><code>XELP_REGS_SZ</code></td><td>4</td><td>Number of callee-clobbers-all return registers (minimum 4). R0 is command status, R1&ndash;R3 are command-specific.</td></tr>
 <tr><td><code>XELPREG</code></td><td><code>int</code></td><td>Register type (change for platforms where <code>int</code> is not ideal)</td></tr>
 </tbody>
@@ -193,13 +187,12 @@ its default.</p>
 <h3>Minimal (KEY mode only)</h3>
 <pre><code>/* xelpcfg.h */
 #define XELP_ENABLE_KEY   1
-/* Leave CLI, LINE_EDIT, THR, HELP undefined */
+/* Leave CLI, THR undefined */
 </code></pre>
 <p>Estimated size: ~900 bytes</p>
 
 <h3>CLI with help</h3>
 <pre><code>#define XELP_ENABLE_CLI   1
-#define XELP_ENABLE_HELP  1
 </code></pre>
 <p>Estimated size: ~2 KB</p>
 

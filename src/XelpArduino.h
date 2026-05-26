@@ -145,12 +145,6 @@ public:
 #endif
 
 #ifdef XELP_ENABLE_CLI
-    /** Set the destructive-backspace handler for the CLI prompt. */
-    void setBackspace(void (*fn)())
-    {
-        XELP_SET_FN_BKSP(m_x, fn);
-    }
-
     /** Set the default handler for unrecognized CLI commands (raw C signature). */
     void setDefaultCommandHandler(XELPRESULT (*fn)(XELP*, int, const char**))
     {
@@ -190,7 +184,7 @@ public:
 
 #ifdef ARDUINO
     /**
-     * Bind a Stream for automatic output and backspace handling.
+     * Bind a Stream for automatic output.
      * Replaces the output function pointer set in begin().
      *
      * Note: uses a static pointer, so only one XelpCLI instance at a
@@ -201,9 +195,6 @@ public:
     {
         s_outStream = &stream;
         XELP_SET_FN_OUT(m_x, &_streamOut);
-#ifdef XELP_ENABLE_CLI
-        XELP_SET_FN_BKSP(m_x, &_streamBksp);
-#endif
     }
 #endif
 
@@ -248,7 +239,7 @@ public:
         XelpOut(&m_x, msg, XelpStrLen(msg));
     }
 
-#ifdef XELP_ENABLE_HELP
+#ifdef XELP_ENABLE_CLI
     /** Print the built-in help listing. */
     XELPRESULT help()
     {
@@ -331,15 +322,6 @@ private:
     static void _streamOut(char c)
     {
         if (s_outStream) s_outStream->write(c);
-    }
-
-    static void _streamBksp()
-    {
-        if (s_outStream) {
-            s_outStream->write('\b');
-            s_outStream->write(' ');
-            s_outStream->write('\b');
-        }
     }
 #endif
 

@@ -32,7 +32,6 @@ xelp integration pattern with no dependencies beyond a UART:
 
 /* 1. Platform stubs -- replace with your hardware */
 static void uart_putc(char c)  { /* UART TX */ }
-static void uart_bksp(void)    { uart_putc('\b'); uart_putc(' '); uart_putc('\b'); }
 static int  uart_rx_ready(void) { return 0; }
 static char uart_getc(void)     { return 0; }
 
@@ -58,7 +57,6 @@ void main(void) {
     XelpInit(&cli, "My Device v1.0\n");
 
     XELP_SET_FN_OUT(cli, &uart_putc);
-    XELP_SET_FN_BKSP(cli, &uart_bksp);
     XELP_SET_FN_KEY(cli, key_commands);
     XELP_SET_FN_CLI(cli, cli_commands);
     XELP_SET_FN_THR(cli, &thr_passthrough);      /* optional */
@@ -76,9 +74,8 @@ void main(void) {
 
 ### Key points
 
-- **5 function pointers** are the entire platform abstraction layer:
-  output, error, backspace, pass-through, mode change. Only output is
-  required.
+- **4 function pointers** are the entire platform abstraction layer:
+  output, error, pass-through, mode change. Only output is required.
 - Command tables are NULL-terminated arrays. Use `XELP_FUNC_ENTRY_LAST`
   as the sentinel.
 - The main loop just feeds characters. xelp handles line buffering,
@@ -145,7 +142,6 @@ Requires ncurses (`sudo apt-get install libncurses5-dev` on Debian/Ubuntu).
 - KEY mode commands: `h` (help), `f` (fooBar), `p`/`w` (print), `b`
   (banner), `x` (exit)
 - Mode switching: ESC for KEY mode, CTRL-P for CLI, CTRL-T for THR
-- Backspace handling with ncurses `delch()`
 - Mode change callback showing mode transitions
 - Token parsing and numeric argument handling
 - Command history: UP/DOWN arrow recall of previous commands

@@ -1,7 +1,7 @@
 #!/bin/bash
 # gen_build_reference.sh -- Generate build/build-reference.md with measured sizes
 #
-# Compiles xelp.c in four configurations (KEY, CLI, HIST, SCRIPT),
+# Compiles xelp.c in four configurations (KEY, CLI, CLI_HISTORY, SCRIPT),
 # measures .text sizes and sizeof(XELP) on host, and incorporates
 # cross-compiled per-platform sizes from build/sizes.csv when available.
 #
@@ -36,12 +36,10 @@ done
 cat > "$TMP_DIR/key/xelp_ovr.h" << 'EOF'
 /* KEY-only config */
 #undef XELP_ENABLE_CLI
-#undef XELP_ENABLE_LINE_EDIT
-#undef XELP_ENABLE_HISTORY
+#undef XELP_ENABLE_CLI_HISTORY
 #undef XELP_ENABLE_ARGV
 #undef XELP_ENABLE_KEY
 #undef XELP_ENABLE_THR
-#undef XELP_ENABLE_HELP
 #undef XELP_ENABLE_SCRIPT
 
 #define XELP_ENABLE_KEY       1
@@ -50,55 +48,43 @@ EOF
 cat > "$TMP_DIR/cli/xelp_ovr.h" << 'EOF'
 /* CLI config */
 #undef XELP_ENABLE_CLI
-#undef XELP_ENABLE_LINE_EDIT
-#undef XELP_ENABLE_HISTORY
+#undef XELP_ENABLE_CLI_HISTORY
 #undef XELP_ENABLE_ARGV
 #undef XELP_ENABLE_KEY
 #undef XELP_ENABLE_THR
-#undef XELP_ENABLE_HELP
 #undef XELP_ENABLE_SCRIPT
 
 #define XELP_ENABLE_KEY       1
 #define XELP_ENABLE_CLI       1
-#define XELP_ENABLE_LINE_EDIT 1
-#define XELP_ENABLE_HELP      1
 EOF
 
 cat > "$TMP_DIR/hist/xelp_ovr.h" << 'EOF'
 /* HIST config */
 #undef XELP_ENABLE_CLI
-#undef XELP_ENABLE_LINE_EDIT
-#undef XELP_ENABLE_HISTORY
+#undef XELP_ENABLE_CLI_HISTORY
 #undef XELP_ENABLE_ARGV
 #undef XELP_ENABLE_KEY
 #undef XELP_ENABLE_THR
-#undef XELP_ENABLE_HELP
 #undef XELP_ENABLE_SCRIPT
 
 #define XELP_ENABLE_KEY       1
 #define XELP_ENABLE_CLI       1
-#define XELP_ENABLE_LINE_EDIT 1
-#define XELP_ENABLE_HELP      1
-#define XELP_ENABLE_HISTORY   1
+#define XELP_ENABLE_CLI_HISTORY 1
 #define XELP_ENABLE_THR       1
 EOF
 
 cat > "$TMP_DIR/script/xelp_ovr.h" << 'EOF'
 /* SCRIPT config */
 #undef XELP_ENABLE_CLI
-#undef XELP_ENABLE_LINE_EDIT
-#undef XELP_ENABLE_HISTORY
+#undef XELP_ENABLE_CLI_HISTORY
 #undef XELP_ENABLE_ARGV
 #undef XELP_ENABLE_KEY
 #undef XELP_ENABLE_THR
-#undef XELP_ENABLE_HELP
 #undef XELP_ENABLE_SCRIPT
 
 #define XELP_ENABLE_KEY       1
 #define XELP_ENABLE_CLI       1
-#define XELP_ENABLE_LINE_EDIT 1
-#define XELP_ENABLE_HELP      1
-#define XELP_ENABLE_HISTORY   1
+#define XELP_ENABLE_CLI_HISTORY 1
 #define XELP_ENABLE_ARGV      1
 #define XELP_ENABLE_THR       1
 #define XELP_ENABLE_SCRIPT    1
@@ -138,13 +124,10 @@ int main(void) {
     ptr_bytes += sizeof(x.mpCLIModeFuncs);
     ptr_bytes += sizeof(x.mpfDefCLI);
     ptr_bytes += sizeof(x.mCmdXB.s) + sizeof(x.mCmdXB.p) + sizeof(x.mCmdXB.e);
-    ptr_bytes += sizeof(x.mpfBksp);
+    ptr_bytes += sizeof(x.mCur);
 #endif
 #ifdef XELP_CLI_PROMPT
     ptr_bytes += sizeof(x.mpPrompt);
-#endif
-#if defined(XELP_ENABLE_CLI) && defined(XELP_ENABLE_LINE_EDIT)
-    ptr_bytes += sizeof(x.mCur);
 #endif
 #ifdef XELP_ENABLE_THR
     ptr_bytes += sizeof(x.mpfPassThru);
@@ -152,7 +135,7 @@ int main(void) {
 #ifdef XELP_ENABLE_SCRIPT
     ptr_bytes += sizeof(x.mSP);
     ptr_bytes += sizeof(x.mHP);
-    ptr_bytes += sizeof(x.mpFrameArgv);
+    ptr_bytes += sizeof(x.mpFrameArgData);
     ptr_bytes += sizeof(x.mpScriptFuncs);
     ptr_bytes += sizeof(x.mpfBreakpoint);
 #endif
@@ -279,13 +262,13 @@ features are compiled in. Unused features are stripped at compile time.
 
 All flags are independent -- mix and match freely. These profiles are convenient
 bundles, not hard requirements. For example, \`XELP_ENABLE_THR\` can be added to
-any profile, or \`XELP_ENABLE_SCRIPT\` can be used without \`XELP_ENABLE_HISTORY\`.
+any profile, or \`XELP_ENABLE_SCRIPT\` can be used without \`XELP_ENABLE_CLI_HISTORY\`.
 
 | Profile | Flags | Description |
 |---------|-------|-------------|
 | **KEY** | \`XELP_ENABLE_KEY\` | Single-keypress dispatch only. Menus, debug jigs, minimal footprint. |
-| **CLI** | \`KEY\` + \`CLI\` + \`LINE_EDIT\` + \`HELP\` | Interactive command line with cursor editing and help. |
-| **HIST** | CLI + \`HISTORY\` + \`THR\` | CLI plus command history (UP/DOWN recall) and pass-through mode. |
+| **CLI** | \`KEY\` + \`CLI\` | Interactive command line with cursor editing and help. |
+| **HIST** | CLI + \`CLI_HISTORY\` + \`THR\` | CLI plus command history (UP/DOWN recall) and pass-through mode. |
 | **SCRIPT** | HIST + \`SCRIPT\` + \`ARGV\` | All features including the XelpScript engine. |
 
 ---
@@ -378,22 +361,19 @@ to the buffers.
 | Flag | What it enables | Requires | Code cost |
 |------|----------------|----------|----------|
 | \`XELP_ENABLE_KEY\` | Single key press dispatch (menus) | -- | ~200-500 B |
-| \`XELP_ENABLE_CLI\` | Command line prompt, tokenizer, command dispatch | -- | ~1.5-2.5 KB |
-| \`XELP_ENABLE_LINE_EDIT\` | Cursor movement, insert-at-cursor, Delete, ANSI keys | \`CLI\` | ~800-1000 B |
-| \`XELP_ENABLE_HISTORY\` | Command history (UP/DOWN arrow recall) | \`CLI\` + \`LINE_EDIT\` | ~420 B |
+| \`XELP_ENABLE_CLI\` | Command line prompt, tokenizer, line editing, help, command dispatch | -- | ~2.5-3.5 KB |
+| \`XELP_ENABLE_CLI_HISTORY\` | Command history (UP/DOWN arrow recall) | \`CLI\` | ~420 B |
 | \`XELP_ENABLE_THR\` | Pass-through mode (redirect keys to peripheral) | **none** | ~50-125 B |
-| \`XELP_ENABLE_HELP\` | Built-in help command listing | **none** | ~180-350 B |
 | \`XELP_ENABLE_SCRIPT\` | XelpScript: variables, math, conditionals, labels, functions | \`CLI\` | ~1-2 KB |
-| \`XELP_ENABLE_FULL\` | Shorthand: KEY + CLI + THR + HELP (no LINE_EDIT, HISTORY, SCRIPT) | -- | combined |
+| \`XELP_ENABLE_FULL\` | Shorthand: KEY + CLI + THR | -- | combined |
 
 ### Dependency Rules
 
 Unmet dependencies are silently disabled (no compile errors):
 
-- \`LINE_EDIT\` requires \`CLI\`
-- \`HISTORY\` requires \`CLI\` + \`LINE_EDIT\`
+- \`CLI_HISTORY\` requires \`CLI\`
 - \`SCRIPT\` requires \`CLI\`
-- \`KEY\`, \`THR\`, \`HELP\` -- **no dependencies**, work alone or with any profile
+- \`KEY\`, \`THR\` -- **no dependencies**, work alone or with any profile
 
 ### Key Mappings
 
@@ -445,28 +425,22 @@ Customize the build without modifying source files:
 \`\`\`c
 /* xelp_ovr.h -- lean build for ATtiny (KEY only) */
 #undef XELP_ENABLE_CLI
-#undef XELP_ENABLE_LINE_EDIT
-#undef XELP_ENABLE_HISTORY
+#undef XELP_ENABLE_CLI_HISTORY
 #undef XELP_ENABLE_THR
-#undef XELP_ENABLE_HELP
 #undef XELP_ENABLE_SCRIPT
 \`\`\`
 
 \`\`\`c
 /* xelp_ovr.h -- CLI + THR, no history, no scripting */
 #undef XELP_ENABLE_CLI
-#undef XELP_ENABLE_LINE_EDIT
-#undef XELP_ENABLE_HISTORY
+#undef XELP_ENABLE_CLI_HISTORY
 #undef XELP_ENABLE_ARGV
 #undef XELP_ENABLE_KEY
 #undef XELP_ENABLE_THR
-#undef XELP_ENABLE_HELP
 #undef XELP_ENABLE_SCRIPT
 
 #define XELP_ENABLE_KEY       1
 #define XELP_ENABLE_CLI       1
-#define XELP_ENABLE_LINE_EDIT 1
-#define XELP_ENABLE_HELP      1
 #define XELP_ENABLE_THR       1
 \`\`\`
 

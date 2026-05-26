@@ -52,31 +52,19 @@ ENTER needed. Ideal for debug menus and hardware test jigs.
 #define XELP_ENABLE_KEY  1
 ```
 
-### CLI Lean (~1.4 KB)
-
-Append-only command line with tokenizer, scripting, and command dispatch.
-No line editing, no cursor movement, no help listing. Ideal for the
-most size-constrained targets that still need a CLI.
-
-```c
-#define XELP_ENABLE_CLI  1
-```
-
 ### CLI (~3-5 KB)
 
 Line-buffered command prompt with cursor movement, line editing, multi-byte
-ANSI key recognition, tokenizer, scripting, and help. This is the typical
+ANSI key recognition, tokenizer, scripting, help, and command dispatch. This is the typical
 interactive configuration.
 
 ```c
 #define XELP_ENABLE_CLI        1
-#define XELP_ENABLE_LINE_EDIT  1
 #define XELP_ENABLE_KEY        1
-#define XELP_ENABLE_HELP       1
 ```
 
-Optional: add `XELP_ENABLE_HISTORY` for UP/DOWN arrow command recall
-(~420 bytes, requires `XELP_ENABLE_LINE_EDIT`).
+Optional: add `XELP_ENABLE_CLI_HISTORY` for UP/DOWN arrow command recall
+(~420 bytes, requires `XELP_ENABLE_CLI`).
 
 ### Full (~3-6 KB)
 
@@ -103,9 +91,6 @@ Add these three files to your project: `xelp.c`, `xelp.h`, `xelpcfg.h`.
 
 /* Your output function -- write one char to UART, LCD, etc. */
 void uart_putc(char c) { UART_TX = c; }
-
-/* Your destructive backspace function - customize for your OS */
-void uart_bksp(void)   { uart_putc('\b'); uart_putc(' '); uart_putc('\b'); }
 
 /* Commands -- any C function with this signature */
 XELPRESULT cmd_hello(XELP *ths, int argc, const char **argv) {
@@ -134,7 +119,6 @@ XELP cli;
 void main(void) {
     XelpInit(&cli, "My Device v1.0");
     XELP_SET_FN_OUT(cli, &uart_putc);
-    XELP_SET_FN_BKSP(cli, &uart_bksp);
     XELP_SET_FN_CLI(cli, commands);
 
     for (;;) {

@@ -8,13 +8,11 @@ compiled out saves code space.
 
 | Flag | Purpose | Size Impact |
 |------|---------|-------------|
-| `XELP_ENABLE_CLI` | Command line mode with prompt, backspace, and command dispatch | Required for CLI and scripting |
-| `XELP_ENABLE_LINE_EDIT` | Cursor movement (left/right, Home/End), insert-at-cursor, Delete. Requires `XELP_ENABLE_CLI`. | ~800--1000 bytes |
+| `XELP_ENABLE_CLI` | Command line mode with prompt, backspace, line editing, help, and command dispatch | Required for CLI and scripting |
 | `XELP_ENABLE_KEY` | Single key press mode (menus, immediate actions) | ~200--500 bytes |
 | `XELP_ENABLE_THR` | Pass-through mode (redirect keys to another peripheral) | ~50--125 bytes |
-| `XELP_ENABLE_HELP` | Built-in help function listing all commands | ~180--350 bytes |
-| `XELP_ENABLE_HISTORY` | Command history (UP/DOWN arrow recall). Requires `XELP_ENABLE_CLI` + `XELP_ENABLE_LINE_EDIT`. | ~420 bytes |
-| `XELP_ENABLE_FULL` | Enables KEY, CLI, THR, HELP (not LINE_EDIT or HISTORY) | All combined |
+| `XELP_ENABLE_CLI_HISTORY` | Command history (UP/DOWN arrow recall). Requires `XELP_ENABLE_CLI`. | ~420 bytes |
+| `XELP_ENABLE_FULL` | Enables KEY, CLI, THR (not CLI_HISTORY) | All combined |
 
 ## Key Mappings
 
@@ -42,7 +40,7 @@ Override by redefining in `xelpcfg.h`, e.g. `#define XELPKEY_CLI ('c')`
 |--------|---------|---------|
 | `XELP_CMDBUFSZ` | 64 | CLI input buffer size in bytes |
 | `XELP_ARGVBUFSZ` | `XELP_CMDBUFSZ` | Scratch buffer size for CLI dispatch argv tokenization (bytes per instance). Override to a larger value if variable expansion or long script lines may produce arguments longer than the CLI input buffer. Only allocated when `XELP_ENABLE_CLI` is defined. Argv capacity is derived: `XELP_ARGVBUFSZ / sizeof(const char *)`. |
-| `XELP_HIST_DEPTH` | 4 | Number of commands stored in history ring (requires `XELP_ENABLE_HISTORY`) |
+| `XELP_HIST_DEPTH` | 4 | Number of commands stored in history ring (requires `XELP_ENABLE_CLI_HISTORY`) |
 | `XELP_REGS_SZ` | 4 | Number of callee-clobbers-all return registers (minimum 4). R0 is command status, R1-R3 are command-specific. |
 | `XELPREG` | `int` | Register type (change for platforms where `int` is not ideal) |
 
@@ -99,16 +97,15 @@ Anything you don't touch keeps its default.
 ```c
 /* xelpcfg.h */
 #define XELP_ENABLE_KEY   1
-/* Leave CLI, LINE_EDIT, THR, HELP undefined */
+/* Leave CLI, THR undefined */
 ```
 
 Estimated size: ~900 bytes
 
-### CLI with help
+### CLI only
 
 ```c
 #define XELP_ENABLE_CLI   1
-#define XELP_ENABLE_HELP  1
 ```
 
 Estimated size: ~2 KB

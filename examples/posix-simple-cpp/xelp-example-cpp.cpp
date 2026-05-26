@@ -24,14 +24,6 @@
 
 static void ncOut(char c)  { addch(c); refresh(); }
 
-static void ncBksp() {
-    int r, c;
-    getyx(stdscr, r, c);
-    move(r, c - 1);
-    delch();
-    refresh();
-}
-
 /* ------------------------------------------------------------------ */
 /* Globals                                                             */
 /* ------------------------------------------------------------------ */
@@ -69,7 +61,6 @@ int main()
         "\n";
 
     cli.begin(about, &ncOut);
-    cli.setBackspace(&ncBksp);
     cli.setErrorHandler(&ncOut);
     cli.setModeChangeHandler([](int mode) {
         const char *names[] = { "CLI", "KEY", "THR" };

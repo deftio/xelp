@@ -37,11 +37,9 @@ Fuzz testing uses Homebrew LLVM by default (`/usr/local/opt/llvm/bin/clang`). Ov
 All code is in a single `src/xelp.c` file, feature-gated with `#ifdef` blocks:
 
 - `XELP_ENABLE_KEY` — single-keypress dispatch mode
-- `XELP_ENABLE_CLI` — line-buffered CLI with tokenizer and command dispatch
-- `XELP_ENABLE_LINE_EDIT` — cursor movement, insert, delete (requires CLI)
-- `XELP_ENABLE_HISTORY` — UP/DOWN command recall (requires LINE_EDIT)
+- `XELP_ENABLE_CLI` — line-buffered CLI with tokenizer, command dispatch, line editing, and built-in help
+- `XELP_ENABLE_CLI_HISTORY` — UP/DOWN command recall (requires CLI)
 - `XELP_ENABLE_THR` — pass-through mode
-- `XELP_ENABLE_HELP` — built-in help listing
 - `XELP_ENABLE_SCRIPT` — script engine with variables, control flow, functions (requires CLI)
 
 Feature dependencies auto-disable at the bottom of `xelpcfg.h` if prerequisites are missing.

@@ -61,7 +61,7 @@ through 64-bit targets with any C89+ compiler. Version 0.4.0.
             |
             +-- CLI mode: line buffer -> on ENTER:
                     |
-                    +-- _xelpHistSave()     (optional, if XELP_ENABLE_HISTORY)
+                    +-- _xelpHistSave()     (optional, if XELP_ENABLE_CLI_HISTORY)
                     |
                     +-- XelpParseXB()       <-- tokenize + dispatch
                             |
@@ -176,21 +176,19 @@ Every xelp integration follows this pattern:
 #include "xelp.h"
 
 void uart_putc(char c)  { /* write one char to your hardware */ }
-void uart_bksp(void)    { uart_putc('\b'); uart_putc(' '); uart_putc('\b'); }
 
 XELP cli;
 
 void init(void) {
     XelpInit(&cli, "My Device v1.0");     /* 1. init instance           */
     XELP_SET_FN_OUT(cli, &uart_putc);     /* 2. set output function     */
-    XELP_SET_FN_BKSP(cli, &uart_bksp);   /* 3. set backspace handler   */
-    XELP_SET_FN_CLI(cli, cli_commands);   /* 4. register command table  */
-    XELP_SET_FN_KEY(cli, key_commands);   /* 5. register key table      */
+    XELP_SET_FN_CLI(cli, cli_commands);   /* 3. register command table  */
+    XELP_SET_FN_KEY(cli, key_commands);   /* 4. register key table      */
 }
 
 void loop(void) {
     if (char_available())
-        XelpParseKey(&cli, read_char());  /* 6. feed chars one at a time */
+        XelpParseKey(&cli, read_char());  /* 5. feed chars one at a time */
 }
 ```
 
@@ -200,7 +198,6 @@ void loop(void) {
 |-------|---------|
 | `XELP_SET_FN_OUT(ths, fn)` | Set output function: `void fn(char)` **(required)** |
 | `XELP_SET_FN_ERR(ths, fn)` | Set error output function (optional) |
-| `XELP_SET_FN_BKSP(ths, fn)` | Set backspace handler: `void fn(void)` |
 | `XELP_SET_FN_THR(ths, fn)` | Set pass-through function |
 | `XELP_SET_FN_EMCHG(ths, fn)` | Set mode-change callback: `void fn(int)` |
 | `XELP_SET_FN_CLI(ths, tbl)` | Set CLI command table |
@@ -386,13 +383,11 @@ Edit `src/xelpcfg.h` to enable/disable features:
 
 | Flag | Purpose | Size impact |
 |------|---------|-------------|
-| `XELP_ENABLE_CLI` | CLI mode + scripting | Core (~1.5-2.6 KB) |
-| `XELP_ENABLE_LINE_EDIT` | Cursor movement, insert, delete | ~800-1000 bytes |
-| `XELP_ENABLE_HISTORY` | Command history (UP/DOWN recall) | ~420 bytes |
+| `XELP_ENABLE_CLI` | CLI mode + line editing + help + scripting | Core (~1.5-2.6 KB) |
+| `XELP_ENABLE_CLI_HISTORY` | Command history (UP/DOWN recall, requires CLI) | ~420 bytes |
 | `XELP_ENABLE_KEY` | Single keypress mode | ~200-500 bytes |
 | `XELP_ENABLE_THR` | Pass-through mode | ~50-125 bytes |
-| `XELP_ENABLE_HELP` | Built-in help command | ~180-350 bytes |
-| `XELP_ENABLE_FULL` | Enables KEY, CLI, THR, HELP (not LINE_EDIT or HISTORY) | All combined |
+| `XELP_ENABLE_FULL` | Enables KEY, CLI, THR | All combined |
 
 ### Buffer and register sizes
 
@@ -620,10 +615,10 @@ typedef struct XELP_tag {
     XELPKEYCODE mKeyAccum;
     char      mKeyLen;
 
-    /* Line editing (if XELP_ENABLE_LINE_EDIT) */
+    /* Line editing (part of XELP_ENABLE_CLI) */
     char*     mCur;                  /* cursor in [mCmdXB.s .. mCmdXB.p] */
 
-    /* History (if XELP_ENABLE_HISTORY) */
+    /* History (if XELP_ENABLE_CLI_HISTORY) */
     char      mHistBuf[XELP_HIST_DEPTH][XELP_CMDBUFSZ];
     char      mHistWrite, mHistCount, mHistBrowse;
     char      mHistSaved[XELP_CMDBUFSZ];
@@ -634,7 +629,6 @@ typedef struct XELP_tag {
     void (*mpfErr)(char);            /* error output */
     void (*mpfEditModeChg)(int);     /* mode change callback */
     void (*mpfPassThru)(char);       /* THR mode forward */
-    void (*mpfBksp)();               /* destructive backspace */
 } XELP;
 ```
 
@@ -665,8 +659,7 @@ The version in `src/xelp.h` is the single source of truth.
 8. Using `//` comments in core source files (must use `/* */` for C89).
 9. Mixed declarations and code in core source files.
 10. Assuming `int` is a specific size (varies 16-bit to 64-bit).
-11. Using `XELP_ENABLE_HISTORY` without `XELP_ENABLE_LINE_EDIT`.
-12. Calling removed functions (XelpArgsInit, XelpNextTok, XelpTokN, XelpNumToks, XelpBuf2Argv) -- use argv[] directly.
+11. Calling removed functions (XelpArgsInit, XelpNextTok, XelpTokN, XelpNumToks, XelpBuf2Argv) -- use argv[] directly.
 
 ---
 

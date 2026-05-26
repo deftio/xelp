@@ -71,35 +71,25 @@
 
 /****************************************************************************************************
  Enable CLI Mode.
- definining this flag includes support for interactive command line.  Script support also requires this.
-
+ Includes interactive command line with line editing (cursor movement, insert,
+ delete-at-cursor), built-in help listing, and argv tokenizer.
+ Script support also requires this.
  */
 #ifndef XELP_ENABLE_CLI
 #define XELP_ENABLE_CLI       1
 #endif
 
 /****************************************************************************************************
- Enable Line Editing in CLI Mode.
- When defined, provides cursor movement (left/right, Home/End), mid-line insert,
- and delete-at-cursor using only \b for terminal repositioning.
- Requires XELP_ENABLE_CLI. Adds ~800-1000 bytes on ARM Thumb.
- When not defined, CLI uses append-only input with mpfBksp callback.
- */
-#ifndef XELP_ENABLE_LINE_EDIT
-#define XELP_ENABLE_LINE_EDIT 1
-#endif
-
-/****************************************************************************************************
  Enable Command History (UP/DOWN arrow recall).
  When defined, provides a ring buffer of previously entered commands that can
- be browsed with UP/DOWN arrows. Requires XELP_ENABLE_CLI and XELP_ENABLE_LINE_EDIT.
+ be browsed with UP/DOWN arrows. Requires XELP_ENABLE_CLI.
  XELP_HIST_DEPTH sets the number of commands stored (default 4, overridable via
  compiler flag or xelp_ovr.h when XELP_CONFIG_OVERRIDE is defined).
  RAM cost: XELP_HIST_DEPTH * XELP_CMDBUFSZ + XELP_CMDBUFSZ + 4 bytes per instance.
  Code cost: ~420 bytes on ARM Thumb (-Os).
  */
-#ifndef XELP_ENABLE_HISTORY
-#define XELP_ENABLE_HISTORY 1
+#ifndef XELP_ENABLE_CLI_HISTORY
+#define XELP_ENABLE_CLI_HISTORY 1
 #endif
 
 /****************************************************************************************************
@@ -125,16 +115,7 @@
 #endif
 
 /****************************************************************************************************
- Compile built-in help function.
- Leaving undefined saves ~180-350 bytes. (target dependent)
- XELP_HELP_XXX_STR  are the strings used to prefix sections in the online help.  See examples or docs
- */
-#ifndef XELP_ENABLE_HELP
-#define XELP_ENABLE_HELP	  1
-#endif
-
-/****************************************************************************************************
- Help related controls
+ Help related controls (help is always available when CLI is enabled)
  */
 #ifndef XELP_HELP_KEY_STR
 #define XELP_HELP_KEY_STR    "\nKey functions\n"        /* Help section for single-key press commands such as menus */
@@ -259,18 +240,23 @@
 #include "xelp_ovr.h"
 #endif
 
+/* Migration guards: these flags were removed or renamed.
+   If user code still defines them, emit a helpful error. */
+#ifdef XELP_ENABLE_LINE_EDIT
+#error "XELP_ENABLE_LINE_EDIT removed. Line editing is now always part of XELP_ENABLE_CLI."
+#endif
+#ifdef XELP_ENABLE_HELP
+#error "XELP_ENABLE_HELP removed. Help is now always part of XELP_ENABLE_CLI."
+#endif
+#ifdef XELP_ENABLE_HISTORY
+#error "XELP_ENABLE_HISTORY renamed to XELP_ENABLE_CLI_HISTORY."
+#endif
+
 /* Auto-disable dependent features when their base is missing.
-   LINE_EDIT and HISTORY require CLI; HISTORY requires LINE_EDIT.
-   SCRIPT requires CLI.
+   CLI_HISTORY requires CLI. SCRIPT requires CLI.
    This prevents compile errors from invalid override combinations. */
-#if defined(XELP_ENABLE_LINE_EDIT) && !defined(XELP_ENABLE_CLI)
-#undef XELP_ENABLE_LINE_EDIT
-#endif
-#if defined(XELP_ENABLE_HISTORY) && !defined(XELP_ENABLE_CLI)
-#undef XELP_ENABLE_HISTORY
-#endif
-#if defined(XELP_ENABLE_HISTORY) && !defined(XELP_ENABLE_LINE_EDIT)
-#undef XELP_ENABLE_HISTORY
+#if defined(XELP_ENABLE_CLI_HISTORY) && !defined(XELP_ENABLE_CLI)
+#undef XELP_ENABLE_CLI_HISTORY
 #endif
 #if defined(XELP_ENABLE_SCRIPT) && !defined(XELP_ENABLE_CLI)
 #undef XELP_ENABLE_SCRIPT

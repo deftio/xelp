@@ -63,7 +63,6 @@ pattern with no dependencies beyond a UART.</p>
 
 /* 1. Platform stubs -- replace with your hardware */
 static void uart_putc(char c)   { /* UART TX */ }
-static void uart_bksp(void)     { uart_putc('\b'); uart_putc(' '); uart_putc('\b'); }
 static int  uart_rx_ready(void) { return 0; }
 static char uart_getc(void)     { return 0; }
 
@@ -89,7 +88,6 @@ void main(void) {
     XelpInit(&amp;cli, "My Device v1.0\n");
 
     XELP_SET_FN_OUT(cli,  &amp;uart_putc);
-    XELP_SET_FN_BKSP(cli, &amp;uart_bksp);
     XELP_SET_FN_KEY(cli,  key_commands);
     XELP_SET_FN_CLI(cli,  cli_commands);
 
@@ -106,8 +104,8 @@ void main(void) {
 <h3>Key points</h3>
 
 <ul>
-  <li><strong>5 function pointers</strong> are the entire platform abstraction:
-      output, error, backspace, pass-through, mode change. Only output is required.</li>
+  <li><strong>4 function pointers</strong> are the entire platform abstraction:
+      output, error, pass-through, mode change. Only output is required.</li>
   <li>Command tables are NULL-terminated arrays. Use <code>XELP_FUNC_ENTRY_LAST</code>
       as the sentinel.</li>
   <li>The main loop just feeds characters. xelp handles line buffering,

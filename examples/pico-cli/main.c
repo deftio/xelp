@@ -41,13 +41,6 @@
 
 static void uart_putc_fn(char c) { putchar(c); }
 
-static void uart_bksp(void)
-{
-    putchar('\b');
-    putchar(' ');
-    putchar('\b');
-}
-
 /* ------------------------------------------------------------------ */
 /* LED helpers (Pico vs Pico W)                                        */
 /* ------------------------------------------------------------------ */
@@ -254,7 +247,6 @@ int main(void)
     XelpInit(&cli, "Pico CLI (xelp)\n");
 
     XELP_SET_FN_OUT(cli, &uart_putc_fn);
-    XELP_SET_FN_BKSP(cli, &uart_bksp);
     XELP_SET_FN_KEY(cli, key_commands);
     XELP_SET_FN_CLI(cli, cli_commands);
 

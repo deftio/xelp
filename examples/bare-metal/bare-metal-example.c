@@ -21,13 +21,6 @@ static void uart_putc(char c)
     (void)c;
 }
 
-static void uart_bksp(void)
-{
-    uart_putc('\b');
-    uart_putc(' ');
-    uart_putc('\b');
-}
-
 static int uart_rx_ready(void)
 {
     /* TODO: return nonzero if a byte is available */
@@ -137,7 +130,6 @@ void main(void)
 
     /* Wire up the platform abstraction layer */
     XELP_SET_FN_OUT(cli, &uart_putc);
-    XELP_SET_FN_BKSP(cli, &uart_bksp);
     XELP_SET_FN_THR(cli, &thr_passthrough);
     XELP_SET_FN_EMCHG(cli, &on_mode_change);
 
