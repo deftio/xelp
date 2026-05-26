@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>XelpScript Reference — xelp</title>
+  <meta name="description" content="XelpScript is an optional no-malloc script engine for xelp: variables, math, conditionals, functions, and a fixed per-instance arena.">
+  <link rel="stylesheet" href="assets/main.css">
+  <link rel="icon" href="../img/favicon-32x32.png" type="image/png">
+</head>
+<body>
+
+<header>
+  <nav>
+    <a href="index.html"><strong>xelp</strong></a>
+    <a href="tutorial.html">Tutorial</a>
+    <a href="examples.html">Examples</a>
+    <a href="api-reference.html">API Reference</a>
+    <a href="configuration.html">Configuration</a>
+    <a href="xelp-script.html">XelpScript</a>
+    <a href="porting.html">Porting Guide</a>
+    <a href="releases.html">Releases</a>
+    <a href="https://github.com/deftio/xelp">GitHub</a>
+  </nav>
+</header>
+
+<main>
+
+<h1>XelpScript Reference</h1>
+
+<p>XelpScript is an optional, no-malloc script engine for xelp. It is not
+Lua, MicroPython, Tcl, or Forth. It does not replace C firmware. It adds
+lightweight programmable control flow over xelp&rsquo;s native C command table:
+variables, conditionals, nested command values, math, and script
+functions &mdash; all using a fixed per-instance arena with no dynamic memory.</p>
+
+<p>Enable it with <code>XELP_ENABLE_SCRIPT</code> (requires
+<code>XELP_ENABLE_CLI</code>). Compiled cost: ~6&ndash;7 KB over the HIST
+profile on 32-bit targets (ARM Thumb: 9,200 bytes total, rv32: 10,970
+bytes, ESP32-S3: 9,542 bytes).</p>
+
+<h2>Terminology: two kinds of scripting</h2>
+
+<p>xelp has always supported <strong>command sequences</strong> &mdash; flat ROM-safe
+strings that run multiple commands separated by semicolons or newlines:</p>
+
+<pre><code>/* Command sequences: available with XELP_ENABLE_CLI, no script engine needed */
+XelpParse(&amp;cli, "led 1; wait 100; led 0", 22);
+</code></pre>
+
+<p><strong>XelpScript</strong> is the optional programmable layer on top of that.
+When <code>XELP_ENABLE_SCRIPT</code> is defined, the CLI parser routes through
+the script engine, enabling variables, math, conditionals, functions, and
+all the builtins documented below.</p>
+
+<pre><code>Command sequences:  "led 1; wait 100; led 0"       -- always available with CLI
+XelpScript:         "_set t ($sensor read); _if (_gt $t 80) _then fan 1"  -- requires XELP_ENABLE_SCRIPT
+</code></pre>
+
+<h2>Quick start</h2>
+
+<h3>Enable</h3>
+
+<pre><code>#define XELP_ENABLE_CLI     1
+#define XELP_ENABLE_SCRIPT  1
+</code></pre>
+
+<h3>Minimal example</h3>
+
+<pre><code>#include "xelp.h"
+
+XELP cli;
+
+void setup(void) {
+    XelpInit(&amp;cli, "My Device");
+    XELP_SET_FN_OUT(cli, &amp;uart_putc);
+    XELP_SET_FN_CLI(cli, commands);
+
+    const char *script =
+        "_set count 0\n"
+        ":loop\n"
+        "_print $count\n"
+        "_inc count\n"
+        "_if (_lt $count 5) _then _goto :loop\n"
+        ":_end\n";
+    XelpParse(&amp;cli, script, XelpStrLen(script));
+}
+</code></pre>
+
+<h3>Interactive use</h3>
+
+<div class="terminal">
+  <div class="terminal-bar">
+    <span class="terminal-dot red"></span>
+    <span class="terminal-dot yellow"></span>
+    <span class="terminal-dot green"></span>
+  </div>
+  <div class="terminal-body"><span class="prompt">xelp&gt;</span> <span class="cmd">_set x 42</span>
+<span class="prompt">xelp&gt;</span> <span class="cmd">_print $x</span>
+<span class="output">42</span>
+<span class="prompt">xelp&gt;</span> <span class="cmd">_set y (_add $x 8)</span>
+<span class="prompt">xelp&gt;</span> <span class="cmd">_print $y</span>
+<span class="output">50</span>
+<span class="prompt">xelp&gt;</span> <span class="cmd">_if (_gt $y 40) _then echo "y is big"</span>
+<span class="output">y is big</span>
+<span class="prompt">xelp&gt;</span> <span class="cmd">_</span></div>
+</div>
+
+<h2>Variables</h2>
+
+<p><code>_set</code> creates or overwrites a variable in the arena.
+<code>$name</code> expands the variable&rsquo;s value inline.</p>
+
+<pre><code>_set x 42          # INT variable (numeric value detected)
+_set msg hello     # STR variable (non-numeric)
+_set y $x          # y gets the current value of x
+echo $msg          # expands to: echo hello
+</code></pre>
+
+<h3>Type inference</h3>
+
+<p>When the value string parses as a number (decimal or hex), the variable
+is stored as INT. Otherwise it is stored as STR. This matters for math
+and comparison builtins &mdash; math operations require INT values.</p>
+
+<h3>In-place modification</h3>
+
+<p><code>_inc</code> and <code>_dec</code> increment or decrement an INT
+variable by 1. They return the new value.</p>
+
+<pre><code>_set i 0
+_inc i       # i is now 1
+_dec i       # i is now 0
+</code></pre>
+
+<h2>Parenthesized subexpressions</h2>
+
+<p>Parentheses capture a command&rsquo;s result as text and substitute it inline.
+Evaluation proceeds innermost-first:</p>
+
+<pre><code>_set area (_mul (_add $w 1) $h)
+</code></pre>
+
+<p>The engine evaluates <code>(_add $w 1)</code> first, substitutes the result,
+then evaluates <code>(_mul 5 $h)</code>. The final result is stored in
+<code>area</code>.</p>
+
+<p>Paren evaluation uses a 32-byte result buffer, so returned text is
+truncated to 31 characters.</p>
+
+<h2>Math builtins</h2>
+
+<table>
+<thead><tr><th>Builtin</th><th>Arguments</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>_add</code></td><td><code>a b [c ...]</code></td><td>Sum of all arguments (variadic)</td></tr>
+<tr><td><code>_sub</code></td><td><code>a b</code></td><td><code>a - b</code></td></tr>
+<tr><td><code>_mul</code></td><td><code>a b [c ...]</code></td><td>Product of all arguments (variadic)</td></tr>
+<tr><td><code>_div</code></td><td><code>a b</code></td><td>Integer division (error on divide-by-zero)</td></tr>
+<tr><td><code>_mod</code></td><td><code>a b</code></td><td>Modulo (error on divide-by-zero)</td></tr>
+</tbody>
+</table>
+
+<pre><code>_set r (_add 10 20 30)    # r = 60
+_set r (_mul 2 3 4)       # r = 24
+_set r (_div 17 5)        # r = 3
+_set r (_mod 17 5)        # r = 2
+</code></pre>
+
+<h2>Bitwise builtins</h2>
+
+<table>
+<thead><tr><th>Builtin</th><th>Arguments</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>_band</code></td><td><code>a b</code></td><td>Bitwise AND</td></tr>
+<tr><td><code>_bor</code></td><td><code>a b</code></td><td>Bitwise OR</td></tr>
+<tr><td><code>_bxor</code></td><td><code>a b</code></td><td>Bitwise XOR</td></tr>
+<tr><td><code>_bnot</code></td><td><code>a</code></td><td>Bitwise NOT</td></tr>
+<tr><td><code>_shl</code></td><td><code>a n</code></td><td>Left shift (n: 0&ndash;31)</td></tr>
+<tr><td><code>_shr</code></td><td><code>a n</code></td><td>Right shift unsigned (n: 0&ndash;31)</td></tr>
+</tbody>
+</table>
+
+<pre><code>_set r (_band 0xFF 0x0F)   # r = 15
+_set r (_shl 1 4)          # r = 16
+_set r (_bxor 0xAA 0xFF)   # r = 85
+</code></pre>
+
+<h2>Comparison builtins</h2>
+
+<table>
+<thead><tr><th>Builtin</th><th>Arguments</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>_eq</code></td><td><code>a b</code></td><td>Equal (numeric-first, string fallback)</td></tr>
+<tr><td><code>_neq</code></td><td><code>a b</code></td><td>Not equal (numeric-first, string fallback)</td></tr>
+<tr><td><code>_lt</code></td><td><code>a b</code></td><td>Less than (numeric only)</td></tr>
+<tr><td><code>_gt</code></td><td><code>a b</code></td><td>Greater than (numeric only)</td></tr>
+<tr><td><code>_le</code></td><td><code>a b</code></td><td>Less than or equal (numeric only)</td></tr>
+<tr><td><code>_ge</code></td><td><code>a b</code></td><td>Greater than or equal (numeric only)</td></tr>
+</tbody>
+</table>
+
+<p><code>_eq</code> and <code>_neq</code> try numeric comparison first. If either
+argument is non-numeric, they fall back to byte-for-byte string comparison.</p>
+
+<h2>Logic builtins</h2>
+
+<table>
+<thead><tr><th>Builtin</th><th>Arguments</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>_and</code></td><td><code>a b</code></td><td>Logical AND</td></tr>
+<tr><td><code>_or</code></td><td><code>a b</code></td><td>Logical OR</td></tr>
+<tr><td><code>_not</code></td><td><code>a</code></td><td>Logical NOT</td></tr>
+</tbody>
+</table>
+
+<p><strong>Truthiness:</strong> <code>0</code> and empty string are false. Any non-zero
+number or non-empty non-numeric string is true.</p>
+
+<h2>Conditionals</h2>
+
+<pre><code>_if &lt;condition&gt; _then &lt;command&gt; [_else &lt;command&gt;]
+</code></pre>
+
+<p>Each branch is a <strong>single command</strong> (one command name with its
+arguments). For multi-step branches, call a function or use
+<code>_goto</code>.</p>
+
+<pre><code>_if (_lt $t 100) _then echo OK _else echo OVER
+_if $flag _then led 1
+_if (_eq $mode auto) _then _goto :auto_loop
+</code></pre>
+
+<h2>Labels and jumps</h2>
+
+<table>
+<thead><tr><th>Command</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>:label</code></td><td>Define a label (marker, not executed)</td></tr>
+<tr><td><code>_goto :label</code></td><td>Jump to label from <strong>start</strong> of script</td></tr>
+<tr><td><code>_next :label</code></td><td>Jump to label <strong>forward</strong> only</td></tr>
+<tr><td><code>_next &lt;cmd&gt;</code></td><td>Execute sub-command</td></tr>
+<tr><td><code>:_end</code></td><td>Special label marking end of script</td></tr>
+</tbody>
+</table>
+
+<pre><code>_set i 0
+:loop
+_print $i
+_inc i
+_if (_lt $i 5) _then _goto :loop
+echo done
+:_end
+</code></pre>
+
+<h2>Functions</h2>
+
+<h3>Script-defined functions</h3>
+
+<pre><code>_func square "_return (_mul @1 @1)"
+_set r (square 7)       # r = 49
+</code></pre>
+
+<h3>Positional parameters</h3>
+
+<p>Inside function bodies, <code>@1</code>, <code>@2</code>, etc. refer to caller
+arguments.</p>
+
+<h3>C-registered ROM script functions</h3>
+
+<pre><code>XELPScriptFuncEntry script_funcs[] = {
+    { "double", "_return (_mul @1 2)",  "double &lt;n&gt;" },
+    { "add2",   "_return (_add @1 @2)", "add2 &lt;a&gt; &lt;b&gt;" },
+    { 0, 0, 0 }
+};
+
+XELP_SET_FN_SCRIPT(cli, script_funcs);
+</code></pre>
+
+<h3>Capturing return values</h3>
+
+<p>Use parentheses to capture: <code>_set r (double 7)</code></p>
+
+<h2>C interop</h2>
+
+<p>C commands and script functions share the same dispatch path. Any C
+command is callable from scripts. From C, use:</p>
+
+<pre><code>XelpCallProc(&amp;cli, "double 21");       /* invoke script function from C */
+XelpSetResultInt(&amp;cli, 42);            /* push INT result for paren capture */
+XelpSetResultStr(&amp;cli, "ok", 2);       /* push STR result */
+
+XelpResult res;
+XelpGetResult(&amp;cli, &amp;res);             /* read last result */
+</code></pre>
+
+<h2>Registers</h2>
+
+<p><code>_mr</code> reads and writes <code>mR[]</code> registers:</p>
+
+<pre><code>_mr 1 42             # write 42 to mR[1]
+_set v (_mr 1)       # read mR[1] into variable v
+</code></pre>
+
+<h2>Introspection</h2>
+
+<table>
+<thead><tr><th>Command</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>_list</code></td><td>List all variables and functions</td></tr>
+<tr><td><code>_list vars</code></td><td>Variables only</td></tr>
+<tr><td><code>_list funcs</code></td><td>Functions only</td></tr>
+<tr><td><code>_print &lt;val&gt;</code></td><td>Output value</td></tr>
+<tr><td><code>_lpad &lt;str&gt; &lt;width&gt;</code></td><td>Right-align output</td></tr>
+</tbody>
+</table>
+
+<h2>Breakpoint callback</h2>
+
+<p>Register a callback for safe execution (step budgets, watchdog):</p>
+
+<pre><code>XELP_SET_FN_BREAKPOINT(cli, &amp;my_breakpoint);
+</code></pre>
+
+<p>The callback fires after every statement. Return non-OK to halt.</p>
+
+<h2>Arena memory model</h2>
+
+<pre><code>Arena layout (XELP_SCRIPT_ARENA_SZ bytes):
+
+ Low address                                    High address
+ |                                                         |
+ [  Stack (grows up)  |  free  |  (grows down) Heap       ]
+ ^                    ^        ^                           ^
+ mArena             mSP      mHP           mArena + ARENA_SZ
+</code></pre>
+
+<p><strong>Stack</strong> (grows up): result entries, call frames.<br>
+<strong>Heap</strong> (grows down): variables, PROC entries (function bodies).</p>
+
+<p>Default size: <code>sizeof(int) * 256</code> (512 on 16-bit, 1024 on 32-bit,
+2048 on 64-bit). Override: <code>-DXELP_SCRIPT_ARENA_SZ=2048</code></p>
+
+<h2>Error codes</h2>
+
+<table>
+<thead><tr><th>Code</th><th style="text-align:right">Value</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><code>XELP_E_ARENA_FULL</code></td><td style="text-align:right">-4</td><td>Arena stack/heap collision</td></tr>
+<tr><td><code>XELP_E_UNDEF_VAR</code></td><td style="text-align:right">-5</td><td>Variable not found</td></tr>
+<tr><td><code>XELP_E_TYPE_ERR</code></td><td style="text-align:right">-6</td><td>Type mismatch</td></tr>
+<tr><td><code>XELP_E_NO_LABEL</code></td><td style="text-align:right">-7</td><td>Label not found</td></tr>
+<tr><td><code>XELP_E_NO_FRAME</code></td><td style="text-align:right">-8</td><td><code>_return</code> outside function</td></tr>
+<tr><td><code>XELP_E_BUDGET</code></td><td style="text-align:right">-9</td><td>Step budget exceeded</td></tr>
+<tr><td><code>XELP_E_BREAK</code></td><td style="text-align:right">-10</td><td>Breakpoint halted execution</td></tr>
+</tbody>
+</table>
+
+<h2>Builtin reference (all 32)</h2>
+
+<table>
+<thead><tr><th>Builtin</th><th>Arguments</th><th>Returns</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>_set</code></td><td><code>name value</code></td><td>OK</td><td>Set variable</td></tr>
+<tr><td><code>_print</code></td><td><code>value [...]</code></td><td>OK</td><td>Output values</td></tr>
+<tr><td><code>_mr</code></td><td><code>idx [val]</code></td><td>INT</td><td>Read/write register</td></tr>
+<tr><td><code>_inc</code></td><td><code>name</code></td><td>INT</td><td>Increment variable</td></tr>
+<tr><td><code>_dec</code></td><td><code>name</code></td><td>INT</td><td>Decrement variable</td></tr>
+<tr><td><code>_add</code></td><td><code>a b [...]</code></td><td>INT</td><td>Sum (variadic)</td></tr>
+<tr><td><code>_sub</code></td><td><code>a b</code></td><td>INT</td><td>Subtract</td></tr>
+<tr><td><code>_mul</code></td><td><code>a b [...]</code></td><td>INT</td><td>Product (variadic)</td></tr>
+<tr><td><code>_div</code></td><td><code>a b</code></td><td>INT</td><td>Integer division</td></tr>
+<tr><td><code>_mod</code></td><td><code>a b</code></td><td>INT</td><td>Modulo</td></tr>
+<tr><td><code>_band</code></td><td><code>a b</code></td><td>INT</td><td>Bitwise AND</td></tr>
+<tr><td><code>_bor</code></td><td><code>a b</code></td><td>INT</td><td>Bitwise OR</td></tr>
+<tr><td><code>_bxor</code></td><td><code>a b</code></td><td>INT</td><td>Bitwise XOR</td></tr>
+<tr><td><code>_bnot</code></td><td><code>a</code></td><td>INT</td><td>Bitwise NOT</td></tr>
+<tr><td><code>_shl</code></td><td><code>a n</code></td><td>INT</td><td>Left shift</td></tr>
+<tr><td><code>_shr</code></td><td><code>a n</code></td><td>INT</td><td>Right shift (unsigned)</td></tr>
+<tr><td><code>_eq</code></td><td><code>a b</code></td><td>INT</td><td>Equal</td></tr>
+<tr><td><code>_neq</code></td><td><code>a b</code></td><td>INT</td><td>Not equal</td></tr>
+<tr><td><code>_lt</code></td><td><code>a b</code></td><td>INT</td><td>Less than</td></tr>
+<tr><td><code>_gt</code></td><td><code>a b</code></td><td>INT</td><td>Greater than</td></tr>
+<tr><td><code>_le</code></td><td><code>a b</code></td><td>INT</td><td>Less or equal</td></tr>
+<tr><td><code>_ge</code></td><td><code>a b</code></td><td>INT</td><td>Greater or equal</td></tr>
+<tr><td><code>_and</code></td><td><code>a b</code></td><td>INT</td><td>Logical AND</td></tr>
+<tr><td><code>_or</code></td><td><code>a b</code></td><td>INT</td><td>Logical OR</td></tr>
+<tr><td><code>_not</code></td><td><code>a</code></td><td>INT</td><td>Logical NOT</td></tr>
+<tr><td><code>_if</code></td><td><code>cond _then cmd [_else cmd]</code></td><td>varies</td><td>Conditional</td></tr>
+<tr><td><code>_goto</code></td><td><code>:label</code></td><td>OK</td><td>Jump (from start)</td></tr>
+<tr><td><code>_next</code></td><td><code>:label</code> or <code>cmd</code></td><td>OK</td><td>Forward jump or exec</td></tr>
+<tr><td><code>_func</code></td><td><code>name "body"</code></td><td>OK</td><td>Define function</td></tr>
+<tr><td><code>_return</code></td><td><code>[value]</code></td><td>special</td><td>Return from function</td></tr>
+<tr><td><code>_list</code></td><td><code>[vars|funcs]</code></td><td>OK</td><td>List arena contents</td></tr>
+<tr><td><code>_lpad</code></td><td><code>str width</code></td><td>OK</td><td>Left-pad output</td></tr>
+</tbody>
+</table>
+
+<h2>Design boundaries</h2>
+
+<ul>
+  <li><strong>Single-command <code>_if</code> branches.</strong> For multi-step, use functions or <code>_goto</code>.</li>
+  <li><strong>Paren result: 31 chars max.</strong> The engine handles control values, not large strings.</li>
+  <li><strong>No string operations.</strong> No substring, concat, or length builtins.</li>
+  <li><strong>No floating point.</strong> All math is integer.</li>
+  <li><strong>Arena not defragmented.</strong> Bounded but not compacted.</li>
+  <li><strong>No nested <code>_if</code>.</strong> Use functions or labels for complex branching.</li>
+  <li><strong>No local variables.</strong> Use <code>@1</code>/<code>@2</code> positional params in functions.</li>
+</ul>
+
+<h2>Build configuration</h2>
+
+<table>
+<thead><tr><th>Item</th><th>Value</th></tr></thead>
+<tbody>
+<tr><td>Feature flag</td><td><code>XELP_ENABLE_SCRIPT</code></td></tr>
+<tr><td>Requires</td><td><code>XELP_ENABLE_CLI</code></td></tr>
+<tr><td>Code size (ARM Thumb)</td><td>~9,200 bytes total / ~6,100 delta over HIST</td></tr>
+<tr><td>Code size (rv32)</td><td>~10,970 bytes total / ~7,300 delta over HIST</td></tr>
+<tr><td>Code size (ESP32-S3)</td><td>~9,542 bytes total / ~6,400 delta over HIST</td></tr>
+<tr><td>RAM per instance</td><td>arena + ~20 bytes struct overhead</td></tr>
+<tr><td>Arena default</td><td><code>sizeof(int) * 256</code> (512/1024/2048)</td></tr>
+<tr><td>Arena override</td><td><code>-DXELP_SCRIPT_ARENA_SZ=&lt;n&gt;</code></td></tr>
+</tbody>
+</table>
+
+</main>
+
+<footer>
+  <p>xelp &mdash; <a href="https://github.com/deftio/xelp">github.com/deftio/xelp</a></p>
+</footer>
+
+</body>
+</html>

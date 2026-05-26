@@ -212,6 +212,10 @@ XELP_XB_INIT(xb, script, XelpStrLen(script));
 XelpParseXB(&cli, &xb);
 ```
 
+> This section covers command sequences (flat ROM-safe strings). For the
+> XelpScript engine -- variables, conditionals, math, functions, and
+> arena -- see the [XelpScript Reference](xelp-script.md).
+
 ## 6. Help system
 
 When `XELP_ENABLE_CLI` is defined, calling `XelpHelp(&cli)` prints a

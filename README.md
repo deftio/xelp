@@ -334,6 +334,7 @@ what we welcome, branch model, and the release process.
 - [API Reference](docs/api-reference.md) -- all public functions, macros, types
 - [Build Reference](docs/build-reference.md) -- feature system and compile-time options
 - [Configuration Quick Reference](docs/configuration.md) -- all `#define` flags at a glance
+- [XelpScript Reference](docs/xelp-script.md) -- script engine: variables, math, conditionals, functions, arena
 - [Porting Guide](docs/porting.md) -- bringing up xelp on a new platform
 - [Release Management](release_management.md) -- versioning, CI, release workflow
 - [Tools](tools/README_TOOLS.md) -- build utilities and code generators
