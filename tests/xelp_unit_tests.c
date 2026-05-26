@@ -4440,14 +4440,14 @@ XELPRESULT test_HistoryAndEcho() {
 /* handler that records argc/argv for inspection */
 static int gArgvTestArgc;
 static const char **gArgvTestArgv;
-static char gArgvTestCopy[XELP_ARGV_MAX][32]; /* copies of argv values */
+static char gArgvTestCopy[XELP_ARGV_CAP][32]; /* copies of argv values */
 
 XELPRESULT argvTestHandler(XELP *ths, int argc, const char **argv) {
     int i;
     (void)ths;
     gArgvTestArgc = argc;
     gArgvTestArgv = argv;
-    for (i = 0; i < argc && i < XELP_ARGV_MAX; i++) {
+    for (i = 0; i < argc && i < (int)XELP_ARGV_CAP; i++) {
         int len = XelpStrLen(argv[i]);
         if (len > 31) len = 31;
         for (int j = 0; j < len; j++) gArgvTestCopy[i][j] = argv[i][j];
@@ -4706,11 +4706,11 @@ XELPRESULT test_XelpArgvDispatch() {
             return XELP_E_ERR;
     }
 
-    /* 23. Too many args: exceeds XELP_ARGV_MAX (default 8).
+    /* 23. Too many args: exceeds XELP_ARGV_CAP (8 on 64-bit).
        Dispatch should still work for the matched command; overflow returns error
        from _xelpBuf2Argv but the handler may not be called. */
     {
-        char *buf = "cmd a b c d e f g h\n"; /* cmd + 8 args = 9 total > XELP_ARGV_MAX */
+        char *buf = "cmd a b c d e f g h\n"; /* cmd + 8 args = 9 total > XELP_ARGV_CAP */
         gArgvTestArgc = 0;
         XELP_XB_INIT(script, buf, XelpStrLen(buf));
         r = XelpParseXB(&x, &script);
@@ -6876,7 +6876,7 @@ XELPRESULT test_ScriptIfElseBranches(void) {
         return XELP_E_ERR;
 
     /* Multi-word then (8 tokens: _if 1 _then _set a 10 _else _print) */
-    /* Keep under XELP_ARGV_MAX=8: "_if 1 _then _set a 10" = 6 tokens */
+    /* Keep under XELP_ARGV_CAP=8: "_if 1 _then _set a 10" = 6 tokens */
     XelpCallProc(&x, "_if 1 _then _set a 10");
     resetDummyBuf();
     XelpCallProc(&x, "_print $a");
@@ -7125,7 +7125,7 @@ XELPRESULT test_ScriptIfGotoFalse(void) {
     x.mpfBreakpoint = breakpointCounter;
     gBreakCount = 0;
 
-    /* _if 0 with _else _goto (keep under XELP_ARGV_MAX=8) */
+    /* _if 0 with _else _goto (keep under XELP_ARGV_CAP=8) */
     script = "_set x 10\n_if 0 _then _print x _else _goto :done\n_set x 99\n:done\n:_end";
     r = XelpParse(&x, script, XelpStrLen(script));
     if (JB_ASSERT(r != XELP_S_OK, "if goto false ok"))
@@ -8614,7 +8614,7 @@ XELPRESULT test_ScriptIfElseBufferEdge(void) {
     /* _if 0 _then _set a 1 _else _print x -> exercises else branch build */
     r = XelpCallProc(&x, "_if 0 _then _set a 1 _else _print x");
     (void)r;
-    /* This is 9 tokens > XELP_ARGV_MAX=8... need exactly 8 */
+    /* This is 9 tokens > XELP_ARGV_CAP=8... need exactly 8 */
     /* Actually: _if 0 _then X _else _print x = 7 tokens. */
     resetDummyBuf();
     r = XelpCallProc(&x, "_if 0 _then X _else _print x");

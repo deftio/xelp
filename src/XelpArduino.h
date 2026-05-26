@@ -38,7 +38,7 @@
 #define XELP_MAX_KEY_CMDS 8
 #endif
 #ifndef XELP_MAX_EASY_ARGV
-#define XELP_MAX_EASY_ARGV XELP_ARGV_MAX
+#define XELP_MAX_EASY_ARGV XELP_ARGV_CAP
 #endif
 
 class XelpCLI;

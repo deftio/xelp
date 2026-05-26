@@ -251,8 +251,8 @@ command handlers, use <code>ths-&gt;mR[1]</code> directly.</p>
 <tr><td><code>XELP_VER_MINOR(v)</code></td><td></td><td>Extract minor version byte</td></tr>
 <tr><td><code>XELP_VER_PATCH(v)</code></td><td></td><td>Extract patch version byte</td></tr>
 <tr><td><code>XELP_CMDBUFSZ</code></td><td>64</td><td>CLI input buffer size</td></tr>
-<tr><td><code>XELP_ARGVBUFSZ</code></td><td><code>XELP_CMDBUFSZ</code></td><td>Scratch buffer for CLI dispatch argv tokenization (requires <code>XELP_ENABLE_CLI</code>)</td></tr>
-<tr><td><code>XELP_ARGV_MAX</code></td><td>8</td><td>Maximum arguments for CLI dispatch tokenization</td></tr>
+<tr><td><code>XELP_ARGVBUFSZ</code></td><td><code>XELP_CMDBUFSZ</code></td><td>Scratch buffer for CLI dispatch argv tokenization (requires <code>XELP_ENABLE_CLI</code>). Argv capacity is derived: <code>XELP_ARGVBUFSZ / sizeof(ptr)</code></td></tr>
+<tr><td><code>XELP_ARGV_CAP</code></td><td><code>XELP_ARGVBUFSZ / sizeof(ptr)</code></td><td>Maximum arguments for CLI dispatch (derived, not user-settable)</td></tr>
 <tr><td><code>XELP_ENTER_LF</code></td><td>1</td><td>Accept <code>\n</code> as ENTER in interactive input</td></tr>
 <tr><td><code>XELP_ENTER_CR</code></td><td>1</td><td>Accept <code>\r</code> as ENTER in interactive input</td></tr>
 <tr><td><code>XELP_ESC_MAP</code></td><td><code>"n\x0A" "t\x09" ""</code></td><td>Escape expansion table for quoted strings during CLI dispatch tokenization</td></tr>

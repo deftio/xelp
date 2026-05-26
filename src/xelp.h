@@ -158,6 +158,11 @@ typedef unsigned long XELPKEYCODE;
 #define XELP_CMDBUFSZ 		(64)
 #endif
 
+/* Argv capacity: derived from XELP_ARGVBUFSZ and pointer width.
+   Replaces the old XELP_ARGV_MAX compile-time constant.
+   Typical values: 32 on 16-bit, 16 on 32-bit, 8 on 64-bit. */
+#define XELP_ARGV_CAP  (XELP_ARGVBUFSZ / sizeof(const char *))
+
 /**
  used by tokenizer function
  */
@@ -335,6 +340,7 @@ typedef struct XELP_tag
 	char					mCmdMsgBuf[XELP_CMDBUFSZ]; 	/* cli string buffer storage        */
     XelpBuf                 mCmdXB;          /* buffer ptrs for parsing                     */
 	char					mArgvBuf[XELP_ARGVBUFSZ]; /* scratch buffer for argv tokenization */
+	const char				*mArgv[XELP_ARGV_CAP];    /* argv pointer array (derived from XELP_ARGVBUFSZ) */
 #endif
 
 #ifdef XELP_CLI_PROMPT 						 /* prompt for CLI enabled                      */

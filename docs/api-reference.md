@@ -308,7 +308,7 @@ natural value (e.g. `'a'` == 0x61). Multi-byte keys are >= 0x100.
 | `XELP_VER_PATCH(v)` | | Extract patch version byte |
 | `XELP_CMDBUFSZ` | 64 | CLI input buffer size |
 | `XELP_ARGVBUFSZ` | `XELP_CMDBUFSZ` | Scratch buffer size for CLI argv tokenization |
-| `XELP_ARGV_MAX` | 8 | Maximum number of arguments for CLI dispatch |
+| `XELP_ARGV_CAP` | `XELP_ARGVBUFSZ / sizeof(ptr)` | Maximum arguments for CLI dispatch (derived, not user-settable) |
 | `XELP_ENTER_LF` | 1 | Accept `\n` (0x0A) as ENTER in interactive input |
 | `XELP_ENTER_CR` | 1 | Accept `\r` (0x0D) as ENTER in interactive input |
 | `XELP_ESC_MAP` | `"n\x0A" "t\x09" ""` | Escape expansion table for quoted strings during CLI argv tokenization |

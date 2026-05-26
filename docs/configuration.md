@@ -41,8 +41,7 @@ Override by redefining in `xelpcfg.h`, e.g. `#define XELPKEY_CLI ('c')`
 | Define | Default | Purpose |
 |--------|---------|---------|
 | `XELP_CMDBUFSZ` | 64 | CLI input buffer size in bytes |
-| `XELP_ARGVBUFSZ` | `XELP_CMDBUFSZ` | Scratch buffer size for CLI dispatch argv tokenization (bytes per instance). Override to a larger value if variable expansion or long script lines may produce arguments longer than the CLI input buffer. Only allocated when `XELP_ENABLE_CLI` is defined. |
-| `XELP_ARGV_MAX` | 8 | Maximum number of arguments for CLI dispatch tokenization. |
+| `XELP_ARGVBUFSZ` | `XELP_CMDBUFSZ` | Scratch buffer size for CLI dispatch argv tokenization (bytes per instance). Override to a larger value if variable expansion or long script lines may produce arguments longer than the CLI input buffer. Only allocated when `XELP_ENABLE_CLI` is defined. Argv capacity is derived: `XELP_ARGVBUFSZ / sizeof(const char *)`. |
 | `XELP_HIST_DEPTH` | 4 | Number of commands stored in history ring (requires `XELP_ENABLE_HISTORY`) |
 | `XELP_REGS_SZ` | 4 | Number of callee-clobbers-all return registers (minimum 4). R0 is command status, R1-R3 are command-specific. |
 | `XELPREG` | `int` | Register type (change for platforms where `int` is not ideal) |

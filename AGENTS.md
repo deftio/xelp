@@ -236,7 +236,8 @@ XELPRESULT cmd_set(XELP *ths, int argc, const char **argv) {
 | `XelpArgvInt(argv, argc, n, &val)` | Get argv[n] as int (bounds-checked) |
 | `XelpArgvStr(argv, argc, n, &s, &slen)` | Get argv[n] as string pointer + length (bounds-checked) |
 
-`XELP_ARGV_MAX` (default 16) limits the maximum number of argv entries.
+`XELP_ARGV_CAP` (derived: `XELP_ARGVBUFSZ / sizeof(ptr)`) limits the maximum
+number of argv entries. Increase `XELP_ARGVBUFSZ` to raise the capacity.
 Tokens are null-terminated. Quoted strings are unquoted and escape
 sequences are processed by the dispatch tokenizer.
 
@@ -401,8 +402,7 @@ flag (`-DXELP_CMDBUFSZ=128`) or `xelp_ovr.h`.
 | Setting | Default | Purpose |
 |---------|---------|---------|
 | `XELP_CMDBUFSZ` | 64 | CLI input buffer size (bytes). In `xelpcfg.h`, `#ifndef`-guarded. |
-| `XELP_ARGV_MAX` | 16 | Maximum arguments in argc/argv dispatch. In `xelpcfg.h`, `#ifndef`-guarded. |
-| `XELP_ARGVBUFSZ` | `XELP_CMDBUFSZ` | Scratch buffer for argv tokenization (bytes per instance). |
+| `XELP_ARGVBUFSZ` | `XELP_CMDBUFSZ` | Scratch buffer for argv tokenization (bytes per instance). Argv capacity (`XELP_ARGV_CAP`) is derived: `XELP_ARGVBUFSZ / sizeof(ptr)`. |
 | `XELP_REGS_SZ` | 4 | Return registers per instance (minimum 4) |
 | `XELPREG` | `int` | Register element type |
 | `XELP_HIST_DEPTH` | 4 | History ring buffer depth |

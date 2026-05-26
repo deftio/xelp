@@ -691,7 +691,7 @@ XELPRESULT XelpTokLineXB (XelpBuf *buf, XelpBuf *tok, int srchType) {
  */
 #ifndef XELP_ENABLE_SCRIPT
 static XELPRESULT _xelpBuf2Argv(XELP *ths, const char *r, int len,
-                         int *argc, const char **argv, int maxargs)
+                         int *argc)
 {
     const char *end = r + len;
     char *w = ths->mArgvBuf, c;
@@ -704,8 +704,8 @@ static XELPRESULT _xelpBuf2Argv(XELP *ths, const char *r, int len,
     while (r < end) {
         while (r < end && (*r == ' ' || *r == '\t')) r++;
         if (r >= end) break;
-        if (ac >= maxargs) return XELP_E_ERR;
-        argv[ac++] = w;
+        if (ac >= (int)XELP_ARGV_CAP) return XELP_E_ERR;
+        ths->mArgv[ac++] = w;
         if (*r == '"') {
             r++;                                       /* skip open quote  */
             while (r < end && *r != '"') {
@@ -752,7 +752,6 @@ XELPRESULT XelpParseXB (XELP* ths, XelpBuf *args) {
 #else
 	XelpBuf line;
 	XELPCLIFuncMapEntry   *f;
-	const char *argv[XELP_ARGV_MAX];
 	int argc;
 
 	while (XELP_S_OK ==  XelpTokLineXB(args,&line,XELP_TOK_LINE) ) { /* for each logical line */
@@ -768,11 +767,11 @@ XELPRESULT XelpParseXB (XELP* ths, XelpBuf *args) {
             if (f->mpCmd || ths->mpfDefCLI) {
                 argc = 0;
                 if (XELP_S_OK == _xelpBuf2Argv(ths, line.s, (int)(line.e-line.s),
-                                               &argc, argv, XELP_ARGV_MAX)) {
+                                               &argc)) {
                     if (f->mpCmd)
-                        ths->mR[0] = (f->mFunPtr)(ths, argc, argv);
+                        ths->mR[0] = (f->mFunPtr)(ths, argc, ths->mArgv);
                     else
-                        ths->mR[0] = ths->mpfDefCLI(ths, argc, argv);
+                        ths->mR[0] = ths->mpfDefCLI(ths, argc, ths->mArgv);
                 } else {
                     ths->mR[0] = XELP_E_ERR;
                 }
@@ -2165,7 +2164,6 @@ static const char *_xelpFindProc(XELP *ths, const char *name, int nlen, int *bod
 static XELPRESULT _xelpEvalStatement(XELP *ths, const char *lineS, int lineLen) {
     char scratch[XELP_ARGVBUFSZ];
     char expandBuf[XELP_ARGVBUFSZ];
-    const char *argv[XELP_ARGV_MAX];
     int argc = 0;
     const char *pos, *end, *tokS, *tokE;
     int isQuoted, ppLen;
@@ -2273,14 +2271,14 @@ static XELPRESULT _xelpEvalStatement(XELP *ths, const char *lineS, int lineLen) 
     end = scratch + ppLen;
     wp = expandBuf;
 
-    while (argc < XELP_ARGV_MAX && _xelpNextTokSpan(&pos, end, &tokS, &tokE, &isQuoted)) {
+    while (argc < (int)XELP_ARGV_CAP && _xelpNextTokSpan(&pos, end, &tokS, &tokE, &isQuoted)) {
         int tokLen = (int)(tokE - tokS);
 
         if (isQuoted) {
             /* Quoted: strip quotes, process escapes, store as-is */
             const char *r2 = tokS + 1; /* skip open quote */
             const char *e2 = tokE - 1; /* before close quote */
-            argv[argc++] = wp;
+            ths->mArgv[argc++] = wp;
             while (r2 < e2 && wp < expandBuf + XELP_ARGVBUFSZ - 1) {
                 char c = *r2++;
                 if (c == XELP_QUO_ESC && r2 < e2) {
@@ -2294,7 +2292,7 @@ static XELPRESULT _xelpEvalStatement(XELP *ths, const char *lineS, int lineLen) 
         } else if (tokLen > 0 && tokS[0] == '$') {
             /* Variable expansion */
             int expLen;
-            argv[argc++] = wp;
+            ths->mArgv[argc++] = wp;
             expLen = _xelpExpandToken(ths, tokS, tokLen, wp, (int)(expandBuf + XELP_ARGVBUFSZ - wp - 1));
             if (expLen < 0) return XELP_E_UNDEF_VAR;
             wp += expLen;
@@ -2302,7 +2300,7 @@ static XELPRESULT _xelpEvalStatement(XELP *ths, const char *lineS, int lineLen) 
         } else if (tokLen > 1 && tokS[0] == '@') {
             /* Positional parameter expansion: @1, @2, etc. */
             int idx;
-            argv[argc++] = wp;
+            ths->mArgv[argc++] = wp;
             if (XelpParseNum(tokS + 1, tokLen - 1, &idx) == XELP_S_OK &&
                 idx >= 0 && idx < (int)ths->mFrameArgc) {
                 const char *arg = _xelpFrameArg(ths, idx);
@@ -2314,7 +2312,7 @@ static XELPRESULT _xelpEvalStatement(XELP *ths, const char *lineS, int lineLen) 
         } else {
             /* Literal token: process CLI_ESC */
             int i;
-            argv[argc++] = wp;
+            ths->mArgv[argc++] = wp;
             for (i = 0; i < tokLen && wp < expandBuf + XELP_ARGVBUFSZ - 1; i++) {
                 if (tokS[i] == XELP_CLI_ESC && i + 1 < tokLen) { i++; }
                 *wp++ = tokS[i];
@@ -2323,50 +2321,50 @@ static XELPRESULT _xelpEvalStatement(XELP *ths, const char *lineS, int lineLen) 
         }
     }
 
-    /* Check for argv overflow: if we filled ARGV_MAX, check for remaining tokens */
-    if (argc >= XELP_ARGV_MAX && _xelpNextTokSpan(&pos, end, &tokS, &tokE, &isQuoted))
+    /* Check for argv overflow: if we filled ARGV_CAP, check for remaining tokens */
+    if (argc >= (int)XELP_ARGV_CAP && _xelpNextTokSpan(&pos, end, &tokS, &tokE, &isQuoted))
         return XELP_E_ERR;
 
     if (argc == 0) return XELP_S_OK;
 
     /* Dispatch: builtins -> script funcs -> C commands -> default handler */
     {
-        const char *cmd = argv[0];
+        const char *cmd = ths->mArgv[0];
         int cmdLen = XelpStrLen(cmd);
 
         /* Check builtins (start with '_') */
         if (cmd[0] == '_') {
-            if (XelpStrEq(cmd, cmdLen, "_set") == XELP_S_OK) return _xelpBuiltin_set(ths, argc, argv);
-            if (XelpStrEq(cmd, cmdLen, "_print") == XELP_S_OK) return _xelpBuiltin_print(ths, argc, argv);
-            if (XelpStrEq(cmd, cmdLen, "_mr") == XELP_S_OK) return _xelpBuiltin_mr(ths, argc, argv);
-            if (XelpStrEq(cmd, cmdLen, "_add") == XELP_S_OK) return _xelpBuiltin_add(ths, argc, argv);
-            if (XelpStrEq(cmd, cmdLen, "_sub") == XELP_S_OK) return _xelpBuiltin_sub(ths, argc, argv);
-            if (XelpStrEq(cmd, cmdLen, "_mul") == XELP_S_OK) return _xelpBuiltin_mul(ths, argc, argv);
-            if (XelpStrEq(cmd, cmdLen, "_div") == XELP_S_OK) return _xelpBuiltin_div(ths, argc, argv);
-            if (XelpStrEq(cmd, cmdLen, "_mod") == XELP_S_OK) return _xelpBuiltin_mod(ths, argc, argv);
-            if (XelpStrEq(cmd, cmdLen, "_inc") == XELP_S_OK) return _xelpBuiltin_inc(ths, argc, argv);
-            if (XelpStrEq(cmd, cmdLen, "_dec") == XELP_S_OK) return _xelpBuiltin_dec(ths, argc, argv);
-            if (XelpStrEq(cmd, cmdLen, "_eq") == XELP_S_OK) return _xelpBuiltin_eq(ths, argc, argv);
-            if (XelpStrEq(cmd, cmdLen, "_neq") == XELP_S_OK) return _xelpBuiltin_neq(ths, argc, argv);
-            if (XelpStrEq(cmd, cmdLen, "_gt") == XELP_S_OK) return _xelpBuiltin_gt(ths, argc, argv);
-            if (XelpStrEq(cmd, cmdLen, "_lt") == XELP_S_OK) return _xelpBuiltin_lt(ths, argc, argv);
-            if (XelpStrEq(cmd, cmdLen, "_ge") == XELP_S_OK) return _xelpBuiltin_ge(ths, argc, argv);
-            if (XelpStrEq(cmd, cmdLen, "_le") == XELP_S_OK) return _xelpBuiltin_le(ths, argc, argv);
-            if (XelpStrEq(cmd, cmdLen, "_and") == XELP_S_OK) return _xelpBuiltin_and(ths, argc, argv);
-            if (XelpStrEq(cmd, cmdLen, "_or") == XELP_S_OK) return _xelpBuiltin_or(ths, argc, argv);
-            if (XelpStrEq(cmd, cmdLen, "_not") == XELP_S_OK) return _xelpBuiltin_not(ths, argc, argv);
-            if (XelpStrEq(cmd, cmdLen, "_if") == XELP_S_OK) return _xelpBuiltin_if(ths, argc, argv);
-            if (XelpStrEq(cmd, cmdLen, "_next") == XELP_S_OK) return _xelpBuiltin_next(ths, argc, argv);
-            if (XelpStrEq(cmd, cmdLen, "_goto") == XELP_S_OK) return _xelpBuiltin_goto(ths, argc, argv);
-            if (XelpStrEq(cmd, cmdLen, "_return") == XELP_S_OK) return _xelpBuiltin_return(ths, argc, argv);
-            if (XelpStrEq(cmd, cmdLen, "_func") == XELP_S_OK) return _xelpBuiltin_func(ths, argc, argv);
-            if (XelpStrEq(cmd, cmdLen, "_lpad") == XELP_S_OK) return _xelpBuiltin_lpad(ths, argc, argv);
-            if (XelpStrEq(cmd, cmdLen, "_band") == XELP_S_OK) return _xelpBuiltin_band(ths, argc, argv);
-            if (XelpStrEq(cmd, cmdLen, "_bor") == XELP_S_OK) return _xelpBuiltin_bor(ths, argc, argv);
-            if (XelpStrEq(cmd, cmdLen, "_bxor") == XELP_S_OK) return _xelpBuiltin_bxor(ths, argc, argv);
-            if (XelpStrEq(cmd, cmdLen, "_bnot") == XELP_S_OK) return _xelpBuiltin_bnot(ths, argc, argv);
-            if (XelpStrEq(cmd, cmdLen, "_shl") == XELP_S_OK) return _xelpBuiltin_shl(ths, argc, argv);
-            if (XelpStrEq(cmd, cmdLen, "_shr") == XELP_S_OK) return _xelpBuiltin_shr(ths, argc, argv);
+            if (XelpStrEq(cmd, cmdLen, "_set") == XELP_S_OK) return _xelpBuiltin_set(ths, argc, ths->mArgv);
+            if (XelpStrEq(cmd, cmdLen, "_print") == XELP_S_OK) return _xelpBuiltin_print(ths, argc, ths->mArgv);
+            if (XelpStrEq(cmd, cmdLen, "_mr") == XELP_S_OK) return _xelpBuiltin_mr(ths, argc, ths->mArgv);
+            if (XelpStrEq(cmd, cmdLen, "_add") == XELP_S_OK) return _xelpBuiltin_add(ths, argc, ths->mArgv);
+            if (XelpStrEq(cmd, cmdLen, "_sub") == XELP_S_OK) return _xelpBuiltin_sub(ths, argc, ths->mArgv);
+            if (XelpStrEq(cmd, cmdLen, "_mul") == XELP_S_OK) return _xelpBuiltin_mul(ths, argc, ths->mArgv);
+            if (XelpStrEq(cmd, cmdLen, "_div") == XELP_S_OK) return _xelpBuiltin_div(ths, argc, ths->mArgv);
+            if (XelpStrEq(cmd, cmdLen, "_mod") == XELP_S_OK) return _xelpBuiltin_mod(ths, argc, ths->mArgv);
+            if (XelpStrEq(cmd, cmdLen, "_inc") == XELP_S_OK) return _xelpBuiltin_inc(ths, argc, ths->mArgv);
+            if (XelpStrEq(cmd, cmdLen, "_dec") == XELP_S_OK) return _xelpBuiltin_dec(ths, argc, ths->mArgv);
+            if (XelpStrEq(cmd, cmdLen, "_eq") == XELP_S_OK) return _xelpBuiltin_eq(ths, argc, ths->mArgv);
+            if (XelpStrEq(cmd, cmdLen, "_neq") == XELP_S_OK) return _xelpBuiltin_neq(ths, argc, ths->mArgv);
+            if (XelpStrEq(cmd, cmdLen, "_gt") == XELP_S_OK) return _xelpBuiltin_gt(ths, argc, ths->mArgv);
+            if (XelpStrEq(cmd, cmdLen, "_lt") == XELP_S_OK) return _xelpBuiltin_lt(ths, argc, ths->mArgv);
+            if (XelpStrEq(cmd, cmdLen, "_ge") == XELP_S_OK) return _xelpBuiltin_ge(ths, argc, ths->mArgv);
+            if (XelpStrEq(cmd, cmdLen, "_le") == XELP_S_OK) return _xelpBuiltin_le(ths, argc, ths->mArgv);
+            if (XelpStrEq(cmd, cmdLen, "_and") == XELP_S_OK) return _xelpBuiltin_and(ths, argc, ths->mArgv);
+            if (XelpStrEq(cmd, cmdLen, "_or") == XELP_S_OK) return _xelpBuiltin_or(ths, argc, ths->mArgv);
+            if (XelpStrEq(cmd, cmdLen, "_not") == XELP_S_OK) return _xelpBuiltin_not(ths, argc, ths->mArgv);
+            if (XelpStrEq(cmd, cmdLen, "_if") == XELP_S_OK) return _xelpBuiltin_if(ths, argc, ths->mArgv);
+            if (XelpStrEq(cmd, cmdLen, "_next") == XELP_S_OK) return _xelpBuiltin_next(ths, argc, ths->mArgv);
+            if (XelpStrEq(cmd, cmdLen, "_goto") == XELP_S_OK) return _xelpBuiltin_goto(ths, argc, ths->mArgv);
+            if (XelpStrEq(cmd, cmdLen, "_return") == XELP_S_OK) return _xelpBuiltin_return(ths, argc, ths->mArgv);
+            if (XelpStrEq(cmd, cmdLen, "_func") == XELP_S_OK) return _xelpBuiltin_func(ths, argc, ths->mArgv);
+            if (XelpStrEq(cmd, cmdLen, "_lpad") == XELP_S_OK) return _xelpBuiltin_lpad(ths, argc, ths->mArgv);
+            if (XelpStrEq(cmd, cmdLen, "_band") == XELP_S_OK) return _xelpBuiltin_band(ths, argc, ths->mArgv);
+            if (XelpStrEq(cmd, cmdLen, "_bor") == XELP_S_OK) return _xelpBuiltin_bor(ths, argc, ths->mArgv);
+            if (XelpStrEq(cmd, cmdLen, "_bxor") == XELP_S_OK) return _xelpBuiltin_bxor(ths, argc, ths->mArgv);
+            if (XelpStrEq(cmd, cmdLen, "_bnot") == XELP_S_OK) return _xelpBuiltin_bnot(ths, argc, ths->mArgv);
+            if (XelpStrEq(cmd, cmdLen, "_shl") == XELP_S_OK) return _xelpBuiltin_shl(ths, argc, ths->mArgv);
+            if (XelpStrEq(cmd, cmdLen, "_shr") == XELP_S_OK) return _xelpBuiltin_shr(ths, argc, ths->mArgv);
             return XELP_E_CMDNOTFOUND;
         }
 
@@ -2376,7 +2374,7 @@ static XELPRESULT _xelpEvalStatement(XELP *ths, const char *lineS, int lineLen) 
             const char *body = _xelpFindProc(ths, cmd, cmdLen, &bodyLen);
             if (body) {
                 /* Push arena frame (saves caller context, copies argv) */
-                r = _xelpFramePush(ths, argv, argc);
+                r = _xelpFramePush(ths, ths->mArgv, argc);
                 if (r != XELP_S_OK) return r;
                 /* Set up new script context for function body */
                 ths->mpScriptS = body;
@@ -2392,7 +2390,7 @@ static XELPRESULT _xelpEvalStatement(XELP *ths, const char *lineS, int lineLen) 
             if (f) {
                 while (f->mpCmd) {
                     if (XelpStrEq(cmd, cmdLen, f->mpCmd) == XELP_S_OK) {
-                        ths->mR[0] = f->mFunPtr(ths, argc, argv);
+                        ths->mR[0] = f->mFunPtr(ths, argc, ths->mArgv);
                         return ths->mR[0];
                     }
                     f++;
@@ -2402,7 +2400,7 @@ static XELPRESULT _xelpEvalStatement(XELP *ths, const char *lineS, int lineLen) 
 
         /* Default handler */
         if (ths->mpfDefCLI) {
-            ths->mR[0] = ths->mpfDefCLI(ths, argc, argv);
+            ths->mR[0] = ths->mpfDefCLI(ths, argc, ths->mArgv);
             return ths->mR[0];
         }
 

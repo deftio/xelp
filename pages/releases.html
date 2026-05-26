@@ -57,8 +57,8 @@ on GitHub for the full changelog.</p>
   <li><strong>Structured argc/argv parsing</strong> (<code>XELP_ENABLE_ARGV</code>):
       new <code>XelpBuf2Argv</code> function tokenizes a command line into a
       null-terminated <code>argv[]</code> array with quote stripping, escape
-      processing, and configurable max arguments (<code>XELP_ARGV_MAX</code>,
-      default 8). ~530&ndash;700 bytes ARM Thumb.</li>
+      processing, and configurable max arguments (<code>XELP_ARGV_CAP</code>,
+      derived from <code>XELP_ARGVBUFSZ</code>). ~530&ndash;700 bytes ARM Thumb.</li>
   <li><code>XELP_PARSE_ARGV(ths, args, len)</code> convenience macro: declares
       <code>argc</code>/<code>argv</code> and calls <code>XelpBuf2Argv</code>
       in one line. Recommended for new command handlers.</li>

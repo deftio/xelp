@@ -190,12 +190,10 @@
 #define XELP_CMDBUFSZ       (64)
 #endif
 
-/****************************************************************************************************
-  XELP_ARGV_MAX is the maximum number of arguments for CLI dispatch.
-  Override with -DXELP_ARGV_MAX=16 on the compiler command line, or in xelp_ovr.h.
- */
-#ifndef XELP_ARGV_MAX
-#define XELP_ARGV_MAX       8
+/* Migration guard: XELP_ARGV_MAX removed in 0.5.0.
+   Argv capacity is now derived from XELP_ARGVBUFSZ / sizeof(pointer). */
+#ifdef XELP_ARGV_MAX
+#error "XELP_ARGV_MAX removed. Argv capacity is now derived from XELP_ARGVBUFSZ."
 #endif
 
 /*

@@ -365,8 +365,7 @@ to the buffers.
 | \`XELP_CMDBUFSZ\` | 64 | CLI input buffer + each history slot. Reducing to 32 saves 32 B x (1 + HIST_DEPTH + 1) buffers. |
 | \`XELP_HIST_DEPTH\` | 4 | History ring slots. Reducing to 2 saves \`2 * XELP_CMDBUFSZ\` (~128 B). |
 | \`XELP_SCRIPT_ARENA_SZ\` | \`sizeof(int)*256\` | Script engine arena. 512 on 16-bit, 1024 on 32-bit, 2048 on 64-bit. Override with \`-DXELP_SCRIPT_ARENA_SZ=N\`. |
-| \`XELP_ARGVBUFSZ\` | 64 | Tokenization scratch buffer. Defaults to \`XELP_CMDBUFSZ\`. |
-| \`XELP_ARGV_MAX\` | 8 | Max arguments per command. |
+| \`XELP_ARGVBUFSZ\` | 64 | Tokenization scratch buffer. Defaults to \`XELP_CMDBUFSZ\`. Argv capacity is derived: \`XELP_ARGVBUFSZ / sizeof(ptr)\`. |
 | \`XELP_REGS_SZ\` | 4 | Return registers (min 4). Each is \`sizeof(XELPREG)\` bytes. |
 | \`XELPREG\` | \`int\` | Register type. Use \`short\` on 8-bit targets to save space. |
 

@@ -127,8 +127,7 @@ Reference</a> for full details.</p>
 <thead><tr><th>Define</th><th>Default</th><th>Purpose</th></tr></thead>
 <tbody>
 <tr><td><code>XELP_CMDBUFSZ</code></td><td>64</td><td>CLI input buffer size in bytes</td></tr>
-<tr><td><code>XELP_ARGVBUFSZ</code></td><td><code>XELP_CMDBUFSZ</code></td><td>Scratch buffer for CLI dispatch argv tokenization (bytes per instance, requires <code>XELP_ENABLE_CLI</code>)</td></tr>
-<tr><td><code>XELP_ARGV_MAX</code></td><td>8</td><td>Maximum number of arguments for CLI dispatch tokenization</td></tr>
+<tr><td><code>XELP_ARGVBUFSZ</code></td><td><code>XELP_CMDBUFSZ</code></td><td>Scratch buffer for CLI dispatch argv tokenization (bytes per instance, requires <code>XELP_ENABLE_CLI</code>). Argv capacity is derived: <code>XELP_ARGVBUFSZ / sizeof(const char *)</code></td></tr>
 <tr><td><code>XELP_HIST_DEPTH</code></td><td>4</td><td>Number of commands stored in history ring (requires <code>XELP_ENABLE_HISTORY</code>)</td></tr>
 <tr><td><code>XELP_REGS_SZ</code></td><td>4</td><td>Number of callee-clobbers-all return registers (minimum 4). R0 is command status, R1&ndash;R3 are command-specific.</td></tr>
 <tr><td><code>XELPREG</code></td><td><code>int</code></td><td>Register type (change for platforms where <code>int</code> is not ideal)</td></tr>

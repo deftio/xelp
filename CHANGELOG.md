@@ -21,8 +21,8 @@ Versions always use three-component semver (e.g. `0.3.0`, never `0.3`).
 - `mpfDefCLI` (default command handler) signature changed to match.
 - `XelpBuf2Argv` is now internal (`_xelpBuf2Argv`) -- no longer a public API.
 - `XELP_ENABLE_ARGV` compile flag removed. argv tokenization is always
-  enabled when `XELP_ENABLE_CLI` is defined. `XELP_ARGV_MAX` and
-  `XELP_ARGVBUFSZ` remain as tuning knobs.
+  enabled when `XELP_ENABLE_CLI` is defined. `XELP_ARGVBUFSZ` remains as
+  the tuning knob (argv capacity is derived: `XELP_ARGVBUFSZ / sizeof(ptr)`).
 - `mArgvBuf` moved from `XELP_ENABLE_ARGV` guard to `XELP_ENABLE_CLI`.
   No RAM change for builds that already had `XELP_ENABLE_ARGV` (the default).
 
@@ -54,7 +54,7 @@ Versions always use three-component semver (e.g. `0.3.0`, never `0.3`).
 - **Structured argc/argv parsing** (`XELP_ENABLE_ARGV`): new `XelpBuf2Argv`
   function tokenizes a command line into a null-terminated `argv[]` array with
   quote stripping, escape processing, and configurable max arguments
-  (`XELP_ARGV_MAX`, default 8). Uses a per-instance scratch buffer
+  (`XELP_ARGV_CAP`, derived from `XELP_ARGVBUFSZ`). Uses a per-instance scratch buffer
   (`mArgvBuf`). ~530–700 bytes on ARM Thumb.
 - `XELP_PARSE_ARGV(ths, args, len)` convenience macro: declares `argc` and
   `argv` locals and calls `XelpBuf2Argv` in one line. Returns `XELP_E_ERR`
