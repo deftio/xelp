@@ -231,6 +231,35 @@ _if $flag _then led 1
 _if (_eq $mode auto) _then _goto :auto_loop
 </code></pre>
 
+<h2>Switch (multi-way branch)</h2>
+
+<pre><code>_switch &lt;value&gt; &lt;case1&gt; &lt;cmd1&gt; [&lt;case2&gt; &lt;cmd2&gt; ...] [_default &lt;cmdN&gt;]
+</code></pre>
+
+<p><code>_switch</code> compares <code>value</code> against each case and executes
+the matching command. Cases are checked in order; the first match wins.
+<code>_default</code> matches anything and should appear last.</p>
+
+<p>Each case command is a <strong>single token</strong>. Quote multi-word commands:</p>
+
+<pre><code>_switch $mode idle "_print standby" run "_print active" _default "_print unknown"
+</code></pre>
+
+<p>Case matching uses numeric comparison first. If the value is numeric and
+the case parses as a number, they are compared as integers. Otherwise the
+comparison falls back to byte-for-byte string matching.</p>
+
+<pre><code>_set v 2
+_switch $v 1 "_print one" 2 "_print two" 3 "_print three"
+# prints: two
+
+_switch $color red "_set r 255" green "_set g 255" _default "_print ?"
+</code></pre>
+
+<p>If no case matches and there is no <code>_default</code>, <code>_switch</code>
+returns <code>XELP_S_OK</code> silently. Fewer than 3 arguments returns
+<code>XELP_E_ERR</code>.</p>
+
 <h2>Labels and jumps</h2>
 
 <table>
@@ -356,7 +385,7 @@ _set v (_mr 1)       # read mR[1] into variable v
 </tbody>
 </table>
 
-<h2>Builtin reference (all 32)</h2>
+<h2>Builtin reference (all 33)</h2>
 
 <table>
 <thead><tr><th>Builtin</th><th>Arguments</th><th>Returns</th><th>Description</th></tr></thead>
@@ -387,6 +416,7 @@ _set v (_mr 1)       # read mR[1] into variable v
 <tr><td><code>_or</code></td><td><code>a b</code></td><td>INT</td><td>Logical OR</td></tr>
 <tr><td><code>_not</code></td><td><code>a</code></td><td>INT</td><td>Logical NOT</td></tr>
 <tr><td><code>_if</code></td><td><code>cond _then cmd [_else cmd]</code></td><td>varies</td><td>Conditional</td></tr>
+<tr><td><code>_switch</code></td><td><code>val case1 cmd1 [... _default cmdN]</code></td><td>varies</td><td>Multi-way branch</td></tr>
 <tr><td><code>_goto</code></td><td><code>:label</code></td><td>OK</td><td>Jump (from start)</td></tr>
 <tr><td><code>_next</code></td><td><code>:label</code> or <code>cmd</code></td><td>OK</td><td>Forward jump or exec</td></tr>
 <tr><td><code>_func</code></td><td><code>name "body"</code></td><td>OK</td><td>Define function</td></tr>

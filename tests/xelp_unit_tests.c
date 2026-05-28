@@ -9472,6 +9472,158 @@ XELPRESULT test_ScriptListBogusHeap(void) {
     return XELP_S_OK;
 }
 
+/* ---- _switch tests ---- */
+/* _switch uses case/cmd pairs: _switch val case1 cmd1 case2 cmd2 ...
+   Each cmd is a single token. Use _set for side effects, or register
+   functions for multi-word commands. _default catches unmatched cases. */
+
+XELPRESULT test_ScriptSwitchBasic(void) {
+    XELP x;
+    scriptTestInit(&x);
+
+    /* Numeric match: first case */
+    resetDummyBuf();
+    XelpCallProc(&x, "_switch 1 1 \"_print a\" 2 \"_print b\"");
+    if (JB_ASSERT(gDummyBuf[0] != 'a', "switch 1 should print a"))
+        return XELP_E_ERR;
+
+    /* Numeric match: second case */
+    resetDummyBuf();
+    XelpCallProc(&x, "_switch 2 1 \"_print a\" 2 \"_print b\"");
+    if (JB_ASSERT(gDummyBuf[0] != 'b', "switch 2 should print b"))
+        return XELP_E_ERR;
+
+    return XELP_S_OK;
+}
+
+XELPRESULT test_ScriptSwitchDefault(void) {
+    XELP x;
+    scriptTestInit(&x);
+
+    /* No match, falls to _default */
+    resetDummyBuf();
+    XelpCallProc(&x, "_switch 9 1 \"_print a\" 2 \"_print b\" _default \"_print d\"");
+    if (JB_ASSERT(gDummyBuf[0] != 'd', "switch 9 should print d"))
+        return XELP_E_ERR;
+
+    return XELP_S_OK;
+}
+
+XELPRESULT test_ScriptSwitchNoMatch(void) {
+    XELP x;
+    XELPRESULT r;
+    scriptTestInit(&x);
+
+    /* No match and no _default: should return OK silently */
+    resetDummyBuf();
+    r = XelpCallProc(&x, "_switch 9 1 \"_print a\" 2 \"_print b\"");
+    if (JB_ASSERT(r != XELP_S_OK, "switch no match should be OK"))
+        return XELP_E_ERR;
+    if (JB_ASSERT(gDummyBuf[0] != 0, "switch no match should not print"))
+        return XELP_E_ERR;
+
+    return XELP_S_OK;
+}
+
+XELPRESULT test_ScriptSwitchString(void) {
+    XELP x;
+    scriptTestInit(&x);
+
+    /* String match */
+    resetDummyBuf();
+    XelpCallProc(&x, "_switch hello hello \"_print h\" bye \"_print g\"");
+    if (JB_ASSERT(gDummyBuf[0] != 'h', "switch hello should print h"))
+        return XELP_E_ERR;
+
+    /* String match second case */
+    resetDummyBuf();
+    XelpCallProc(&x, "_switch bye hello \"_print h\" bye \"_print g\"");
+    if (JB_ASSERT(gDummyBuf[0] != 'g', "switch bye should print g"))
+        return XELP_E_ERR;
+
+    return XELP_S_OK;
+}
+
+XELPRESULT test_ScriptSwitchTooFewArgs(void) {
+    XELP x;
+    XELPRESULT r;
+    scriptTestInit(&x);
+
+    /* Too few args */
+    r = XelpCallProc(&x, "_switch 1");
+    if (JB_ASSERT(r != XELP_E_ERR, "switch too few args should error"))
+        return XELP_E_ERR;
+
+    r = XelpCallProc(&x, "_switch 1 1");
+    if (JB_ASSERT(r != XELP_E_ERR, "switch 2 args should error"))
+        return XELP_E_ERR;
+
+    return XELP_S_OK;
+}
+
+XELPRESULT test_ScriptSwitchWithVar(void) {
+    XELP x;
+    const char *c;
+    scriptTestInit(&x);
+
+    c = "_set mode 2";
+    XelpParse(&x, c, XelpStrLen((char*)c));
+
+    resetDummyBuf();
+    c = "_switch $mode 1 \"_print a\" 2 \"_print b\" _default \"_print x\"";
+    XelpParse(&x, c, XelpStrLen((char*)c));
+    if (JB_ASSERT(gDummyBuf[0] != 'b', "switch $mode=2 should print b"))
+        return XELP_E_ERR;
+
+    return XELP_S_OK;
+}
+
+XELPRESULT test_ScriptSwitchDefaultMultiWord(void) {
+    XELP x;
+    scriptTestInit(&x);
+
+    /* _default with a quoted command string */
+    resetDummyBuf();
+    XelpCallProc(&x, "_switch 99 1 \"_print a\" _default \"_print fallback\"");
+    if (JB_ASSERT(gDummyBuf[0] != 'f', "switch _default fallback"))
+        return XELP_E_ERR;
+
+    /* _default with quoted multi-word command */
+    resetDummyBuf();
+    XelpCallProc(&x, "_switch 99 1 \"_print a\" _default \"_print xyz\"");
+    if (JB_ASSERT(gDummyBuf[0] != 'x', "switch _default multi-word"))
+        return XELP_E_ERR;
+
+    return XELP_S_OK;
+}
+
+XELPRESULT test_ScriptIfThenAtEnd(void) {
+    XELP x;
+    scriptTestInit(&x);
+
+    /* condTrue but _then is last token: thenIdx+1 == argc */
+    resetDummyBuf();
+    XelpCallProc(&x, "_if 1 x _then");
+    if (JB_ASSERT(gDummyBuf[0] != 0, "if true _then at end should be silent"))
+        return XELP_E_ERR;
+
+    return XELP_S_OK;
+}
+
+XELPRESULT test_ScriptSwitchNumToStr(void) {
+    XELP x;
+    scriptTestInit(&x);
+
+    /* Numeric value with a non-numeric case label:
+       _switch 5 hello "cmd1" 5 "cmd2" -- hello is non-numeric so falls to string cmp */
+    resetDummyBuf();
+    XelpCallProc(&x, "_switch 5 hello \"_print h\" 5 \"_print m\"");
+    if (JB_ASSERT(gDummyBuf[0] != 'm', "switch num val vs str case then num"))
+        return XELP_E_ERR;
+
+    return XELP_S_OK;
+}
+
 #endif /* XELP_ENABLE_SCRIPT */
 /* ===================== END SCRIPT ENGINE TESTS ===================== */
 
@@ -9741,6 +9893,15 @@ int run_tests() {
     JumpBug_RunUnit(test_ScriptListEmpty,"ScriptListEmp");
     JumpBug_RunUnit(test_ScriptListUnknownFilter,"ScriptListUF");
     JumpBug_RunUnit(test_ScriptListBogusHeap,"ScriptListBH");
+    JumpBug_RunUnit(test_ScriptSwitchBasic,"ScriptSwBasic");
+    JumpBug_RunUnit(test_ScriptSwitchDefault,"ScriptSwDef");
+    JumpBug_RunUnit(test_ScriptSwitchNoMatch,"ScriptSwNoM");
+    JumpBug_RunUnit(test_ScriptSwitchString,"ScriptSwStr");
+    JumpBug_RunUnit(test_ScriptSwitchTooFewArgs,"ScriptSwFewA");
+    JumpBug_RunUnit(test_ScriptSwitchWithVar,"ScriptSwVar");
+    JumpBug_RunUnit(test_ScriptSwitchDefaultMultiWord,"ScriptSwDefMW");
+    JumpBug_RunUnit(test_ScriptSwitchNumToStr,"ScriptSwN2S");
+    JumpBug_RunUnit(test_ScriptIfThenAtEnd,"ScriptIfTAE");
 #endif
 
     JumpBug_PrintResults();

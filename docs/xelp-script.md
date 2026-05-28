@@ -234,6 +234,38 @@ For multi-step branches, call a function or use `_goto`:
 _if $ready _then _goto :startup
 ```
 
+## Switch (multi-way branch)
+
+```
+_switch <value> <case1> <cmd1> [<case2> <cmd2> ...] [_default <cmdN>]
+```
+
+`_switch` compares `value` against each case and executes the matching
+command. Cases are checked in order; the first match wins. `_default`
+matches anything and should appear last.
+
+Each case command is a **single token**. Quote multi-word commands:
+
+```
+_switch $mode idle "_print standby" run "_print active" _default "_print unknown"
+```
+
+Case matching uses numeric comparison first. If the value is numeric and
+the case parses as a number, they are compared as integers. Otherwise
+the comparison falls back to byte-for-byte string matching.
+
+```
+_set v 2
+_switch $v 1 "_print one" 2 "_print two" 3 "_print three"
+# prints: two
+
+_switch $color red "_set r 255" green "_set g 255" _default "_print ?"
+```
+
+If no case matches and there is no `_default`, `_switch` returns
+`XELP_S_OK` silently. Fewer than 3 arguments (value + at least one
+case/cmd pair) returns `XELP_E_ERR`.
+
 ## Labels and jumps
 
 Labels are lines starting with `:` followed by a name. They define jump
@@ -508,7 +540,7 @@ These supplement the core xelp error codes (`XELP_S_OK` = 0,
 
 ## Builtin reference
 
-Complete table of all 32 XelpScript builtins:
+Complete table of all 33 XelpScript builtins:
 
 | Builtin | Arguments | Returns | Description |
 |---------|-----------|---------|-------------|
@@ -538,6 +570,7 @@ Complete table of all 32 XelpScript builtins:
 | `_or` | `a b` | INT | Logical OR |
 | `_not` | `a` | INT | Logical NOT |
 | `_if` | `cond _then cmd [_else cmd]` | varies | Conditional execution |
+| `_switch` | `val case1 cmd1 [... _default cmdN]` | varies | Multi-way branch |
 | `_goto` | `:label` | OK | Jump to label (from script start) |
 | `_next` | `:label` or `cmd` | OK | Forward jump or execute sub-command |
 | `_func` | `name "body"` | OK | Define arena-stored function |

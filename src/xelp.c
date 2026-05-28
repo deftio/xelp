@@ -1962,6 +1962,81 @@ static XELPRESULT _xelpBuiltin_list(XELP *ths, int argc, const char **argv) {
 }
 
 /*****************************************
+ Builtin dispatch table (sorted for binary search)
+ */
+typedef struct {
+    const char *mpName;
+    XELPRESULT (*mpFn)(XELP *, int, const char **);
+} _XelpBuiltinEntry;
+
+/* Forward declarations for builtins defined below the table */
+static XELPRESULT _xelpBuiltin_if(XELP *, int, const char **);
+static XELPRESULT _xelpBuiltin_switch(XELP *, int, const char **);
+static XELPRESULT _xelpBuiltin_next(XELP *, int, const char **);
+static XELPRESULT _xelpBuiltin_goto(XELP *, int, const char **);
+static XELPRESULT _xelpBuiltin_return(XELP *, int, const char **);
+static XELPRESULT _xelpBuiltin_func(XELP *, int, const char **);
+
+/* Table MUST be sorted by name (strcmp order) for binary search.
+   Verify: _add < _and < _band < _bnot < _bor < _bxor < _dec < _div
+   < _eq < _func < _ge < _goto < _gt < _if < _inc < _le < _list
+   < _lpad < _lt < _mod < _mr < _mul < _neq < _next < _not < _or
+   < _print < _return < _set < _shl < _shr < _sub < _switch */
+static const _XelpBuiltinEntry gScriptBuiltins[] = {
+    { "_add",    _xelpBuiltin_add    },
+    { "_and",    _xelpBuiltin_and    },
+    { "_band",   _xelpBuiltin_band   },
+    { "_bnot",   _xelpBuiltin_bnot   },
+    { "_bor",    _xelpBuiltin_bor    },
+    { "_bxor",   _xelpBuiltin_bxor   },
+    { "_dec",    _xelpBuiltin_dec    },
+    { "_div",    _xelpBuiltin_div    },
+    { "_eq",     _xelpBuiltin_eq     },
+    { "_func",   _xelpBuiltin_func   },
+    { "_ge",     _xelpBuiltin_ge     },
+    { "_goto",   _xelpBuiltin_goto   },
+    { "_gt",     _xelpBuiltin_gt     },
+    { "_if",     _xelpBuiltin_if     },
+    { "_inc",    _xelpBuiltin_inc    },
+    { "_le",     _xelpBuiltin_le     },
+    { "_list",   _xelpBuiltin_list   },
+    { "_lpad",   _xelpBuiltin_lpad   },
+    { "_lt",     _xelpBuiltin_lt     },
+    { "_mod",    _xelpBuiltin_mod    },
+    { "_mr",     _xelpBuiltin_mr     },
+    { "_mul",    _xelpBuiltin_mul    },
+    { "_neq",    _xelpBuiltin_neq    },
+    { "_next",   _xelpBuiltin_next   },
+    { "_not",    _xelpBuiltin_not    },
+    { "_or",     _xelpBuiltin_or     },
+    { "_print",  _xelpBuiltin_print  },
+    { "_return", _xelpBuiltin_return },
+    { "_set",    _xelpBuiltin_set    },
+    { "_shl",    _xelpBuiltin_shl    },
+    { "_shr",    _xelpBuiltin_shr    },
+    { "_sub",    _xelpBuiltin_sub    },
+    { "_switch", _xelpBuiltin_switch }
+};
+#define XELP_NUM_BUILTINS (sizeof(gScriptBuiltins) / sizeof(gScriptBuiltins[0]))
+
+/* Binary search for a builtin by name (null-terminated cmd string).
+   Returns function pointer or NULL if not found. */
+static XELPRESULT (*_xelpFindBuiltin(const char *cmd))(XELP *, int, const char **) {
+    int lo = 0, hi = (int)XELP_NUM_BUILTINS - 1;
+    while (lo <= hi) {
+        int mid = (lo + hi) / 2;
+        const char *a = cmd;
+        const char *b = gScriptBuiltins[mid].mpName;
+        /* inline strcmp -- both are null-terminated */
+        while (*a && *b && *a == *b) { a++; b++; }
+        if (*a == *b) return gScriptBuiltins[mid].mpFn;   /* match */
+        if ((unsigned char)*a < (unsigned char)*b) hi = mid - 1;
+        else lo = mid + 1;
+    }
+    return 0; /* not found */
+}
+
+/*****************************************
  Control flow builtins
  */
 
@@ -2014,6 +2089,56 @@ static XELPRESULT _xelpBuiltin_if(XELP *ths, int argc, const char **argv) {
         return _xelpEvalStatement(ths, cmdBuf, pos);
     }
     return XELP_S_OK;
+}
+
+/* _switch: multi-way branch on value.
+   _switch <val> <case1> <cmd1> [<case2> <cmd2> ...] [_default <cmdN>]
+   Compares val against each case using numeric-first, string fallback.
+   Executes the command for the first matching case, or _default if none. */
+static XELPRESULT _xelpBuiltin_switch(XELP *ths, int argc, const char **argv) {
+    const char *val;
+    int valLen, valInt, valIsNum, i;
+
+    if (argc < 4) return XELP_E_ERR; /* minimum: _switch val case cmd */
+
+    val = argv[1];
+    valLen = XelpStrLen(val);
+    valIsNum = (XelpParseNum(val, valLen, &valInt) == XELP_S_OK);
+
+    /* Walk case/cmd pairs starting at argv[2] */
+    for (i = 2; i + 1 < argc; i += 2) {
+        const char *caseStr = argv[i];
+        int caseLen = XelpStrLen(caseStr);
+
+        /* _default matches unconditionally */
+        if (XelpStrEq(caseStr, caseLen, "_default") == XELP_S_OK) {
+            const char *cmdStr = argv[i + 1];
+            return _xelpEvalStatement(ths, cmdStr, XelpStrLen(cmdStr));
+        }
+
+        {
+            int match = 0;
+            int caseInt;
+            /* Numeric comparison if both are numeric */
+            if (valIsNum && XelpParseNum(caseStr, caseLen, &caseInt) == XELP_S_OK) {
+                match = (valInt == caseInt);
+            } else {
+                /* String comparison */
+                match = (XelpBufCmp(val, val + valLen, caseStr, caseStr + caseLen,
+                                    XELP_CMP_TYPE_A0B0) == XELP_S_OK);
+            }
+
+            if (match) {
+                /* Reconstruct command from argv[i+1] to next case or end.
+                   For _switch, each case gets exactly one command (single token). */
+                const char *cmdStr = argv[i + 1];
+                int cmdLen = XelpStrLen(cmdStr);
+                return _xelpEvalStatement(ths, cmdStr, cmdLen);
+            }
+        }
+    }
+
+    return XELP_S_OK; /* no match, no _default */
 }
 
 /* _next: jump forward to label or execute a sub-command */
@@ -2381,40 +2506,10 @@ static XELPRESULT _xelpEvalStatement(XELP *ths, const char *lineS, int lineLen) 
         const char *cmd = ths->mArgv[0];
         int cmdLen = XelpStrLen(cmd);
 
-        /* Check builtins (start with '_') */
+        /* Check builtins (start with '_') via sorted table + binary search */
         if (cmd[0] == '_') {
-            if (XelpStrEq(cmd, cmdLen, "_set") == XELP_S_OK) return _xelpBuiltin_set(ths, argc, ths->mArgv);
-            if (XelpStrEq(cmd, cmdLen, "_print") == XELP_S_OK) return _xelpBuiltin_print(ths, argc, ths->mArgv);
-            if (XelpStrEq(cmd, cmdLen, "_mr") == XELP_S_OK) return _xelpBuiltin_mr(ths, argc, ths->mArgv);
-            if (XelpStrEq(cmd, cmdLen, "_add") == XELP_S_OK) return _xelpBuiltin_add(ths, argc, ths->mArgv);
-            if (XelpStrEq(cmd, cmdLen, "_sub") == XELP_S_OK) return _xelpBuiltin_sub(ths, argc, ths->mArgv);
-            if (XelpStrEq(cmd, cmdLen, "_mul") == XELP_S_OK) return _xelpBuiltin_mul(ths, argc, ths->mArgv);
-            if (XelpStrEq(cmd, cmdLen, "_div") == XELP_S_OK) return _xelpBuiltin_div(ths, argc, ths->mArgv);
-            if (XelpStrEq(cmd, cmdLen, "_mod") == XELP_S_OK) return _xelpBuiltin_mod(ths, argc, ths->mArgv);
-            if (XelpStrEq(cmd, cmdLen, "_inc") == XELP_S_OK) return _xelpBuiltin_inc(ths, argc, ths->mArgv);
-            if (XelpStrEq(cmd, cmdLen, "_dec") == XELP_S_OK) return _xelpBuiltin_dec(ths, argc, ths->mArgv);
-            if (XelpStrEq(cmd, cmdLen, "_eq") == XELP_S_OK) return _xelpBuiltin_eq(ths, argc, ths->mArgv);
-            if (XelpStrEq(cmd, cmdLen, "_neq") == XELP_S_OK) return _xelpBuiltin_neq(ths, argc, ths->mArgv);
-            if (XelpStrEq(cmd, cmdLen, "_gt") == XELP_S_OK) return _xelpBuiltin_gt(ths, argc, ths->mArgv);
-            if (XelpStrEq(cmd, cmdLen, "_lt") == XELP_S_OK) return _xelpBuiltin_lt(ths, argc, ths->mArgv);
-            if (XelpStrEq(cmd, cmdLen, "_ge") == XELP_S_OK) return _xelpBuiltin_ge(ths, argc, ths->mArgv);
-            if (XelpStrEq(cmd, cmdLen, "_le") == XELP_S_OK) return _xelpBuiltin_le(ths, argc, ths->mArgv);
-            if (XelpStrEq(cmd, cmdLen, "_and") == XELP_S_OK) return _xelpBuiltin_and(ths, argc, ths->mArgv);
-            if (XelpStrEq(cmd, cmdLen, "_or") == XELP_S_OK) return _xelpBuiltin_or(ths, argc, ths->mArgv);
-            if (XelpStrEq(cmd, cmdLen, "_not") == XELP_S_OK) return _xelpBuiltin_not(ths, argc, ths->mArgv);
-            if (XelpStrEq(cmd, cmdLen, "_if") == XELP_S_OK) return _xelpBuiltin_if(ths, argc, ths->mArgv);
-            if (XelpStrEq(cmd, cmdLen, "_next") == XELP_S_OK) return _xelpBuiltin_next(ths, argc, ths->mArgv);
-            if (XelpStrEq(cmd, cmdLen, "_goto") == XELP_S_OK) return _xelpBuiltin_goto(ths, argc, ths->mArgv);
-            if (XelpStrEq(cmd, cmdLen, "_return") == XELP_S_OK) return _xelpBuiltin_return(ths, argc, ths->mArgv);
-            if (XelpStrEq(cmd, cmdLen, "_func") == XELP_S_OK) return _xelpBuiltin_func(ths, argc, ths->mArgv);
-            if (XelpStrEq(cmd, cmdLen, "_lpad") == XELP_S_OK) return _xelpBuiltin_lpad(ths, argc, ths->mArgv);
-            if (XelpStrEq(cmd, cmdLen, "_list") == XELP_S_OK) return _xelpBuiltin_list(ths, argc, ths->mArgv);
-            if (XelpStrEq(cmd, cmdLen, "_band") == XELP_S_OK) return _xelpBuiltin_band(ths, argc, ths->mArgv);
-            if (XelpStrEq(cmd, cmdLen, "_bor") == XELP_S_OK) return _xelpBuiltin_bor(ths, argc, ths->mArgv);
-            if (XelpStrEq(cmd, cmdLen, "_bxor") == XELP_S_OK) return _xelpBuiltin_bxor(ths, argc, ths->mArgv);
-            if (XelpStrEq(cmd, cmdLen, "_bnot") == XELP_S_OK) return _xelpBuiltin_bnot(ths, argc, ths->mArgv);
-            if (XelpStrEq(cmd, cmdLen, "_shl") == XELP_S_OK) return _xelpBuiltin_shl(ths, argc, ths->mArgv);
-            if (XelpStrEq(cmd, cmdLen, "_shr") == XELP_S_OK) return _xelpBuiltin_shr(ths, argc, ths->mArgv);
+            XELPRESULT (*fn)(XELP *, int, const char **) = _xelpFindBuiltin(cmd);
+            if (fn) return fn(ths, argc, ths->mArgv);
             return XELP_E_CMDNOTFOUND;
         }
 
