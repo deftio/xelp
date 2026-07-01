@@ -19,7 +19,7 @@ jobs:
             compiler: gcc  # macOS uses Apple Clang natively
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Install dependencies (Ubuntu)
         if: matrix.os == 'ubuntu-latest'
