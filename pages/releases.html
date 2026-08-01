@@ -29,6 +29,31 @@
 <p>See also: <a href="https://github.com/deftio/xelp/blob/master/CHANGELOG.md">CHANGELOG.md</a>
 on GitHub for the full changelog.</p>
 
+<h2>v0.3.5 (2026-08-01)</h2>
+<p><strong>No library code changes.</strong> <code>src/xelp.c</code> and
+<code>src/xelp.h</code> are byte-identical to 0.3.4 apart from the version macro,
+and compiled sizes are unchanged on every target. This release fixes and
+verifies the publishing pipeline, which can only be exercised by tagging.</p>
+<ul>
+  <li><strong>Fixed ESP-IDF Component Registry publishing from CI.</strong>
+      <code>compote component upload</code> ran without <code>--namespace</code>,
+      defaulting to the <code>espressif</code> namespace instead of
+      <code>deftio</code>. Locally the namespace came from a
+      <code>~/.espressif</code> profile that does not exist on a CI runner, so the
+      job had failed on every release since 0.3.2 while hand-publishing covered
+      for it.</li>
+  <li><strong>Excluded <code>tmp/</code> from the published component.</strong>
+      <code>compote</code> reads only <code>files.exclude</code>, not
+      <code>.gitignore</code>, so packing from a working tree with scratch files
+      produced a 1.27&nbsp;MB archive instead of 209&nbsp;KB.</li>
+  <li><strong>Release notes can no longer be silently empty.</strong> Extraction
+      now anchors on the <code>## [X.Y.Z]</code> heading for the version being
+      released and fails the release rather than publishing placeholder text.</li>
+  <li><code>actions/checkout</code> v6&nbsp;&rarr;&nbsp;v7,
+      <code>actions/setup-python</code> v5&nbsp;&rarr;&nbsp;v7, and dependabot
+      now groups all action updates into one PR.</li>
+</ul>
+
 <h2>v0.3.4 (2026-08-01)</h2>
 <ul>
   <li><strong>Fixed: history recall broken on unsigned-<code>char</code> targets</strong>

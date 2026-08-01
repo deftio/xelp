@@ -12,7 +12,7 @@ For the llmstxt.org-format project index, see [llms.txt](llms.txt).
 A command line interpreter, script engine, and single-key menu system
 for embedded systems. Pure C, zero dynamic memory, no OS, no stdlib.
 Three files: `xelp.c`, `xelp.h`, `xelpcfg.h`. Compiles on 8-bit
-through 64-bit targets with any C89+ compiler. Version 0.3.4.
+through 64-bit targets with any C89+ compiler. Version 0.3.5.
 
 ## Critical constraints
 
