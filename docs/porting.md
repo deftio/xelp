@@ -59,8 +59,8 @@ users can recall previous commands with UP/DOWN arrows. No extra setup needed --
 it works automatically. Be aware of the RAM cost:
 
 ```
-RAM = XELP_HIST_DEPTH * XELP_CMDBUFSZ + XELP_CMDBUFSZ + 4 bytes
-    = 4 * 64 + 64 + 4 = 324 bytes  (default settings)
+RAM = XELP_HIST_DEPTH * XELP_CMDBUFSZ + XELP_CMDBUFSZ + 4 ints
+    = 4 * 64 + 64 + 16 = 336 bytes  (default settings, 32-bit target)
 ```
 
 Reduce `XELP_HIST_DEPTH` (default 4) or `XELP_CMDBUFSZ` (default 64) if RAM is tight.
@@ -76,6 +76,19 @@ Override via compiler flag (`-DXELP_HIST_DEPTH=2`) or `xelp_ovr.h` when using
 | `XELP_SET_FN_EMCHG` | `void fn(int)` | Mode change notification |
 
 All callbacks default to NULL and are safely skipped if not set.
+
+## Char Signedness
+
+Plain `char` is signed on x86 and Apple ARM64, but **unsigned** on most ARM
+Linux and embedded MCU toolchains. xelp is built and tested both ways
+(`make tests-unsigned-char`), so no action is needed to port it.
+
+It matters for your own code: if you store a negative value or a `-1`
+sentinel in a plain `char`, it silently becomes `255` on unsigned-`char`
+targets and never compares equal to `-1`. This is what broke history recall
+in [issue #18](https://github.com/deftio/xelp/issues/18). Use `int` for
+state variables and sentinels, or compile with an explicit
+`-fsigned-char` / `-funsigned-char` so behavior does not vary by toolchain.
 
 ## Platform-Specific Notes
 

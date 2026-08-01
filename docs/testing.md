@@ -165,6 +165,26 @@ JumpBug_RunUnit(test_MyFeature, "MyFeature");
 make clean && make tests
 ```
 
+## Char signedness
+
+Plain `char` signedness is implementation-defined. x86 and Apple ARM64
+default to signed; most ARM Linux and embedded MCU toolchains default to
+unsigned. The whole CI matrix runs on the signed-by-default hosts, so a
+signedness bug can pass every job and still break on real hardware --
+which is exactly what happened in
+[issue #18](https://github.com/deftio/xelp/issues/18), where the history
+browse sentinel `-1` stored as `255` and never compared equal.
+
+The suite is therefore built and run a second time with `-funsigned-char`:
+
+```
+make tests-unsigned-char
+```
+
+This is a prerequisite of `make validate`, so it runs on every CI job.
+When adding state variables that hold negative values or sentinels, prefer
+`int` over `char`, and confirm both builds pass.
+
 ## API Quick Reference
 
 | Function / Macro | Description |

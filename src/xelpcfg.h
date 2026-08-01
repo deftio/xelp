@@ -95,8 +95,12 @@
  be browsed with UP/DOWN arrows. Requires XELP_ENABLE_CLI and XELP_ENABLE_LINE_EDIT.
  XELP_HIST_DEPTH sets the number of commands stored (default 4, overridable via
  compiler flag or xelp_ovr.h when XELP_CONFIG_OVERRIDE is defined).
- RAM cost: XELP_HIST_DEPTH * XELP_CMDBUFSZ + XELP_CMDBUFSZ + 4 bytes per instance.
- Code cost: ~420 bytes on ARM Thumb (-Os).
+ RAM cost per instance: XELP_HIST_DEPTH * XELP_CMDBUFSZ (ring) + XELP_CMDBUFSZ
+ (stashed in-progress line) + 4 ints (ring indices and saved length).  At the
+ defaults on a 32-bit target that is 4*64 + 64 + 16 = 336 bytes.
+ The indices are int rather than char deliberately -- see the note on the
+ history fields in xelp.h (issue #18).
+ Code cost: ~550 bytes on ARM Thumb, ~740 on ARM32, ~910 on AVR (-Os).
  */
 #ifndef XELP_ENABLE_HISTORY
 #define XELP_ENABLE_HISTORY 1
