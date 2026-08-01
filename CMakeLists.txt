@@ -62,7 +62,7 @@ endif()
 # ---- Plain CMake library ----
 cmake_minimum_required(VERSION 3.10)
 project(xelp
-    VERSION 0.3.4
+    VERSION 0.3.5
     LANGUAGES C
     DESCRIPTION "Embedded CLI/script interpreter -- no malloc, multi-instance"
 )

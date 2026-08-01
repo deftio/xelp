@@ -8,6 +8,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 The version source of truth is `XELP_VERSION` in `src/xelp.h` (hex format).
 Versions always use three-component semver (e.g. `0.3.0`, never `0.3`).
 
+## [0.3.5] - 2026-08-01
+
+**No library code changes.** `src/xelp.c` and `src/xelp.h` are byte-identical to
+0.3.4 apart from the version macro; compiled sizes are unchanged on every
+target. This release exists to fix and verify the publishing pipeline, which
+can only be exercised by tagging a real release.
+
+### Fixed
+- **ESP-IDF Component Registry publishing from CI.** `compote component upload`
+  was called without `--namespace`, so it defaulted to the `espressif`
+  namespace and POSTed to `components/espressif/xelp` instead of
+  `components/deftio/xelp`. Locally the correct namespace came from
+  `default_namespace` in `~/.espressif/idf_component_manager.yml`, which does
+  not exist on a CI runner — so the workflow had failed on every release since
+  0.3.2 while hand-publishing quietly covered for it. Fixed in both
+  `.github/workflows/release.yml` and `tools/make_release.sh`.
+- **`tmp/` excluded from the published component.** `compote` reads only
+  `files.exclude` in `idf_component.yml`, not `.gitignore`. Packing from a
+  working tree containing the gitignored `tmp/` scratch directory produced a
+  1.27 MB archive instead of 209 KB, carrying local build scratch and compiled
+  probe binaries. CI was never affected (clean checkout); local packs were.
+- **Release notes could silently be empty.** The workflow extracted everything
+  between the first `## [` heading and the next one, so an empty
+  `## [Unreleased]` above the version heading yielded no notes, and a
+  boilerplate fallback hid it. Extraction now anchors on the `## [X.Y.Z]`
+  heading for the version being released and **fails the release** rather than
+  publishing placeholder notes.
+
+### Notes
+- The GitHub Actions bumps (`actions/checkout` v6 → v7, `actions/setup-python`
+  v5 → v7) and the dependabot grouping of `github-actions` updates into a
+  single PR both shipped in **0.3.4** but were not recorded in its changelog
+  entry. Noted here for the record; 0.3.4's entry is left as released.
+  Neither breaking change affects this repo: checkout v7 restricts fork-PR
+  checkout for `pull_request_target` / `workflow_run` (these workflows trigger
+  on `push` and `pull_request`), and setup-python v7 removes the `pip-install`
+  input (unused).
+
 ## [0.3.4] - 2026-08-01
 
 ### Fixed

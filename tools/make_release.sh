@@ -868,7 +868,11 @@ do_idf_publish() {
     echo "  --- Packing component ---"
     run_cmd compote component pack --name xelp
     echo "  --- Uploading component ---"
-    run_cmd compote component upload --name xelp
+    # Pass --namespace explicitly rather than relying on default_namespace in
+    # ~/.espressif/idf_component_manager.yml.  compote defaults to the
+    # "espressif" namespace, so without this the upload silently depends on a
+    # local profile existing -- works on a configured machine, fails elsewhere.
+    run_cmd compote component upload --name xelp --namespace deftio
     pass "Published to ESP-IDF Component Registry."
 }
 
