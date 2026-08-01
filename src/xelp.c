@@ -384,6 +384,9 @@ XELPRESULT XelpHelp(XELP* ths)
 	return XELP_S_OK;
 }
 #endif
+#ifdef XELP_ENABLE_SCRIPT
+static void _xelpFrameInit(XELP *ths); /* forward decl — defined after XelpParseXB */
+#endif
 XELPRESULT XelpInit 	 (
 						XELP *ths,
 						const char *			pAboutMsg
@@ -412,6 +415,9 @@ XELPRESULT XelpInit 	 (
 #endif
 #if defined(XELP_ENABLE_CLI) && defined(XELP_ENABLE_HISTORY)
 	ths->mHistBrowse = -1;
+#endif
+#ifdef XELP_ENABLE_SCRIPT
+	_xelpFrameInit(ths);
 #endif
 	/* comand mode mssage index
 	ths->mCmdMsgIndex = 0;  //set to 0 by ptr loop at top
@@ -752,11 +758,520 @@ XELPRESULT XelpParseXB (XELP* ths, XelpBuf *args) {
 	}
 	return XELP_S_OK;
 }
+
+#ifdef XELP_ENABLE_SCRIPT
+/********************************************************
+ Script Engine — TLV helpers, frame management, variable storage,
+ builtin dispatch, $var expansion, and eval hook.
+ All functions are static and gated with XELP_ENABLE_SCRIPT.
+ ********************************************************/
+
+/* TLV layout: [type:1][size:2 little-endian][payload:size]
+   Total bytes = 1 + 2 + payload_size = 3 + payload_size */
+
+/********************************************************
+ _xelpTLVWriteInt() - write a T_INT TLV to dst.
+ Returns bytes written (always 7: 1 type + 2 size + 4 int).
+ */
+static int _xelpTLVWriteInt(char *dst, int val)
+{
+    unsigned char *d = (unsigned char *)dst;
+    unsigned int uv = (unsigned int)val;
+    d[0] = XELP_T_INT;
+    d[1] = 4;  /* payload size low byte */
+    d[2] = 0;  /* payload size high byte */
+    d[3] = (unsigned char)(uv & 0xFF);
+    d[4] = (unsigned char)((uv >> 8) & 0xFF);
+    d[5] = (unsigned char)((uv >> 16) & 0xFF);
+    d[6] = (unsigned char)((uv >> 24) & 0xFF);
+    return 7;
+}
+
+/********************************************************
+ _xelpTLVWriteStr() - write a T_STR TLV to dst.
+ Returns bytes written (3 + len).
+ */
+static int _xelpTLVWriteStr(char *dst, const char *s, int len)
+{
+    unsigned char *d = (unsigned char *)dst;
+    int i;
+    d[0] = XELP_T_STR;
+    d[1] = (unsigned char)(len & 0xFF);
+    d[2] = (unsigned char)((len >> 8) & 0xFF);
+    for (i = 0; i < len; i++)
+        d[3 + i] = (unsigned char)s[i];
+    return 3 + len;
+}
+
+/********************************************************
+ _xelpTLVRead() - read TLV header from src.
+ Sets *type and *size, returns pointer to payload.
+ */
+static const char *_xelpTLVRead(const char *src, int *type, int *size)
+{
+    const unsigned char *s = (const unsigned char *)src;
+    *type = (int)s[0];
+    *size = (int)s[1] | ((int)s[2] << 8);
+    return src + 3;
+}
+
+/********************************************************
+ _xelpTLVSize() - total size of a TLV entry at src.
+ */
+static int _xelpTLVSize(const char *src)
+{
+    const unsigned char *s = (const unsigned char *)src;
+    return 3 + ((int)s[1] | ((int)s[2] << 8));
+}
+
+/********************************************************
+ _xelpTLVReadInt() - read an integer value from a TLV payload.
+ Returns the int value. Caller must ensure type is T_INT.
+ */
+static int _xelpTLVReadInt(const char *payload)
+{
+    const unsigned char *p = (const unsigned char *)payload;
+    return (int)p[0] | ((int)p[1] << 8) | ((int)p[2] << 16) | ((int)p[3] << 24);
+}
+
+/********************************************************
+ Frame layout in arena (stack, grows up):
+   [prev_SP:sizeof(char*)][prev_HP:sizeof(char*)][prev_FP:sizeof(char*)]
+ Frame pointer (mFP) points to the start of the current frame header.
+ Variables are stored in the heap region (grows down from mHP).
+ ********************************************************/
+#define _XELP_FRAME_SZ  (3 * (int)sizeof(char*))
+
+/********************************************************
+ _xelpFramePush() - push a new frame. Returns XELP_S_OK or XELP_E_ARENA_FULL.
+ */
+static XELPRESULT _xelpFramePush(XELP *ths)
+{
+    char *newFP;
+    char **hdr;
+    if (ths->mSP + _XELP_FRAME_SZ > ths->mHP)
+        return XELP_E_ARENA_FULL;
+    newFP = ths->mSP;
+    hdr = (char **)(void *)newFP;
+    hdr[0] = ths->mSP;   /* save current SP */
+    hdr[1] = ths->mHP;   /* save current HP */
+    hdr[2] = ths->mFP;   /* save current FP */
+    ths->mFP = newFP;
+    ths->mSP = newFP + _XELP_FRAME_SZ;
+    return XELP_S_OK;
+}
+
+/********************************************************
+ _xelpFramePop() - pop current frame, restore parent context.
+ Returns XELP_S_OK or XELP_E_ERR if at root frame.
+ */
+static XELPRESULT _xelpFramePop(XELP *ths)
+{
+    char **hdr = (char **)(void *)ths->mFP;
+    if (hdr[2] == 0 && ths->mFP == ths->mArena)
+        return XELP_E_ERR; /* already at root frame */
+    ths->mSP = hdr[0];
+    ths->mHP = hdr[1];
+    ths->mFP = hdr[2];
+    return XELP_S_OK;
+}
+
+/********************************************************
+ _xelpFrameInit() - initialize arena and create root frame.
+ */
+static void _xelpFrameInit(XELP *ths)
+{
+    int i;
+    for (i = 0; i < XELP_SCRIPT_ARENA_SZ; i++)
+        ths->mArena[i] = 0;
+    ths->mSP = ths->mArena;
+    ths->mHP = ths->mArena + XELP_SCRIPT_ARENA_SZ;
+    ths->mFP = ths->mArena;
+    /* push root frame header (no parent, so store NULL equivalents) */
+    {
+        char **hdr = (char **)(void *)ths->mSP;
+        hdr[0] = 0; /* prev_SP */
+        hdr[1] = 0; /* prev_HP */
+        hdr[2] = 0; /* prev_FP */
+    }
+    ths->mSP = ths->mArena + _XELP_FRAME_SZ;
+}
+
+/********************************************************
+ Variable storage in the heap (grows down from mHP).
+ Each variable entry: [namelen:1][name:namelen][TLV value]
+ Lookup scans current frame's heap region only (no inheritance).
+ ********************************************************/
+
+/********************************************************
+ _xelpVarSet() - store a variable in the current frame's heap.
+ If the variable already exists, it is overwritten in place if the new
+ value fits, otherwise the old entry is abandoned and a new one is
+ allocated (simple bump allocator — no compaction).
+ */
+static XELPRESULT _xelpVarSet(XELP *ths, const char *name, int namelen,
+                               const char *tlv_data, int tlv_size)
+{
+    int entry_size = 1 + namelen + tlv_size;
+    char *scan, *limit, *found;
+    int i;
+
+    /* search for existing variable in current frame's heap region */
+    /* heap entries live between mHP and the arena end (or the saved HP
+       of the current frame's parent). The current frame's heap grows
+       downward from the HP that was active when this frame was created.
+       For the root frame, entries are between mHP and arena end.
+       Scan from mHP upward to the boundary. */
+    {
+        char **hdr = (char **)(void *)ths->mFP;
+        limit = hdr[1] ? hdr[1] : (ths->mArena + XELP_SCRIPT_ARENA_SZ);
+    }
+    found = 0;
+    scan = ths->mHP;
+    while (scan < limit) {
+        int nlen = (unsigned char)scan[0];
+        int tsize = _xelpTLVSize(scan + 1 + nlen);
+        int old_entry = 1 + nlen + tsize;
+        if (nlen == namelen) {
+            int match = 1;
+            for (i = 0; i < namelen; i++) {
+                if (scan[1 + i] != name[i]) { match = 0; break; }
+            }
+            if (match) {
+                /* found existing — overwrite if same size */
+                if (tsize == tlv_size) {
+                    for (i = 0; i < tlv_size; i++)
+                        scan[1 + namelen + i] = tlv_data[i];
+                    return XELP_S_OK;
+                }
+                found = scan;
+                break;
+            }
+        }
+        scan += old_entry;
+    }
+    (void)found; /* abandoned entry — no compaction */
+
+    /* allocate new entry by growing heap downward */
+    if (ths->mHP - entry_size < ths->mSP)
+        return XELP_E_ARENA_FULL;
+    ths->mHP -= entry_size;
+    ths->mHP[0] = (char)(unsigned char)namelen;
+    for (i = 0; i < namelen; i++)
+        ths->mHP[1 + i] = name[i];
+    for (i = 0; i < tlv_size; i++)
+        ths->mHP[1 + namelen + i] = tlv_data[i];
+    return XELP_S_OK;
+}
+
+/********************************************************
+ _xelpVarGet() - lookup variable in current frame (no inheritance).
+ Returns pointer to TLV data or NULL if not found.
+ */
+static const char *_xelpVarGet(XELP *ths, const char *name, int namelen)
+{
+    char *scan, *limit;
+    char **hdr = (char **)(void *)ths->mFP;
+    int i;
+
+    limit = hdr[1] ? hdr[1] : (ths->mArena + XELP_SCRIPT_ARENA_SZ);
+    scan = ths->mHP;
+    while (scan < limit) {
+        int nlen = (unsigned char)scan[0];
+        int tsize = _xelpTLVSize(scan + 1 + nlen);
+        int entry = 1 + nlen + tsize;
+        if (nlen == namelen) {
+            int match = 1;
+            for (i = 0; i < namelen; i++) {
+                if (scan[1 + i] != name[i]) { match = 0; break; }
+            }
+            if (match)
+                return scan + 1 + namelen;
+        }
+        scan += entry;
+    }
+    return 0;
+}
+
+/********************************************************
+ _xelpInt2Str() - convert integer to decimal string.
+ Writes into buf (must be at least 12 bytes). Returns length written.
+ */
+static int _xelpInt2Str(int val, char *buf)
+{
+    char tmp[12];
+    int i = 0, j = 0, neg = 0;
+    unsigned int uv;
+    if (val < 0) {
+        neg = 1;
+        uv = (unsigned int)(-(val + 1)) + 1u;
+    } else {
+        uv = (unsigned int)val;
+    }
+    if (uv == 0) {
+        tmp[i++] = '0';
+    } else {
+        while (uv > 0) {
+            tmp[i++] = (char)('0' + (uv % 10));
+            uv /= 10;
+        }
+    }
+    if (neg) buf[j++] = '-';
+    while (i > 0) buf[j++] = tmp[--i];
+    buf[j] = '\0';
+    return j;
+}
+
+/********************************************************
+ _xelpResolveArg() - resolve an argument to an integer.
+ Arguments arrive already expanded ($var -> value by _xelpExpandVars),
+ so this just parses the string as a literal integer.
+ Returns XELP_S_OK on success, XELP_E_TYPE_ERR on non-numeric input.
+ */
+static XELPRESULT _xelpResolveArg(XELP *ths, const char *arg, int *val)
+{
+    (void)ths;
+    if (XELP_S_OK == XelpParseNum(arg, XelpStrLen(arg), val))
+        return XELP_S_OK;
+    return XELP_E_TYPE_ERR;
+}
+
+/********************************************************
+ _xelpExpandVars() - expand $var references in argv array.
+ Operates after tokenization. For each argv[i] starting with '$',
+ looks up the variable and substitutes the value.
+ Uses a small scratch area for int-to-string conversion.
+ */
+/* Per-slot scratch for $var expansion. 12 bytes handles any 32-bit int.
+   For strings, we point directly at the arena payload. */
+static char _xelpVarScratch[XELP_ARGV_MAX][12];
+static void _xelpExpandVars(XELP *ths, int argc, const char **argv)
+{
+    int i;
+    for (i = 0; i < argc; i++) {
+        if (argv[i][0] == '$') {
+            const char *tlv;
+            int nlen = XelpStrLen(argv[i] + 1);
+            tlv = _xelpVarGet(ths, argv[i] + 1, nlen);
+            if (tlv) {
+                int type, size;
+                const char *payload = _xelpTLVRead(tlv, &type, &size);
+                if (type == XELP_T_INT) {
+                    int val = _xelpTLVReadInt(payload);
+                    _xelpInt2Str(val, _xelpVarScratch[i]);
+                    argv[i] = _xelpVarScratch[i];
+                } else if (type == XELP_T_STR) {
+                    /* The arena payload is stable for this statement's
+                       lifetime. Write a null terminator just past it in
+                       the scratch buffer for safety. */
+                    int j;
+                    if (size < 12) {
+                        for (j = 0; j < size; j++)
+                            _xelpVarScratch[i][j] = payload[j];
+                        _xelpVarScratch[i][size] = '\0';
+                        argv[i] = _xelpVarScratch[i];
+                    }
+                    /* if too long for scratch, leave as-is ($name literal) */
+                }
+            }
+            /* if not found, leave as literal $name */
+        }
+    }
+}
+
+/********************************************************
+ Script builtins — all follow CLI handler signature.
+ ********************************************************/
+
+/* _set name value — store variable */
+static XELPRESULT _xelpBuiltinSet(XELP *ths, int argc, const char **argv)
+{
+    char tlv[XELP_CMDBUFSZ + 4]; /* TLV header (3) + max string payload */
+    int tlv_size, nlen, val;
+    if (argc < 3) return XELP_E_ERR;
+    nlen = XelpStrLen(argv[1]);
+
+    /* try parsing value as integer first */
+    if (XELP_S_OK == XelpParseNum(argv[2], XelpStrLen(argv[2]), &val)) {
+        tlv_size = _xelpTLVWriteInt(tlv, val);
+    } else {
+        /* store as string */
+        int slen = XelpStrLen(argv[2]);
+        tlv_size = _xelpTLVWriteStr(tlv, argv[2], slen);
+    }
+    return _xelpVarSet(ths, argv[1], nlen, tlv, tlv_size);
+}
+
+/* _print expr [expr ...] — output each arg with space between, newline at end */
+static XELPRESULT _xelpBuiltinPrint(XELP *ths, int argc, const char **argv)
+{
+    int i;
+    for (i = 1; i < argc; i++) {
+        if (i > 1) _PUTC(' ');
+        XelpOut(ths, argv[i], 0);
+    }
+    _PUTC('\n');
+    return XELP_S_OK;
+}
+
+/* _type name — print the type of a variable */
+static XELPRESULT _xelpBuiltinType(XELP *ths, int argc, const char **argv)
+{
+    const char *tlv;
+    int type, size, nlen;
+    if (argc < 2) return XELP_E_ERR;
+    nlen = XelpStrLen(argv[1]);
+    tlv = _xelpVarGet(ths, argv[1], nlen);
+    if (!tlv) {
+        XelpOut(ths, "NIL", 0);
+        _PUTC('\n');
+        return XELP_S_OK;
+    }
+    _xelpTLVRead(tlv, &type, &size);
+    XelpOut(ths, (type == XELP_T_INT) ? "INT" : "STR", 0);
+    _PUTC('\n');
+    return XELP_S_OK;
+}
+
+/* Three-operand math/compare helper: _op dest a b */
+static XELPRESULT _xelpBuiltinMathOp(XELP *ths, int argc, const char **argv, int op)
+{
+    int a, b, result;
+    char tlv[8];
+    int tlv_size, nlen;
+    XELPRESULT ra, rb;
+    if (argc < 4) return XELP_E_ERR;
+    ra = _xelpResolveArg(ths, argv[2], &a);
+    rb = _xelpResolveArg(ths, argv[3], &b);
+    if (ra != XELP_S_OK) return ra;
+    if (rb != XELP_S_OK) return rb;
+
+    switch (op) {
+        case 0: result = a + b; break;                     /* _add */
+        case 1: result = a - b; break;                     /* _sub */
+        case 2: result = a * b; break;                     /* _mul */
+        case 3: if (b == 0) return XELP_E_ERR; result = a / b; break; /* _div */
+        case 4: if (b == 0) return XELP_E_ERR; result = a % b; break; /* _mod */
+        case 5: result = (a == b) ? 1 : 0; break;         /* _eq  */
+        case 6: result = (a != b) ? 1 : 0; break;         /* _neq */
+        case 7: result = (a <  b) ? 1 : 0; break;         /* _lt  */
+        case 8: result = (a >  b) ? 1 : 0; break;         /* _gt  */
+    }
+    nlen = XelpStrLen(argv[1]);
+    tlv_size = _xelpTLVWriteInt(tlv, result);
+    return _xelpVarSet(ths, argv[1], nlen, tlv, tlv_size);
+}
+
+static XELPRESULT _xelpBuiltinAdd(XELP *ths, int argc, const char **argv)
+{ return _xelpBuiltinMathOp(ths, argc, argv, 0); }
+static XELPRESULT _xelpBuiltinSub(XELP *ths, int argc, const char **argv)
+{ return _xelpBuiltinMathOp(ths, argc, argv, 1); }
+static XELPRESULT _xelpBuiltinMul(XELP *ths, int argc, const char **argv)
+{ return _xelpBuiltinMathOp(ths, argc, argv, 2); }
+static XELPRESULT _xelpBuiltinDiv(XELP *ths, int argc, const char **argv)
+{ return _xelpBuiltinMathOp(ths, argc, argv, 3); }
+static XELPRESULT _xelpBuiltinMod(XELP *ths, int argc, const char **argv)
+{ return _xelpBuiltinMathOp(ths, argc, argv, 4); }
+static XELPRESULT _xelpBuiltinEq(XELP *ths, int argc, const char **argv)
+{ return _xelpBuiltinMathOp(ths, argc, argv, 5); }
+static XELPRESULT _xelpBuiltinNeq(XELP *ths, int argc, const char **argv)
+{ return _xelpBuiltinMathOp(ths, argc, argv, 6); }
+static XELPRESULT _xelpBuiltinLt(XELP *ths, int argc, const char **argv)
+{ return _xelpBuiltinMathOp(ths, argc, argv, 7); }
+static XELPRESULT _xelpBuiltinGt(XELP *ths, int argc, const char **argv)
+{ return _xelpBuiltinMathOp(ths, argc, argv, 8); }
+
+/* _push — push a new frame (for testing/future use) */
+static XELPRESULT _xelpBuiltinPush(XELP *ths, int argc, const char **argv)
+{ (void)argc; (void)argv; return _xelpFramePush(ths); }
+
+/* _pop — pop current frame (for testing/future use) */
+static XELPRESULT _xelpBuiltinPop(XELP *ths, int argc, const char **argv)
+{ (void)argc; (void)argv; return _xelpFramePop(ths); }
+
+/* Script builtin dispatch table */
+static const XELPCLIFuncMapEntry _xelpScriptBuiltins[] = {
+    { _xelpBuiltinSet,   "_set",   "set variable"      },
+    { _xelpBuiltinPrint, "_print", "print values"      },
+    { _xelpBuiltinType,  "_type",  "print variable type"},
+    { _xelpBuiltinAdd,   "_add",   "add a b -> dest"   },
+    { _xelpBuiltinSub,   "_sub",   "sub a b -> dest"   },
+    { _xelpBuiltinMul,   "_mul",   "mul a b -> dest"   },
+    { _xelpBuiltinDiv,   "_div",   "div a b -> dest"   },
+    { _xelpBuiltinMod,   "_mod",   "mod a b -> dest"   },
+    { _xelpBuiltinEq,    "_eq",    "eq a b -> dest"    },
+    { _xelpBuiltinNeq,   "_neq",   "neq a b -> dest"   },
+    { _xelpBuiltinLt,    "_lt",    "lt a b -> dest"    },
+    { _xelpBuiltinGt,    "_gt",    "gt a b -> dest"    },
+    { _xelpBuiltinPush,  "_push",  "push new frame"    },
+    { _xelpBuiltinPop,   "_pop",   "pop frame"         },
+    XELP_FUNC_ENTRY_LAST
+};
+
+/********************************************************
+ _xelpEvalScript() - script eval entry point.
+ For each line: tokenize into argc/argv, expand $vars,
+ check for builtin (_-prefixed), then fall through to user CLI table.
+ */
+static XELPRESULT _xelpEvalScript(XELP *ths, XelpBuf *args)
+{
+    XelpBuf line;
+    const char *argv[XELP_ARGV_MAX];
+    int argc;
+
+    while (XELP_S_OK == XelpTokLineXB(args, &line, XELP_TOK_LINE)) {
+        int handled = 0;
+        argc = 0;
+        _xelpBuf2Argv(ths, line.s, (int)(line.e - line.s),
+                       &argc, argv, XELP_ARGV_MAX);
+        if (argc <= 0) continue;
+
+        /* expand $var references */
+        _xelpExpandVars(ths, argc, argv);
+
+        /* check if first token starts with '_' — try builtin table */
+        if (argv[0][0] == '_') {
+            const XELPCLIFuncMapEntry *bf = _xelpScriptBuiltins;
+            while (bf->mpCmd) {
+                if (XELP_S_OK == XelpStrEq(argv[0], XelpStrLen(argv[0]), bf->mpCmd)) {
+                    ths->mR[0] = bf->mFunPtr(ths, argc, argv);
+                    handled = 1;
+                    break;
+                }
+                bf++;
+            }
+        }
+
+        /* fall through to user CLI table if not handled by builtin */
+        if (!handled) {
+            XELPCLIFuncMapEntry *f = ths->mpCLIModeFuncs;
+            if (f) {
+                ths->mR[0] = XELP_E_CMDNOTFOUND;
+                while (f->mpCmd) {
+                    if (XELP_S_OK == XelpStrEq(argv[0], XelpStrLen(argv[0]), f->mpCmd))
+                        break;
+                    f++;
+                }
+                if (f->mpCmd)
+                    ths->mR[0] = f->mFunPtr(ths, argc, argv);
+                else if (ths->mpfDefCLI)
+                    ths->mR[0] = ths->mpfDefCLI(ths, argc, argv);
+            }
+        }
+    }
+    return XELP_S_OK;
+}
+#endif /* XELP_ENABLE_SCRIPT */
+
 XELPRESULT XelpParse 		(XELP *ths, const char *buf, int blen)
 {
     XelpBuf args;
     XELP_XB_INIT(args,(char*)buf,blen); /* const discard is safe: tokenizer only reads */
+#ifdef XELP_ENABLE_SCRIPT
+    return _xelpEvalScript(ths, &args);
+#else
     return XelpParseXB(ths,&args);
+#endif
 }
 #endif /* XELP_ENABLE_CLI */
 
@@ -809,6 +1324,10 @@ static void _xelpCursorMove(XELP *ths, int dir, int all) {
 }
 #endif
 
+#ifdef XELP_ENABLE_SCRIPT
+static XELPRESULT _xelpEvalScript(XELP *ths, XelpBuf *args); /* forward decl */
+#endif
+
 #ifdef XELP_ENABLE_CLI
 /* handle ENTER: echo newline, save to history, execute buffer, reset, show prompt */
 static void _xelpHandleEnter(XELP *ths) {
@@ -818,7 +1337,11 @@ static void _xelpHandleEnter(XELP *ths) {
 #endif
 	_PUTC(XELPKEY_ENTER);
 	XELP_XB_INIT_PTRS(line, ths->mCmdXB.s, ths->mCmdXB.s, ths->mCmdXB.p);
+#ifdef XELP_ENABLE_SCRIPT
+	_xelpEvalScript(ths, &line);
+#else
 	XelpParseXB(ths, &line);
+#endif
 	XELP_XB_TOP(ths->mCmdXB);
 #ifdef XELP_ENABLE_LINE_EDIT
 	ths->mCur = ths->mCmdXB.s;

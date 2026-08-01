@@ -2,8 +2,12 @@
 
 This file consolidates early design brainstorming and the original TODO
 list. Preserved for historical reference. The current roadmap is in
-[xelp-todo.md](xelp-todo.md); detailed specs for scripting and VM are
-in [xelp_script.md](xelp_script.md) and [xelp_vm.md](xelp_vm.md).
+[xelp-todo.md](xelp-todo.md). Script design drafts:
+[xelp_script_proposal3.md](xelp_script_proposal3.md) (unified target spec);
+earlier explorations in
+[xelp_script_proposal1.md](xelp_script_proposal1.md) and
+[xelp_script_proposal2.md](xelp_script_proposal2.md).
+VM notes: [xelp_vm.md](xelp_vm.md).
 
 ---
 
@@ -254,8 +258,9 @@ of the buffer (no undo for this just like any other command line).
 
 # Part 2: Language Design Notes (mtcl -- micro-TCL)
 
-Early brainstorming for language extensions. The current scripting design
-is in [xelp_script.md](xelp_script.md).
+Early brainstorming for language extensions. Current scripting design
+direction: [xelp_script_proposal3.md](xelp_script_proposal3.md)
+(earlier drafts: proposal1/proposal2 in this folder).
 
 ## Design Philosophy
 
@@ -330,7 +335,8 @@ Variable packing format:
 
 Code and config that was removed from the source tree because it had
 no implementation. Preserved here for reference when these features
-are implemented. See also `dev/xelp_vm.md` and `dev/xelp_script.md`.
+are implemented. See also [xelp_vm.md](xelp_vm.md) and
+[xelp_script_proposal3.md](xelp_script_proposal3.md).
 
 ## XELP_STACK_MACHINE
 

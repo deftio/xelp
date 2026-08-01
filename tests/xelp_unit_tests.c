@@ -5013,6 +5013,489 @@ XELPRESULT test_BranchCoverage() {
     return XELP_S_OK;
 }
 
+/* ==========================================================================
+   Script Engine Unit Tests (gated with XELP_ENABLE_SCRIPT)
+   ========================================================================== */
+#ifdef XELP_ENABLE_SCRIPT
+
+/* helper: init a scripting-ready instance with output capture */
+static void _setupScriptInstance(XELP *x) {
+    XelpInit(x, "ScriptTest");
+    x->mpfOut = gDummyBufOut;
+    x->mpCLIModeFuncs = gMyCLICommands;
+    resetDummyBuf();
+}
+
+/* helper: check if captured output starts with expected string */
+static int _outputStartsWith(const char *expected) {
+    int elen = XelpStrLen(expected);
+    int i;
+    for (i = 0; i < elen; i++) {
+        if (gDummyBuf[i] != expected[i]) return 0;
+    }
+    return 1;
+}
+
+/* helper: check if captured output contains expected string */
+static int _outputContains(const char *expected) {
+    int elen = XelpStrLen(expected);
+    int olen = (int)(gDummyXelpBuf.p - gDummyXelpBuf.s);
+    int i, j;
+    for (i = 0; i <= olen - elen; i++) {
+        int match = 1;
+        for (j = 0; j < elen; j++) {
+            if (gDummyBuf[i + j] != expected[j]) { match = 0; break; }
+        }
+        if (match) return 1;
+    }
+    return 0;
+}
+
+/* ====================================================================
+ test_ScriptArena() - arena init, overflow detection, frame push/pop
+ */
+XELPRESULT test_ScriptArena() {
+    XELP x;
+    _setupScriptInstance(&x);
+
+    /* verify arena pointers after init */
+    if (JB_ASSERT(x.mFP != x.mArena, "ScriptArena: FP at arena start"))
+        return XELP_E_ERR;
+    if (JB_ASSERT(x.mHP != x.mArena + XELP_SCRIPT_ARENA_SZ, "ScriptArena: HP at arena end"))
+        return XELP_E_ERR;
+    if (JB_ASSERT(x.mSP > x.mHP, "ScriptArena: SP < HP"))
+        return XELP_E_ERR;
+
+    /* _set allocates heap space — HP should move down */
+    {
+        char *hp_before = x.mHP;
+        XelpParse(&x, "_set test_var 42", 16);
+        if (JB_ASSERT(x.mHP >= hp_before, "ScriptArena: HP moved down after _set"))
+            return XELP_E_ERR;
+    }
+
+    /* frame push/pop via builtins */
+    {
+        char *sp_before, *hp_before, *fp_before;
+        _setupScriptInstance(&x);
+        XelpParse(&x, "_set root_var 99", 16);
+        sp_before = x.mSP;
+        hp_before = x.mHP;
+        fp_before = x.mFP;
+
+        /* push a new frame */
+        XelpParse(&x, "_push", 5);
+        if (JB_ASSERT(x.mR[0] != XELP_S_OK, "ScriptArena: push succeeds"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(x.mFP == fp_before, "ScriptArena: FP changed after push"))
+            return XELP_E_ERR;
+
+        /* pop the frame — restores previous state */
+        XelpParse(&x, "_pop", 4);
+        if (JB_ASSERT(x.mR[0] != XELP_S_OK, "ScriptArena: pop succeeds"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(x.mSP != sp_before, "ScriptArena: SP restored after pop"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(x.mHP != hp_before, "ScriptArena: HP restored after pop"))
+            return XELP_E_ERR;
+        if (JB_ASSERT(x.mFP != fp_before, "ScriptArena: FP restored after pop"))
+            return XELP_E_ERR;
+
+        /* pop at root frame returns error */
+        XelpParse(&x, "_pop", 4);
+        if (JB_ASSERT(x.mR[0] != XELP_E_ERR, "ScriptArena: pop at root returns error"))
+            return XELP_E_ERR;
+    }
+
+    /* overflow detection: fill arena with many variables until it fails */
+    {
+        int i;
+        char cmd[32];
+        XELPRESULT last_r = XELP_S_OK;
+
+        _setupScriptInstance(&x);
+        for (i = 0; i < 100; i++) {
+            int pos = 0;
+            int d;
+            cmd[pos++] = '_'; cmd[pos++] = 's'; cmd[pos++] = 'e'; cmd[pos++] = 't';
+            cmd[pos++] = ' '; cmd[pos++] = 'v';
+            if (i >= 10) { d = i / 10; cmd[pos++] = (char)('0' + d); }
+            d = i % 10; cmd[pos++] = (char)('0' + d);
+            cmd[pos++] = ' ';
+            cmd[pos++] = '9'; cmd[pos++] = '9'; cmd[pos++] = '9';
+            cmd[pos] = '\0';
+            XelpParse(&x, cmd, XelpStrLen(cmd));
+            if (x.mR[0] == XELP_E_ARENA_FULL) {
+                last_r = XELP_E_ARENA_FULL;
+                break;
+            }
+        }
+        if (JB_ASSERT(last_r != XELP_E_ARENA_FULL, "ScriptArena: should detect arena full"))
+            return XELP_E_ERR;
+    }
+
+    /* push overflow: fill stack until push fails */
+    {
+        int i;
+        XELPRESULT last_r = XELP_S_OK;
+        _setupScriptInstance(&x);
+        for (i = 0; i < 100; i++) {
+            XelpParse(&x, "_push", 5);
+            if (x.mR[0] == XELP_E_ARENA_FULL) {
+                last_r = XELP_E_ARENA_FULL;
+                break;
+            }
+        }
+        if (JB_ASSERT(last_r != XELP_E_ARENA_FULL, "ScriptArena: push overflow detected"))
+            return XELP_E_ERR;
+    }
+
+    return XELP_S_OK;
+}
+
+/* ====================================================================
+ test_ScriptTLV() - TLV write/read for INT and STR; size computation
+ */
+XELPRESULT test_ScriptTLV() {
+    XELP x;
+    _setupScriptInstance(&x);
+
+    /* test INT via _set and _print */
+    XelpParse(&x, "_set x 42", 9);
+    resetDummyBuf();
+    XelpParse(&x, "_print $x", 9);
+    if (JB_ASSERT(!_outputStartsWith("42"), "ScriptTLV: int stored and retrieved"))
+        return XELP_E_ERR;
+
+    /* test STR */
+    resetDummyBuf();
+    XelpParse(&x, "_set s hello", 12);
+    XelpParse(&x, "_print $s", 9);
+    if (JB_ASSERT(!_outputStartsWith("hello"), "ScriptTLV: str stored and retrieved"))
+        return XELP_E_ERR;
+
+    /* test _type for INT */
+    resetDummyBuf();
+    XelpParse(&x, "_type x", 7);
+    if (JB_ASSERT(!_outputStartsWith("INT"), "ScriptTLV: type INT"))
+        return XELP_E_ERR;
+
+    /* test _type for STR */
+    resetDummyBuf();
+    XelpParse(&x, "_type s", 7);
+    if (JB_ASSERT(!_outputStartsWith("STR"), "ScriptTLV: type STR"))
+        return XELP_E_ERR;
+
+    /* test _type for undefined var */
+    resetDummyBuf();
+    XelpParse(&x, "_type undefined", 15);
+    if (JB_ASSERT(!_outputStartsWith("NIL"), "ScriptTLV: type NIL for undefined"))
+        return XELP_E_ERR;
+
+    return XELP_S_OK;
+}
+
+/* ====================================================================
+ test_ScriptVarSetGet() - _set creates variable, $var expansion retrieves
+ */
+XELPRESULT test_ScriptVarSetGet() {
+    XELP x;
+    _setupScriptInstance(&x);
+
+    /* set integer and retrieve */
+    XelpParse(&x, "_set count 7", 12);
+    resetDummyBuf();
+    XelpParse(&x, "_print $count", 13);
+    if (JB_ASSERT(!_outputStartsWith("7"), "VarSetGet: int retrieval"))
+        return XELP_E_ERR;
+
+    /* set string and retrieve */
+    XelpParse(&x, "_set name world", 15);
+    resetDummyBuf();
+    XelpParse(&x, "_print $name", 12);
+    if (JB_ASSERT(!_outputStartsWith("world"), "VarSetGet: str retrieval"))
+        return XELP_E_ERR;
+
+    /* overwrite variable with new value of same type */
+    XelpParse(&x, "_set count 99", 13);
+    resetDummyBuf();
+    XelpParse(&x, "_print $count", 13);
+    if (JB_ASSERT(!_outputStartsWith("99"), "VarSetGet: overwrite same-size int"))
+        return XELP_E_ERR;
+
+    /* undefined variable stays as literal */
+    resetDummyBuf();
+    XelpParse(&x, "_print $undef", 13);
+    if (JB_ASSERT(!_outputStartsWith("$undef"), "VarSetGet: undefined stays literal"))
+        return XELP_E_ERR;
+
+    /* negative integer */
+    XelpParse(&x, "_set neg -5", 11);
+    resetDummyBuf();
+    XelpParse(&x, "_print $neg", 11);
+    if (JB_ASSERT(!_outputStartsWith("-5"), "VarSetGet: negative int"))
+        return XELP_E_ERR;
+
+    /* hex integer */
+    XelpParse(&x, "_set h 0xFF", 11);
+    resetDummyBuf();
+    XelpParse(&x, "_print $h", 9);
+    if (JB_ASSERT(!_outputStartsWith("255"), "VarSetGet: hex int"))
+        return XELP_E_ERR;
+
+    /* overwrite int with string (different TLV size) */
+    XelpParse(&x, "_set count hello", 16);
+    resetDummyBuf();
+    XelpParse(&x, "_print $count", 13);
+    if (JB_ASSERT(!_outputStartsWith("hello"), "VarSetGet: overwrite int with str"))
+        return XELP_E_ERR;
+
+    /* overwrite string with int (different TLV size again) */
+    XelpParse(&x, "_set count 77", 13);
+    resetDummyBuf();
+    XelpParse(&x, "_print $count", 13);
+    if (JB_ASSERT(!_outputStartsWith("77"), "VarSetGet: overwrite str with int"))
+        return XELP_E_ERR;
+
+    return XELP_S_OK;
+}
+
+/* ====================================================================
+ test_ScriptPrint() - _print outputs to buffer, verify content
+ */
+XELPRESULT test_ScriptPrint() {
+    XELP x;
+    _setupScriptInstance(&x);
+
+    /* single arg */
+    XelpParse(&x, "_print hello", 12);
+    if (JB_ASSERT(!_outputStartsWith("hello\n"), "Print: single arg"))
+        return XELP_E_ERR;
+
+    /* multiple args with spaces */
+    resetDummyBuf();
+    XelpParse(&x, "_print a b c", 12);
+    if (JB_ASSERT(!_outputStartsWith("a b c\n"), "Print: multiple args"))
+        return XELP_E_ERR;
+
+    /* no args prints just newline */
+    resetDummyBuf();
+    XelpParse(&x, "_print", 6);
+    if (JB_ASSERT(!_outputStartsWith("\n"), "Print: no args just newline"))
+        return XELP_E_ERR;
+
+    /* mixed vars and literals */
+    XelpParse(&x, "_set x 10", 9);
+    resetDummyBuf();
+    XelpParse(&x, "_print val $x end", 17);
+    if (JB_ASSERT(!_outputStartsWith("val 10 end\n"), "Print: mixed vars and literals"))
+        return XELP_E_ERR;
+
+    return XELP_S_OK;
+}
+
+/* ====================================================================
+ test_ScriptMathOps() - _add, _sub, _mul, _div, _mod
+ */
+XELPRESULT test_ScriptMathOps() {
+    XELP x;
+    _setupScriptInstance(&x);
+
+    /* _add with literals */
+    XelpParse(&x, "_add r 3 4", 10);
+    resetDummyBuf();
+    XelpParse(&x, "_print $r", 9);
+    if (JB_ASSERT(!_outputStartsWith("7"), "MathOps: 3+4=7"))
+        return XELP_E_ERR;
+
+    /* _add with variables */
+    XelpParse(&x, "_set a 10", 9);
+    XelpParse(&x, "_set b 20", 9);
+    XelpParse(&x, "_add r $a $b", 12);
+    resetDummyBuf();
+    XelpParse(&x, "_print $r", 9);
+    if (JB_ASSERT(!_outputStartsWith("30"), "MathOps: 10+20=30"))
+        return XELP_E_ERR;
+
+    /* _sub */
+    XelpParse(&x, "_sub r $b $a", 12);
+    resetDummyBuf();
+    XelpParse(&x, "_print $r", 9);
+    if (JB_ASSERT(!_outputStartsWith("10"), "MathOps: 20-10=10"))
+        return XELP_E_ERR;
+
+    /* _mul */
+    XelpParse(&x, "_mul r 6 7", 10);
+    resetDummyBuf();
+    XelpParse(&x, "_print $r", 9);
+    if (JB_ASSERT(!_outputStartsWith("42"), "MathOps: 6*7=42"))
+        return XELP_E_ERR;
+
+    /* _div */
+    XelpParse(&x, "_div r 100 4", 12);
+    resetDummyBuf();
+    XelpParse(&x, "_print $r", 9);
+    if (JB_ASSERT(!_outputStartsWith("25"), "MathOps: 100/4=25"))
+        return XELP_E_ERR;
+
+    /* _mod */
+    XelpParse(&x, "_mod r 10 3", 11);
+    resetDummyBuf();
+    XelpParse(&x, "_print $r", 9);
+    if (JB_ASSERT(!_outputStartsWith("1"), "MathOps: 10%3=1"))
+        return XELP_E_ERR;
+
+    /* mixed literal and variable */
+    XelpParse(&x, "_add r $a 1", 11);
+    resetDummyBuf();
+    XelpParse(&x, "_print $r", 9);
+    if (JB_ASSERT(!_outputStartsWith("11"), "MathOps: $a+1=11"))
+        return XELP_E_ERR;
+
+    /* negative result */
+    XelpParse(&x, "_sub r 3 10", 11);
+    resetDummyBuf();
+    XelpParse(&x, "_print $r", 9);
+    if (JB_ASSERT(!_outputStartsWith("-7"), "MathOps: 3-10=-7"))
+        return XELP_E_ERR;
+
+    return XELP_S_OK;
+}
+
+/* ====================================================================
+ test_ScriptCompareOps() - _eq, _neq, _lt, _gt
+ */
+XELPRESULT test_ScriptCompareOps() {
+    XELP x;
+    _setupScriptInstance(&x);
+
+    XelpParse(&x, "_set x 10", 9);
+    XelpParse(&x, "_set y 20", 9);
+
+    /* _eq: 10 == 20 -> 0 */
+    XelpParse(&x, "_eq r $x $y", 11);
+    resetDummyBuf();
+    XelpParse(&x, "_print $r", 9);
+    if (JB_ASSERT(!_outputStartsWith("0"), "CompareOps: 10==20 -> 0"))
+        return XELP_E_ERR;
+
+    /* _eq: 10 == 10 -> 1 */
+    XelpParse(&x, "_eq r $x $x", 11);
+    resetDummyBuf();
+    XelpParse(&x, "_print $r", 9);
+    if (JB_ASSERT(!_outputStartsWith("1"), "CompareOps: 10==10 -> 1"))
+        return XELP_E_ERR;
+
+    /* _neq: 10 != 20 -> 1 */
+    XelpParse(&x, "_neq r $x $y", 12);
+    resetDummyBuf();
+    XelpParse(&x, "_print $r", 9);
+    if (JB_ASSERT(!_outputStartsWith("1"), "CompareOps: 10!=20 -> 1"))
+        return XELP_E_ERR;
+
+    /* _lt: 10 < 20 -> 1 */
+    XelpParse(&x, "_lt r $x $y", 11);
+    resetDummyBuf();
+    XelpParse(&x, "_print $r", 9);
+    if (JB_ASSERT(!_outputStartsWith("1"), "CompareOps: 10<20 -> 1"))
+        return XELP_E_ERR;
+
+    /* _gt: 10 > 20 -> 0 */
+    XelpParse(&x, "_gt r $x $y", 11);
+    resetDummyBuf();
+    XelpParse(&x, "_print $r", 9);
+    if (JB_ASSERT(!_outputStartsWith("0"), "CompareOps: 10>20 -> 0"))
+        return XELP_E_ERR;
+
+    /* _gt: 20 > 10 -> 1 */
+    XelpParse(&x, "_gt r $y $x", 11);
+    resetDummyBuf();
+    XelpParse(&x, "_print $r", 9);
+    if (JB_ASSERT(!_outputStartsWith("1"), "CompareOps: 20>10 -> 1"))
+        return XELP_E_ERR;
+
+    return XELP_S_OK;
+}
+
+/* ====================================================================
+ test_ScriptVarScope() - variables in root frame persist across statements
+ */
+XELPRESULT test_ScriptVarScope() {
+    XELP x;
+    _setupScriptInstance(&x);
+
+    /* set in one parse call, read in another */
+    XelpParse(&x, "_set p 100", 10);
+    resetDummyBuf();
+    XelpParse(&x, "_print $p", 9);
+    if (JB_ASSERT(!_outputStartsWith("100"), "VarScope: persist across parse calls"))
+        return XELP_E_ERR;
+
+    /* multiple statements in one parse call via semicolons */
+    resetDummyBuf();
+    XelpParse(&x, "_set q 5; _add q $q 10; _print $q", 33);
+    if (JB_ASSERT(!_outputContains("15"), "VarScope: multi-statement"))
+        return XELP_E_ERR;
+
+    /* variables persist after math operations */
+    resetDummyBuf();
+    XelpParse(&x, "_print $p", 9);
+    if (JB_ASSERT(!_outputStartsWith("100"), "VarScope: original var still valid"))
+        return XELP_E_ERR;
+
+    return XELP_S_OK;
+}
+
+/* ====================================================================
+ test_ScriptErrors() - arena full, division by zero, bad args
+ */
+XELPRESULT test_ScriptErrors() {
+    XELP x;
+    _setupScriptInstance(&x);
+
+    /* division by zero */
+    XelpParse(&x, "_set a 10", 9);
+    XelpParse(&x, "_div r $a 0", 11);
+    if (JB_ASSERT(x.mR[0] != XELP_E_ERR, "ScriptErrors: div by zero returns error"))
+        return XELP_E_ERR;
+
+    /* mod by zero */
+    XelpParse(&x, "_mod r $a 0", 11);
+    if (JB_ASSERT(x.mR[0] != XELP_E_ERR, "ScriptErrors: mod by zero returns error"))
+        return XELP_E_ERR;
+
+    /* _set with too few args */
+    XelpParse(&x, "_set", 4);
+    if (JB_ASSERT(x.mR[0] != XELP_E_ERR, "ScriptErrors: _set too few args"))
+        return XELP_E_ERR;
+
+    /* _add with too few args */
+    XelpParse(&x, "_add r 5", 8);
+    if (JB_ASSERT(x.mR[0] != XELP_E_ERR, "ScriptErrors: _add too few args"))
+        return XELP_E_ERR;
+
+    /* type error: math on non-numeric string */
+    XelpParse(&x, "_set s hello", 12);
+    XelpParse(&x, "_add r $s 1", 11);
+    if (JB_ASSERT(x.mR[0] >= 0, "ScriptErrors: math on string returns error"))
+        return XELP_E_ERR;
+
+    /* _type with too few args */
+    XelpParse(&x, "_type", 5);
+    if (JB_ASSERT(x.mR[0] != XELP_E_ERR, "ScriptErrors: _type too few args"))
+        return XELP_E_ERR;
+
+    /* user CLI commands still work through script eval */
+    resetDummyBuf();
+    XelpParse(&x, "cli0", 4);
+    if (JB_ASSERT(x.mR[0] != XELP_S_OK, "ScriptErrors: user commands still dispatch"))
+        return XELP_E_ERR;
+
+    return XELP_S_OK;
+}
+
+#endif /* XELP_ENABLE_SCRIPT */
+
 /* 	************************************************
 	Xelp Simple Unit Test suite.
 */
@@ -5083,6 +5566,17 @@ int run_tests() {
     JumpBug_RunUnit(test_HistoryWithEditing,"HistoryEditing");
     JumpBug_RunUnit(test_HistoryDuplicates,"HistoryDups");
     JumpBug_RunUnit(test_HistoryAndEcho,"HistoryEcho");
+#endif
+
+#ifdef XELP_ENABLE_SCRIPT
+    JumpBug_RunUnit(test_ScriptArena,"ScriptArena");
+    JumpBug_RunUnit(test_ScriptTLV,"ScriptTLV");
+    JumpBug_RunUnit(test_ScriptVarSetGet,"ScriptVarSetGet");
+    JumpBug_RunUnit(test_ScriptPrint,"ScriptPrint");
+    JumpBug_RunUnit(test_ScriptMathOps,"ScriptMathOps");
+    JumpBug_RunUnit(test_ScriptCompareOps,"ScriptCompareOps");
+    JumpBug_RunUnit(test_ScriptVarScope,"ScriptVarScope");
+    JumpBug_RunUnit(test_ScriptErrors,"ScriptErrors");
 #endif
 
     JumpBug_PrintResults();

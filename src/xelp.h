@@ -136,8 +136,17 @@ typedef unsigned long XELPKEYCODE;
 #define XELP_E_ERR			(-1)
 #define XELP_E_CMDBUFFULL 	(-2)
 #define XELP_E_CMDNOTFOUND  (-3)
+#define XELP_E_ARENA_FULL   (-4)
+#define XELP_E_TYPE_ERR     (-5)
+#define XELP_E_VAR_NOT_FOUND (-6)
 
 #define XELP_T_OK(r) ((r)>=0) 	/* simple macro for testing OK or warning (e.g. not a failure) */
+
+/* Script engine type tags (TLV type byte) */
+#define XELP_T_NIL    (0)
+#define XELP_T_INT    (1)
+#define XELP_T_STR    (2)
+#define XELP_T_ARRAY  (3)
 
 
 #ifndef XELP_HIST_DEPTH
@@ -320,6 +329,13 @@ typedef struct XELP_tag
 	char  mHistBrowse;   /* browse position (-1 = not browsing)                  */
 	char  mHistSaved[XELP_CMDBUFSZ]; /* stash of in-progress line on first UP   */
 	char  mHistSavedLen; /* length of saved in-progress line                     */
+#endif
+
+#ifdef XELP_ENABLE_SCRIPT
+	char  mArena[XELP_SCRIPT_ARENA_SZ]; /* fixed arena for all script state      */
+	char *mSP;           /* stack pointer (grows up from mArena)                  */
+	char *mHP;           /* heap pointer (grows down from end of mArena)          */
+	char *mFP;           /* current frame pointer                                */
 #endif
 
 	/****

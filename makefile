@@ -4,7 +4,7 @@
 CC=gcc   	# C compiler to use
 CPP=g++		# C++ compiler to use
 
-C_FLAGS=-I. -Wall -Wextra -Werror -g -O0 -fprofile-arcs -ftest-coverage
+C_FLAGS=-I. -Wall -Wextra -Werror -g -O0 -fprofile-arcs -ftest-coverage -DXELP_ENABLE_SCRIPT
 CPP_FLAGS=-std=c++11 -Wall
 
 LIB_DIR=src

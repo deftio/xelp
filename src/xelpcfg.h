@@ -216,6 +216,20 @@
 
 /* #define XELP_ENABLE_FULL	  1 */
 
+/****************************************************************************************************
+ Enable Script Engine.
+ When defined, provides a frame-scoped typed-value scripting engine with
+ variables, math/comparison builtins, and $var expansion.
+ Requires XELP_ENABLE_CLI.  Adds arena storage (XELP_SCRIPT_ARENA_SZ bytes)
+ per instance.
+ */
+#ifndef XELP_ENABLE_SCRIPT
+/* #define XELP_ENABLE_SCRIPT 1 */
+#endif
+
+#ifndef XELP_SCRIPT_ARENA_SZ
+#define XELP_SCRIPT_ARENA_SZ  (512)
+#endif
 
 /****************************************************************************************************
  XELP_CONFIG_OVERRIDE -- customize the library without modifying source files.
@@ -252,6 +266,9 @@
 #endif
 #if defined(XELP_ENABLE_HISTORY) && !defined(XELP_ENABLE_LINE_EDIT)
 #undef XELP_ENABLE_HISTORY
+#endif
+#if defined(XELP_ENABLE_SCRIPT) && !defined(XELP_ENABLE_CLI)
+#undef XELP_ENABLE_SCRIPT
 #endif
 
 #endif  /* __XELP_CONFIG_H__ */

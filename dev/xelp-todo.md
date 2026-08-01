@@ -32,7 +32,7 @@ link have detailed specifications in `dev/`.
       ~420 bytes ARM Thumb.
 - [x] `XelpArgInt` / `XelpArgStr` convenience functions for direct argument
       access by index.
-- [x] Test suite: 47 units, 598 cases, 100% line coverage
+- [x] Test suite: 45 units, 597 cases, 100% line coverage
 
 ## Scripting Engine (deferred -- clean up core first)
 
@@ -66,7 +66,9 @@ Not starting until dev experience and examples are solid.
       Use cases: format specifiers, string type hints for the scripting
       engine, user-defined token annotations.
 
-Design doc: [dev/xelp_script.md](xelp_script.md)
+Design docs: [dev/xelp_script_proposal3.md](xelp_script_proposal3.md)
+(primary target); [dev/xelp_script_proposal1.md](xelp_script_proposal1.md),
+[dev/xelp_script_proposal2.md](xelp_script_proposal2.md) (earlier drafts).
 
 ## Virtual Machine (postponed -- likely a separate project)
 
@@ -92,11 +94,11 @@ command name per argc/argv convention.
 
 ### 0.4.0: Breaking handler signature change (argc/argv)
 
-- [ ] **Change CLI handler signature** from
+- [x] **Change CLI handler signature** from
       `fn(XELP *ths, const char *args, int len)` to
-      `fn(XELP *ths, int argc, XelpBuf *argv)`.
-      Dispatcher pre-tokenizes into stack-allocated `XelpBuf argv[]`.
-      `XelpArgInt`/`XelpArgStr` simplify to take `XelpBuf *` directly.
+      `fn(XELP *ths, int argc, const char **argv)`.
+      Dispatcher pre-tokenizes into stack-allocated `argv[]`.
+      `XelpArgvInt`/`XelpArgvStr` take `(const char **argv, int argc, ...)`.
 
 Last planned breaking change before the scripting engine. Stack cost
 (~12 bytes per arg on 32-bit) is acceptable -- the primary audience
