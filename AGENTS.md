@@ -12,7 +12,7 @@ For the llmstxt.org-format project index, see [llms.txt](llms.txt).
 A command line interpreter, script engine, and single-key menu system
 for embedded systems. Pure C, zero dynamic memory, no OS, no stdlib.
 Three files: `xelp.c`, `xelp.h`, `xelpcfg.h`. Compiles on 8-bit
-through 64-bit targets with any C89+ compiler. Version 0.3.3.
+through 64-bit targets with any C89+ compiler. Version 0.3.4.
 
 ## Critical constraints
 
@@ -448,7 +448,7 @@ Edit `src/xelpcfg.h` to enable/disable features:
 |------|---------|-------------|
 | `XELP_ENABLE_CLI` | CLI mode + scripting | Core (~1.5-2.6 KB) |
 | `XELP_ENABLE_LINE_EDIT` | Cursor movement, insert, delete | ~800-1000 bytes |
-| `XELP_ENABLE_HISTORY` | Command history (UP/DOWN recall) | ~420 bytes |
+| `XELP_ENABLE_HISTORY` | Command history (UP/DOWN recall) | ~550 bytes |
 | `XELP_ENABLE_KEY` | Single keypress mode | ~200-500 bytes |
 | `XELP_ENABLE_THR` | Pass-through mode | ~50-125 bytes |
 | `XELP_ENABLE_HELP` | Built-in help command | ~180-350 bytes |
@@ -764,7 +764,7 @@ Methods: `begin()`, `setCommands()`, `poll()`, `parse()`,
 xelp uses **JumpBug**, a minimal C89-compatible unit test framework with
 no external dependencies. Tests are in `tests/xelp_unit_tests.c`.
 
-**50 test units, 693 test cases, 100% line coverage of xelp.c.**
+**51 test units, 707 test cases, 100% line coverage of xelp.c.**
 
 ### Running tests
 

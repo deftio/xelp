@@ -4,7 +4,7 @@
 > system for embedded systems. Pure C, zero dynamic memory, no OS, no
 > standard library dependencies. Under 1 KB (key dispatch only) to ~5 KB
 > (full CLI with line editing) compiled. Works on 8-bit (AVR, 8051)
-> through 64-bit (ARM64, x86-64) targets. Version 0.3.3.
+> through 64-bit (ARM64, x86-64) targets. Version 0.3.4.
 
 xelp gives bare-metal firmware a real interactive CLI with scriptable
 commands, single-key menus, and pass-through mode. Three source files
@@ -28,7 +28,7 @@ the CLI or from scripts.
 - Output control: mute all output, echo masking (password mode)
 - Quoted strings, escape sequences, comments, semicolon statement separator
 - Hex + decimal number parsing (0xFF, FFh, -123 formats)
-- 50 test units, 693 test cases, 100% line coverage
+- 51 test units, 707 test cases, 100% line coverage
 - Fuzz tested with libFuzzer
 - BSD 2-Clause license
 
@@ -68,7 +68,7 @@ the CLI or from scripts.
 
 ## Tests
 
-- [Unit tests](https://github.com/deftio/xelp/blob/master/tests/xelp_unit_tests.c): 50 test units, 693 test cases (JumpBug framework)
+- [Unit tests](https://github.com/deftio/xelp/blob/master/tests/xelp_unit_tests.c): 51 test units, 707 test cases (JumpBug framework)
 - [JumpBug framework](https://github.com/deftio/xelp/blob/master/tests/jumpbug_unit_test_fw.c): Minimal C89-compatible unit test framework
 - [Fuzz parse](https://github.com/deftio/xelp/blob/master/tests/fuzz/fuzz_parse.c): libFuzzer harness for XelpParse
 - [Fuzz parsekey](https://github.com/deftio/xelp/blob/master/tests/fuzz/fuzz_parsekey.c): libFuzzer harness for XelpParseKey
@@ -141,7 +141,7 @@ XELP_E_ERR (-1), XELP_E_CMDBUFFULL (-2), XELP_E_CMDNOTFOUND (-3).
 
 - `XELP_ENABLE_CLI` -- CLI mode + scripting (core, ~1.5-2.6 KB)
 - `XELP_ENABLE_LINE_EDIT` -- cursor movement, insert, delete (~800-1000 bytes)
-- `XELP_ENABLE_HISTORY` -- UP/DOWN command recall (~420 bytes, requires LINE_EDIT)
+- `XELP_ENABLE_HISTORY` -- UP/DOWN command recall (~550 bytes, requires LINE_EDIT)
 - `XELP_ENABLE_KEY` -- single keypress mode (~200-500 bytes)
 - `XELP_ENABLE_THR` -- pass-through mode (~50-125 bytes)
 - `XELP_ENABLE_HELP` -- built-in help listing (~180-350 bytes)

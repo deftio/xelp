@@ -29,6 +29,34 @@
 <p>See also: <a href="https://github.com/deftio/xelp/blob/master/CHANGELOG.md">CHANGELOG.md</a>
 on GitHub for the full changelog.</p>
 
+<h2>v0.3.4 (2026-08-01)</h2>
+<ul>
+  <li><strong>Fixed: history recall broken on unsigned-<code>char</code> targets</strong>
+      (<a href="https://github.com/deftio/xelp/issues/18">#18</a>).
+      <code>mHistBrowse</code> was a plain <code>char</code>, whose signedness is
+      implementation-defined. Where <code>char</code> is unsigned &mdash; most ARM
+      and embedded MCU toolchains &mdash; the <code>-1</code> &ldquo;not browsing&rdquo;
+      sentinel stored as <code>255</code> and the <code>== -1</code> test could never
+      fire, so users had to press UP three or more times to recall a single stored
+      command. Reported by @XiaoMu-712.</li>
+  <li><strong>History ring indices are now <code>int</code></strong>
+      (<code>mHistWrite</code>, <code>mHistCount</code>, <code>mHistBrowse</code>,
+      <code>mHistSavedLen</code>). This fixes the issue at the type level and removes
+      the undocumented <code>XELP_HIST_DEPTH &lt;= 127</code> and
+      <code>XELP_CMDBUFSZ &lt;= 128</code> ceilings the byte-wide fields carried.</li>
+  <li><strong>Size note:</strong> FULL-profile builds grow on targets where
+      <code>char</code> is unsigned (ARM Thumb 3463&nbsp;&rarr;&nbsp;3587 bytes) because
+      compilers had been dead-code-eliminating the unreachable first-UP branch &mdash;
+      that code now exists and runs. Targets where <code>char</code> is signed (x86,
+      m68k, MIPS) are flat or slightly smaller. KEY and CLI profiles are byte-identical
+      to 0.3.3, since history is not compiled into them.</li>
+  <li><code>make tests-unsigned-char</code>: runs the full unit suite built with
+      <code>-funsigned-char</code>, now part of <code>make validate</code>. x86 and
+      Apple ARM64 default <code>char</code> to signed, so the build matrix had never
+      exercised the case this bug depended on.</li>
+  <li>Test suite expanded to 51 units, 707 test cases.</li>
+</ul>
+
 <h2>v0.3.3 (2026-05-12)</h2>
 <ul>
   <li><strong>Structured argc/argv parsing</strong> (<code>XELP_ENABLE_ARGV</code>):

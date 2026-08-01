@@ -44,7 +44,7 @@ extern "C"
 {
 #endif
 
-#define XELP_VERSION      (0x00000303UL) /* 32-bit version: 0x00MMmmpp (major.minor.patch) */
+#define XELP_VERSION      (0x00000304UL) /* 32-bit version: 0x00MMmmpp (major.minor.patch) */
 #define XELP_VER_MAJOR(v) (((v) >> 16) & 0xFF)
 #define XELP_VER_MINOR(v) (((v) >>  8) & 0xFF)
 #define XELP_VER_PATCH(v) ( (v)        & 0xFF)
@@ -319,11 +319,18 @@ typedef struct XELP_tag
 
 #if defined(XELP_ENABLE_CLI) && defined(XELP_ENABLE_HISTORY)
 	char  mHistBuf[XELP_HIST_DEPTH][XELP_CMDBUFSZ]; /* history ring             */
-	char  mHistWrite;    /* next write slot (ring index)                          */
-	char  mHistCount;    /* entries stored (0..DEPTH)                             */
-	char  mHistBrowse;   /* browse position (-1 = not browsing)                  */
+	/* Ring indices and lengths are plain int, not char.  mHistBrowse holds -1
+	   as its "not browsing" sentinel, and plain char is unsigned on most ARM
+	   and embedded targets -- there -1 stores as 255 and the == -1 test can
+	   never fire (issue #18).  int is the native register width on 16/32/64-bit
+	   targets, so byte-width fields buy nothing: they cost sign-extend/mask ops
+	   on access and get padded back to word alignment anyway.  int also removes
+	   the XELP_HIST_DEPTH <= 127 ceiling these fields would otherwise carry. */
+	int   mHistWrite;    /* next write slot (ring index)                          */
+	int   mHistCount;    /* entries stored (0..DEPTH)                             */
+	int   mHistBrowse;   /* browse position (-1 = not browsing)                    */
 	char  mHistSaved[XELP_CMDBUFSZ]; /* stash of in-progress line on first UP   */
-	char  mHistSavedLen; /* length of saved in-progress line                     */
+	int   mHistSavedLen; /* length of saved in-progress line                      */
 #endif
 
 	/****

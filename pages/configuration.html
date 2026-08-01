@@ -59,7 +59,7 @@ the typical interactive configuration.</p>
 </code></pre>
 
 <p>Optional: add <code>XELP_ENABLE_HISTORY</code> for UP/DOWN arrow command
-recall (~420 bytes, requires <code>XELP_ENABLE_LINE_EDIT</code>).</p>
+recall (~550 bytes, requires <code>XELP_ENABLE_LINE_EDIT</code>).</p>
 
 <p>Representative size: <strong>~2600 bytes</strong> on ARM Thumb,
 <strong>~4200 bytes</strong> on AVR.</p>
@@ -87,7 +87,7 @@ Profiles &amp; Configuration Guide</a> for full details.</p>
 <tr><td><code>XELP_ENABLE_KEY</code></td><td>Single key press mode (menus, immediate actions)</td><td>~200&ndash;500 bytes</td></tr>
 <tr><td><code>XELP_ENABLE_THR</code></td><td>Pass-through mode (redirect keys to another peripheral)</td><td>~50&ndash;125 bytes</td></tr>
 <tr><td><code>XELP_ENABLE_HELP</code></td><td>Built-in help function listing all commands</td><td>~180&ndash;350 bytes</td></tr>
-<tr><td><code>XELP_ENABLE_HISTORY</code></td><td>Command history (UP/DOWN arrow recall). Requires <code>XELP_ENABLE_CLI</code> + <code>XELP_ENABLE_LINE_EDIT</code>.</td><td>~420 bytes</td></tr>
+<tr><td><code>XELP_ENABLE_HISTORY</code></td><td>Command history (UP/DOWN arrow recall). Requires <code>XELP_ENABLE_CLI</code> + <code>XELP_ENABLE_LINE_EDIT</code>.</td><td>~550 bytes</td></tr>
 <tr><td><code>XELP_ENABLE_ARGV</code></td><td>Structured argc/argv parsing (<code>XelpBuf2Argv</code>, <code>XELP_PARSE_ARGV</code>). Adds a per-instance scratch buffer.</td><td>~530&ndash;700 bytes + <code>XELP_ARGVBUFSZ</code> RAM</td></tr>
 <tr><td><code>XELP_ENABLE_FULL</code></td><td>Enable all of the above</td><td>All combined</td></tr>
 </tbody>

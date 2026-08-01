@@ -218,20 +218,20 @@ static void _xelpHistSave(XELP *ths) {
 
     /* skip consecutive duplicate */
     if (ths->mHistCount > 0) {
-        prev = ((int)ths->mHistWrite - 1 + XELP_HIST_DEPTH) % XELP_HIST_DEPTH;
+        prev = (ths->mHistWrite - 1 + XELP_HIST_DEPTH) % XELP_HIST_DEPTH;
         if (XelpStrEq(ths->mCmdXB.s, len, ths->mHistBuf[prev]) == XELP_S_OK)
             return;
     }
 
     /* copy command into ring slot */
     {
-        char *dst = ths->mHistBuf[(int)ths->mHistWrite];
+        char *dst = ths->mHistBuf[ths->mHistWrite];
         int i;
         for (i = 0; i < len && i < XELP_CMDBUFSZ - 1; i++)
             dst[i] = ths->mCmdXB.s[i];
         dst[i] = 0;
     }
-    ths->mHistWrite = (char)(((int)ths->mHistWrite + 1) % XELP_HIST_DEPTH);
+    ths->mHistWrite = (ths->mHistWrite + 1) % XELP_HIST_DEPTH;
     if (ths->mHistCount < XELP_HIST_DEPTH)
         ths->mHistCount++;
 }
@@ -252,7 +252,7 @@ static void _xelpHistRecall(XELP *ths, int dir) {
             for (i = 0; i < len; i++)
                 ths->mHistSaved[i] = ths->mCmdXB.s[i];
             ths->mHistSaved[len] = 0;
-            ths->mHistSavedLen = (char)len;
+            ths->mHistSavedLen = len;
             /* start at most recent entry */
             ths->mHistBrowse = ths->mHistCount - 1;
         } else if (ths->mHistBrowse > 0) {
@@ -269,14 +269,14 @@ static void _xelpHistRecall(XELP *ths, int dir) {
         } else {
             /* past newest: restore in-progress line */
             ths->mHistBrowse = -1;
-            _xelpHistReplaceLine(ths, ths->mHistSaved, (int)ths->mHistSavedLen);
+            _xelpHistReplaceLine(ths, ths->mHistSaved, ths->mHistSavedLen);
             return;
         }
     }
 
     /* load the entry at mHistBrowse (0=oldest, count-1=newest) */
     {
-        int slot = ((int)ths->mHistWrite - (int)ths->mHistCount + (int)ths->mHistBrowse + XELP_HIST_DEPTH) % XELP_HIST_DEPTH;
+        int slot = (ths->mHistWrite - ths->mHistCount + ths->mHistBrowse + XELP_HIST_DEPTH) % XELP_HIST_DEPTH;
         _xelpHistReplaceLine(ths, ths->mHistBuf[slot], XelpStrLen(ths->mHistBuf[slot]));
     }
 }
