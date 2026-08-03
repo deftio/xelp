@@ -25,6 +25,12 @@
 #include <stddef.h>           /* offsetof */
 #include <initializer_list>   /* std::initializer_list */
 
+/* The Easy API (commands({...})) needs argc/argv tokenization for safety:
+   a fallback tokenizer would write NUL through token pointers, corrupting
+   ROM or const script strings.  As of 0.4.x argv parsing is always compiled
+   in -- the old XELP_ENABLE_ARGV opt-in flag was removed -- so no guard is
+   needed here. */
+
 #ifdef ARDUINO
 #include <Arduino.h>
 #endif

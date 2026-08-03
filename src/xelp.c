@@ -220,20 +220,20 @@ static void _xelpHistSave(XELP *ths) {
 
     /* skip consecutive duplicate */
     if (ths->mHistCount > 0) {
-        prev = ((int)ths->mHistWrite - 1 + XELP_HIST_DEPTH) % XELP_HIST_DEPTH;
+        prev = (ths->mHistWrite - 1 + XELP_HIST_DEPTH) % XELP_HIST_DEPTH;
         if (XelpStrEq(ths->mCmdXB.s, len, ths->mHistBuf[prev]) == XELP_S_OK)
             return;
     }
 
     /* copy command into ring slot */
     {
-        char *dst = ths->mHistBuf[(int)ths->mHistWrite];
-        const char *src = ths->mCmdXB.s;
-        int n = (len < XELP_CMDBUFSZ - 1) ? len : XELP_CMDBUFSZ - 1;
-        while (n-- > 0) *dst++ = *src++;
-        *dst = 0;
+        char *dst = ths->mHistBuf[ths->mHistWrite];
+        int i;
+        for (i = 0; i < len && i < XELP_CMDBUFSZ - 1; i++)
+            dst[i] = ths->mCmdXB.s[i];
+        dst[i] = 0;
     }
-    ths->mHistWrite = (char)(((int)ths->mHistWrite + 1) % XELP_HIST_DEPTH);
+    ths->mHistWrite = (ths->mHistWrite + 1) % XELP_HIST_DEPTH;
     if (ths->mHistCount < XELP_HIST_DEPTH)
         ths->mHistCount++;
 }
@@ -250,12 +250,11 @@ static void _xelpHistRecall(XELP *ths, int dir) {
         if (ths->mHistBrowse == -1) {
             /* first UP: save in-progress line */
             int len = (int)(ths->mCmdXB.p - ths->mCmdXB.s);
-            const char *src = ths->mCmdXB.s;
-            char *dst = ths->mHistSaved;
-            int n = len;
-            while (n-- > 0) *dst++ = *src++;
-            *dst = 0;
-            ths->mHistSavedLen = (char)len;
+            int i;
+            for (i = 0; i < len; i++)
+                ths->mHistSaved[i] = ths->mCmdXB.s[i];
+            ths->mHistSaved[len] = 0;
+            ths->mHistSavedLen = len;
             /* start at most recent entry */
             ths->mHistBrowse = ths->mHistCount - 1;
         } else if (ths->mHistBrowse > 0) {
@@ -272,14 +271,14 @@ static void _xelpHistRecall(XELP *ths, int dir) {
         } else {
             /* past newest: restore in-progress line */
             ths->mHistBrowse = -1;
-            _xelpHistReplaceLine(ths, ths->mHistSaved, (int)ths->mHistSavedLen);
+            _xelpHistReplaceLine(ths, ths->mHistSaved, ths->mHistSavedLen);
             return;
         }
     }
 
     /* load the entry at mHistBrowse (0=oldest, count-1=newest) */
     {
-        int slot = ((int)ths->mHistWrite - (int)ths->mHistCount + (int)ths->mHistBrowse + XELP_HIST_DEPTH) % XELP_HIST_DEPTH;
+        int slot = (ths->mHistWrite - ths->mHistCount + ths->mHistBrowse + XELP_HIST_DEPTH) % XELP_HIST_DEPTH;
         _xelpHistReplaceLine(ths, ths->mHistBuf[slot], XelpStrLen(ths->mHistBuf[slot]));
     }
 }
@@ -1297,7 +1296,91 @@ XELPRESULT XelpArgvStr(const char **argv, int argc, int n, const char **s, int *
     *slen = XelpStrLen(argv[n]);
     return XELP_S_OK;
 }
+
 #endif /* XELP_ENABLE_CLI */
+
+#ifdef XELP_ENABLE_ARGV
+/********************************************************
+ XelpBuf2Argv() - tokenize args into argc/argv using mArgvBuf as scratch.
+ Strips quotes, processes escape sequences, null-terminates each token.
+ argv[0] = command name per argc/argv convention.
+ Returns XELP_E_ERR if input exceeds scratch buffer or too many args.
+ */
+XELPRESULT XelpBuf2Argv(XELP *ths, const char *args, int len,
+                         int *argc, const char **argv, int maxargs)
+{
+    char *r, *w, *end, c;
+    int ac = 0, i, q;
+
+    *argc = 0;
+    if (len <= 0) return XELP_S_OK;
+    if (len >= XELP_ARGVBUFSZ) return XELP_E_ERR;
+
+    r = ths->mArgvBuf;
+    for (i = 0; i < len; i++) r[i] = args[i];
+    end = r + len;
+    w = r;
+
+    while (r < end) {
+        while (r < end && (*r == ' ' || *r == '\t')) r++;
+        if (r >= end || *r == ';' || *r == '\n' || *r == '#') break;
+        if (ac >= maxargs) return XELP_E_ERR;
+        argv[ac] = w;
+        q = (*r == '"');
+        if (q) r++;
+
+        while (r < end) {
+            c = *r;
+            if (q) {
+                if (c == '"')  { r++; break; }
+                if (c == XELP_QUO_ESC && r + 1 < end) {
+                    const char *m = XELP_ESC_MAP;
+                    c = *++r;
+                    while (*m) { if (c == m[0]) { c = m[1]; break; } m += 2; }
+                }
+            } else {
+                if (c == ' ' || c == '\t' ||
+                    c == ';' || c == '\n' || c == '#') break;
+                if (c == XELP_CLI_ESC) { if (++r >= end) break; c = *r; }
+            }
+            *w++ = c;
+            r++;
+        }
+        {   /* check stop char before null-write can overwrite it */
+            int stop = !q && r < end &&
+                       (*r == ';' || *r == '\n' || *r == '#');
+            *w++ = '\0';
+            ac++;
+            if (stop) break;
+        }
+        if (w > r) r = w;
+    }
+    *argc = ac;
+    return XELP_S_OK;
+}
+
+/********************************************************
+ XelpArgvInt() - get argv[n] as an integer.
+ Returns XELP_E_ERR if n is out of range or not a valid number.
+ */
+XELPRESULT XelpArgvInt(const char **argv, int argc, int n, int *val)
+{
+    if (n < 0 || n >= argc) return XELP_E_ERR;
+    return XelpParseNum(argv[n], XelpStrLen(argv[n]), val);
+}
+
+/********************************************************
+ XelpArgvStr() - get argv[n] as a string pointer and length.
+ Returns XELP_E_ERR if n is out of range.
+ */
+XELPRESULT XelpArgvStr(const char **argv, int argc, int n, const char **s, int *slen)
+{
+    if (n < 0 || n >= argc) return XELP_E_ERR;
+    *s = argv[n];
+    *slen = XelpStrLen(argv[n]);
+    return XELP_S_OK;
+}
+#endif /* XELP_ENABLE_ARGV */
 
 /********************************************************
 	XelpParseKey() 

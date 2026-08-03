@@ -48,6 +48,97 @@ Versions always use three-component semver (e.g. `0.3.0`, never `0.3`).
 5. Replace `XELP_PARSE_ARGV(ths, args, len)` -- remove (argc/argv are now parameters).
 6. Remove `XELP_ENABLE_ARGV` from any override headers.
 
+> **Note:** 0.4.x is an unreleased experimental line (native `argc/argv`
+> dispatch plus the script engine). It sits above 0.3.x by version number,
+> but 0.3.5 is the current released version on `master`.
+
+## [0.3.5] - 2026-08-01
+
+**No library code changes.** `src/xelp.c` and `src/xelp.h` are byte-identical to
+0.3.4 apart from the version macro; compiled sizes are unchanged on every
+target. This release exists to fix and verify the publishing pipeline, which
+can only be exercised by tagging a real release.
+
+### Fixed
+- **ESP-IDF Component Registry publishing from CI.** `compote component upload`
+  was called without `--namespace`, so it defaulted to the `espressif`
+  namespace and POSTed to `components/espressif/xelp` instead of
+  `components/deftio/xelp`. Locally the correct namespace came from
+  `default_namespace` in `~/.espressif/idf_component_manager.yml`, which does
+  not exist on a CI runner — so the workflow had failed on every release since
+  0.3.2 while hand-publishing quietly covered for it. Fixed in both
+  `.github/workflows/release.yml` and `tools/make_release.sh`.
+- **`tmp/` excluded from the published component.** `compote` reads only
+  `files.exclude` in `idf_component.yml`, not `.gitignore`. Packing from a
+  working tree containing the gitignored `tmp/` scratch directory produced a
+  1.27 MB archive instead of 209 KB, carrying local build scratch and compiled
+  probe binaries. CI was never affected (clean checkout); local packs were.
+- **Release notes could silently be empty.** The workflow extracted everything
+  between the first `## [` heading and the next one, so an empty
+  `## [Unreleased]` above the version heading yielded no notes, and a
+  boilerplate fallback hid it. Extraction now anchors on the `## [X.Y.Z]`
+  heading for the version being released and **fails the release** rather than
+  publishing placeholder notes.
+
+### Notes
+- The GitHub Actions bumps (`actions/checkout` v6 → v7, `actions/setup-python`
+  v5 → v7) and the dependabot grouping of `github-actions` updates into a
+  single PR both shipped in **0.3.4** but were not recorded in its changelog
+  entry. Noted here for the record; 0.3.4's entry is left as released.
+  Neither breaking change affects this repo: checkout v7 restricts fork-PR
+  checkout for `pull_request_target` / `workflow_run` (these workflows trigger
+  on `push` and `pull_request`), and setup-python v7 removes the `pip-install`
+  input (unused).
+
+## [0.3.4] - 2026-08-01
+
+### Fixed
+- **History recall broken on unsigned-`char` targets**
+  ([#18](https://github.com/deftio/xelp/issues/18)). `mHistBrowse` was declared
+  plain `char`, whose signedness is implementation-defined. On targets where
+  `char` is unsigned — most ARM Linux and embedded MCU toolchains, or any build
+  using `-funsigned-char` — the `-1` "not browsing" sentinel stored as `255`
+  and the `== -1` test could never fire. The first-UP branch was skipped, the
+  browse index ran backwards from 255, and the ring-slot modulo returned
+  unrelated slots, so users had to press UP three or more times to recall a
+  single stored command. Reported by @XiaoMu-712.
+
+### Changed
+- **History ring indices are now `int`** (`mHistWrite`, `mHistCount`,
+  `mHistBrowse`, `mHistSavedLen`), replacing `char`. `int` is the native
+  register width on 16/32/64-bit targets, so the byte-wide fields bought
+  nothing: they cost sign-extend and mask operations on every access and were
+  padded back to word alignment anyway. Using `int` fixes #18 at the type
+  level, removes the undocumented `XELP_HIST_DEPTH <= 127` and
+  `XELP_CMDBUFSZ <= 128` ceilings, and let six casts be deleted from the ring
+  arithmetic — simpler logic and, on most targets, slightly smaller code.
+
+### Size notes
+- FULL-profile builds grow on targets where plain `char` is unsigned (ARM
+  Thumb 3463 → 3587 bytes, AArch64 6987 → 7099). This is restored
+  functionality, not overhead: the `mHistBrowse == -1` test was provably false
+  there, so compilers dead-code-eliminated the entire first-UP branch. Earlier
+  releases were smaller on those targets because part of the history feature
+  was never emitted. Targets where `char` is signed (x86, m68k, MIPS) are flat
+  or slightly smaller.
+- KEY and CLI profile builds are byte-identical to 0.3.3 on every target,
+  since history is not compiled into them.
+- The size tables in `README.md` and `pages/index.html` were regenerated from
+  a full cross-compile for this release and are accurate as of 0.3.4. Some
+  size figures quoted in earlier releases and in older release notes were
+  never refreshed and understate the real numbers; they are left as-is as a
+  historical record rather than retroactively corrected.
+
+### Added
+- `make tests-unsigned-char` builds and runs the full unit suite with
+  `-funsigned-char`, and is now part of `make validate`. x86 and Apple ARM64
+  both default `char` to signed, so the existing build matrix never exercised
+  the unsigned case that #18 depended on. Guards the remaining plain-`char`
+  fields against the same bug class.
+- `test_HistoryBrowseSentinel` — 9 regression cases pinning the browse
+  sentinel and exact UP/DOWN press counts across empty, partial, exactly-full,
+  and wrapped history rings.
+
 ## [0.3.3] - 2026-05-12
 
 ### Added
@@ -103,7 +194,7 @@ Versions always use three-component semver (e.g. `0.3.0`, never `0.3`).
   works unchanged.
 - `XelpBuf2Argv`, `XelpArgvInt`, `XelpArgvStr` signatures use
   `const char **argv` (was `char **argv`) for const-correctness.
-- Test suite expanded to 49 units, 678 test cases (from 47/598).
+- Test suite expanded to 50 units, 693 test cases (from 47/598).
 
 ### Fixed
 - `\r` stripping in Web Bluetooth terminals (`esp32-ble-cli` and

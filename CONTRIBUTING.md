@@ -98,6 +98,7 @@ Avoid: `update stuff`, `fix`, `wip`, `clean up code`.
 ```bash
 make validate           # tests + build all examples -- the everyday check
 make tests              # unit tests + gcov only
+make tests-unsigned-char # unit tests built with -funsigned-char
 make examples           # build all examples (no interactive launch)
 make coverage           # tests + coverage summary
 make funcsizes          # per-function compiled sizes (x86-32, ARM32)
@@ -110,6 +111,13 @@ make clean-all          # remove all build artifacts including examples
 `make validate` is the recommended pre-push check. It runs the full test
 suite with `-Werror` and builds all examples, confirming zero warnings
 everywhere. Takes seconds on any modern machine.
+
+It also runs the suite a second time under `-funsigned-char`
+(`make tests-unsigned-char`). Plain `char` signedness is
+implementation-defined; x86 and Apple ARM64 default to signed, while most
+ARM Linux and embedded MCU toolchains default to unsigned. Without that
+second build, no host in the CI matrix exercises the unsigned case -- which
+is how issue #18 (broken history recall on ARM) shipped undetected.
 
 Before a release, run:
 
