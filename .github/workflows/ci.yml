@@ -19,7 +19,7 @@ jobs:
             compiler: gcc  # macOS uses Apple Clang natively
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Install dependencies (Ubuntu)
         if: matrix.os == 'ubuntu-latest'
@@ -41,6 +41,15 @@ jobs:
 
       - name: Lint (cppcheck static analysis)
         run: make lint
+
+      # Plain `char` signedness is implementation-defined.  Every host in this
+      # matrix (x86 and Apple ARM64) defaults to signed, while most ARM Linux
+      # and embedded MCU toolchains default to unsigned -- which is how issue
+      # #18 shipped undetected.  `make validate` runs this too; it is called
+      # out as its own step so a signedness regression is attributable at a
+      # glance instead of buried in the validate log.
+      - name: Unit tests (unsigned char)
+        run: make tests-unsigned-char
 
       - name: Validate (tests + examples, -Werror)
         run: make validate

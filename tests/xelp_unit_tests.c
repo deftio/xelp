@@ -4413,6 +4413,223 @@ XELPRESULT test_HistoryAndEcho() {
     return XELP_S_OK;
 }
 
+
+/* ====================================================================
+ test_HistoryBrowseSentinel() -- regression coverage for issue #18.
+ mHistBrowse was a plain char; where char is unsigned the -1 "not browsing"
+ sentinel stored as 255 and the == -1 test never fired, so a single stored
+ command took 3+ UP presses to recall.  These cases assert exact press counts
+ so the offset-by-modulo failure cannot hide.  Run under -funsigned-char via
+ `make tests-unsigned-char` to exercise the case this bug depended on.
+ */
+XELPRESULT test_HistoryBrowseSentinel() {
+    char buf[64];
+
+    /* 1. Issue #18 core symptom: exactly ONE UP recalls the sole entry. */
+    {
+        XELP x;
+        XelpInit(&x,"HBS1");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,dummyOut);
+
+        feedString(&x, "add 3 5"); XelpParseKey(&x, XELPKEY_ENTER);
+
+        feedKeycode(&x, XELP_KEYCODE_UP);   /* first and only press needed */
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XELP_S_OK != XelpStrEq(buf, XelpStrLen(buf), "add 3 5"),
+                      "One UP recalls sole entry (issue #18)"))
+            return XELP_E_ERR;
+    }
+
+    /* 2. First UP must never yield an empty line while history is non-empty.
+          Under the bug the first two presses rendered empty ring slots. */
+    {
+        XELP x;
+        XelpInit(&x,"HBS2");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,dummyOut);
+
+        feedString(&x, "aaa"); XelpParseKey(&x, XELPKEY_ENTER);
+
+        feedKeycode(&x, XELP_KEYCODE_UP);
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XelpStrLen(buf) == 0, "First UP is never an empty slot"))
+            return XELP_E_ERR;
+    }
+
+    /* 3. ENTER re-arms the sentinel: after executing a recalled line, the
+          next UP starts again at the newest entry rather than continuing
+          from the stale browse index (issue #18 symptom 2). */
+    {
+        XELP x;
+        XelpInit(&x,"HBS3");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,dummyOut);
+
+        feedString(&x, "aaa"); XelpParseKey(&x, XELPKEY_ENTER);
+        feedString(&x, "bbb"); XelpParseKey(&x, XELPKEY_ENTER);
+
+        feedKeycode(&x, XELP_KEYCODE_UP);   /* bbb */
+        feedKeycode(&x, XELP_KEYCODE_UP);   /* aaa */
+        XelpParseKey(&x, XELPKEY_ENTER);    /* execute aaa, ends browsing   */
+
+        feedKeycode(&x, XELP_KEYCODE_UP);   /* must be newest again */
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XELP_S_OK != XelpStrEq(buf, XelpStrLen(buf), "aaa"),
+                      "ENTER re-arms sentinel; UP restarts at newest"))
+            return XELP_E_ERR;
+    }
+
+    /* 4. DOWN with no browse session in progress is a no-op.  This is the
+          second `== -1` test site; if the sentinel is unreachable it
+          instead walks the index and clobbers the typed line. */
+    {
+        XELP x;
+        XelpInit(&x,"HBS4");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,dummyOut);
+
+        feedString(&x, "aaa"); XelpParseKey(&x, XELPKEY_ENTER);
+        feedString(&x, "typing");            /* in-progress, never browsed */
+
+        feedKeycode(&x, XELP_KEYCODE_DOWN);  /* must not disturb the line */
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XELP_S_OK != XelpStrEq(buf, XelpStrLen(buf), "typing"),
+                      "DOWN while not browsing is a no-op"))
+            return XELP_E_ERR;
+    }
+
+    /* 5. DOWN past newest clears the sentinel, and the following UP behaves
+          as a fresh first-UP (back to newest, not to index-1). */
+    {
+        XELP x;
+        XelpInit(&x,"HBS5");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,dummyOut);
+
+        feedString(&x, "aaa"); XelpParseKey(&x, XELPKEY_ENTER);
+        feedString(&x, "bbb"); XelpParseKey(&x, XELPKEY_ENTER);
+
+        feedKeycode(&x, XELP_KEYCODE_UP);   /* bbb */
+        feedKeycode(&x, XELP_KEYCODE_UP);   /* aaa */
+        feedKeycode(&x, XELP_KEYCODE_DOWN); /* bbb */
+        feedKeycode(&x, XELP_KEYCODE_DOWN); /* past newest -> sentinel, empty */
+
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XelpStrLen(buf) != 0, "DOWN past newest restores empty"))
+            return XELP_E_ERR;
+
+        feedKeycode(&x, XELP_KEYCODE_UP);   /* fresh first-UP -> newest */
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XELP_S_OK != XelpStrEq(buf, XelpStrLen(buf), "bbb"),
+                      "UP after sentinel reset returns to newest"))
+            return XELP_E_ERR;
+    }
+
+    /* 6. Exactly-full ring: one UP still lands on the newest entry.  This is
+          where the browse index and the (write - count + browse) modulo can
+          alias onto a valid-but-wrong slot rather than an empty one. */
+    {
+        XELP x;
+        char cmd[8];
+        int i;
+        XelpInit(&x,"HBS6");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,dummyOut);
+
+        for (i = 0; i < XELP_HIST_DEPTH; i++) {
+            cmd[0] = 'a' + (char)i; cmd[1] = 0;
+            feedString(&x, cmd); XelpParseKey(&x, XELPKEY_ENTER);
+        }
+        cmd[0] = 'a' + (char)(XELP_HIST_DEPTH - 1); cmd[1] = 0;
+
+        feedKeycode(&x, XELP_KEYCODE_UP);
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XELP_S_OK != XelpStrEq(buf, XelpStrLen(buf), cmd),
+                      "Full ring: one UP lands on newest"))
+            return XELP_E_ERR;
+    }
+
+    /* 7. Wrapped ring (2x depth written): one UP still lands on newest. */
+    {
+        XELP x;
+        char cmd[8];
+        int i;
+        XelpInit(&x,"HBS7");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,dummyOut);
+
+        for (i = 0; i < 2 * XELP_HIST_DEPTH; i++) {
+            cmd[0] = 'a' + (char)i; cmd[1] = 0;
+            feedString(&x, cmd); XelpParseKey(&x, XELPKEY_ENTER);
+        }
+        cmd[0] = 'a' + (char)(2 * XELP_HIST_DEPTH - 1); cmd[1] = 0;
+
+        feedKeycode(&x, XELP_KEYCODE_UP);
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XELP_S_OK != XelpStrEq(buf, XelpStrLen(buf), cmd),
+                      "Wrapped ring: one UP lands on newest"))
+            return XELP_E_ERR;
+    }
+
+    /* 8. Walking the full ring takes exactly DEPTH presses to reach oldest,
+          proving no phantom entries are interleaved. */
+    {
+        XELP x;
+        char cmd[8];
+        int i;
+        XelpInit(&x,"HBS8");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,dummyOut);
+
+        for (i = 0; i < XELP_HIST_DEPTH; i++) {
+            cmd[0] = 'a' + (char)i; cmd[1] = 0;
+            feedString(&x, cmd); XelpParseKey(&x, XELPKEY_ENTER);
+        }
+
+        /* press i+1 must yield entry (DEPTH-1-i), newest first */
+        for (i = 0; i < XELP_HIST_DEPTH; i++) {
+            feedKeycode(&x, XELP_KEYCODE_UP);
+            cmd[0] = 'a' + (char)(XELP_HIST_DEPTH - 1 - i); cmd[1] = 0;
+            getCmdBuf(&x, buf, sizeof(buf));
+            if (JB_ASSERT(XELP_S_OK != XelpStrEq(buf, XelpStrLen(buf), cmd),
+                          "Nth UP yields Nth-newest entry"))
+                return XELP_E_ERR;
+        }
+    }
+
+    /* 9. In-progress line stash survives a browse round-trip at the longest
+          length the command buffer allows.  mHistSavedLen is now int; as a
+          char it would wrap for XELP_CMDBUFSZ > 128 overrides. */
+    {
+        XELP x;
+        char longline[XELP_CMDBUFSZ];
+        int n = XELP_CMDBUFSZ - 2;
+        int i;
+        XelpInit(&x,"HBS9");
+        XELP_SET_FN_CLI(x,gMyCLICommands);
+        XELP_SET_FN_OUT(x,dummyOut);
+
+        for (i = 0; i < n; i++) longline[i] = 'x';
+        longline[n] = 0;
+
+        feedString(&x, "aaa"); XelpParseKey(&x, XELPKEY_ENTER);
+        feedString(&x, longline);            /* in-progress, not entered */
+
+        feedKeycode(&x, XELP_KEYCODE_UP);    /* stash it, show aaa */
+        getCmdBuf(&x, buf, sizeof(buf));
+        if (JB_ASSERT(XELP_S_OK != XelpStrEq(buf, XelpStrLen(buf), "aaa"),
+                      "Long in-progress line: UP shows history"))
+            return XELP_E_ERR;
+
+        feedKeycode(&x, XELP_KEYCODE_DOWN);  /* restore stashed line */
+        if (JB_ASSERT(XELP_XB_POS(x.mCmdXB) != n,
+                      "Long in-progress line restored at full length"))
+            return XELP_E_ERR;
+    }
+
+    return XELP_S_OK;
+}
 #endif /* XELP_ENABLE_CLI_HISTORY */
 
 /* ====================================================================
@@ -9627,6 +9844,7 @@ XELPRESULT test_ScriptSwitchNumToStr(void) {
 #endif /* XELP_ENABLE_SCRIPT */
 /* ===================== END SCRIPT ENGINE TESTS ===================== */
 
+
 /* 	************************************************
 	Xelp Simple Unit Test suite.
 */
@@ -9697,6 +9915,7 @@ int run_tests() {
     JumpBug_RunUnit(test_HistoryWithEditing,"HistoryEditing");
     JumpBug_RunUnit(test_HistoryDuplicates,"HistoryDups");
     JumpBug_RunUnit(test_HistoryAndEcho,"HistoryEcho");
+    JumpBug_RunUnit(test_HistoryBrowseSentinel,"HistBrowseSentinel");
 #endif
 #ifdef XELP_ENABLE_SCRIPT
     JumpBug_RunUnit(test_ScriptArenaInit,"ScriptArenaInit");

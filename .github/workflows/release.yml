@@ -12,7 +12,7 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Install dependencies
         run: |
@@ -56,7 +56,7 @@ jobs:
     needs: validate
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Extract version
         id: version
@@ -72,9 +72,19 @@ jobs:
         id: changelog
         run: |
           VER="${{ steps.version.outputs.version }}"
-          NOTES=$(awk '/^## \[/{if(found) exit; found=1; next} found{print}' CHANGELOG.md)
-          if [ -z "$NOTES" ]; then
-            NOTES="Release $VER. See CHANGELOG.md for details."
+          # Anchor on the "## [X.Y.Z]" heading for THIS version rather than
+          # taking whatever follows the first "## [" heading.  An empty
+          # "## [Unreleased]" sitting above the version heading previously
+          # yielded empty notes, and the boilerplate fallback made that silent.
+          NOTES=$(awk -v ver="$VER" \
+            'index($0, "## [" ver "]") == 1 { found=1; next }
+             found && /^## \[/ { exit }
+             found { print }' CHANGELOG.md)
+          if [ -z "$(printf '%s' "$NOTES" | tr -d '[:space:]')" ]; then
+            echo "ERROR: no CHANGELOG entry found for version $VER."
+            echo "Expected a '## [$VER] - YYYY-MM-DD' heading with content in CHANGELOG.md."
+            echo "Failing rather than publishing a release with placeholder notes."
+            exit 1
           fi
           echo "$NOTES" > /tmp/release_notes.md
 
@@ -91,9 +101,9 @@ jobs:
     needs: release
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.x'
 
@@ -109,18 +119,24 @@ jobs:
     needs: release
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.x'
 
       - name: Install idf-component-manager
         run: pip install idf-component-manager
 
+      # --namespace is required.  compote defaults to the "espressif" namespace;
+      # locally the right one comes from default_namespace in
+      # ~/.espressif/idf_component_manager.yml, which does not exist on a runner.
+      # Without it the upload POSTs to components/espressif/xelp and fails.
+      # IDF_COMPONENT_API_TOKEN must carry the write:components scope -- a
+      # user-scoped token packs fine and then fails at upload.
       - name: Pack and upload to ESP-IDF Component Registry
         run: |
           compote component pack --name xelp
-          compote component upload --name xelp
+          compote component upload --name xelp --namespace deftio
         env:
           IDF_COMPONENT_API_TOKEN: ${{ secrets.IDF_COMPONENT_API_TOKEN }}

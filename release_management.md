@@ -33,6 +33,7 @@ make version   # compile + run, writes build/xelp_version.yaml
 | --- | --- |
 | `make validate` | Tests + build all examples -- the everyday pre-push check |
 | `make tests` | Unit tests + gcov only |
+| `make tests-unsigned-char` | Unit tests built with `-funsigned-char` (also run by `validate`) |
 | `make examples` | Build all examples (no interactive launch) |
 | `make example` | Build + run posix ncurses example (interactive) |
 | `make coverage` | Tests + coverage summary |
@@ -132,6 +133,8 @@ Runs on every push and PR to `master`:
 - **Build matrix**: Ubuntu + macOS, GCC + Clang — each runs `make validate`
 - **Coverage**: gcov report on Ubuntu/GCC
 - CI mirrors local validation exactly. No extra jobs beyond `make validate`.
+- `make validate` includes `tests-unsigned-char`, so both `char` signedness
+  conventions are covered on every CI job without extra matrix entries.
 
 ### Release CI (`.github/workflows/release.yml`)
 

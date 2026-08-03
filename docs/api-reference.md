@@ -168,6 +168,75 @@ XELPRESULT cmd_set(XELP *ths, int argc, const char **argv) {
 }
 ```
 
+## XelpBuf2Argv -- Structured argc/argv Parsing
+
+Requires `XELP_ENABLE_ARGV`. Tokenizes a command line into a standard
+argc/argv array using `ths->mArgvBuf` as scratch. Strips quotes, processes
+escape sequences (via `XELP_ESC_MAP`), and null-terminates each token.
+
+### `XelpBuf2Argv`
+
+```c
+XELPRESULT XelpBuf2Argv(XELP *ths, const char *args, int len,
+                         int *argc, const char **argv, int maxargs);
+```
+
+Tokenize `args` into `argv[0]..argv[argc-1]`. `argv[0]` is the command
+name (per argc/argv convention). Returns `XELP_E_ERR` if input exceeds
+`XELP_ARGVBUFSZ` or there are more than `maxargs` tokens.
+
+### `XELP_PARSE_ARGV`
+
+```c
+XELP_PARSE_ARGV(ths, args, len);
+```
+
+Convenience macro (C99+ / C++). Declares `const char *argv[XELP_ARGV_MAX]`
+and `int argc`, calls `XelpBuf2Argv`, and returns `XELP_E_ERR` on failure.
+Place at the top of a command handler body, before other statements.
+
+### `XelpArgvInt`
+
+```c
+XELPRESULT XelpArgvInt(const char **argv, int argc, int n, int *val);
+```
+
+Get `argv[n]` as an integer. Returns `XELP_E_ERR` if out of range or
+not a valid number.
+
+### `XelpArgvStr`
+
+```c
+XELPRESULT XelpArgvStr(const char **argv, int argc, int n,
+                        const char **s, int *slen);
+```
+
+Get `argv[n]` as a string pointer and length. Returns `XELP_E_ERR` if
+out of range.
+
+### Example
+
+```c
+XELPRESULT cmd_set(XELP *ths, const char *args, int len) {
+    XELP_PARSE_ARGV(ths, args, len);
+    /* argv[0] = "set", argv[1] = key, argv[2] = value */
+    int val;
+    if (XelpArgvInt(argv, argc, 2, &val) != XELP_S_OK)
+        return XELP_E_ERR;
+    /* ... use argv[1] and val ... */
+    return XELP_S_OK;
+}
+```
+
+### Which argument API to use
+
+| Situation | Recommended |
+|-----------|-------------|
+| C handler, multiple args | `XELP_PARSE_ARGV` + `XelpArgvInt`/`XelpArgvStr` |
+| C++ Easy API lambda | Auto-argv built-in + `XelpCLI::argInt`/`argStr` |
+| Minimal code size, left-to-right | `XelpArgs` iterator |
+| Quick single-arg access | `XelpArgInt`/`XelpArgStr` |
+
 ## String Utilities
 
 ### `XelpStrLen`

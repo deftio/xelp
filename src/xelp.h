@@ -360,11 +360,18 @@ typedef struct XELP_tag
 
 #if defined(XELP_ENABLE_CLI) && defined(XELP_ENABLE_CLI_HISTORY)
 	char  mHistBuf[XELP_HIST_DEPTH][XELP_CMDBUFSZ]; /* history ring             */
-	char  mHistWrite;    /* next write slot (ring index)                          */
-	char  mHistCount;    /* entries stored (0..DEPTH)                             */
-	char  mHistBrowse;   /* browse position (-1 = not browsing)                  */
+	/* Ring indices and lengths are plain int, not char.  mHistBrowse holds -1
+	   as its "not browsing" sentinel, and plain char is unsigned on most ARM
+	   and embedded targets -- there -1 stores as 255 and the == -1 test can
+	   never fire (issue #18).  int is the native register width on 16/32/64-bit
+	   targets, so byte-width fields buy nothing: they cost sign-extend/mask ops
+	   on access and get padded back to word alignment anyway.  int also removes
+	   the XELP_HIST_DEPTH <= 127 ceiling these fields would otherwise carry. */
+	int   mHistWrite;    /* next write slot (ring index)                          */
+	int   mHistCount;    /* entries stored (0..DEPTH)                             */
+	int   mHistBrowse;   /* browse position (-1 = not browsing)                    */
 	char  mHistSaved[XELP_CMDBUFSZ]; /* stash of in-progress line on first UP   */
-	char  mHistSavedLen; /* length of saved in-progress line                     */
+	int   mHistSavedLen; /* length of saved in-progress line                      */
 #endif
 
 #ifdef XELP_ENABLE_SCRIPT
@@ -466,6 +473,32 @@ XELPRESULT XelpArgvInt(const char **argv, int argc, int n, int *val);
 
 /* Get argv[n] as a string pointer and length. */
 XELPRESULT XelpArgvStr(const char **argv, int argc, int n, const char **s, int *slen);
+
+#ifdef XELP_ENABLE_ARGV
+/* Tokenize args into argc/argv using ths->mArgvBuf as scratch buffer.
+   Strips quotes, processes escape sequences, null-terminates each token.
+   argv[0] = command name per argc/argv convention.
+   Returns XELP_E_ERR if input exceeds scratch buffer or too many args. */
+XELPRESULT XelpBuf2Argv(XELP *ths, const char *args, int len,
+                         int *argc, const char **argv, int maxargs);
+
+/* Get argv[n] as an integer.  Returns XELP_E_ERR if out of range or not numeric. */
+XELPRESULT XelpArgvInt(const char **argv, int argc, int n, int *val);
+
+/* Get argv[n] as a string pointer and length. */
+XELPRESULT XelpArgvStr(const char **argv, int argc, int n, const char **s, int *slen);
+
+/* Convenience macro for command handlers (C99+ / C++).
+   Declares local 'int argc' and 'const char *argv[XELP_ARGV_MAX]',
+   tokenizes args, returns XELP_E_ERR on failure.
+   Place at the top of a handler body, before other statements. */
+#define XELP_PARSE_ARGV(ths, args, len) \
+    const char *argv[XELP_ARGV_MAX]; \
+    int argc = 0; \
+    if (XelpBuf2Argv((ths), (args), (len), &argc, argv, XELP_ARGV_MAX) \
+        != XELP_S_OK) \
+        return XELP_E_ERR
+#endif
 
 /* XELPNEXTTOK get next token in a string buffer.  This is just a macro call to XelpTokLine             */
 /* #define    XELPNEXTTOK(buf,blen,tok_s,tok_e)    (XelpTokLine(buf, buf+blen, tok_s, tok_e, 0, XELP_TOK_ONLY)) */

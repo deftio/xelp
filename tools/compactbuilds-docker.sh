@@ -88,6 +88,8 @@ cat > "$CFG_DIR/hist/xelp_ovr.h" << 'EOF'
 #define XELP_ENABLE_KEY       1
 #define XELP_ENABLE_CLI       1
 #define XELP_ENABLE_LINE_EDIT 1
+#define XELP_ENABLE_HISTORY   1
+#define XELP_ENABLE_ARGV      1
 #define XELP_ENABLE_HELP      1
 #define XELP_ENABLE_HISTORY   1
 #define XELP_ENABLE_THR       1

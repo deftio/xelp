@@ -13,7 +13,7 @@ BUILD_DIR=build
 INCLUDES=\
     -I$(LIB_DIR)\
 
-.PHONY: help tests clean clean-all clean-fuzz coverage version fuzz fuzz-parsekey fuzz-parse fuzz-buf2argv fuzz-script examples example validate prerelease funcsizes sizes lint build-ref
+.PHONY: help tests tests-unsigned-char clean clean-all clean-fuzz coverage version fuzz fuzz-parsekey fuzz-parse fuzz-buf2argv fuzz-script examples example validate prerelease funcsizes sizes lint build-ref
 
 #=======================================================================
 # Default target: print available targets
@@ -23,6 +23,7 @@ help:
 	@echo "  make validate     Lint + build + run tests + build examples (pre-push check)"
 	@echo "  make prerelease   Validate + cross-build sizes + update README tables"
 	@echo "  make tests        Build + run unit tests with coverage"
+	@echo "  make tests-unsigned-char  Run unit tests built with -funsigned-char"
 	@echo "  make examples     Build all examples (no interactive launch)"
 	@echo "  make example      Build + run the posix ncurses demo (interactive)"
 	@echo "  make coverage     Tests + coverage summary"
@@ -63,6 +64,27 @@ tests: $(OBJ_TESTS)
 	@$(BUILD_DIR)/xelp_unit_tests.out
 	@gcov -b -o $(BUILD_DIR) $(LIB_DIR)/xelp.c
 	@mv -f *.gcov $(BUILD_DIR)/ 2>/dev/null || true
+
+#-----------------------------------------------------------------------
+# Unsigned-char build of the test suite.
+#
+# Plain `char` signedness is implementation-defined.  x86 and Apple ARM64
+# default to signed, so the normal matrix (Linux/macOS x GCC/Clang) never
+# exercises the unsigned-char case -- which is the default on most ARM
+# Linux and embedded MCU toolchains.  Issue #18 (history recall needing
+# 3+ UP presses) was exactly this class of bug and was invisible to CI.
+#
+# Built into a separate object dir so it cannot collide with the coverage
+# instrumented objects from the `tests` target.
+UC_DIR=$(BUILD_DIR)/unsigned-char
+UC_FLAGS=-I. -Wall -Wextra -Werror -g -O0 -funsigned-char -DXELP_ENABLE_SCRIPT
+
+tests-unsigned-char:
+	@mkdir -p $(UC_DIR)
+	$(CC) $(UC_FLAGS) $(INCLUDES) \
+		$(LIB_DIR)/xelp.c $(TEST_DIR)/jumpbug_unit_test_fw.c $(TEST_DIR)/xelp_unit_tests.c \
+		-o $(UC_DIR)/xelp_unit_tests_uc.out
+	@$(UC_DIR)/xelp_unit_tests_uc.out
 
 coverage: tests
 	@echo "--- Coverage Summary ---"
@@ -124,7 +146,7 @@ lint:
 # Local validation: lint + tests + examples build (no Docker, no release)
 # Use this for day-to-day development before pushing.
 
-validate: lint tests examples
+validate: lint tests tests-unsigned-char examples
 	@echo ""
 	@echo "--- Coverage gate ---"
 	@LINE_PCT=$$(gcov -b -o $(BUILD_DIR) $(LIB_DIR)/xelp.c 2>/dev/null \
