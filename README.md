@@ -64,7 +64,7 @@ interactive configuration.
 ```
 
 Optional: add `XELP_ENABLE_CLI_HISTORY` for UP/DOWN arrow command recall
-(~420 bytes, requires `XELP_ENABLE_CLI`).
+(~550 bytes, requires `XELP_ENABLE_CLI`).
 
 ### Full (~3-6 KB)
 

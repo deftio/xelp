@@ -11,7 +11,7 @@ compiled out saves code space.
 | `XELP_ENABLE_CLI` | Command line mode with prompt, backspace, line editing, help, and command dispatch | Required for CLI and scripting |
 | `XELP_ENABLE_KEY` | Single key press mode (menus, immediate actions) | ~200--500 bytes |
 | `XELP_ENABLE_THR` | Pass-through mode (redirect keys to another peripheral) | ~50--125 bytes |
-| `XELP_ENABLE_CLI_HISTORY` | Command history (UP/DOWN arrow recall). Requires `XELP_ENABLE_CLI`. | ~420 bytes |
+| `XELP_ENABLE_CLI_HISTORY` | Command history (UP/DOWN arrow recall). Requires `XELP_ENABLE_CLI`. | ~550 bytes |
 | `XELP_ENABLE_FULL` | Enables KEY, CLI, THR (not CLI_HISTORY) | All combined |
 
 ## Key Mappings

@@ -384,7 +384,7 @@ Edit `src/xelpcfg.h` to enable/disable features:
 | Flag | Purpose | Size impact |
 |------|---------|-------------|
 | `XELP_ENABLE_CLI` | CLI mode + line editing + help + scripting | Core (~1.5-2.6 KB) |
-| `XELP_ENABLE_CLI_HISTORY` | Command history (UP/DOWN recall, requires CLI) | ~420 bytes |
+| `XELP_ENABLE_CLI_HISTORY` | Command history (UP/DOWN recall, requires CLI) | ~550 bytes |
 | `XELP_ENABLE_KEY` | Single keypress mode | ~200-500 bytes |
 | `XELP_ENABLE_THR` | Pass-through mode | ~50-125 bytes |
 | `XELP_ENABLE_FULL` | Enables KEY, CLI, THR | All combined |

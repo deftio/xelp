@@ -135,7 +135,7 @@ XELP_E_ERR (-1), XELP_E_CMDBUFFULL (-2), XELP_E_CMDNOTFOUND (-3).
 ## Compile-time feature flags
 
 - `XELP_ENABLE_CLI` -- CLI mode with line editing, help, and scripting (core, ~2.5-3.5 KB)
-- `XELP_ENABLE_CLI_HISTORY` -- UP/DOWN command recall (~420 bytes, requires CLI)
+- `XELP_ENABLE_CLI_HISTORY` -- UP/DOWN command recall (~550 bytes, requires CLI)
 - `XELP_ENABLE_KEY` -- single keypress mode (~200-500 bytes)
 - `XELP_ENABLE_THR` -- pass-through mode (~50-125 bytes)
 - `XELP_ENABLE_FULL` -- enables KEY, CLI, THR

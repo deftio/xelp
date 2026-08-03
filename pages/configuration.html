@@ -58,7 +58,7 @@ the typical interactive configuration.</p>
 </code></pre>
 
 <p>Optional: add <code>XELP_ENABLE_CLI_HISTORY</code> for UP/DOWN arrow command
-recall (~420 bytes, requires <code>XELP_ENABLE_CLI</code>).</p>
+recall (~550 bytes, requires <code>XELP_ENABLE_CLI</code>).</p>
 
 <p>Representative size: <strong>~2600 bytes</strong> on ARM Thumb,
 <strong>~4200 bytes</strong> on AVR.</p>
@@ -84,7 +84,7 @@ Reference</a> for full details.</p>
 <tr><td><code>XELP_ENABLE_CLI</code></td><td>Command line mode with prompt, backspace, line editing, help, and command dispatch</td><td>Required for CLI and scripting</td></tr>
 <tr><td><code>XELP_ENABLE_KEY</code></td><td>Single key press mode (menus, immediate actions)</td><td>~200&ndash;500 bytes</td></tr>
 <tr><td><code>XELP_ENABLE_THR</code></td><td>Pass-through mode (redirect keys to another peripheral)</td><td>~50&ndash;125 bytes</td></tr>
-<tr><td><code>XELP_ENABLE_CLI_HISTORY</code></td><td>Command history (UP/DOWN arrow recall). Requires <code>XELP_ENABLE_CLI</code>.</td><td>~420 bytes</td></tr>
+<tr><td><code>XELP_ENABLE_CLI_HISTORY</code></td><td>Command history (UP/DOWN arrow recall). Requires <code>XELP_ENABLE_CLI</code>.</td><td>~550 bytes</td></tr>
 <tr><td><code>XELP_ENABLE_FULL</code></td><td>Enables KEY, CLI, and THR</td><td>All combined</td></tr>
 </tbody>
 </table>
