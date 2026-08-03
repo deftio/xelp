@@ -71,7 +71,7 @@ without KEY, or KEY without HELP.
 | `XELP_ENABLE_KEY` | Single key press mode (menus, immediate actions) | -- | ~200-500 bytes |
 | `XELP_ENABLE_CLI` | Command line prompt, backspace, command dispatch, scripting, tokenizer | -- | Core (~2 KB) |
 | `XELP_ENABLE_LINE_EDIT` | Cursor movement (left/right, Home/End), insert-at-cursor, Delete, multi-byte ANSI key recognition | `XELP_ENABLE_CLI` | ~800-1000 bytes |
-| `XELP_ENABLE_HISTORY` | Command history (UP/DOWN arrow recall of previous commands) | `XELP_ENABLE_CLI` + `XELP_ENABLE_LINE_EDIT` | ~420 bytes |
+| `XELP_ENABLE_HISTORY` | Command history (UP/DOWN arrow recall of previous commands) | `XELP_ENABLE_CLI` + `XELP_ENABLE_LINE_EDIT` | ~550 bytes |
 | `XELP_ENABLE_THR` | Pass-through mode -- redirect all keys to another peripheral | -- | ~50-125 bytes |
 | `XELP_ENABLE_HELP` | Built-in help command listing all registered commands | -- | ~180-350 bytes |
 | `XELP_ENABLE_FULL` | Shorthand: enables KEY, CLI, THR, and HELP | -- | All combined |

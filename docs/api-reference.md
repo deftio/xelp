@@ -1,6 +1,6 @@
 # API Reference
 
-All public types, functions, and macros defined in `xelp.h`. Version 0.4.0.
+All public types, functions, and macros defined in `xelp.h`. Version 0.4.1.
 
 ## Types
 

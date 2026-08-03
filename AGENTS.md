@@ -12,7 +12,7 @@ For the llmstxt.org-format project index, see [llms.txt](llms.txt).
 A command line interpreter, script engine, and single-key menu system
 for embedded systems. Pure C, zero dynamic memory, no OS, no stdlib.
 Three files: `xelp.c`, `xelp.h`, `xelpcfg.h`. Compiles on 8-bit
-through 64-bit targets with any C89+ compiler. Version 0.4.0.
+through 64-bit targets with any C89+ compiler. Version 0.4.1.
 
 ## Critical constraints
 
@@ -387,7 +387,7 @@ Edit `src/xelpcfg.h` to enable/disable features:
 |------|---------|-------------|
 | `XELP_ENABLE_CLI` | CLI mode + scripting | Core (~1.5-2.6 KB) |
 | `XELP_ENABLE_LINE_EDIT` | Cursor movement, insert, delete | ~800-1000 bytes |
-| `XELP_ENABLE_HISTORY` | Command history (UP/DOWN recall) | ~420 bytes |
+| `XELP_ENABLE_HISTORY` | Command history (UP/DOWN recall) | ~550 bytes |
 | `XELP_ENABLE_KEY` | Single keypress mode | ~200-500 bytes |
 | `XELP_ENABLE_THR` | Pass-through mode | ~50-125 bytes |
 | `XELP_ENABLE_HELP` | Built-in help command | ~180-350 bytes |
