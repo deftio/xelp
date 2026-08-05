@@ -1,4 +1,4 @@
-# Branch status — `exp_argv_core` (0.4.0)
+# Branch status — `experimental/0.4.0-script-engine` (0.4.0)
 
 Orientation note for picking this work back up. Written 2026-08-03, after
 merging master (0.3.5) in.
@@ -35,12 +35,12 @@ Both 0.4.x branches fork from `37cb455` (*0.4.0 native argc,argv draft*,
 - `fuzz-script` target and a script corpus
 - KEY / CLI / HIST / SCRIPT size profiles in `tools/compactbuilds-docker.sh`
 
-## How it differs from `exp_script_revisions` (0.4.1)
+## How it differs from `experimental/0.4.1-script-design` (0.4.1)
 
 They are **not** a linear progression — they are divergent designs from the
 same fork point. 0.4.1 is *less* aggressive about API removal:
 
-| | `exp_argv_core` (0.4.0) | `exp_script_revisions` (0.4.1) |
+| | `experimental/0.4.0-script-engine` (0.4.0) | `experimental/0.4.1-script-design` (0.4.1) |
 | --- | --- | --- |
 | `XelpBuf2Argv` | internal only | still public |
 | `XELP_ARGV_MAX` | removed → `XELP_ARGV_CAP` | retained |
