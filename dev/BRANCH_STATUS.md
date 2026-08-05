@@ -1,4 +1,4 @@
-# Branch status — `exp_script_revisions` (0.4.1)
+# Branch status — `experimental/0.4.1-script-design` (0.4.1)
 
 Orientation note for picking this work back up. Written 2026-08-03, after
 merging master (0.3.5) in.
@@ -7,7 +7,7 @@ merging master (0.3.5) in.
 
 **The later, smaller of the two 0.4.x script attempts** — a partial restart,
 plus the design-document set. The name suggests it holds the script work, but
-the *fuller* implementation is on `exp_argv_core`. This branch is where the
+the *fuller* implementation is on `experimental/0.4.0-script-engine`. This branch is where the
 requirements and proposals live and where a second, thinner engine was
 started.
 
@@ -28,7 +28,7 @@ Both 0.4.x branches fork from `37cb455` (*0.4.0 native argc,argv draft*,
 - `_xelpVarSet` / `_xelpVarGet` / `_xelpVarScratch` — variable storage
 - `_xelpFrameInit` / `_xelpFramePush` / `_xelpFramePop` — call frames
 - `_xelpEvalScript` — evaluator
-- **Missing** relative to `exp_argv_core`: arena init, `_xelpVarFind`,
+- **Missing** relative to `experimental/0.4.0-script-engine`: arena init, `_xelpVarFind`,
   `_xelpEvalLoop`, public `XelpCallProc`, script fuzz target
 
 **Design documents** (the main value of this branch)
@@ -41,14 +41,14 @@ Both 0.4.x branches fork from `37cb455` (*0.4.0 native argc,argv draft*,
   for `_if`
 - `dev/xelp_discussion_0.5.x.md` — 0.5.x tier plan and the gate list
 - `dev/xelp_script.md`, `dev/xelp_vm.md` — earlier design notes
-  (`xelp_script.md` was deleted on `exp_argv_core`; it survives only here)
+  (`xelp_script.md` was deleted on `experimental/0.4.0-script-engine`; it survives only here)
 
-## How it differs from `exp_argv_core` (0.4.0)
+## How it differs from `experimental/0.4.0-script-engine` (0.4.0)
 
 They are **not** a linear progression — they are divergent designs from the
 same fork point. This branch is *less* aggressive about API removal:
 
-| | `exp_script_revisions` (0.4.1) | `exp_argv_core` (0.4.0) |
+| | `experimental/0.4.1-script-design` (0.4.1) | `experimental/0.4.0-script-engine` (0.4.0) |
 | --- | --- | --- |
 | `XelpBuf2Argv` | still public | internal only |
 | `XELP_ARGV_MAX` | retained | removed → `XELP_ARGV_CAP` |
